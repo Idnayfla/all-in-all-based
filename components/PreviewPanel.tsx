@@ -92,12 +92,14 @@ export default function PreviewPanel({ files, projectType }: {
         <button className="run-btn" onClick={publishApp} disabled={isPublishing}>
           {isPublishing ? '⏳ Publishing...' : '🌐 Publish'}
         </button>
-        {publishUrl && (
-          <a href={publishUrl} target="_blank" rel="noreferrer" className="publish-link">
-            {publishUrl}
-          </a>
-        )}
       </div>
+      {publishUrl && (
+        <div className="publish-url-bar">
+          <a href={publishUrl} target="_blank" rel="noreferrer" className="publish-link">
+            🔗 {publishUrl}
+          </a>
+        </div>
+      )}
       <iframe
         className="preview-frame"
         srcDoc={previewHtml}

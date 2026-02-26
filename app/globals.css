@@ -60,7 +60,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   display: flex; flex-direction: column; flex-shrink: 0; align-items: stretch;
 }
 .sidebar-files { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; }
-.sidebar-section { display: flex; flex-direction: column; }
+.sidebar-section { display: flex; flex-direction: column; padding-bottom: 8px; }
 .sidebar-section .no-files {
   flex: 1; display: flex; align-items: center; justify-content: center;
   font-size: 12px; color: var(--text3); text-align: center; padding: 20px;
@@ -534,4 +534,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     font-size: 10px; word-break: break-all; 
     display: block; width: 100%; margin-top: 4px;
   }
+}
+
+.publish-url-bar {
+  padding: 8px 16px; background: rgba(106,247,200,0.08); 
+  border-bottom: 1px solid rgba(106,247,200,0.2);
+  font-size: 12px; word-break: break-all;
 }
