@@ -120,9 +120,9 @@ export default function Home() {
         {currentProject && <div className="project-name-display">{currentProject.name}</div>}
         <nav className="header-nav">
           <button className={`nav-btn ${activePanel === 'chat' ? 'active' : ''}`} onClick={() => setActivePanel('chat')}>Chat</button>
-          <button className={`nav-btn ${activePanel === 'editor' ? 'active' : ''}`} onClick={() => setActivePanel('editor')}>Editor</button>
-          <button className={`nav-btn ${activePanel === 'preview' ? 'active' : ''}`} onClick={() => setActivePanel('preview')}>Preview</button>
-          <button className={`nav-btn ${showSettings ? 'active' : ''}`} onClick={() => setShowSettings(s => !s)}>Settings</button>
+          <button className={`nav-btn ${activePanel === 'editor' ? 'active' : ''}`} onClick={() => setActivePanel('editor')}>✎</button>
+          <button className={`nav-btn ${activePanel === 'preview' ? 'active' : ''}`} onClick={() => setActivePanel('preview')}>◉</button>
+          <button className={`nav-btn ${showSettings ? 'active' : ''}`} onClick={() => setShowSettings(s => !s)}>⚙</button>
         </nav>
         <div className="header-status">
           {isGenerating && <span className="status-dot generating">●</span>}

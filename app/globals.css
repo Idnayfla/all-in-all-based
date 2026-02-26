@@ -268,3 +268,15 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .chat-messages {
   padding-top: max(24px, env(safe-area-inset-top));
 }
+
+@media (max-width: 768px) {
+  .nav-btn[data-label="Editor"]::before { content: '✎'; }
+  .nav-btn[data-label="Preview"]::before { content: '◉'; }
+  .nav-btn[data-label="Settings"]::before { content: '⚙'; }
+  .project-name-display { display: none; }
+}
+
+@media (max-width: 768px) {
+  .project-name-display { display: none; }
+  .header-status { display: none; }
+}
