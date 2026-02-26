@@ -213,3 +213,27 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 .publish-link { font-size: 11px; color: var(--accent3); text-decoration: none; margin-left: 8px; }
 .publish-link:hover { text-decoration: underline; }
+
+/* MOBILE */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed; left: -220px; top: 52px; height: calc(100vh - 52px);
+    z-index: 200; transition: left 0.2s;
+  }
+  .sidebar.open { left: 0; }
+  .logo-sub { display: none; }
+  .logo-text { font-size: 14px; }
+  .header-nav { gap: 2px; }
+  .nav-btn { padding: 5px 10px; font-size: 10px; }
+  .header-status { display: none; }
+  .hamburger {
+    display: flex; align-items: center; justify-content: center;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text2); width: 32px; height: 32px; border-radius: 4px;
+    cursor: pointer; font-size: 16px; flex-shrink: 0;
+  }
+}
+
+@media (min-width: 769px) {
+  .hamburger { display: none; }
+}

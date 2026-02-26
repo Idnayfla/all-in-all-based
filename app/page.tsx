@@ -34,30 +34,24 @@ export default function Home() {
   const [projectType, setProjectType] = useState('html');
   const [personality, setPersonality] = useState('You are Based, the AI inside All in All Based — a sharp, witty, and direct coding assistant. You are confident, occasionally funny, and always helpful. You treat the user like a smart friend, not a customer. You get straight to the point, never over-explain, and celebrate when things work.');
   const [showSettings, setShowSettings] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview'>('chat');
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
 
-  // Load projects from localStorage on mount
   useEffect(() => {
     const saved = localStorage.getItem('forge_projects');
     if (saved) setProjects(JSON.parse(saved));
   }, []);
 
   useEffect(() => {
-  const saved = localStorage.getItem('forge_personality');
-  if (saved) setPersonality(saved);
-}, []);
+    const saved = localStorage.getItem('forge_personality');
+    if (saved) setPersonality(saved);
+  }, []);
 
-  // Auto-save current project
   useEffect(() => {
     if (!currentProject || (files.length === 0 && messages.length === 0)) return;
-    const updated: Project = {
-      ...currentProject,
-      files,
-      messages,
-      updatedAt: Date.now(),
-    };
+    const updated: Project = { ...currentProject, files, messages, updatedAt: Date.now() };
     setCurrentProject(updated);
     const allProjects = projects.map(p => p.id === updated.id ? updated : p);
     const exists = projects.find(p => p.id === updated.id);
@@ -70,25 +64,23 @@ export default function Home() {
     const project: Project = {
       id: Date.now().toString(),
       name: `Project ${projects.length + 1}`,
-      files: [],
-      messages: [],
-      updatedAt: Date.now(),
+      files: [], messages: [], updatedAt: Date.now(),
     };
     const updated = [...projects, project];
     setProjects(updated);
     localStorage.setItem('forge_projects', JSON.stringify(updated));
     setCurrentProject(project);
-    setFiles([]);
-    setMessages([]);
-    setActiveFile(null);
-    setActivePanel('chat');
+    setFiles([]); setMessages([]); setActiveFile(null); setActivePanel('chat');
+    setSidebarOpen(false);
   };
+
   const loadProject = (project: Project) => {
     setCurrentProject(project);
     setFiles(project.files);
     setMessages(project.messages);
     setActiveFile(project.files[0] ?? null);
     setActivePanel('chat');
+    setSidebarOpen(false);
   };
 
   const deleteProject = (id: string) => {
@@ -96,10 +88,7 @@ export default function Home() {
     setProjects(updated);
     localStorage.setItem('forge_projects', JSON.stringify(updated));
     if (currentProject?.id === id) {
-      setCurrentProject(null);
-      setFiles([]);
-      setMessages([]);
-      setActiveFile(null);
+      setCurrentProject(null); setFiles([]); setMessages([]); setActiveFile(null);
     }
   };
 
@@ -123,15 +112,12 @@ export default function Home() {
     <div className="app-root">
       <header className="app-header">
         <div className="logo">
+          <button className="hamburger" onClick={() => setSidebarOpen(s => !s)}>☰</button>
           <span className="logo-icon">⬡</span>
           <span className="logo-text">BASED</span>
           <span className="logo-sub">All in All Based</span>
         </div>
-        {currentProject && (
-          <div className="project-name-display">
-            {currentProject.name}
-          </div>
-        )}
+        {currentProject && <div className="project-name-display">{currentProject.name}</div>}
         <nav className="header-nav">
           <button className={`nav-btn ${activePanel === 'chat' ? 'active' : ''}`} onClick={() => setActivePanel('chat')}>Chat</button>
           <button className={`nav-btn ${activePanel === 'editor' ? 'active' : ''}`} onClick={() => setActivePanel('editor')}>Editor</button>
@@ -145,6 +131,7 @@ export default function Home() {
       </header>
 
       <div className="app-body">
+        {sidebarOpen && <div onClick={() => setSidebarOpen(false)} style={{position:'fixed',inset:0,zIndex:199,background:'rgba(0,0,0,0.5)'}} />}
         <Sidebar
           files={files}
           activeFile={activeFile}
@@ -155,48 +142,46 @@ export default function Home() {
           onLoadProject={loadProject}
           onDeleteProject={deleteProject}
           onRenameProject={renameProject}
+          isOpen={sidebarOpen}
         />
-
-{showSettings && (
-  <div className="settings-panel">
-    <div className="settings-header">⬡ Settings</div>
-    <div className="settings-section">
-      <label className="settings-label">AI Personality</label>
-      <textarea
-        className="settings-textarea"
-        value={personality}
-        onChange={e => {
-          setPersonality(e.target.value);
-          localStorage.setItem('forge_personality', e.target.value);
-        }}
-        rows={6}
-        placeholder="Describe how Forge should behave..."
-      />
-      <div className="settings-hint">This shapes how Forge talks and thinks. Changes apply immediately.</div>
-    </div>
-    {currentProject && (
-      <div className="settings-section">
-        <label className="settings-label">Project Memory</label>
-        <textarea
-          className="settings-textarea"
-          value={currentProject.memory ?? ''}
-          onChange={e => {
-            const updated = { ...currentProject, memory: e.target.value };
-            setCurrentProject(updated);
-            const all = projects.map(p => p.id === updated.id ? updated : p);
-            setProjects(all);
-            localStorage.setItem('forge_projects', JSON.stringify(all));
-          }}
-          rows={4}
-          placeholder="Tell Forge things to always remember about this project... e.g. 'This is a todo app using vanilla JS. Always use dark theme.'"
-        />
-        <div className="settings-hint">Forge will remember this context for every message in this project.</div>
-      </div>
-    )}
-  </div>
-)}
 
         <main className="main-content">
+          {showSettings && (
+            <div className="settings-panel">
+              <div className="settings-header">⬡ Settings</div>
+              <div className="settings-section">
+                <label className="settings-label">AI Personality</label>
+                <textarea
+                  className="settings-textarea"
+                  value={personality}
+                  onChange={e => { setPersonality(e.target.value); localStorage.setItem('forge_personality', e.target.value); }}
+                  rows={6}
+                  placeholder="Describe how Based should behave..."
+                />
+                <div className="settings-hint">This shapes how Based talks and thinks. Changes apply immediately.</div>
+              </div>
+              {currentProject && (
+                <div className="settings-section">
+                  <label className="settings-label">Project Memory</label>
+                  <textarea
+                    className="settings-textarea"
+                    value={currentProject.memory ?? ''}
+                    onChange={e => {
+                      const updated = { ...currentProject, memory: e.target.value };
+                      setCurrentProject(updated);
+                      const all = projects.map(p => p.id === updated.id ? updated : p);
+                      setProjects(all);
+                      localStorage.setItem('forge_projects', JSON.stringify(all));
+                    }}
+                    rows={4}
+                    placeholder="Tell Based things to always remember about this project..."
+                  />
+                  <div className="settings-hint">Based will remember this for every message in this project.</div>
+                </div>
+              )}
+            </div>
+          )}
+
           {!currentProject ? (
             <div className="no-project">
               <div className="no-project-icon">⬡</div>
