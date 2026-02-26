@@ -237,3 +237,17 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 @media (min-width: 769px) {
   .hamburger { display: none; }
 }
+
+/* SAFE AREA FOR MOBILE */
+.app-header {
+  padding-top: env(safe-area-inset-top);
+  height: calc(52px + env(safe-area-inset-top));
+}
+
+.app-root {
+  padding-top: 0;
+}
+
+.chat-input-area {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
