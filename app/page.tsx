@@ -200,7 +200,7 @@ export default function Home() {
           {!currentProject ? (
             <div className="no-project">
               <div className="no-project-icon">⬡</div>
-              <div className="no-project-title">Welcome to Forge</div>
+              <div className="no-project-title">Welcome to Based</div>
               <div className="no-project-sub">Create a new project to get started.</div>
               <button className="new-project-btn-large" onClick={newProject}>+ New Project</button>
             </div>
