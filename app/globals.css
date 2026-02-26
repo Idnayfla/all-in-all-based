@@ -441,3 +441,60 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* ===== UI POLISH ===== */
+
+/* Sidebar indent & spacing */
+.sidebar { padding: 0; }
+.sidebar-header { padding: 16px 20px 10px; font-size: 11px; letter-spacing: 3px; }
+.sidebar-header-row { padding: 16px 20px 10px; }
+.sidebar-projects { padding: 4px 12px 12px; }
+.sidebar-files { padding: 4px 12px 12px; }
+
+.project-item {
+  padding: 10px 12px; border-radius: 6px; font-size: 13px;
+  border-left: 2px solid transparent;
+}
+.project-item.active { border-left-color: var(--accent); }
+.project-item:hover { border-left-color: var(--border); }
+
+.file-item {
+  padding: 9px 12px; border-radius: 6px; font-size: 12px;
+  border-left: 2px solid transparent;
+}
+.file-item.active { border-left-color: var(--accent3); }
+.file-item:hover { border-left-color: var(--border); }
+
+.no-files { padding: 16px 12px; font-size: 12px; }
+
+/* Markdown in chat */
+.message-content p { margin-bottom: 8px; }
+.message-content p:last-child { margin-bottom: 0; }
+.message-content strong { color: var(--text); font-weight: 700; }
+.message-content em { color: var(--text2); font-style: italic; }
+.message-content code {
+  background: var(--bg); padding: 2px 6px; border-radius: 3px;
+  font-family: var(--font-mono); font-size: 12px; color: var(--accent3);
+}
+.message-content pre {
+  background: var(--bg); padding: 12px; border-radius: 6px;
+  overflow-x: auto; margin: 8px 0; border: 1px solid var(--border);
+}
+.message-content pre code { background: none; padding: 0; color: var(--text2); }
+.message-content ul, .message-content ol { padding-left: 20px; margin: 8px 0; }
+.message-content li { margin-bottom: 4px; line-height: 1.6; }
+.message-content h1, .message-content h2, .message-content h3 {
+  font-family: var(--font-display); color: var(--text); margin: 12px 0 6px;
+}
+.message-content h1 { font-size: 18px; }
+.message-content h2 { font-size: 15px; }
+.message-content h3 { font-size: 13px; }
+
+/* Welcome screen centered */
+.no-project {
+  max-width: 400px; margin: 0 auto; width: 100%;
+}
+
+/* Larger readable text in chat */
+.message-content { font-size: 14px; line-height: 1.75; }
+.chat-textarea { font-size: 14px; }

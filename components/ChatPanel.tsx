@@ -1,6 +1,7 @@
 'use client';
 import { useRef, useEffect, useState } from 'react';
 import { Message, FileNode } from '@/app/page';
+import ReactMarkdown from 'react-markdown';
 
 const SUGGESTIONS = [
   'Build a todo app with React',
@@ -82,7 +83,9 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           messages.map((m, i) => (
             <div key={i} className={`message ${m.role}`}>
               <div className="message-role">{m.role === 'user' ? '▸ You' : '◈ Based'}</div>
-              <div className="message-content">{m.content}</div>
+              <div className="message-content">
+                <ReactMarkdown>{m.content}</ReactMarkdown>
+            </div>
             </div>
           ))
         )}
