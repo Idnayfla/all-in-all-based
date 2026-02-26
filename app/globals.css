@@ -68,7 +68,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 .sidebar-header { 
   font-size: 10px; letter-spacing: 3px; color: var(--text3); 
-  text-transform: uppercase; padding: 14px 16px 10px;
+  text-transform: uppercase; padding: 8px 16px 6px;
   text-align: left;
 }
 
@@ -152,7 +152,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 /* PROJECT MANAGEMENT */
 .sidebar-section { display: flex; flex-direction: column; }
-.sidebar-header-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px 10px; border-bottom: 1px solid var(--border); }
+.sidebar-header-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px 6px; border-bottom: 1px solid var(--border); }
 .sidebar-header { font-size: 10px; letter-spacing: 2px; color: var(--text3); text-transform: uppercase; padding: 14px 16px 10px; }
 .sidebar-new-btn {
   background: transparent; border: 1px solid var(--border); color: var(--text2);
