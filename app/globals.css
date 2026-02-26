@@ -280,3 +280,164 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   .project-name-display { display: none; }
   .header-status { display: none; }
 }
+
+/* ===== ANIMATIONS & POLISH ===== */
+
+/* Page load stagger */
+.app-header {
+  animation: slideDown 0.4s ease forwards;
+}
+.sidebar {
+  animation: slideRight 0.4s ease 0.1s both;
+}
+.main-content {
+  animation: fadeIn 0.4s ease 0.2s both;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes slideRight {
+  from { transform: translateX(-10px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Message animations */
+.message {
+  animation: messageIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes messageIn {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Button polish */
+.send-btn {
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 0 0 rgba(124,106,247,0);
+}
+.send-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px rgba(124,106,247,0.4);
+}
+.send-btn:active:not(:disabled) {
+  transform: translateY(0px) scale(0.98);
+}
+
+.nav-btn {
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.nav-btn:hover {
+  transform: translateY(-1px);
+}
+.nav-btn:active {
+  transform: scale(0.96);
+}
+
+.new-project-btn-large {
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.new-project-btn-large:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(124,106,247,0.4);
+}
+.new-project-btn-large:active {
+  transform: scale(0.97);
+}
+
+/* Sidebar item hover */
+.file-item {
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.file-item:hover {
+  transform: translateX(3px);
+}
+
+.project-item {
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.project-item:hover {
+  transform: translateX(3px);
+}
+
+/* Panel fade transition */
+.panel {
+  transition: opacity 0.2s ease;
+}
+.panel.panel-active {
+  animation: panelFadeIn 0.25s ease forwards;
+}
+@keyframes panelFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Generating dots animation */
+.generating-dots::after {
+  content: '';
+  animation: dots 1.2s infinite;
+}
+@keyframes dots {
+  0%   { content: '.'; }
+  33%  { content: '..'; }
+  66%  { content: '...'; }
+  100% { content: ''; }
+}
+
+/* Settings panel slide in */
+.settings-panel {
+  animation: settingsSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes settingsSlide {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* Logo pulse on hover */
+.logo-icon {
+  transition: all 0.3s ease;
+  display: inline-block;
+}
+.logo:hover .logo-icon {
+  transform: rotate(30deg) scale(1.2);
+  color: var(--accent3);
+}
+
+/* Input focus glow */
+.chat-textarea:focus {
+  box-shadow: 0 0 0 2px rgba(124,106,247,0.2);
+}
+
+/* Run button */
+.run-btn {
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.run-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(106,247,200,0.3);
+}
+.run-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Sidebar new btn */
+.sidebar-new-btn {
+  transition: all 0.15s ease;
+}
+.sidebar-new-btn:hover {
+  transform: scale(1.15) rotate(90deg);
+}
+
+/* Mobile overlay fade */
+[style*="rgba(0,0,0,0.5)"] {
+  animation: overlayFade 0.2s ease forwards;
+}
+@keyframes overlayFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
