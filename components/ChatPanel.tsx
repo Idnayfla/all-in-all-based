@@ -90,6 +90,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             }
 
             if (data.done) {
+              console.log('DONE:', data.reply, data.files, data.projectType);
               setMessages(prev => [
                 ...prev.slice(0, -1),
                 { role: 'assistant', content: data.reply || '✅ Done — check the editor.' }
