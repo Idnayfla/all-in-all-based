@@ -64,11 +64,15 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() ?? '';
+        const lines = buffer.split('\n');
+        buffer = '';
 
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (!line.startsWith('data: ')) {
+            buffer += line + '\n';
+            continue;
+          }
           try {
             const data = JSON.parse(line.slice(6));
 
@@ -88,7 +92,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             if (data.done) {
               setMessages(prev => [
                 ...prev.slice(0, -1),
-                { role: 'assistant', content: data.reply }
+                { role: 'assistant', content: data.reply || '✅ Done — check the editor.' }
               ]);
               if (data.files?.length) {
                 onFilesUpdate(data.files, data.projectType);
