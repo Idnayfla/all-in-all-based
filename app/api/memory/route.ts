@@ -11,20 +11,20 @@ async function getRedis() {
 }
 
 export async function GET() {
-  let redis;
+  const redis = createClient({ url: process.env.REDIS_URL });
   try {
-    redis = await getRedis();
+    await redis.connect();
     const memory = await redis.get('based_memory');
+    await redis.disconnect();
     return NextResponse.json({ memory: memory ?? '' });
   } catch (err: any) {
+    try { await redis.disconnect(); } catch {}
     return NextResponse.json({ memory: '' });
-  } finally {
-    await redis?.disconnect();
   }
 }
 
 export async function POST(req: NextRequest) {
-  let redis;
+  const redis = createClient({ url: process.env.REDIS_URL });
   try {
     const { messages } = await req.json();
 
@@ -32,10 +32,8 @@ export async function POST(req: NextRequest) {
       .map((m: any) => `${m.role.toUpperCase()}: ${m.content}`)
       .join('\n');
 
-    const existing = await (async () => {
-      redis = await getRedis();
-      return await redis.get('based_memory') ?? '';
-    })();
+    await redis.connect();
+    const existing = await redis.get('based_memory') ?? '';
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
@@ -55,13 +53,13 @@ Return ONLY a concise updated memory as bullet points. Max 20 bullets. Focus on 
     });
 
     const newMemory = response.content[0].type === 'text' ? response.content[0].text : existing;
-    await redis!.set('based_memory', newMemory);
-    await redis!.disconnect();
+    await redis.set('based_memory', newMemory);
+    await redis.disconnect();
 
     return NextResponse.json({ memory: newMemory });
   } catch (err: any) {
     console.error(err);
-    await redis?.disconnect();
+    try { await redis.disconnect(); } catch {}
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
