@@ -60,11 +60,16 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       setIsGenerating(false);
       // Auto-update memory after conversation
       try {
-        await fetch('/api/memory', {
+        const res = await fetch('/api/memory', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ messages: newMessages }),
         });
+        const data = await res.json();
+        if (data.memory) {
+          // Notify parent to refresh memory
+          window.dispatchEvent(new CustomEvent('memory-updated'));
+        }
       } catch (e) {
         // Memory update failed silently
       }

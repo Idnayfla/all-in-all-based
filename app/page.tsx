@@ -50,6 +50,12 @@ export default function Home() {
     if (saved) setPersonality(saved);
   }, []);
 
+  useEffect(() => {
+  const handler = () => fetchMemory();
+  window.addEventListener('memory-updated', handler);
+  return () => window.removeEventListener('memory-updated', handler);
+  }, []);
+
   const fetchMemory = () => {
   fetch('/api/memory')
     .then(r => r.json())
@@ -57,7 +63,6 @@ export default function Home() {
 };
 
 useEffect(() => { fetchMemory(); }, []);
-useEffect(() => { if (!isGenerating) fetchMemory(); }, [isGenerating]);
 
   useEffect(() => {
     if (!currentProject || (files.length === 0 && messages.length === 0)) return;

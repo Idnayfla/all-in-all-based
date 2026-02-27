@@ -42,7 +42,17 @@ ${existing || 'None yet'}
 NEW CONVERSATION:
 ${conversation}
 
-Return ONLY a concise updated memory as bullet points. Max 20 bullets. Focus on facts that would help personalize future conversations. If nothing new to add, return existing memory unchanged.`
+        Return ONLY a plain numbered list. Max 20 items. Format exactly like:
+        1) Fact about the user
+        2) Another fact
+        3) Another fact
+
+        STRICT RULES:
+        - No headers
+        - No bold text, no asterisks, no markdown whatsoever
+        - No categories or labels
+        - Just plain sentences
+        - If nothing new to add, return existing memory unchanged.`
       }]
     });
 
