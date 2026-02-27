@@ -180,10 +180,10 @@ useEffect(() => { if (!isGenerating) fetchMemory(); }, [isGenerating]);
                   />
                   <div className="settings-hint">Auto-updated after each conversation. Based remembers this across all projects.</div>
                   <button className="run-btn" style={{marginTop: 8}} onClick={async () => {
-                    await fetch('/api/memory', {
+                    await fetch('/api/memory/save', {
                       method: 'POST',
                       headers: {'Content-Type': 'application/json'},
-                      body: JSON.stringify({ messages: [{ role: 'user', content: `Update memory with: ${globalMemory}` }] })
+                      body: JSON.stringify({ memory: globalMemory }),
                     });
                   }}>Save Memory</button>
                 </div>
