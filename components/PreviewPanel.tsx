@@ -89,9 +89,11 @@ export default function PreviewPanel({ files, projectType }: {
     <div className="preview-panel">
       <div className="preview-header">
         <span>⬡ Preview — Live</span>
-        <button className="run-btn" onClick={publishApp} disabled={isPublishing}>
-          {isPublishing ? '⏳ Publishing...' : '🌐 Publish'}
-        </button>
+        <div className="preview-actions">
+          <button className="run-btn" onClick={publishApp} disabled={isPublishing}>
+            {isPublishing ? '⏳ Publishing...' : '🌐 Publish'}
+          </button>
+        </div>
       </div>
       {publishUrl && (
         <div className="publish-url-bar">

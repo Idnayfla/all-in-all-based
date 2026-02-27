@@ -107,7 +107,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         )}
         {isGenerating && (
           <div className="message assistant">
-            <div className="message-role">◈ Forge</div>
+            <div className="message-role">◈ Based</div>
             <div className="message-content" style={{ color: 'var(--text3)' }}>Generating...</div>
           </div>
         )}
