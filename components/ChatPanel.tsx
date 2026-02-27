@@ -99,13 +99,14 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                 onFilesUpdate(data.files, data.projectType);
               }
             }
-          } catch (e) {}
+          } catch (e) { console.log('ERR:', e, 'LINE:', line); }
         }
       }
 
       if (buffer.startsWith('data: ')) {
         try {
           const data = JSON.parse(buffer.slice(6));
+          console.log('BUFFER DONE:', JSON.stringify(data));
           if (data.done) {
             setMessages(prev => [
               ...prev.slice(0, -1),
