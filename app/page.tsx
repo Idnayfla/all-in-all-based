@@ -132,7 +132,7 @@ useEffect(() => { fetchMemory(); }, []);
       <header className="app-header">
         <div className="logo">
           <button className="hamburger" onClick={() => setSidebarOpen(s => !s)}>☰</button>
-          <span className="logo-icon">⬡</span>
+          <img src="/icon-192.png" className="logo-img" alt="Based" />
           <span className="logo-text">BASED</span>
           <span className="logo-sub">All in All Based</span>
         </div>

@@ -627,3 +627,33 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   display: flex;
   flex-direction: column;
 }
+
+/* LOGO IMAGE */
+.logo-img {
+  width: 32px; height: 32px; border-radius: 8px;
+  animation: logoPulse 3s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes logoPulse {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(212,175,55,0), 
+                0 0 8px rgba(212,175,55,0.3);
+    opacity: 1;
+  }
+  50% { 
+    box-shadow: 0 0 0 6px rgba(212,175,55,0.1), 
+                0 0 20px rgba(212,175,55,0.5);
+    opacity: 0.9;
+  }
+}
+
+.logo-img:hover {
+  animation: logoSpin 0.6s ease forwards;
+}
+
+@keyframes logoSpin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.1); }
+  100% { transform: rotate(360deg) scale(1); }
+}
