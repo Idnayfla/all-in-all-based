@@ -34,6 +34,7 @@ export default function Home() {
   const [projectType, setProjectType] = useState('html');
   const [personality, setPersonality] = useState('You are Based, the AI inside All in All Based — a sharp, witty, and direct coding assistant. You are confident, occasionally funny, and always helpful. You treat the user like a smart friend, not a customer. You get straight to the point, never over-explain, and celebrate when things work.');
   const [showSettings, setShowSettings] = useState(false);
+  const [globalMemory, setGlobalMemory] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview'>('chat');
   const [projects, setProjects] = useState<Project[]>([]);
@@ -48,6 +49,12 @@ export default function Home() {
     const saved = localStorage.getItem('forge_personality');
     if (saved) setPersonality(saved);
   }, []);
+
+  useEffect(() => {
+  fetch('/api/memory')
+    .then(r => r.json())
+    .then(d => setGlobalMemory(d.memory ?? ''));
+}, []);
 
   useEffect(() => {
     if (!currentProject || (files.length === 0 && messages.length === 0)) return;
@@ -159,6 +166,24 @@ export default function Home() {
                   placeholder="Describe how Based should behave..."
                 />
                 <div className="settings-hint">This shapes how Based talks and thinks. Changes apply immediately.</div>
+                <div className="settings-section">
+                  <label className="settings-label">Global Memory</label>
+                  <textarea
+                    className="settings-textarea"
+                    value={globalMemory}
+                    onChange={e => setGlobalMemory(e.target.value)}
+                    rows={8}
+                    placeholder="Based will learn about you as you chat..."
+                  />
+                  <div className="settings-hint">Auto-updated after each conversation. Based remembers this across all projects.</div>
+                  <button className="run-btn" style={{marginTop: 8}} onClick={async () => {
+                    await fetch('/api/memory', {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({ messages: [{ role: 'user', content: `Update memory with: ${globalMemory}` }] })
+                    });
+                  }}>Save Memory</button>
+                </div>
               </div>
               {currentProject && (
                 <div className="settings-section">

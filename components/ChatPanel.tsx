@@ -58,6 +58,16 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       setMessages(prev => [...prev, { role: 'assistant', content: 'Error: Could not reach the API. Check your API key.' }]);
     } finally {
       setIsGenerating(false);
+      // Auto-update memory after conversation
+      try {
+        await fetch('/api/memory', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: newMessages }),
+        });
+      } catch (e) {
+        // Memory update failed silently
+      }
     }
   };
 

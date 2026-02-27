@@ -58,6 +58,18 @@ export async function POST(req: NextRequest) {
   try {
     const { messages, existingFiles, personality, memory } = await req.json();
 
+    // Fetch global memory from Redis
+    let globalMemory = '';
+    try {
+      const { createClient } = await import('redis');
+      const redis = createClient({ url: process.env.REDIS_URL });
+      await redis.connect();
+      globalMemory = await redis.get('based_memory') ?? '';
+      await redis.disconnect();
+    } catch (e) {
+      console.error('Redis fetch failed:', e);
+    }
+
     const context = existingFiles?.length
       ? `\n\nCurrent project files (preserve and edit these, do not rewrite from scratch):\n${existingFiles.map((f: any) => `--- ${f.name} (${f.language}) ---\n${f.content}`).join('\n\n')}`
       : '';
@@ -69,7 +81,7 @@ export async function POST(req: NextRequest) {
         : m.content,
     }));
 
-    const fullSystem = `${personality ? personality + '\n\n' : ''}${SYSTEM}${memory ? `\n\nPROJECT MEMORY (always keep this in mind):\n${memory}` : ''}`;
+    const fullSystem = `${personality ? personality + '\n\n' : ''}${SYSTEM}${globalMemory ? `\n\nGLOBAL USER MEMORY (facts learned about the user across all conversations):\n${globalMemory}` : ''}${memory ? `\n\nPROJECT MEMORY (specific to this project):\n${memory}` : ''}`;
 
     const response = await client.messages.create({
       model: 'claude-opus-4-6',
