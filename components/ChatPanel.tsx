@@ -74,10 +74,10 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
 
             if (data.chunk) {
               assistantMsg += data.chunk;
-              const display = assistantMsg
-                .replace(/<forge_file[\s\S]*?<\/forge_file>/g, '')
+              const preFile = assistantMsg.split('<forge_file')[0]
                 .replace(/<forge_type>.*?<\/forge_type>/g, '')
-                .trim() || '⏳ Working...';
+                .trim();
+              const display = preFile || '⏳ Working...';
               setMessages(prev => {
                 const updated = [...prev];
                 updated[updated.length - 1] = { role: 'assistant', content: display };
@@ -100,6 +100,14 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     } catch (e) {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Error: Could not reach the API.' }]);
     } finally {
+      // Cleanup incomplete stream
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (last?.content === '⏳ Working...') {
+          return [...prev.slice(0, -1), { role: 'assistant', content: 'Done — check the files in the editor.' }];
+        }
+        return prev;
+      });
       setIsGenerating(false);
       if (!incognito) {
         try {
