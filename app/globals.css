@@ -595,3 +595,35 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     flex-shrink: 0;
   }
 }
+
+.app-root {
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+}
+
+.main-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.panel {
+  flex: 1;
+  overflow: hidden;
+  display: none;
+}
+
+.panel.panel-active {
+  display: flex;
+  flex-direction: column;
+}
