@@ -4,12 +4,6 @@ import { createClient } from 'redis';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-async function getRedis() {
-  const client = createClient({ url: process.env.REDIS_URL });
-  await client.connect();
-  return client;
-}
-
 export async function GET() {
   const redis = createClient({ url: process.env.REDIS_URL });
   try {
@@ -58,7 +52,6 @@ Return ONLY a concise updated memory as bullet points. Max 20 bullets. Focus on 
 
     return NextResponse.json({ memory: newMemory });
   } catch (err: any) {
-    console.error(err);
     try { await redis.disconnect(); } catch {}
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
