@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
     const fullSystem = `${personality ? personality + '\n\n' : ''}${SYSTEM}${globalMemory ? `\n\nGLOBAL USER MEMORY:\n${globalMemory}` : ''}${memory ? `\n\nPROJECT MEMORY:\n${memory}` : ''}`;
 
     const stream = await client.messages.stream({
-      model: 'claude-opus-4-6',
+      model: 'claude-sonnet-4-5',
       max_tokens: 16000,
       system: fullSystem,
       messages: anthropicMessages,
