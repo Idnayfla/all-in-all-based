@@ -31,6 +31,15 @@ RULES FOR CODE GENERATION:
 - When building apps, keep chat reply to 1-3 sentences describing what you built
 - Small snippets under 10 lines are fine in chat for quick fixes or answers
 - Large code blocks (10+ lines) must go in forge_file tags, never in chat
+- For all clickable elements use actual <button> tags, never <div> or <span> with onclick
+- Always add touch-action: manipulation to clickable elements to prevent 300ms tap delay on Android
+- Add -webkit-tap-highlight-color: transparent to buttons for clean Android taps
+- Always include in every CSS file: * { touch-action: manipulation; } and button, a { -webkit-tap-highlight-color: transparent; cursor: pointer; }
+- For canvas games, always add touch event listeners alongside mouse events
+- Never rely on hover states for mobile interactions
+- If a single file exceeds 300 lines, split it into multiple logical files (e.g. utils.js, components.js, main.js)
+- Never truncate or cut off code — if it doesn't fit, split into more files
+- Always ensure every file is complete and has proper opening and closing tags/brackets
 
 RULES FOR CONVERSATION:
 - Answer clearly and concisely
@@ -90,7 +99,7 @@ export async function POST(req: NextRequest) {
 
     const response = await client.messages.create({
       model: 'claude-opus-4-6',
-      max_tokens: 8096,
+      max_tokens: 32000,
       system: fullSystem,
       messages: anthropicMessages,
     });
