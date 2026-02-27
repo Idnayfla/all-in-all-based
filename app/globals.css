@@ -630,9 +630,16 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 /* LOGO IMAGE */
 .logo-img {
-  width: 32px; height: 32px; border-radius: 8px;
+  width: 36px; height: 36px; border-radius: 10px;
   animation: logoPulse 3s ease-in-out infinite;
   flex-shrink: 0;
+  image-rendering: crisp-edges;
+}
+
+@media (min-width: 769px) {
+  .logo-img {
+    width: 40px; height: 40px; border-radius: 10px;
+  }
 }
 
 @keyframes logoPulse {
