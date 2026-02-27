@@ -41,6 +41,8 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     setMessages(newMessages);
     setIsGenerating(true);
 
+    let doneHandled = false;
+
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
@@ -56,7 +58,6 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       let assistantMsg = '';
       let buffer = '';
 
-      // Add placeholder assistant message to stream into
       setMessages(prev => [...prev, { role: 'assistant', content: '⏳ Working...' }]);
 
       while (true) {
@@ -64,15 +65,14 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
 
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          if (!line.startsWith('data: ')) {
-            buffer += line + '\n';
-            continue;
-          }
+        let newlineIndex;
+        while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+          const line = buffer.slice(0, newlineIndex);
+          buffer = buffer.slice(newlineIndex + 1);
+
+          if (!line.startsWith('data: ')) continue;
+
           try {
             const data = JSON.parse(line.slice(6));
 
@@ -81,16 +81,15 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               const preFile = assistantMsg.split('<forge_file')[0]
                 .replace(/<forge_type>.*?<\/forge_type>/g, '')
                 .trim();
-              const display = preFile || '⏳ Working...';
               setMessages(prev => {
                 const updated = [...prev];
-                updated[updated.length - 1] = { role: 'assistant', content: display };
+                updated[updated.length - 1] = { role: 'assistant', content: preFile || '⏳ Working...' };
                 return updated;
               });
             }
 
             if (data.done) {
-              console.log('DONE:', data.reply, data.files, data.projectType);
+              doneHandled = true;
               setMessages(prev => [
                 ...prev.slice(0, -1),
                 { role: 'assistant', content: data.reply || '✅ Done — check the editor.' }
@@ -99,37 +98,22 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                 onFilesUpdate(data.files, data.projectType);
               }
             }
-          } catch (e) { console.log('ERR:', e, 'LINE:', line); }
+          } catch (e) {}
         }
-      }
-
-      if (buffer.startsWith('data: ')) {
-        try {
-          const data = JSON.parse(buffer.slice(6));
-          console.log('BUFFER DONE:', JSON.stringify(data));
-          if (data.done) {
-            setMessages(prev => [
-              ...prev.slice(0, -1),
-              { role: 'assistant', content: data.reply || '✅ Done — check the editor.' }
-            ]);
-            if (data.files?.length) {
-              onFilesUpdate(data.files, data.projectType);
-            }
-          }
-        } catch (e) {}
       }
 
     } catch (e) {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Error: Could not reach the API.' }]);
     } finally {
-      // Cleanup incomplete stream
-      setMessages(prev => {
-        const last = prev[prev.length - 1];
-        if (last?.content === '⏳ Working...') {
-          return [...prev.slice(0, -1), { role: 'assistant', content: 'Done — check the files in the editor.' }];
-        }
-        return prev;
-      });
+      if (!doneHandled) {
+        setMessages(prev => {
+          const last = prev[prev.length - 1];
+          if (last?.content === '⏳ Working...') {
+            return [...prev.slice(0, -1), { role: 'assistant', content: '⚠️ Response cut off. Try again.' }];
+          }
+          return prev;
+        });
+      }
       setIsGenerating(false);
       if (!incognito) {
         try {
@@ -172,7 +156,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               <div className="message-role">{m.role === 'user' ? '▸ You' : '◈ Based'}</div>
               <div className="message-content">
                 <ReactMarkdown>{m.content}</ReactMarkdown>
-            </div>
+              </div>
             </div>
           ))
         )}
