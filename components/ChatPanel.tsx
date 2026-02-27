@@ -56,8 +56,8 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       let assistantMsg = '';
       let buffer = '';
 
-      // Add empty assistant message to stream into
-      setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+      // Add placeholder assistant message to stream into
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Generating...' }]);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -77,11 +77,12 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               const display = assistantMsg
                 .replace(/<forge_file[\s\S]*?<\/forge_file>/g, '')
                 .replace(/<forge_type>.*?<\/forge_type>/g, '')
-                .trim();
-              setMessages(prev => [
-                ...prev.slice(0, -1),
-                { role: 'assistant', content: display }
-              ]);
+                .trim() || 'Generating...';
+              setMessages(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = { role: 'assistant', content: display };
+                return updated;
+              });
             }
 
             if (data.done) {
