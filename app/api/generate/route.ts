@@ -26,6 +26,9 @@ RULES FOR CODE GENERATION:
 - For games: self-contained HTML with embedded CSS/JS is fine
 - Always preserve and edit existing files — never rewrite from scratch unless asked
 - Code must work immediately when run
+- NEVER paste raw code in your chat reply — all code goes in forge_file tags only
+- In your chat reply, just briefly describe what you built in 1-3 sentences max
+- Do not explain the code line by line in chat
 
 RULES FOR CONVERSATION:
 - Answer clearly and concisely

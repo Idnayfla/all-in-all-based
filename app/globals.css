@@ -552,3 +552,26 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   color: #ff6b6b; font-size: 11px; letter-spacing: 1px; padding: 8px 20px;
   text-align: center; flex-shrink: 0;
 }
+
+/* CODE BLOCKS */
+.message-content pre {
+  background: #0d0d14; border: 1px solid var(--border);
+  border-radius: 8px; margin: 12px 0; overflow: hidden;
+}
+
+.message-content pre code {
+  display: block; padding: 16px; overflow-x: auto;
+  font-family: var(--font-mono); font-size: 12px;
+  line-height: 1.7; color: #a8b1c2; background: none;
+}
+
+.message-content code {
+  background: #0d0d14; padding: 2px 6px; border-radius: 4px;
+  font-family: var(--font-mono); font-size: 12px; 
+  color: var(--accent3); border: 1px solid var(--border);
+}
+
+.message-content pre > code {
+  background: none; padding: 16px; border: none;
+  border-radius: 0; color: #a8b1c2;
+}
