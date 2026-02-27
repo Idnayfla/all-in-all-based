@@ -102,6 +102,22 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           } catch (e) {}
         }
       }
+
+      if (buffer.startsWith('data: ')) {
+        try {
+          const data = JSON.parse(buffer.slice(6));
+          if (data.done) {
+            setMessages(prev => [
+              ...prev.slice(0, -1),
+              { role: 'assistant', content: data.reply || '✅ Done — check the editor.' }
+            ]);
+            if (data.files?.length) {
+              onFilesUpdate(data.files, data.projectType);
+            }
+          }
+        } catch (e) {}
+      }
+
     } catch (e) {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Error: Could not reach the API.' }]);
     } finally {
