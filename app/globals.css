@@ -546,3 +546,9 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .settings-panel {
   overflow-y: auto;
 }
+
+.incognito-banner {
+  background: rgba(255,107,107,0.1); border-bottom: 1px solid rgba(255,107,107,0.3);
+  color: #ff6b6b; font-size: 11px; letter-spacing: 1px; padding: 8px 20px;
+  text-align: center; flex-shrink: 0;
+}

@@ -37,6 +37,7 @@ export default function Home() {
   const [globalMemory, setGlobalMemory] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [incognito, setIncognito] = useState(false);
+  const [incognitoMessages, setIncognitoMessages] = useState<Message[]>([]);
   const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview'>('chat');
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
@@ -139,7 +140,7 @@ useEffect(() => { fetchMemory(); }, []);
         <nav className="header-nav">
           <button 
             className={`nav-btn ${incognito ? 'active' : ''}`} 
-            onClick={() => setIncognito(s => !s)}
+            onClick={() => { setIncognito(s => !s); setIncognitoMessages([]); setActivePanel('chat'); }}
             title="Temp chat — no memory saved"
             style={incognito ? {borderColor:'#ff6b6b', color:'#ff6b6b'} : {}}
           >
@@ -226,7 +227,22 @@ useEffect(() => { fetchMemory(); }, []);
                         </div>
                       )}
 
-          {!currentProject ? (
+          {incognito ? (
+            <div className="panel panel-active">
+              <div className="incognito-banner">🕵️ Incognito Mode — chat will be wiped when you exit</div>
+              <ChatPanel
+                messages={incognitoMessages}
+                setMessages={setIncognitoMessages}
+                files={[]}
+                onFilesUpdate={() => {}}
+                isGenerating={isGenerating}
+                setIsGenerating={setIsGenerating}
+                personality={personality}
+                memory=""
+                incognito={true}
+              />
+            </div>
+          ) : !currentProject ? (
             <div className="no-project">
               <div className="no-project-icon">⬡</div>
               <div className="no-project-title">Welcome to Based</div>
@@ -271,5 +287,5 @@ useEffect(() => { fetchMemory(); }, []);
         </main>
       </div>
     </div>
-  );
+  );``
 }
