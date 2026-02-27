@@ -36,6 +36,7 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [globalMemory, setGlobalMemory] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [incognito, setIncognito] = useState(false);
   const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview'>('chat');
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
@@ -76,9 +77,11 @@ useEffect(() => { fetchMemory(); }, []);
   }, [files, messages]);
 
   const newProject = () => {
+    const name = prompt('Project name:');
+    if (!name?.trim()) return;
     const project: Project = {
       id: Date.now().toString(),
-      name: `Project ${projects.length + 1}`,
+      name: name.trim(),
       files: [], messages: [], updatedAt: Date.now(),
     };
     const updated = [...projects, project];
@@ -134,6 +137,14 @@ useEffect(() => { fetchMemory(); }, []);
         </div>
         {currentProject && <div className="project-name-display">{currentProject.name}</div>}
         <nav className="header-nav">
+          <button 
+            className={`nav-btn ${incognito ? 'active' : ''}`} 
+            onClick={() => setIncognito(s => !s)}
+            title="Temp chat — no memory saved"
+            style={incognito ? {borderColor:'#ff6b6b', color:'#ff6b6b'} : {}}
+          >
+            {incognito ? '🕵️ Incognito' : '🕵️'}
+          </button>
           <button className={`nav-btn ${activePanel === 'chat' ? 'active' : ''}`} onClick={() => setActivePanel('chat')}>Chat</button>
           <button className={`nav-btn ${activePanel === 'editor' ? 'active' : ''}`} onClick={() => setActivePanel('editor')}>✎</button>
           <button className={`nav-btn ${activePanel === 'preview' ? 'active' : ''}`} onClick={() => setActivePanel('preview')}>◉</button>
@@ -246,6 +257,7 @@ useEffect(() => { fetchMemory(); }, []);
                   setIsGenerating={setIsGenerating}
                   personality={personality}
                   memory={currentProject?.memory ?? ''}
+                  incognito={incognito}
                 />
               </div>
               <div className={`panel ${activePanel === 'editor' ? 'panel-active' : ''}`}>
