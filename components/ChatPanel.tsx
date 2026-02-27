@@ -65,7 +65,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        buffer = '';
+        buffer = lines.pop() ?? '';
 
         for (let i = 0; i < lines.length; i++) {
           const line = lines[i];
