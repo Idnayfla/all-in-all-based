@@ -5,6 +5,7 @@ import ChatPanel from '@/components/ChatPanel';
 import EditorPanel from '@/components/EditorPanel';
 import PreviewPanel from '@/components/PreviewPanel';
 import Sidebar from '@/components/Sidebar';
+import DebugPanel from '@/components/DebugPanel';
 
 export interface FileNode {
   name: string;
@@ -286,6 +287,7 @@ useEffect(() => { fetchMemory(); }, []);
           )}
         </main>
       </div>
+      <DebugPanel enabled={true} />
     </div>
   );``
 }

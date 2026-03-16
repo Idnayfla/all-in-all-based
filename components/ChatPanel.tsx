@@ -77,18 +77,20 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             const data = JSON.parse(line.slice(6));
 
             if (data.chunk) {
+              window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'chunk', data: data.chunk } }));
               assistantMsg += data.chunk;
-              const preFile = assistantMsg.split('<forge_file')[0]
-                .replace(/<forge_type>.*?<\/forge_type>/g, '')
-                .trim();
-              setMessages(prev => {
-                const updated = [...prev];
-                updated[updated.length - 1] = { role: 'assistant', content: preFile || '⏳ Working...' };
-                return updated;
-              });
+              if (!assistantMsg.includes('<forge_file') && !assistantMsg.includes('<forge_type>')) {
+                setMessages(prev => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = { role: 'assistant', content: assistantMsg.trim() || '⏳ Working...' };
+                  return updated;
+                });
+              }
+              // Once file tags detected, stay frozen at Working...
             }
 
             if (data.done) {
+              window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'done', data: JSON.stringify({ filesCount: data.files?.length, reply: data.reply?.slice(0, 100) }) } }));
               doneHandled = true;
               setMessages(prev => [
                 ...prev.slice(0, -1),
@@ -159,12 +161,6 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               </div>
             </div>
           ))
-        )}
-        {isGenerating && (
-          <div className="message assistant">
-            <div className="message-role">◈ Based</div>
-            <div className="message-content" style={{ color: 'var(--text3)' }}>Generating...</div>
-          </div>
         )}
         <div ref={bottomRef} />
       </div>
