@@ -135,27 +135,27 @@ useEffect(() => { fetchMemory(); }, []);
           <button className="hamburger" onClick={() => setSidebarOpen(s => !s)}>☰</button>
           <img src="/icon-192.png" className="logo-img" alt="Based" />
           <span className="logo-text">BASED</span>
-          <span className="logo-sub">All in All Based</span>
+          {currentProject && <span className="project-name-display">{currentProject.name}</span>}
         </div>
-        {currentProject && <div className="project-name-display">{currentProject.name}</div>}
         <nav className="header-nav">
-          <button 
-            className={`nav-btn ${incognito ? 'active' : ''}`} 
-            onClick={() => { setIncognito(s => !s); setIncognitoMessages([]); setActivePanel('chat'); }}
-            title="Temp chat — no memory saved"
-            style={incognito ? {borderColor:'#ff6b6b', color:'#ff6b6b'} : {}}
-          >
-            {incognito ? '🕵️ Incognito' : '🕵️'}
-          </button>
-          <button className={`nav-btn ${activePanel === 'chat' ? 'active' : ''}`} onClick={() => setActivePanel('chat')}>Chat</button>
-          <button className={`nav-btn ${activePanel === 'editor' ? 'active' : ''}`} onClick={() => setActivePanel('editor')}>✎</button>
-          <button className={`nav-btn ${activePanel === 'preview' ? 'active' : ''}`} onClick={() => setActivePanel('preview')}>◉</button>
-          <button className={`nav-btn ${showSettings ? 'active' : ''}`} onClick={() => setShowSettings(s => !s)}>⚙</button>
+          <div className="tab-switcher">
+            <button className={`tab-btn ${activePanel === 'chat' ? 'active' : ''}`} onClick={() => setActivePanel('chat')}>Chat</button>
+            <button className={`tab-btn ${activePanel === 'editor' ? 'active' : ''}`} onClick={() => setActivePanel('editor')}>Editor</button>
+            <button className={`tab-btn ${activePanel === 'preview' ? 'active' : ''}`} onClick={() => setActivePanel('preview')}>Preview</button>
+          </div>
+          <div className="header-controls">
+            <button
+              className={`icon-btn ${incognito ? 'incognito-active' : ''}`}
+              onClick={() => { setIncognito(s => !s); setIncognitoMessages([]); setActivePanel('chat'); }}
+              title="Temp chat — no memory saved"
+            >🕵️</button>
+            <button className={`icon-btn ${showSettings ? 'active' : ''}`} onClick={() => setShowSettings(s => !s)}>⚙</button>
+            <div className="header-status">
+              <span className={`status-dot ${isGenerating ? 'generating' : 'ready'}`}>●</span>
+              <span className="status-text">{isGenerating ? 'Generating...' : 'Ready'}</span>
+            </div>
+          </div>
         </nav>
-        <div className="header-status">
-          {isGenerating && <span className="status-dot generating">●</span>}
-          <span className="status-text">{isGenerating ? 'Generating...' : 'Ready'}</span>
-        </div>
       </header>
 
       <div className="app-body">
