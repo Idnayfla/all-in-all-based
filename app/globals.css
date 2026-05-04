@@ -10,6 +10,7 @@
   --border-subtle: #1e1e2a;
   --accent: #7c6af7;
   --accent2: #f76a8a;
+  --danger: #ff6b6b;
   --accent3: #6af7c8;
   --text: #e8e8f0;
   --text2: #8888aa;
@@ -63,7 +64,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 .icon-btn:hover { border-color: var(--border); color: var(--text); }
 .icon-btn.active { border-color: var(--accent); color: var(--accent); }
-.icon-btn.incognito-active { border-color: #ff6b6b; color: #ff6b6b; }
+.icon-btn.incognito-active { border-color: var(--danger); color: var(--danger); }
 
 .header-status {
   display: flex; align-items: center; gap: 6px;
@@ -95,12 +96,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 
 .file-item {
-  padding: 8px 10px; border-radius: 4px; cursor: pointer;
-  font-size: 12px; color: var(--text2); transition: all 0.15s;
-  display: flex; align-items: center; gap: 8px; margin-bottom: 2px;
+  padding: 9px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;
+  color: var(--text2); display: flex; align-items: center; gap: 8px; margin-bottom: 2px;
+  border-left: 2px solid transparent;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.file-item:hover { background: var(--bg3); color: var(--text); }
-.file-item.active { background: rgba(106,247,200,0.06); color: var(--accent3); }
+.file-item:hover { background: var(--bg3); color: var(--text); border-left-color: var(--border); transform: translateX(3px); }
+.file-item.active { background: rgba(106,247,200,0.06); color: var(--accent3); border-left-color: var(--accent3); }
 .file-icon { font-size: 11px; }
 .no-files { padding: 20px 16px; font-size: 11px; color: var(--text3); text-align: center; line-height: 1.6; }
 
@@ -201,12 +203,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 .sidebar-projects { padding: 8px; overflow-y: auto; max-height: 200px; }
 .project-item {
-  padding: 8px 10px; border-radius: 4px; cursor: pointer;
-  font-size: 12px; color: var(--text2); transition: all 0.15s;
-  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;
+  color: var(--text2); display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 2px; gap: 8px;
+  border-left: 2px solid transparent;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
-.project-item:hover { background: var(--bg3); color: var(--text); border-left-color: var(--border); }
+.project-item:hover { background: var(--bg3); color: var(--text); border-left-color: var(--border); transform: translateX(3px); }
 .project-item.active { background: rgba(124,106,247,0.08); color: var(--accent); border-left-color: var(--accent); }
 .project-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s; }
@@ -382,20 +385,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   transform: scale(0.97);
 }
 
-/* Sidebar item hover */
-.file-item {
-  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.file-item:hover {
-  transform: translateX(3px);
-}
-
-.project-item {
-  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
-}
-.project-item:hover {
-  transform: translateX(3px);
-}
+/* Sidebar item hover — consolidated into canonical blocks above */
 
 /* Panel fade transition */
 .panel {
@@ -482,19 +472,9 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .sidebar-projects { padding: 4px 12px 12px; }
 .sidebar-files { padding: 4px 12px 12px; }
 
-.project-item {
-  padding: 10px 12px; border-radius: 6px; font-size: 13px;
-  border-left: 2px solid transparent;
-}
-.project-item.active { background: rgba(124,106,247,0.08); color: var(--accent); border-left-color: var(--accent); }
-.project-item:hover { background: var(--bg3); color: var(--text); border-left-color: var(--border); }
+/* .project-item consolidated into canonical block in PROJECT MANAGEMENT section */
 
-.file-item {
-  padding: 9px 12px; border-radius: 6px; font-size: 12px;
-  border-left: 2px solid transparent;
-}
-.file-item.active { background: rgba(106,247,200,0.06); color: var(--accent3); border-left-color: var(--accent3); }
-.file-item:hover { background: var(--bg3); color: var(--text); border-left-color: var(--border); }
+/* .file-item consolidated into canonical block in sidebar section */
 
 .no-files { 
   padding: 16px 12px; font-size: 12px; 
@@ -552,7 +532,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 .incognito-banner {
   background: rgba(255,107,107,0.1); border-bottom: 1px solid rgba(255,107,107,0.3);
-  color: #ff6b6b; font-size: 11px; letter-spacing: 1px; padding: 8px 20px;
+  color: var(--danger); font-size: 11px; letter-spacing: 1px; padding: 8px 20px;
   text-align: center; flex-shrink: 0;
 }
 
