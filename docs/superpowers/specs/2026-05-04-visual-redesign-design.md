@@ -60,7 +60,7 @@ Tidy up the UI to be cleaner, more readable, and more user-friendly. The dark ae
 - Icon: a small rounded square with a gradient background (`linear-gradient(135deg, rgba(124,106,247,0.25), rgba(106,247,200,0.15))`) and a subtle border — replaces the large symbol
 - Title: `BASED` in Space Mono, `font-weight: 700; letter-spacing: 3px; font-size: 16px`
 - Subtitle: `"Your AI coding assistant. Describe what you want to build."` in system sans-serif, `font-size: 14px; color: var(--text3); line-height: 1.7`
-- Suggestion chips: `font-family: system-ui; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; padding: 7px 14px` — no background fill on rest state, hover gets `border-color: var(--accent)`
+- Suggestion chips: `font-family: system-ui; font-size: 12px; border: 1px solid var(--border); border-radius: 6px; padding: 7px 14px; background: transparent` — hover gets `border-color: var(--accent)`
 
 ### 5. No-project landing screen (`app/page.tsx` + `globals.css`)
 
@@ -108,4 +108,5 @@ Tidy up the UI to be cleaner, more readable, and more user-friendly. The dark ae
 - Preview panel (iframe — untouched)
 - Settings panel (minor spacing inherits from CSS changes, no explicit rework)
 - All API routes and logic
+- Hamburger button (mobile sidebar toggle) — stays, styling unchanged
 - Mobile breakpoints (CSS changes are additive/replacing, not structural)

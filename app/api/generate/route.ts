@@ -34,11 +34,32 @@ CODE QUALITY STANDARDS:
 - Never use inline styles in HTML — always use CSS classes
 - Always validate user input before processing
 
+INTERACTIVITY — EVERY BUTTON AND LINK MUST WORK:
+- NEVER use onclick="..." attributes in HTML — always attach event listeners in JS
+- ALL event listeners go inside a DOMContentLoaded callback (or at bottom of <body> with defer)
+- When multiple JS files are used: index.html loads them with <script defer src="..."> in dependency order (shared state first, then game logic, then UI last)
+- Every button click must produce a visible result — screen change, sound, state update, something
+- Never leave a button that does nothing. If a feature isn't implemented, remove the button entirely.
+- Multi-screen apps: use a single-page approach — show/hide <div> sections with CSS classes, never navigate to a new HTML file
+- Test every user flow mentally before outputting: can the user get from the start screen to gameplay to game-over and back?
+
+SCREEN TRANSITIONS (games with a start screen, menu, or "Begin" button):
+- Define ALL screens as <div class="screen" id="screen-menu">, <div class="screen" id="screen-game">, etc. in index.html
+- CSS: .screen { display: none } and .screen.active { display: block } (or flex/grid)
+- The Begin/Start button handler must: (1) hide the current screen by removing "active", (2) show the game screen by adding "active", (3) call the game init/start function
+- The game init function must actually start the game loop — not just set a flag
+- NEVER rely on CSS :active pseudo-class as the only response to a button click — that is just a press animation, not an action
+- Every screen div ID used in JS must exactly match the ID written in index.html — double-check this
+- Wrap the Begin button handler in try/catch and console.error any failure so silent crashes are visible
+
 BUG FIXING RULES:
-- When fixing bugs: ALWAYS rewrite ALL files completely from scratch
-- Never do partial edits
-- If a bug has been attempted before: completely rethink the approach
-- Before fixing: state the root cause. After fixing: state what changed.
+- First, identify exactly which file(s) contain the broken code
+- Fix ONLY the affected file(s) — do not touch files that are working correctly
+- Rewrite a file completely only if the bug is architectural (wrong approach throughout); otherwise, fix the specific broken section
+- Never rewrite a working file just because it's related to the broken one
+- If a bug has been attempted before: rethink the approach in the broken file only, not the whole project
+- Before fixing: state the root cause and which file(s) you are changing
+- After fixing: state exactly what changed and why
 
 MOBILE & TOUCH:
 - Every CSS file must include: * { touch-action: manipulation; box-sizing: border-box; }
@@ -53,23 +74,31 @@ ARCHITECTURE PATTERNS:
 
 const PLANNER_SYSTEM = `You are a software architect. Output ONLY a JSON array. No explanation. No markdown. Raw JSON only.
 
-FILE LIMITS: Every file must be completable in under 600 lines.
+FILE LIMITS: Every file must be completable in under 600 lines. Split only when a single file would exceed that.
 
-For ANY game request, plan these exact files:
-- index.html — HTML structure only, links to all JS/CSS
-- style.css — all styling, animations, UI components
-- rooms.js — all room definitions, map data, note texts, item placements
-- entities.js — monster AI, entity creation, interaction handlers, chase sequences
-- audio.js — all audio management, Web Audio API, sound effects
-- ui.js — HUD updates, inventory screen, dialogue box, notifications, safe input, death/win screens
-- game.js — game state, constants, player object, input system, camera, room loading, transitions, event system
-- engine.js — game loop, requestAnimationFrame, all canvas render/draw functions, canvas setup, resize
+BUG FIXES AND CORRECTIONS:
+- If existing files are provided and the request is a fix, correction, or improvement: output ONLY the files that need to change
+- Do NOT include files that are already working correctly — leave them untouched
+- A button fix is never a reason to regenerate a working game engine or style file
+- Only include a file if you are genuinely changing something in it
 
-For non-game web apps: index.html, style.css, app.js, utils.js minimum.
-For Python: main.py and supporting modules.
+NEW PROJECTS — size the plan to the actual complexity:
+
+SIMPLE (todo app, counter, calculator, Snake, Pong, Tetris, Breakout, basic landing page):
+- 1-2 files. A self-contained index.html with inline JS/CSS is fine.
+- Only split into separate files if a single file would exceed 600 lines.
+
+MEDIUM (multi-page apps, dashboards, chat UI, platformer with multiple systems):
+- 3-5 files. index.html + style.css + 1-3 JS modules split by responsibility.
+
+COMPLEX (RPG, multiplayer game, large data app, distinct subsystems like rooms/entities/audio/UI):
+- Up to 8 files. Split by subsystem — one clear concern per file.
+- Only add rooms.js, entities.js, audio.js etc. if those systems actually exist in the project.
+
+For Python: main.py and supporting modules only as needed.
 
 Output format:
-[{"name":"index.html","language":"html","description":"..."},{"name":"style.css","language":"css","description":"..."},{"name":"rooms.js","language":"javascript","description":"..."},{"name":"entities.js","language":"javascript","description":"..."},{"name":"audio.js","language":"javascript","description":"..."},{"name":"ui.js","language":"javascript","description":"..."},{"name":"game.js","language":"javascript","description":"..."},{"name":"engine.js","language":"javascript","description":"..."}]`;
+[{"name":"filename.ext","language":"html|css|javascript|python","description":"..."}]`;
 
 const FILE_GENERATOR_SYSTEM = `You are Based, an elite coding assistant. Generate ONE file as part of a larger project.
 
@@ -82,16 +111,24 @@ Format:
 
 CRITICAL RULES:
 - Hard limit: 600 lines maximum per file
-- rooms.js: ONLY the first 4 rooms maximum. Do not define more than 4 rooms in this file.
-- rooms2.js: remaining rooms if more than 4 exist
-- entities.js: ONLY monster AI, entity factory, interaction handlers, chase logic — nothing else
-- audio.js: ONLY Web Audio API setup and all sound functions — nothing else
-- ui.js: ONLY DOM manipulation, HUD updates, inventory, dialogue, overlays — nothing else
-- game.js: ONLY game state object, constants, player object, input system, camera — stop after camera, do NOT include room loader or event system
-- events.js: ONLY room loader, transition logic, event system, trigger handlers
-- engine.js: ONLY game loop, requestAnimationFrame, all draw/render functions, canvas init — NO game logic
-- No placeholders, no TODOs, no truncation
-- Assume all other files are loaded before this one`;
+- Generate ONLY what belongs in this file based on its description — nothing more
+- No placeholders, no TODOs, no truncation — complete working code only
+- Assume all other project files are loaded before this one
+
+INTERACTIVITY RULES (non-negotiable):
+- NEVER use onclick="..." in HTML — attach all listeners in JS with addEventListener
+- All JS event listeners must be inside DOMContentLoaded or placed in a deferred script
+- Every button must do something visible when clicked — show a screen, start a game, play a sound
+- Multi-screen games: use show/hide div sections (CSS display:none / display:block), never separate HTML files
+- If generating index.html with multiple JS files: load them with <script defer src="..."> in dependency order
+- Mentally trace every button click to its outcome before writing — if a path is broken, fix it
+
+SCREEN TRANSITION PATTERN (Begin/Start/Play buttons):
+- All screens are <div class="screen" id="screen-X"> in HTML; CSS hides all, .active shows the current one
+- Begin button handler: remove "active" from current screen → add "active" to game screen → call startGame()
+- startGame() must actually initialize and run the game (start the loop, render the first frame)
+- IDs referenced in JS must exactly match IDs in the HTML — mismatches cause silent failures
+- Wrap every button handler in try/catch and log errors so failures are never silent`;
 
 function parseFiles(text: string) {
   const files = [];
@@ -264,6 +301,8 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
             for await (const chunk of fileStream) {
               if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
                 fileText += chunk.delta.text;
+                // Forward chunks to keep the connection alive (client ignores forge_file content visually)
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
               }
             }
             const fileResult = await fileStream.finalMessage();
@@ -282,6 +321,7 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
               for await (const chunk of contStream) {
                 if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
                   fileText += chunk.delta.text;
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
                 }
               }
             }
