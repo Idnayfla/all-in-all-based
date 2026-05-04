@@ -100,7 +100,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   display: flex; align-items: center; gap: 8px; margin-bottom: 2px;
 }
 .file-item:hover { background: var(--bg3); color: var(--text); }
-.file-item.active { background: rgba(124,106,247,0.12); color: var(--accent); }
+.file-item.active { background: rgba(106,247,200,0.06); color: var(--accent3); }
 .file-icon { font-size: 11px; }
 .no-files { padding: 20px 16px; font-size: 11px; color: var(--text3); text-align: center; line-height: 1.6; }
 
@@ -206,8 +206,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 2px; gap: 8px;
 }
-.project-item:hover { background: var(--bg3); color: var(--text); }
-.project-item.active { background: rgba(124,106,247,0.12); color: var(--accent); }
+.project-item:hover { background: var(--bg3); color: var(--text); border-left-color: var(--border); }
+.project-item.active { background: rgba(124,106,247,0.08); color: var(--accent); border-left-color: var(--accent); }
 .project-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s; }
 .project-item:hover .project-actions { opacity: 1; }
@@ -224,7 +224,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   padding: 2px 6px; border-radius: 3px; outline: none;
 }
 
-.sidebar-divider { height: 1px; background: var(--border); margin: 4px 0; }
+.sidebar-divider { height: 1px; background: var(--border-subtle); margin: 4px 12px; }
 
 .no-project {
   flex: 1; display: flex; flex-direction: column; align-items: center;
@@ -486,15 +486,15 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   padding: 10px 12px; border-radius: 6px; font-size: 13px;
   border-left: 2px solid transparent;
 }
-.project-item.active { border-left-color: var(--accent); }
-.project-item:hover { border-left-color: var(--border); }
+.project-item.active { background: rgba(124,106,247,0.08); color: var(--accent); border-left-color: var(--accent); }
+.project-item:hover { background: var(--bg3); color: var(--text); border-left-color: var(--border); }
 
 .file-item {
   padding: 9px 12px; border-radius: 6px; font-size: 12px;
   border-left: 2px solid transparent;
 }
-.file-item.active { border-left-color: var(--accent3); }
-.file-item:hover { border-left-color: var(--border); }
+.file-item.active { background: rgba(106,247,200,0.06); color: var(--accent3); border-left-color: var(--accent3); }
+.file-item:hover { background: var(--bg3); color: var(--text); border-left-color: var(--border); }
 
 .no-files { 
   padding: 16px 12px; font-size: 12px; 
