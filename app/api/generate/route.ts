@@ -287,8 +287,8 @@ ${generatedContext}${existingContext}
 
 Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
 
-            // Send structured progress event
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: { current: i + 1, total: filePlan.length, file: fileSpec.name } })}\n\n`));
+            // Announce which file is starting (updates label, does not advance bar)
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`));
 
             const fileStream = client.messages.stream({
               model: 'claude-opus-4-6',
@@ -330,7 +330,6 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
             if (parsedFiles.length > 0) {
               generatedFiles.push(...parsedFiles);
             } else {
-              // Strip the forge_file opening tag if the file was truncated before the closing tag
               const rawContent = fileText.replace(/^<forge_file[^>]*>\n?/, '').trim();
               generatedFiles.push({
                 name: fileSpec.name,
@@ -338,6 +337,9 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
                 content: rawContent || fileText.trim(),
               });
             }
+
+            // File complete — advance the progress bar
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`));
           }
 
           // Step 3: Brief summary

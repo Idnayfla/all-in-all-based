@@ -1,5 +1,6 @@
 'use client';
 import { useRef, useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { Message, FileNode } from '@/app/page';
 import ReactMarkdown from 'react-markdown';
 
@@ -127,16 +128,33 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             const data = JSON.parse(line.slice(6));
 
             if (data.plan) {
-              setGenProgress({ files: data.plan, current: 0, total: data.plan.length, file: '' });
+              flushSync(() => {
+                setGenProgress({ files: data.plan, current: 0, total: data.plan.length, file: '' });
+              });
             }
 
+            // status = file starting (update label, keep current bar position)
+            if (data.status) {
+              flushSync(() => {
+                setGenProgress(prev => ({
+                  files: prev?.files ?? [],
+                  current: prev?.current ?? 0,
+                  total: data.status.total,
+                  file: data.status.file,
+                }));
+              });
+            }
+
+            // progress = file complete (advance the bar)
             if (data.progress) {
-              setGenProgress(prev => ({
-                files: prev?.files ?? [],
-                current: data.progress.current,
-                total: data.progress.total,
-                file: data.progress.file,
-              }));
+              flushSync(() => {
+                setGenProgress(prev => ({
+                  files: prev?.files ?? [],
+                  current: data.progress.current,
+                  total: data.progress.total,
+                  file: data.progress.file,
+                }));
+              });
             }
 
             if (data.chunk) {
