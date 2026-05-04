@@ -19,11 +19,11 @@ interface GenerationProgress {
   chunks: number;     // chunks received for the current file
 }
 
-// Rough estimate: a typical generated file streams ~250 chunks
-const CHUNKS_PER_FILE = 250;
-
 function ProgressBar({ progress }: { progress: GenerationProgress }) {
-  const withinFile = progress.file ? Math.min(progress.chunks / CHUNKS_PER_FILE, 0.92) : 0;
+  // Asymptotic curve: fills quickly then tapers — no fixed chunk estimate needed
+  const withinFile = progress.file
+    ? Math.min(1 - Math.exp(-progress.chunks / 50), 0.92)
+    : 0;
   const pct = progress.total === 0 ? 0
     : Math.round((progress.completed + withinFile) / progress.total * 100);
 
