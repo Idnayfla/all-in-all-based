@@ -289,5 +289,5 @@ useEffect(() => { fetchMemory(); }, []);
       </div>
       <DebugPanel enabled={true} />
     </div>
-  );``
+  );
 }

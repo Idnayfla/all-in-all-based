@@ -9,7 +9,6 @@
   --border: #2a2a3a;
   --border-subtle: #1e1e2a;
   --accent: #7c6af7;
-  --accent2: #f76a8a;
   --danger: #ff6b6b;
   --accent3: #6af7c8;
   --text: #e8e8f0;
@@ -31,9 +30,9 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 .app-header {
   display: flex; align-items: center; gap: 24px;
-  padding: 0 20px; height: 52px;
+  padding: env(safe-area-inset-top) 20px 0; height: calc(52px + env(safe-area-inset-top));
   background: var(--bg2); border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
+  flex-shrink: 0; position: sticky; top: 0; z-index: 100;
 }
 
 .logo { display: flex; align-items: center; gap: 8px; }
@@ -88,11 +87,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .sidebar-section .no-files {
   flex: 1; display: flex; align-items: center; justify-content: center;
   font-size: 12px; color: var(--text3); text-align: center; padding: 20px;
-}
-.sidebar-header { 
-  font-size: 10px; letter-spacing: 3px; color: var(--text3); 
-  text-transform: uppercase; padding: 8px 16px 6px;
-  text-align: left;
 }
 
 .file-item {
@@ -192,7 +186,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 /* PROJECT MANAGEMENT */
 .sidebar-section { display: flex; flex-direction: column; }
 .sidebar-header-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px 6px; border-bottom: 1px solid var(--border); }
-.sidebar-header { font-size: 10px; letter-spacing: 2px; color: var(--text3); text-transform: uppercase; padding: 14px 16px 10px; }
+.sidebar-header { font-size: 10px; letter-spacing: 3px; color: var(--text3); text-transform: uppercase; padding: 16px 20px 10px; }
 .sidebar-new-btn {
   background: transparent; border: 1px solid var(--border); color: var(--text2);
   width: 20px; height: 20px; border-radius: 3px; cursor: pointer; font-size: 14px;
@@ -219,7 +213,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   font-size: 11px; padding: 2px 4px; border-radius: 3px; transition: all 0.15s;
 }
 .action-btn:hover { color: var(--text); background: var(--bg); }
-.action-btn.danger:hover { color: var(--accent2); }
+.action-btn.danger:hover { color: var(--danger); }
 
 .rename-input {
   flex: 1; background: var(--bg); border: 1px solid var(--accent);
@@ -301,33 +295,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   .hamburger { display: none; }
 }
 
-/* SAFE AREA FOR MOBILE */
-.app-header {
-  padding-top: env(safe-area-inset-top);
-  height: calc(52px + env(safe-area-inset-top));
-}
-
-.app-root {
-  padding-top: 0;
-}
-
-
-/* IOS HEADER FIX */
-.app-header {
-  display: flex; align-items: center; gap: 24px;
-  padding: 0 20px; height: 52px;
-  background: var(--bg2); border-bottom: 1px solid var(--border);
-  flex-shrink: 0;
-  position: sticky; top: 0; z-index: 100;
-}
-
-.app-body {
-  padding-top: 0;
-}
-
-.chat-messages {
-  padding-top: max(24px, env(safe-area-inset-top));
-}
+/* IOS HEADER FIX — consolidated into canonical .app-header above */
 
 @media (max-width: 768px) {
   .header-status { display: none; }
@@ -336,9 +304,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 /* ===== ANIMATIONS & POLISH ===== */
 
 /* Page load stagger */
-.app-header {
-  animation: slideDown 0.4s ease forwards;
-}
 .sidebar {
   animation: slideRight 0.4s ease 0.1s both;
 }
@@ -467,7 +432,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 /* Sidebar indent & spacing */
 .sidebar { padding: 0; }
-.sidebar-header { padding: 16px 20px 10px; font-size: 11px; letter-spacing: 3px; }
 .sidebar-header-row { padding: 16px 20px 10px; }
 .sidebar-projects { padding: 4px 12px 12px; }
 .sidebar-files { padding: 4px 12px 12px; }
@@ -505,8 +469,6 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .message-content h2 { font-size: 15px; }
 .message-content h3 { font-size: 13px; }
 
-
-.chat-textarea { font-size: 14px; }
 
 .preview-header {
   flex-wrap: wrap; gap: 8px; padding: 10px 16px;
