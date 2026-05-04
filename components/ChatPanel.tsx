@@ -183,7 +183,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         ) : (
           messages.map((m, i) => (
             <div key={i} className={`message ${m.role}`}>
-              <div className="message-role">{m.role === 'user' ? '▸ You' : '◈ Based'}</div>
+              <div className="message-role">{m.role === 'user' ? 'You' : 'Based'}</div>
               <div className="message-content">
                 <ReactMarkdown>{m.content}</ReactMarkdown>
               </div>
