@@ -44,8 +44,7 @@ if [ ! -d ~/.claude/skills/gstack ]; then
 else
   ok "gstack already present"
 fi
-~/.claude/skills/gstack/setup || warn "gstack browser setup failed (Playwright/Chromium unavailable) — core skills still available"
-ok "gstack setup complete"
+ok "gstack setup complete (browser/Playwright skipped — unavailable in Codespaces)"
 
 # ── 5. Claude Code plugins (direct filesystem install) ───────────────────────
 # The `claude plugins` CLI requires an interactive terminal for first-run setup,
