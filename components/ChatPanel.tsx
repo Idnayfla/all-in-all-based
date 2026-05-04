@@ -199,7 +199,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           value={input}
           onChange={e => { setInput(e.target.value); autoResize(); }}
           onKeyDown={handleKey}
-          placeholder="How may I assist you today?"
+          placeholder="Ask Based anything..."
           rows={1}
           disabled={isGenerating}
         />
