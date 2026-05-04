@@ -46,151 +46,25 @@ else
 fi
 ok "gstack setup complete (browser/Playwright skipped — unavailable in Codespaces)"
 
-# ── 5. Claude Code plugins (direct filesystem install) ───────────────────────
-# The `claude plugins` CLI requires an interactive terminal for first-run setup,
-# which is not available during postCreateCommand. We replicate what it would do
-# by cloning the actual plugin repos and writing the manifest files Claude Code reads.
-
+# ── 5. Claude Code plugins ────────────────────────────────────────────────────
+# ANTHROPIC_API_KEY is available as a Codespace secret, which allows
+# claude plugins install to run non-interactively.
 step "Installing Claude Code plugins..."
 
-PLUGINS_DIR="$HOME/.claude/plugins"
-mkdir -p "$PLUGINS_DIR/marketplaces"
-mkdir -p "$PLUGINS_DIR/cache"
-NOW=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+claude plugins install superpowers@superpowers-marketplace
+ok "superpowers installed"
 
-clone_repo() {
-  local repo="$1" dest="$2"
-  if [ -d "$dest/.git" ]; then
-    ok "$repo already cloned"
-  else
-    rm -rf "$dest"
-    git clone --depth 1 "https://github.com/$repo.git" "$dest"
-    ok "Cloned $repo"
-  fi
-}
+claude plugins install frontend-design@claude-plugins-official
+ok "frontend-design installed"
 
-# Clone marketplace index repos (needed for known_marketplaces.json)
-clone_repo "anthropics/claude-plugins-official" "$PLUGINS_DIR/marketplaces/claude-plugins-official"
-clone_repo "obra/superpowers-marketplace"       "$PLUGINS_DIR/marketplaces/superpowers-marketplace"
-clone_repo "thedotmack/claude-mem"              "$PLUGINS_DIR/marketplaces/thedotmack"
+claude plugins install code-review@claude-plugins-official
+ok "code-review installed"
 
-# Clone actual superpowers plugin (marketplace is just a listing; plugin is a separate repo)
-clone_repo "obra/superpowers" "$PLUGINS_DIR/marketplaces/superpowers-plugin"
+claude plugins install security-guidance@claude-plugins-official
+ok "security-guidance installed"
 
-# ── Install official plugins ──────────────────────────────────────────────────
-# Plugin files live in plugins/<name>/ inside the claude-plugins-official repo
-install_official() {
-  local plugin="$1"
-  local src="$PLUGINS_DIR/marketplaces/claude-plugins-official/plugins/$plugin"
-  local dest="$PLUGINS_DIR/cache/claude-plugins-official/$plugin/unknown"
-  if [ -d "$src" ]; then
-    mkdir -p "$dest"
-    cp -r "$src/." "$dest/"
-    ok "$plugin@claude-plugins-official"
-  else
-    warn "Could not find plugins/$plugin in claude-plugins-official — skipping"
-  fi
-}
-
-install_official "frontend-design"
-install_official "code-review"
-install_official "security-guidance"
-
-# ── Install superpowers (versioned) ───────────────────────────────────────────
-SP_SRC="$PLUGINS_DIR/marketplaces/superpowers-plugin"
-SP_VER=$(node -e "try{const p=require('$SP_SRC/package.json');console.log(p.version||'unknown')}catch(e){console.log('unknown')}" 2>/dev/null || echo "unknown")
-SP_SHA=$(cd "$SP_SRC" && git rev-parse HEAD 2>/dev/null || echo "")
-SP_DEST="$PLUGINS_DIR/cache/superpowers-marketplace/superpowers/$SP_VER"
-mkdir -p "$SP_DEST"
-cp -r "$SP_SRC/." "$SP_DEST/"
-ok "superpowers@superpowers-marketplace ($SP_VER)"
-
-# ── Install claude-mem (versioned) ────────────────────────────────────────────
-MEM_SRC="$PLUGINS_DIR/marketplaces/thedotmack"
-MEM_VER=$(node -e "try{const p=require('$MEM_SRC/package.json');console.log(p.version||'unknown')}catch(e){console.log('unknown')}" 2>/dev/null || echo "unknown")
-MEM_SHA=$(cd "$MEM_SRC" && git rev-parse HEAD 2>/dev/null || echo "")
-MEM_DEST="$PLUGINS_DIR/cache/thedotmack/claude-mem/$MEM_VER"
-mkdir -p "$MEM_DEST"
-cp -r "$MEM_SRC/." "$MEM_DEST/"
-ok "claude-mem@thedotmack ($MEM_VER)"
-
-# ── Write registry files that Claude Code reads at startup ────────────────────
-cat > "$PLUGINS_DIR/known_marketplaces.json" << JSONEOF
-{
-  "claude-plugins-official": {
-    "source": {"source": "github", "repo": "anthropics/claude-plugins-official"},
-    "installLocation": "$PLUGINS_DIR/marketplaces/claude-plugins-official",
-    "lastUpdated": "$NOW"
-  },
-  "superpowers-marketplace": {
-    "source": {"source": "github", "repo": "obra/superpowers-marketplace"},
-    "installLocation": "$PLUGINS_DIR/marketplaces/superpowers-marketplace",
-    "lastUpdated": "$NOW"
-  },
-  "thedotmack": {
-    "source": {"source": "github", "repo": "thedotmack/claude-mem"},
-    "installLocation": "$PLUGINS_DIR/marketplaces/thedotmack",
-    "lastUpdated": "$NOW"
-  }
-}
-JSONEOF
-
-cat > "$PLUGINS_DIR/installed_plugins.json" << JSONEOF
-{
-  "version": 2,
-  "plugins": {
-    "superpowers@superpowers-marketplace": [
-      {
-        "scope": "user",
-        "installPath": "$SP_DEST",
-        "version": "$SP_VER",
-        "installedAt": "$NOW",
-        "lastUpdated": "$NOW",
-        "gitCommitSha": "$SP_SHA"
-      }
-    ],
-    "frontend-design@claude-plugins-official": [
-      {
-        "scope": "user",
-        "installPath": "$PLUGINS_DIR/cache/claude-plugins-official/frontend-design/unknown",
-        "version": "unknown",
-        "installedAt": "$NOW",
-        "lastUpdated": "$NOW"
-      }
-    ],
-    "code-review@claude-plugins-official": [
-      {
-        "scope": "user",
-        "installPath": "$PLUGINS_DIR/cache/claude-plugins-official/code-review/unknown",
-        "version": "unknown",
-        "installedAt": "$NOW",
-        "lastUpdated": "$NOW"
-      }
-    ],
-    "security-guidance@claude-plugins-official": [
-      {
-        "scope": "user",
-        "installPath": "$PLUGINS_DIR/cache/claude-plugins-official/security-guidance/unknown",
-        "version": "unknown",
-        "installedAt": "$NOW",
-        "lastUpdated": "$NOW"
-      }
-    ],
-    "claude-mem@thedotmack": [
-      {
-        "scope": "user",
-        "installPath": "$MEM_DEST",
-        "version": "$MEM_VER",
-        "installedAt": "$NOW",
-        "lastUpdated": "$NOW",
-        "gitCommitSha": "$MEM_SHA"
-      }
-    ]
-  }
-}
-JSONEOF
-
-ok "Plugin manifests written to $PLUGINS_DIR"
+claude plugins install claude-mem@thedotmack
+ok "claude-mem installed"
 
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo -e "\n${GREEN}✓ Codespace setup complete.${NC}"
