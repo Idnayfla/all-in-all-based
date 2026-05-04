@@ -149,7 +149,7 @@ useEffect(() => { fetchMemory(); }, []);
               onClick={() => { setIncognito(s => !s); setIncognitoMessages([]); setActivePanel('chat'); }}
               title="Temp chat — no memory saved"
             >🕵️</button>
-            <button className={`icon-btn ${showSettings ? 'active' : ''}`} onClick={() => setShowSettings(s => !s)}>⚙</button>
+            <button className={`icon-btn ${showSettings ? 'active' : ''}`} onClick={() => setShowSettings(s => !s)} title="Settings" aria-label="Toggle settings">⚙</button>
             <div className="header-status">
               <span className={`status-dot ${isGenerating ? 'generating' : 'ready'}`}>●</span>
               <span className="status-text">{isGenerating ? 'Generating...' : 'Ready'}</span>

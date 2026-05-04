@@ -70,7 +70,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   border-left: 1px solid var(--border); padding-left: 10px; margin-left: 2px;
 }
 .status-dot { font-size: 10px; }
-.status-dot.ready { color: var(--accent3); }
+.status-dot.ready { color: var(--text3); }
 .status-dot.generating { color: var(--accent3); animation: pulse 1s infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
 .status-text { font-size: 11px; color: var(--text3); }
@@ -290,6 +290,8 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
     color: var(--text2); width: 32px; height: 32px; border-radius: 4px;
     cursor: pointer; font-size: 16px; flex-shrink: 0;
   }
+  .project-name-display { display: none; }
+  .tab-btn { padding: 5px 10px; font-size: 10px; }
 }
 
 @media (min-width: 769px) {
