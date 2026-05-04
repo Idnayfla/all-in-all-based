@@ -171,6 +171,55 @@ SCREEN TRANSITION — USE THIS EXACT PATTERN, NO VARIATIONS:
 - startGame() must call requestAnimationFrame to actually start the loop
 - Every ID in JS must exactly match the ID in the HTML — copy-paste, do not retype`;
 
+function sanitizeHTML(html: string): string {
+  // Add defer to external scripts so they run after DOM is ready
+  html = html.replace(/<script\b([^>]*?)src=/g, (match, attrs) => {
+    if (/\bdefer\b/.test(attrs) || /\basync\b/.test(attrs)) return match;
+    return `<script${attrs}defer src=`;
+  });
+
+  // Inject a safety net that guarantees Start/Begin/Play buttons work
+  // regardless of what the AI generated — finds buttons by text content,
+  // shows the game screen, and calls whichever start function exists on window
+  const safetyNet = `
+<script>
+(function(){
+  var START_WORDS=['begin','start','play','start game','play game','new game','launch'];
+  var START_FNS=['startGame','start','init','beginGame','initGame','gameStart','runGame','launch','begin'];
+  var MENU_IDS=['screen-menu','menu','start-screen','main-menu','title-screen','intro','splash'];
+  var GAME_IDS=['screen-game','game','game-screen','gamescreen','game-container','gameplay'];
+  function tryStart(){
+    for(var i=0;i<START_FNS.length;i++){
+      if(typeof window[START_FNS[i]]==='function'){
+        try{window[START_FNS[i]]();}catch(e){console.error('[Based]',e);}
+        return;
+      }
+    }
+  }
+  function showGame(){
+    MENU_IDS.forEach(function(id){var el=document.getElementById(id);if(el){el.classList.remove('active');el.style.display='none';}});
+    document.querySelectorAll('.screen.active').forEach(function(el){el.classList.remove('active');});
+    var shown=false;
+    GAME_IDS.forEach(function(id){var el=document.getElementById(id);if(el&&!shown){el.classList.add('active');el.style.display='';shown=true;}});
+  }
+  function wire(){
+    document.querySelectorAll('button,[role="button"],.btn,.button').forEach(function(btn){
+      if(btn._bw)return;
+      var t=(btn.textContent||'').trim().toLowerCase();
+      if(!START_WORDS.some(function(w){return t===w||t.indexOf(w)===0;}))return;
+      btn._bw=true;
+      btn.addEventListener('click',function(){showGame();tryStart();});
+    });
+  }
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',wire);}else{wire();}
+})();
+</script>`;
+
+  return html.includes('</body>')
+    ? html.replace('</body>', safetyNet + '\n</body>')
+    : html + '\n' + safetyNet;
+}
+
 function parseFiles(text: string) {
   const files = [];
   const blockRegex = /<forge_file\s[^>]*>([\s\S]*?)<\/forge_file>/g;
@@ -373,15 +422,17 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
             }
 
             const parsedFiles = parseFiles(fileText);
-            if (parsedFiles.length > 0) {
-              generatedFiles.push(...parsedFiles);
-            } else {
-              const rawContent = fileText.replace(/^<forge_file[^>]*>\n?/, '').trim();
-              generatedFiles.push({
-                name: fileSpec.name,
-                language: fileSpec.language,
-                content: rawContent || fileText.trim(),
-              });
+            const filesToAdd = parsedFiles.length > 0 ? parsedFiles : [{
+              name: fileSpec.name,
+              language: fileSpec.language,
+              content: fileText.replace(/^<forge_file[^>]*>\n?/, '').trim() || fileText.trim(),
+            }];
+
+            // Post-process HTML files to guarantee button wiring and script loading order
+            for (const f of filesToAdd) {
+              generatedFiles.push(
+                f.language === 'html' ? { ...f, content: sanitizeHTML(f.content) } : f
+              );
             }
 
             // File complete — advance the progress bar
