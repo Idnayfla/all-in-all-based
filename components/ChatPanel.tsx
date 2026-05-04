@@ -13,18 +13,25 @@ const SUGGESTIONS = [
 
 interface GenerationProgress {
   files: string[];
-  current: number;
+  completed: number;  // fully finished files
   total: number;
   file: string;
+  chunks: number;     // chunks received for the current file
 }
 
+// Rough estimate: a typical generated file streams ~250 chunks
+const CHUNKS_PER_FILE = 250;
+
 function ProgressBar({ progress }: { progress: GenerationProgress }) {
-  const pct = Math.round((progress.current / progress.total) * 100);
+  const withinFile = progress.file ? Math.min(progress.chunks / CHUNKS_PER_FILE, 0.92) : 0;
+  const pct = progress.total === 0 ? 0
+    : Math.round((progress.completed + withinFile) / progress.total * 100);
+
   return (
     <div className="generation-progress">
       <div className="gen-progress-header">
-        <span className="gen-progress-file">⚙ {progress.file}</span>
-        <span className="gen-progress-count">{progress.current}/{progress.total}</span>
+        <span className="gen-progress-file">{progress.file ? `⚙ ${progress.file}` : '⏳ Preparing...'}</span>
+        <span className="gen-progress-count">{progress.completed}/{progress.total}</span>
       </div>
       <div className="gen-progress-bar-track">
         <div className="gen-progress-bar-fill" style={{ width: `${pct}%` }} />
@@ -32,8 +39,8 @@ function ProgressBar({ progress }: { progress: GenerationProgress }) {
       <div className="gen-progress-pct">{pct}%</div>
       <div className="gen-progress-files">
         {progress.files.map((f, i) => {
-          const done = i < progress.current - 1;
-          const active = i === progress.current - 1;
+          const done = i < progress.completed;
+          const active = i === progress.completed;
           return (
             <span key={f} className={`gen-file-chip ${done ? 'done' : active ? 'active' : ''}`}>
               {done ? '✓ ' : active ? '⚙ ' : ''}{f}
@@ -129,37 +136,29 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
 
             if (data.plan) {
               flushSync(() => {
-                setGenProgress({ files: data.plan, current: 0, total: data.plan.length, file: '' });
+                setGenProgress({ files: data.plan, completed: 0, total: data.plan.length, file: '', chunks: 0 });
               });
             }
 
-            // status = file starting (update label, keep current bar position)
+            // status = file starting: reset chunk counter, update file label
             if (data.status) {
               flushSync(() => {
-                setGenProgress(prev => ({
-                  files: prev?.files ?? [],
-                  current: prev?.current ?? 0,
-                  total: data.status.total,
-                  file: data.status.file,
-                }));
+                setGenProgress(prev => prev ? { ...prev, file: data.status.file, chunks: 0 } : null);
               });
             }
 
-            // progress = file complete (advance the bar)
+            // progress = file complete: advance completed count, reset chunk counter
             if (data.progress) {
               flushSync(() => {
-                setGenProgress(prev => ({
-                  files: prev?.files ?? [],
-                  current: data.progress.current,
-                  total: data.progress.total,
-                  file: data.progress.file,
-                }));
+                setGenProgress(prev => prev ? { ...prev, completed: data.progress.current, chunks: 0 } : null);
               });
             }
 
             if (data.chunk) {
               window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'chunk', data: data.chunk } }));
               assistantMsg += data.chunk;
+              // Increment chunk counter to drive within-file progress
+              setGenProgress(prev => prev && prev.file ? { ...prev, chunks: prev.chunks + 1 } : prev);
               if (!assistantMsg.includes('<forge_file') && !assistantMsg.includes('<forge_type>')) {
                 setMessages(prev => {
                   const updated = [...prev];
