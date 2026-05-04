@@ -28,6 +28,7 @@ function ProgressBar({ progress }: { progress: GenerationProgress }) {
       <div className="gen-progress-bar-track">
         <div className="gen-progress-bar-fill" style={{ width: `${pct}%` }} />
       </div>
+      <div className="gen-progress-pct">{pct}%</div>
       <div className="gen-progress-files">
         {progress.files.map((f, i) => {
           const done = i < progress.current - 1;

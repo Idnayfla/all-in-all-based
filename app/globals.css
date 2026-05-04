@@ -637,17 +637,24 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 .gen-progress-bar-track {
   width: 100%;
-  height: 4px;
-  background: var(--bg3);
-  border-radius: 2px;
+  height: 6px;
+  background: #2a2a3a;
+  border-radius: 3px;
   overflow: hidden;
 }
 
 .gen-progress-bar-fill {
   height: 100%;
   background: var(--accent3);
-  border-radius: 2px;
-  transition: width 0.3s ease;
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.gen-progress-pct {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 4px;
 }
 
 .gen-progress-files {
