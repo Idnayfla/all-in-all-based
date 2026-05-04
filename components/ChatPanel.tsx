@@ -32,6 +32,20 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     if (ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 200) + 'px'; }
   };
 
+  const parseForgeFiles = (text: string) => {
+    const files: { name: string; language: string; content: string }[] = [];
+    const blockRegex = /<forge_file\s[^>]*>([\s\S]*?)<\/forge_file>/g;
+    let m;
+    while ((m = blockRegex.exec(text)) !== null) {
+      const tag = m[0];
+      const content = m[1].trim();
+      const nameMatch = tag.match(/name=["']([^"']+)["']/);
+      const langMatch = tag.match(/language=["']([^"']+)["']/);
+      if (nameMatch && langMatch) files.push({ name: nameMatch[1], language: langMatch[1], content });
+    }
+    return files;
+  };
+
   const send = async (text?: string) => {
     const content = text ?? input.trim();
     if (!content || isGenerating) return;
@@ -89,18 +103,32 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               // Once file tags detected, stay frozen at Working...
             }
 
+            if (data.error) {
+              window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'error', data: data.error } }));
+              doneHandled = true;
+              setMessages(prev => [
+                ...prev.slice(0, -1),
+                { role: 'assistant', content: `❌ Generation failed: ${data.error}` },
+              ]);
+            }
+
             if (data.done) {
-              window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'done', data: JSON.stringify({ filesCount: data.files?.length, reply: data.reply?.slice(0, 100) }) } }));
+              const resolvedFiles = data.files?.length
+                ? data.files
+                : parseForgeFiles(assistantMsg);
+              window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'done', data: JSON.stringify({ filesCount: resolvedFiles.length, reply: data.reply?.slice(0, 100) }) } }));
               doneHandled = true;
               setMessages(prev => [
                 ...prev.slice(0, -1),
                 { role: 'assistant', content: data.reply || '✅ Done — check the editor.' }
               ]);
-              if (data.files?.length) {
-                onFilesUpdate(data.files, data.projectType);
+              if (resolvedFiles.length) {
+                onFilesUpdate(resolvedFiles, data.projectType);
               }
             }
-          } catch (e) {}
+          } catch (e) {
+            window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'parse-error', data: String(e) } }));
+          }
         }
       }
 

@@ -94,11 +94,17 @@ CRITICAL RULES:
 - Assume all other files are loaded before this one`;
 
 function parseFiles(text: string) {
-  const regex = /<forge_file name="([^"]+)" language="([^"]+)">([\s\S]*?)<\/forge_file>/g;
   const files = [];
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    files.push({ name: match[1], language: match[2], content: match[3].trim() });
+  const blockRegex = /<forge_file\s[^>]*>([\s\S]*?)<\/forge_file>/g;
+  let blockMatch;
+  while ((blockMatch = blockRegex.exec(text)) !== null) {
+    const tag = blockMatch[0];
+    const content = blockMatch[1].trim();
+    const nameMatch = tag.match(/name=["']([^"']+)["']/);
+    const langMatch = tag.match(/language=["']([^"']+)["']/);
+    if (nameMatch && langMatch) {
+      files.push({ name: nameMatch[1], language: langMatch[1], content });
+    }
   }
   return files;
 }
@@ -191,9 +197,12 @@ export async function POST(req: NextRequest) {
           let filePlan: { name: string; language: string; description: string }[] = [];
           try {
             const planText = plannerResponse.content[0].type === 'text' ? plannerResponse.content[0].text : '[]';
-            filePlan = JSON.parse(planText.trim());
+            // Extract JSON array even when the model wraps it in a markdown code fence
+            const jsonMatch = planText.match(/\[[\s\S]*\]/);
+            filePlan = JSON.parse(jsonMatch ? jsonMatch[0] : planText.trim());
+            if (!Array.isArray(filePlan) || filePlan.length === 0) throw new Error('empty plan');
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: `\n📋 Plan: ${filePlan.map((f: any) => f.name).join(', ')}\n` })}\n\n`));
-            } catch (e) {
+          } catch (e) {
             // Fallback to single request
             const stream = await client.messages.stream({
               model: 'claude-opus-4-6',
@@ -244,7 +253,7 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
             // Send progress update
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: `\n⚙️ Generating ${fileSpec.name} (${i + 1}/${filePlan.length})...\n` })}\n\n`));
 
-            const fileStream = await client.messages.stream({
+            const fileStream = client.messages.stream({
               model: 'claude-opus-4-6',
               max_tokens: 16000,
               system: FILE_GENERATOR_SYSTEM,
@@ -257,15 +266,36 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
                 fileText += chunk.delta.text;
               }
             }
+            const fileResult = await fileStream.finalMessage();
+
+            // If the model was cut off before closing the forge_file tag, continue from where it stopped
+            if (fileResult.stop_reason === 'max_tokens' && !fileText.includes('</forge_file>')) {
+              const contStream = client.messages.stream({
+                model: 'claude-opus-4-6',
+                max_tokens: 16000,
+                system: FILE_GENERATOR_SYSTEM,
+                messages: [
+                  { role: 'user', content: filePrompt },
+                  { role: 'assistant', content: fileText },
+                ],
+              });
+              for await (const chunk of contStream) {
+                if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+                  fileText += chunk.delta.text;
+                }
+              }
+            }
 
             const parsedFiles = parseFiles(fileText);
             if (parsedFiles.length > 0) {
               generatedFiles.push(...parsedFiles);
             } else {
+              // Strip the forge_file opening tag if the file was truncated before the closing tag
+              const rawContent = fileText.replace(/^<forge_file[^>]*>\n?/, '').trim();
               generatedFiles.push({
                 name: fileSpec.name,
                 language: fileSpec.language,
-                content: fileText.trim()
+                content: rawContent || fileText.trim(),
               });
             }
           }
