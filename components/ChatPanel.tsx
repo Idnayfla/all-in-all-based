@@ -10,6 +10,39 @@ const SUGGESTIONS = [
   'Build a Markdown editor',
 ];
 
+interface GenerationProgress {
+  files: string[];
+  current: number;
+  total: number;
+  file: string;
+}
+
+function ProgressBar({ progress }: { progress: GenerationProgress }) {
+  const pct = Math.round((progress.current / progress.total) * 100);
+  return (
+    <div className="generation-progress">
+      <div className="gen-progress-header">
+        <span className="gen-progress-file">⚙ {progress.file}</span>
+        <span className="gen-progress-count">{progress.current}/{progress.total}</span>
+      </div>
+      <div className="gen-progress-bar-track">
+        <div className="gen-progress-bar-fill" style={{ width: `${pct}%` }} />
+      </div>
+      <div className="gen-progress-files">
+        {progress.files.map((f, i) => {
+          const done = i < progress.current - 1;
+          const active = i === progress.current - 1;
+          return (
+            <span key={f} className={`gen-file-chip ${done ? 'done' : active ? 'active' : ''}`}>
+              {done ? '✓ ' : active ? '⚙ ' : ''}{f}
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function ChatPanel({ messages, setMessages, files, onFilesUpdate, isGenerating, setIsGenerating, personality, memory, incognito }: {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -22,6 +55,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   incognito: boolean;
 }) {
   const [input, setInput] = useState('');
+  const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -33,7 +67,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   };
 
   const parseForgeFiles = (text: string) => {
-    const files: { name: string; language: string; content: string }[] = [];
+    const forgeFiles: { name: string; language: string; content: string }[] = [];
     const blockRegex = /<forge_file\s[^>]*>([\s\S]*?)<\/forge_file>/g;
     let m;
     while ((m = blockRegex.exec(text)) !== null) {
@@ -41,15 +75,16 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       const content = m[1].trim();
       const nameMatch = tag.match(/name=["']([^"']+)["']/);
       const langMatch = tag.match(/language=["']([^"']+)["']/);
-      if (nameMatch && langMatch) files.push({ name: nameMatch[1], language: langMatch[1], content });
+      if (nameMatch && langMatch) forgeFiles.push({ name: nameMatch[1], language: langMatch[1], content });
     }
-    return files;
+    return forgeFiles;
   };
 
   const send = async (text?: string) => {
     const content = text ?? input.trim();
     if (!content || isGenerating) return;
     setInput('');
+    setGenProgress(null);
     const userMsg: Message = { role: 'user', content };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
@@ -90,6 +125,19 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           try {
             const data = JSON.parse(line.slice(6));
 
+            if (data.plan) {
+              setGenProgress({ files: data.plan, current: 0, total: data.plan.length, file: '' });
+            }
+
+            if (data.progress) {
+              setGenProgress(prev => ({
+                files: prev?.files ?? [],
+                current: data.progress.current,
+                total: data.progress.total,
+                file: data.progress.file,
+              }));
+            }
+
             if (data.chunk) {
               window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'chunk', data: data.chunk } }));
               assistantMsg += data.chunk;
@@ -100,12 +148,12 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                   return updated;
                 });
               }
-              // Once file tags detected, stay frozen at Working...
             }
 
             if (data.error) {
               window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'error', data: data.error } }));
               doneHandled = true;
+              setGenProgress(null);
               setMessages(prev => [
                 ...prev.slice(0, -1),
                 { role: 'assistant', content: `❌ Generation failed: ${data.error}` },
@@ -118,6 +166,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                 : parseForgeFiles(assistantMsg);
               window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'done', data: JSON.stringify({ filesCount: resolvedFiles.length, reply: data.reply?.slice(0, 100) }) } }));
               doneHandled = true;
+              setGenProgress(null);
               setMessages(prev => [
                 ...prev.slice(0, -1),
                 { role: 'assistant', content: data.reply || '✅ Done — check the editor.' }
@@ -133,9 +182,11 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       }
 
     } catch (e) {
+      setGenProgress(null);
       setMessages(prev => [...prev, { role: 'assistant', content: 'Error: Could not reach the API.' }]);
     } finally {
       if (!doneHandled) {
+        setGenProgress(null);
         setMessages(prev => {
           const last = prev[prev.length - 1];
           if (last?.content === '⏳ Working...') {
@@ -148,13 +199,13 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       if (!incognito) {
         try {
           const finalMessages = [...messages, { role: 'user', content }];
-          const res = await fetch('/api/memory', {
+          const memRes = await fetch('/api/memory', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ messages: finalMessages }),
           });
-          const data = await res.json();
-          if (data.memory) {
+          const memData = await memRes.json();
+          if (memData.memory) {
             window.dispatchEvent(new CustomEvent('memory-updated'));
           }
         } catch (e) {}
@@ -183,9 +234,12 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         ) : (
           messages.map((m, i) => (
             <div key={i} className={`message ${m.role}`}>
-              <div className="message-role">{m.role === 'user' ? 'You' : 'Based'}</div>
+              <div className="message-role">{m.role === 'user' ? 'YOU' : 'BASED'}</div>
               <div className="message-content">
-                <ReactMarkdown>{m.content}</ReactMarkdown>
+                {m.role === 'assistant' && genProgress && i === messages.length - 1
+                  ? <ProgressBar progress={genProgress} />
+                  : <ReactMarkdown>{m.content}</ReactMarkdown>
+                }
               </div>
             </div>
           ))

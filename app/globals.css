@@ -608,3 +608,72 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   50% { transform: rotate(180deg) scale(1.1); }
   100% { transform: rotate(360deg) scale(1); }
 }
+/* Generation progress bar */
+.generation-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.gen-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.gen-progress-file {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent3);
+  letter-spacing: 0.5px;
+}
+
+.gen-progress-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text3);
+}
+
+.gen-progress-bar-track {
+  width: 100%;
+  height: 4px;
+  background: var(--bg3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.gen-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent3));
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.gen-progress-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gen-file-chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  color: var(--text3);
+  background: transparent;
+  transition: all 0.2s;
+}
+
+.gen-file-chip.active {
+  border-color: var(--accent3);
+  color: var(--accent3);
+  background: rgba(106, 247, 200, 0.06);
+}
+
+.gen-file-chip.done {
+  border-color: rgba(106, 247, 200, 0.3);
+  color: rgba(106, 247, 200, 0.5);
+}

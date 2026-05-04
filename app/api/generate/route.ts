@@ -238,7 +238,7 @@ export async function POST(req: NextRequest) {
             const jsonMatch = planText.match(/\[[\s\S]*\]/);
             filePlan = JSON.parse(jsonMatch ? jsonMatch[0] : planText.trim());
             if (!Array.isArray(filePlan) || filePlan.length === 0) throw new Error('empty plan');
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: `\n📋 Plan: ${filePlan.map((f: any) => f.name).join(', ')}\n` })}\n\n`));
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ plan: filePlan.map((f: any) => f.name) })}\n\n`));
           } catch (e) {
             // Fallback to single request
             const stream = await client.messages.stream({
@@ -287,8 +287,8 @@ ${generatedContext}${existingContext}
 
 Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
 
-            // Send progress update
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: `\n⚙️ Generating ${fileSpec.name} (${i + 1}/${filePlan.length})...\n` })}\n\n`));
+            // Send structured progress event
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: { current: i + 1, total: filePlan.length, file: fileSpec.name } })}\n\n`));
 
             const fileStream = client.messages.stream({
               model: 'claude-opus-4-6',
