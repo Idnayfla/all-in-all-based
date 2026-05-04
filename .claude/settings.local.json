@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(browse)",
+      "Bash(claude --version)",
+      "Bash(npm list *)",
+      "Read(//c/Users/Obsidian/.claude/plugins/**)",
+      "Read(//c/Users/Obsidian/.claude/skills/**)",
+      "Bash(claude plugins *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
+    ]
+  }
+}
