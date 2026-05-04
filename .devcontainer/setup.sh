@@ -60,11 +60,12 @@ NOW=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
 
 clone_repo() {
   local repo="$1" dest="$2"
-  if [ ! -d "$dest/.git" ]; then
+  if [ -d "$dest/.git" ]; then
+    ok "$repo already cloned"
+  else
+    rm -rf "$dest"
     git clone --depth 1 "https://github.com/$repo.git" "$dest"
     ok "Cloned $repo"
-  else
-    ok "$repo already cloned"
   fi
 }
 
