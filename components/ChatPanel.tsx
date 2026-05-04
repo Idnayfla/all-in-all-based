@@ -159,10 +159,21 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               assistantMsg += data.chunk;
               // Increment chunk counter to drive within-file progress
               setGenProgress(prev => prev && prev.file ? { ...prev, chunks: prev.chunks + 1 } : prev);
-              if (!assistantMsg.includes('<forge_file') && !assistantMsg.includes('<forge_type>')) {
+              const hasForge = assistantMsg.includes('<forge_file') || assistantMsg.includes('<forge_type');
+              if (!hasForge) {
                 setMessages(prev => {
                   const updated = [...prev];
                   updated[updated.length - 1] = { role: 'assistant', content: assistantMsg.trim() || '⏳ Working...' };
+                  return updated;
+                });
+              } else {
+                // Forge tags detected — clear any partial tag text that leaked into the message
+                setMessages(prev => {
+                  const updated = [...prev];
+                  const last = updated[updated.length - 1];
+                  if (last?.content && last.content !== '⏳ Working...') {
+                    updated[updated.length - 1] = { role: 'assistant', content: '⏳ Working...' };
+                  }
                   return updated;
                 });
               }

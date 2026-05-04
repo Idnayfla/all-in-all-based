@@ -203,7 +203,12 @@ function stripTags(text: string) {
 }
 
 function isCodeRequest(message: string): boolean {
-  const codeKeywords = ['make', 'build', 'create', 'generate', 'code', 'write', 'develop', 'fix', 'update', 'add', 'implement', 'modify', 'change', 'edit'];
+  const codeKeywords = [
+    'make', 'build', 'create', 'generate', 'code', 'write', 'develop',
+    'fix', 'update', 'add', 'implement', 'modify', 'change', 'edit',
+    'correct', 'repair', 'patch', 'solve', 'resolve', 'debug',
+    'broken', 'not work', "doesn't work", 'button', 'issue', 'problem', 'bug', 'error',
+  ];
   const lower = message.toLowerCase();
   return codeKeywords.some(k => lower.includes(k));
 }
