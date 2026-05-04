@@ -43,14 +43,38 @@ INTERACTIVITY — EVERY BUTTON AND LINK MUST WORK:
 - Multi-screen apps: use a single-page approach — show/hide <div> sections with CSS classes, never navigate to a new HTML file
 - Test every user flow mentally before outputting: can the user get from the start screen to gameplay to game-over and back?
 
-SCREEN TRANSITIONS (games with a start screen, menu, or "Begin" button):
-- Define ALL screens as <div class="screen" id="screen-menu">, <div class="screen" id="screen-game">, etc. in index.html
-- CSS: .screen { display: none } and .screen.active { display: block } (or flex/grid)
-- The Begin/Start button handler must: (1) hide the current screen by removing "active", (2) show the game screen by adding "active", (3) call the game init/start function
-- The game init function must actually start the game loop — not just set a flag
-- NEVER rely on CSS :active pseudo-class as the only response to a button click — that is just a press animation, not an action
-- Every screen div ID used in JS must exactly match the ID written in index.html — double-check this
-- Wrap the Begin button handler in try/catch and console.error any failure so silent crashes are visible
+SCREEN TRANSITIONS — COPY THIS EXACT PATTERN FOR ANY GAME WITH A START SCREEN:
+
+HTML (index.html):
+  <div id="screen-menu" class="screen active">
+    <button id="btn-begin">Begin</button>
+  </div>
+  <div id="screen-game" class="screen">
+    <canvas id="canvas"></canvas>
+  </div>
+
+CSS:
+  .screen { display: none; }
+  .screen.active { display: flex; } /* or block */
+
+JS (must be in a <script defer> or inside DOMContentLoaded):
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('btn-begin').addEventListener('click', () => {
+      try {
+        document.getElementById('screen-menu').classList.remove('active');
+        document.getElementById('screen-game').classList.add('active');
+        startGame();
+      } catch (e) { console.error('Begin failed:', e); }
+    });
+  });
+
+RULES:
+- Copy this pattern exactly — do not invent a different approach
+- NEVER use onclick="..." on any HTML element
+- NEVER querySelector or getElementById before DOMContentLoaded (returns null, listener silently fails)
+- Every ID in JS must exactly match the ID in the HTML
+- startGame() must start the game loop (call requestAnimationFrame), not just set a flag
+- Script tags: <script defer src="game.js"></script> — always defer, never bare <script src="..."></script>
 
 BUG FIXING RULES:
 - First, identify exactly which file(s) contain the broken code
@@ -117,18 +141,35 @@ CRITICAL RULES:
 
 INTERACTIVITY RULES (non-negotiable):
 - NEVER use onclick="..." in HTML — attach all listeners in JS with addEventListener
-- All JS event listeners must be inside DOMContentLoaded or placed in a deferred script
+- NEVER query the DOM before DOMContentLoaded — the element will be null and the listener silently fails
+- Script tags in index.html: always <script defer src="..."></script> — never bare <script src="...">
 - Every button must do something visible when clicked — show a screen, start a game, play a sound
-- Multi-screen games: use show/hide div sections (CSS display:none / display:block), never separate HTML files
-- If generating index.html with multiple JS files: load them with <script defer src="..."> in dependency order
-- Mentally trace every button click to its outcome before writing — if a path is broken, fix it
+- Multi-screen games: show/hide <div class="screen"> sections with a CSS .active class
 
-SCREEN TRANSITION PATTERN (Begin/Start/Play buttons):
-- All screens are <div class="screen" id="screen-X"> in HTML; CSS hides all, .active shows the current one
-- Begin button handler: remove "active" from current screen → add "active" to game screen → call startGame()
-- startGame() must actually initialize and run the game (start the loop, render the first frame)
-- IDs referenced in JS must exactly match IDs in the HTML — mismatches cause silent failures
-- Wrap every button handler in try/catch and log errors so failures are never silent`;
+SCREEN TRANSITION — USE THIS EXACT PATTERN, NO VARIATIONS:
+  /* CSS */
+  .screen { display: none; }
+  .screen.active { display: flex; }
+
+  <!-- HTML -->
+  <div id="screen-menu" class="screen active">
+    <button id="btn-begin">Begin</button>
+  </div>
+  <div id="screen-game" class="screen">...</div>
+
+  // JS — inside DOMContentLoaded
+  document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('btn-begin').addEventListener('click', () => {
+      try {
+        document.getElementById('screen-menu').classList.remove('active');
+        document.getElementById('screen-game').classList.add('active');
+        startGame();
+      } catch (e) { console.error('Begin failed:', e); }
+    });
+  });
+
+- startGame() must call requestAnimationFrame to actually start the loop
+- Every ID in JS must exactly match the ID in the HTML — copy-paste, do not retype`;
 
 function parseFiles(text: string) {
   const files = [];
