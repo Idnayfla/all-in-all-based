@@ -171,9 +171,9 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       <div className="chat-messages">
         {messages.length === 0 ? (
           <div className="chat-empty">
-            <div className="chat-empty-icon">⬡</div>
-            <div className="chat-empty-title">ALL IN ALL BASED</div>
-            <div className="chat-empty-sub">Making your life easier is what matter.</div>
+            <div className="chat-empty-logo" />
+            <div className="chat-empty-title">BASED</div>
+            <div className="chat-empty-sub">Your AI coding assistant. Describe what you want to build.</div>
             <div className="chat-suggestions">
               {SUGGESTIONS.map(s => (
                 <button key={s} className="suggestion-btn" onClick={() => send(s)}>{s}</button>

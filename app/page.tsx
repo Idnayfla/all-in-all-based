@@ -245,9 +245,9 @@ useEffect(() => { fetchMemory(); }, []);
             </div>
           ) : !currentProject ? (
             <div className="no-project">
-              <div className="no-project-icon">⬡</div>
-              <div className="no-project-title">Welcome to Based</div>
-              <div className="no-project-sub">Create a new project to get started.</div>
+              <div className="chat-empty-logo" />
+              <div className="no-project-title">BASED</div>
+              <div className="no-project-sub">Open a project or start a new one.</div>
               <button className="new-project-btn-large" onClick={newProject}>+ New Project</button>
             </div>
           ) : (
