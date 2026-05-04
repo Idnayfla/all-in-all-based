@@ -211,6 +211,10 @@ SETTINGSEOF
 
 ok "Claude Code settings and plugin manifests written"
 
+# ── 6. Convenience aliases ────────────────────────────────────────────────────
+echo 'alias save="git add -A && git commit -m \"save\" && git push"' >> ~/.bashrc
+ok "save alias added"
+
 # ── Done ──────────────────────────────────────────────────────────────────────
 echo -e "\n${GREEN}✓ Codespace setup complete.${NC}"
 echo "The Next.js dev server will start automatically on port 3000."
