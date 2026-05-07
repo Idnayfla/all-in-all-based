@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { Message, FileNode, ContentBlock, contentToString } from '@/app/page';
+import { Message, FileNode, ContentBlock } from '@/app/page';
 import ReactMarkdown from 'react-markdown';
 
 const SUGGESTIONS = [
@@ -90,6 +90,9 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       const [meta, data] = dataUrl.split(',');
       const mediaType = meta.match(/:(.*?);/)?.[1] as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
       setPendingImage({ data, mediaType, previewUrl: dataUrl });
+    };
+    reader.onerror = () => {
+      console.error('Failed to read image file');
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -282,11 +285,15 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     if (typeof content === 'string') return <ReactMarkdown>{content}</ReactMarkdown>;
     return (
       <>
-        {content.map((block, i) =>
-          block.type === 'image'
-            ? <img key={i} className="chat-img-thumb" src={`data:${block.mediaType};base64,${block.data}`} alt="uploaded image" />
-            : <ReactMarkdown key={i}>{block.text}</ReactMarkdown>
-        )}
+        {content.map((block, i) => {
+          if (block.type === 'image') {
+            return <img key={i} className="chat-img-thumb" src={`data:${block.mediaType};base64,${block.data}`} alt="uploaded image" />;
+          }
+          if (block.type === 'text') {
+            return <ReactMarkdown key={i}>{block.text}</ReactMarkdown>;
+          }
+          return null;
+        })}
       </>
     );
   }
