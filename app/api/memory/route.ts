@@ -4,6 +4,17 @@ import { createClient } from 'redis';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+function contentToText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content
+      .filter((b: any) => b.type === 'text')
+      .map((b: any) => b.text as string)
+      .join('\n');
+  }
+  return '';
+}
+
 export async function GET() {
   const redis = createClient({ url: process.env.REDIS_URL });
   try {
@@ -23,7 +34,7 @@ export async function POST(req: NextRequest) {
     const { messages } = await req.json();
 
     const conversation = messages
-      .map((m: any) => `${m.role.toUpperCase()}: ${m.content}`)
+      .map((m: any) => `${m.role.toUpperCase()}: ${contentToText(m.content)}`)
       .join('\n');
 
     await redis.connect();
