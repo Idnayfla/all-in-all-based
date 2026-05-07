@@ -263,10 +263,16 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       if (!incognito) {
         try {
           const finalMessages = [...messages, userMsg];
+          const memMessages = finalMessages.map(m => ({
+            role: m.role,
+            content: Array.isArray(m.content)
+              ? m.content.filter((b: { type: string }) => b.type === 'text')
+              : m.content,
+          }));
           const memRes = await fetch('/api/memory', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messages: finalMessages }),
+            body: JSON.stringify({ messages: memMessages }),
           });
           const memData = await memRes.json();
           if (memData.memory) {

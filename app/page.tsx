@@ -82,7 +82,13 @@ useEffect(() => { fetchMemory(); }, []);
 
   useEffect(() => {
     if (!currentProject || (files.length === 0 && messages.length === 0)) return;
-    const updated: Project = { ...currentProject, files, messages, updatedAt: Date.now() };
+    const strippedMessages = messages.map(m => ({
+      ...m,
+      content: Array.isArray(m.content)
+        ? m.content.map(b => b.type === 'image' ? { type: 'text' as const, text: '[image]' } : b)
+        : m.content,
+    }));
+    const updated: Project = { ...currentProject, files, messages: strippedMessages, updatedAt: Date.now() };
     setCurrentProject(updated);
     const allProjects = projects.map(p => p.id === updated.id ? updated : p);
     const exists = projects.find(p => p.id === updated.id);
