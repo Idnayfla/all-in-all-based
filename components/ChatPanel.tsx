@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { Message, FileNode } from '@/app/page';
+import { Message, FileNode, ContentBlock, contentToString } from '@/app/page';
 import ReactMarkdown from 'react-markdown';
 
 const SUGGESTIONS = [
@@ -67,12 +67,37 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingImage, setPendingImage] = useState<{
+    data: string;
+    mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+    previewUrl: string;
+  } | null>(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   const autoResize = () => {
     const ta = textareaRef.current;
     if (ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 200) + 'px'; }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      const [meta, data] = dataUrl.split(',');
+      const mediaType = meta.match(/:(.*?);/)?.[1] as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+      setPendingImage({ data, mediaType, previewUrl: dataUrl });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const clearPendingImage = () => {
+    setPendingImage(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const parseForgeFiles = (text: string) => {
@@ -90,11 +115,22 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   };
 
   const send = async (text?: string) => {
-    const content = text ?? input.trim();
-    if (!content || isGenerating) return;
+    const trimmed = (text ?? input).trim();
+    if (!trimmed && !pendingImage) return;
+    if (isGenerating) return;
+
+    const messageContent: Message['content'] = pendingImage
+      ? [
+          { type: 'image', mediaType: pendingImage.mediaType, data: pendingImage.data },
+          ...(trimmed ? [{ type: 'text' as const, text: trimmed }] : []),
+        ]
+      : trimmed;
+
     setInput('');
+    setPendingImage(null);
     setGenProgress(null);
-    const userMsg: Message = { role: 'user', content };
+
+    const userMsg: Message = { role: 'user', content: messageContent };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setIsGenerating(true);
@@ -140,14 +176,12 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               });
             }
 
-            // status = file starting: reset chunk counter, update file label
             if (data.status) {
               flushSync(() => {
                 setGenProgress(prev => prev ? { ...prev, file: data.status.file, chunks: 0 } : null);
               });
             }
 
-            // progress = file complete: advance completed count, reset chunk counter
             if (data.progress) {
               flushSync(() => {
                 setGenProgress(prev => prev ? { ...prev, completed: data.progress.current, chunks: 0 } : null);
@@ -157,7 +191,6 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             if (data.chunk) {
               window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'chunk', data: data.chunk } }));
               assistantMsg += data.chunk;
-              // Increment chunk counter to drive within-file progress
               setGenProgress(prev => prev && prev.file ? { ...prev, chunks: prev.chunks + 1 } : prev);
               const hasForge = assistantMsg.includes('<forge_file') || assistantMsg.includes('<forge_type');
               if (!hasForge) {
@@ -167,7 +200,6 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                   return updated;
                 });
               } else {
-                // Forge tags detected — clear any partial tag text that leaked into the message
                 setMessages(prev => {
                   const updated = [...prev];
                   const last = updated[updated.length - 1];
@@ -227,7 +259,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       setIsGenerating(false);
       if (!incognito) {
         try {
-          const finalMessages = [...messages, { role: 'user', content }];
+          const finalMessages = [...messages, userMsg];
           const memRes = await fetch('/api/memory', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -245,6 +277,19 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   const handleKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   };
+
+  function renderContent(content: string | ContentBlock[]) {
+    if (typeof content === 'string') return <ReactMarkdown>{content}</ReactMarkdown>;
+    return (
+      <>
+        {content.map((block, i) =>
+          block.type === 'image'
+            ? <img key={i} className="chat-img-thumb" src={`data:${block.mediaType};base64,${block.data}`} alt="uploaded image" />
+            : <ReactMarkdown key={i}>{block.text}</ReactMarkdown>
+        )}
+      </>
+    );
+  }
 
   return (
     <div className="chat-panel">
@@ -267,7 +312,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               <div className="message-content">
                 {m.role === 'assistant' && genProgress && i === messages.length - 1
                   ? <ProgressBar progress={genProgress} />
-                  : <ReactMarkdown>{m.content}</ReactMarkdown>
+                  : renderContent(m.content)
                 }
               </div>
             </div>
@@ -276,19 +321,44 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         <div ref={bottomRef} />
       </div>
       <div className="chat-input-area">
-        <textarea
-          ref={textareaRef}
-          className="chat-textarea"
-          value={input}
-          onChange={e => { setInput(e.target.value); autoResize(); }}
-          onKeyDown={handleKey}
-          placeholder="Ask Based anything..."
-          rows={1}
-          disabled={isGenerating}
-        />
-        <button className="send-btn" onClick={() => send()} disabled={isGenerating || !input.trim()}>
-          Send
-        </button>
+        {pendingImage && (
+          <div className="chat-image-preview">
+            <img className="chat-img-thumb" src={pendingImage.previewUrl} alt="pending upload" />
+            <button className="img-clear-btn" onClick={clearPendingImage} title="Remove image">✕</button>
+          </div>
+        )}
+        <div className="chat-input-row">
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            onChange={handleFileChange}
+          />
+          <button
+            className="upload-btn"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isGenerating}
+            title="Attach image"
+          >📎</button>
+          <textarea
+            ref={textareaRef}
+            className="chat-textarea"
+            value={input}
+            onChange={e => { setInput(e.target.value); autoResize(); }}
+            onKeyDown={handleKey}
+            placeholder="Ask Based anything..."
+            rows={1}
+            disabled={isGenerating}
+          />
+          <button
+            className="send-btn"
+            onClick={() => send()}
+            disabled={isGenerating || (!input.trim() && !pendingImage)}
+          >
+            Send
+          </button>
+        </div>
       </div>
     </div>
   );
