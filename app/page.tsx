@@ -95,7 +95,7 @@ useEffect(() => { fetchMemory(); }, []);
     const final = exists ? allProjects : [...projects, updated];
     setProjects(final);
     localStorage.setItem('forge_projects', JSON.stringify(final));
-  }, [files, messages]);
+  }, [files, messages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const newProject = () => {
     const name = prompt('Project name:');
