@@ -251,6 +251,41 @@ function stripTags(text: string) {
     .trim();
 }
 
+type ApiContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; mediaType: string; data: string };
+
+function msgToString(content: string | ApiContentBlock[]): string {
+  if (typeof content === 'string') return content;
+  return content
+    .filter((b): b is Extract<ApiContentBlock, { type: 'text' }> => b.type === 'text')
+    .map(b => b.text)
+    .join('\n');
+}
+
+function toClaudeContent(
+  content: string | ApiContentBlock[],
+  appendText?: string
+): string | object[] {
+  if (typeof content === 'string') {
+    return appendText ? content + appendText : content;
+  }
+  const blocks: object[] = content.map(block =>
+    block.type === 'text'
+      ? { type: 'text' as const, text: block.text }
+      : {
+          type: 'image' as const,
+          source: {
+            type: 'base64' as const,
+            media_type: block.mediaType,
+            data: block.data,
+          },
+        }
+  );
+  if (appendText) blocks.push({ type: 'text', text: appendText });
+  return blocks;
+}
+
 function isCodeRequest(message: string): boolean {
   const codeKeywords = [
     'make', 'build', 'create', 'generate', 'code', 'write', 'develop',
@@ -276,7 +311,8 @@ export async function POST(req: NextRequest) {
     } catch (e) {}
 
     const recentMessages = messages.slice(-10);
-    const lastUserMessage = recentMessages.filter((m: any) => m.role === 'user').pop()?.content ?? '';
+    const lastUserMsg = recentMessages.filter((m: any) => m.role === 'user').pop();
+    const lastUserMessage = msgToString(lastUserMsg?.content ?? '');
 
     const context = existingFiles?.length
       ? `\n\nCurrent project files:\n${existingFiles.map((f: any) => `--- ${f.name} (${f.language}) ---\n${f.content}`).join('\n\n')}`
@@ -285,8 +321,8 @@ export async function POST(req: NextRequest) {
     const anthropicMessages = recentMessages.map((m: any, i: number) => ({
       role: m.role,
       content: i === recentMessages.length - 1 && m.role === 'user'
-        ? m.content + context
-        : m.content,
+        ? toClaudeContent(m.content, context || undefined)
+        : toClaudeContent(m.content),
     }));
 
     const fullSystem = `${personality ? personality + '\n\n' : ''}${SYSTEM}${globalMemory ? `\n\nGLOBAL USER MEMORY:\n${globalMemory}` : ''}${memory ? `\n\nPROJECT MEMORY:\n${memory}` : ''}`;
