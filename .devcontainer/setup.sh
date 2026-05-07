@@ -66,9 +66,11 @@ clone_repo() {
 }
 
 # Clone marketplace index repos
-clone_repo "anthropics/claude-plugins-official" "$PLUGINS_DIR/marketplaces/claude-plugins-official"
-clone_repo "obra/superpowers-marketplace"       "$PLUGINS_DIR/marketplaces/superpowers-marketplace"
-clone_repo "thedotmack/claude-mem"              "$PLUGINS_DIR/marketplaces/thedotmack"
+clone_repo "anthropics/claude-plugins-official"   "$PLUGINS_DIR/marketplaces/claude-plugins-official"
+clone_repo "obra/superpowers-marketplace"          "$PLUGINS_DIR/marketplaces/superpowers-marketplace"
+clone_repo "thedotmack/claude-mem"                 "$PLUGINS_DIR/marketplaces/thedotmack"
+clone_repo "nextlevelbuilder/ui-ux-pro-max-skill"  "$PLUGINS_DIR/marketplaces/ui-ux-pro-max-skill"
+clone_repo "Schoepplake/framer-motion-skill"       "$PLUGINS_DIR/marketplaces/framer-motion-skill"
 
 # Clone actual superpowers plugin (the marketplace repo is just a listing)
 clone_repo "obra/superpowers" "$PLUGINS_DIR/marketplaces/superpowers-plugin"
@@ -86,6 +88,7 @@ install_official() {
 install_official "frontend-design"
 install_official "code-review"
 install_official "security-guidance"
+install_official "context7"
 
 # Superpowers — versioned folder
 SP_SRC="$PLUGINS_DIR/marketplaces/superpowers-plugin"
@@ -105,6 +108,24 @@ mkdir -p "$MEM_DEST"
 cp -r "$MEM_SRC/." "$MEM_DEST/"
 ok "claude-mem@thedotmack ($MEM_VER)"
 
+# ui-ux-pro-max — versioned folder
+UX_SRC="$PLUGINS_DIR/marketplaces/ui-ux-pro-max-skill"
+UX_VER=$(node -e "try{const p=require('$UX_SRC/package.json');console.log(p.version||'unknown')}catch(e){console.log('unknown')}" 2>/dev/null || echo "unknown")
+UX_SHA=$(cd "$UX_SRC" && git rev-parse HEAD 2>/dev/null || echo "")
+UX_DEST="$PLUGINS_DIR/cache/ui-ux-pro-max-skill/ui-ux-pro-max/$UX_VER"
+mkdir -p "$UX_DEST"
+cp -r "$UX_SRC/." "$UX_DEST/"
+ok "ui-ux-pro-max@ui-ux-pro-max-skill ($UX_VER)"
+
+# framer-motion — versioned folder
+FM_SRC="$PLUGINS_DIR/marketplaces/framer-motion-skill"
+FM_VER=$(node -e "try{const p=require('$FM_SRC/package.json');console.log(p.version||'unknown')}catch(e){console.log('unknown')}" 2>/dev/null || echo "unknown")
+FM_SHA=$(cd "$FM_SRC" && git rev-parse HEAD 2>/dev/null || echo "")
+FM_DEST="$PLUGINS_DIR/cache/framer-motion-skill/framer-motion/$FM_VER"
+mkdir -p "$FM_DEST"
+cp -r "$FM_SRC/." "$FM_DEST/"
+ok "framer-motion@framer-motion-skill ($FM_VER)"
+
 # Write plugin registry files
 cat > "$PLUGINS_DIR/known_marketplaces.json" << JSONEOF
 {
@@ -121,6 +142,16 @@ cat > "$PLUGINS_DIR/known_marketplaces.json" << JSONEOF
   "thedotmack": {
     "source": {"source": "github", "repo": "thedotmack/claude-mem"},
     "installLocation": "$PLUGINS_DIR/marketplaces/thedotmack",
+    "lastUpdated": "$NOW"
+  },
+  "ui-ux-pro-max-skill": {
+    "source": {"source": "github", "repo": "nextlevelbuilder/ui-ux-pro-max-skill"},
+    "installLocation": "$PLUGINS_DIR/marketplaces/ui-ux-pro-max-skill",
+    "lastUpdated": "$NOW"
+  },
+  "framer-motion-skill": {
+    "source": {"source": "github", "repo": "Schoepplake/framer-motion-skill"},
+    "installLocation": "$PLUGINS_DIR/marketplaces/framer-motion-skill",
     "lastUpdated": "$NOW"
   }
 }
@@ -167,6 +198,15 @@ cat > "$PLUGINS_DIR/installed_plugins.json" << JSONEOF
         "lastUpdated": "$NOW"
       }
     ],
+    "context7@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "$PLUGINS_DIR/cache/claude-plugins-official/context7/unknown",
+        "version": "unknown",
+        "installedAt": "$NOW",
+        "lastUpdated": "$NOW"
+      }
+    ],
     "claude-mem@thedotmack": [
       {
         "scope": "user",
@@ -175,6 +215,26 @@ cat > "$PLUGINS_DIR/installed_plugins.json" << JSONEOF
         "installedAt": "$NOW",
         "lastUpdated": "$NOW",
         "gitCommitSha": "$MEM_SHA"
+      }
+    ],
+    "ui-ux-pro-max@ui-ux-pro-max-skill": [
+      {
+        "scope": "user",
+        "installPath": "$UX_DEST",
+        "version": "$UX_VER",
+        "installedAt": "$NOW",
+        "lastUpdated": "$NOW",
+        "gitCommitSha": "$UX_SHA"
+      }
+    ],
+    "framer-motion@framer-motion-skill": [
+      {
+        "scope": "user",
+        "installPath": "$FM_DEST",
+        "version": "$FM_VER",
+        "installedAt": "$NOW",
+        "lastUpdated": "$NOW",
+        "gitCommitSha": "$FM_SHA"
       }
     ]
   }
@@ -190,7 +250,10 @@ cat > "$HOME/.claude/settings.json" << 'SETTINGSEOF'
     "frontend-design@claude-plugins-official": true,
     "code-review@claude-plugins-official": true,
     "security-guidance@claude-plugins-official": true,
-    "claude-mem@thedotmack": true
+    "context7@claude-plugins-official": true,
+    "claude-mem@thedotmack": true,
+    "ui-ux-pro-max@ui-ux-pro-max-skill": true,
+    "framer-motion@framer-motion-skill": true
   },
   "extraKnownMarketplaces": {
     "superpowers-marketplace": {
@@ -203,6 +266,18 @@ cat > "$HOME/.claude/settings.json" << 'SETTINGSEOF'
       "source": {
         "source": "github",
         "repo": "thedotmack/claude-mem"
+      }
+    },
+    "ui-ux-pro-max-skill": {
+      "source": {
+        "source": "github",
+        "repo": "nextlevelbuilder/ui-ux-pro-max-skill"
+      }
+    },
+    "framer-motion-skill": {
+      "source": {
+        "source": "github",
+        "repo": "Schoepplake/framer-motion-skill"
       }
     }
   }
