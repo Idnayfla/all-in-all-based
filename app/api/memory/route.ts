@@ -9,7 +9,7 @@ function contentToText(content: unknown): string {
   if (Array.isArray(content)) {
     return content
       .filter((b: any) => b.type === 'text')
-      .map((b: any) => b.text as string)
+      .map((b: any) => b.text ?? '')
       .join('\n');
   }
   return '';
