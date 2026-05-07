@@ -6,6 +6,7 @@ import EditorPanel from '@/components/EditorPanel';
 import PreviewPanel from '@/components/PreviewPanel';
 import Sidebar from '@/components/Sidebar';
 import DebugPanel from '@/components/DebugPanel';
+import AnimatedLogo from '@/components/AnimatedLogo';
 
 export interface FileNode {
   name: string;
@@ -133,8 +134,7 @@ useEffect(() => { fetchMemory(); }, []);
       <header className="app-header">
         <div className="logo">
           <button className="hamburger" onClick={() => setSidebarOpen(s => !s)}>☰</button>
-          <img src="/icon-192.png" className="logo-img" alt="Based" />
-          <span className="logo-text">BASED</span>
+          <AnimatedLogo />
           {currentProject && <span className="project-name-display">{currentProject.name}</span>}
         </div>
         <nav className="header-nav">
