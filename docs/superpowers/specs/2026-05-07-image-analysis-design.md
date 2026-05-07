@@ -101,15 +101,16 @@ When `pendingImage !== null`, render above the textarea:
 ### Send behaviour
 
 ```ts
+const trimmed = input.trim();
 const content: Message['content'] = pendingImage
   ? [
       { type: 'image', mediaType: pendingImage.mediaType, data: pendingImage.data },
-      { type: 'text', text: input.trim() },
+      ...(trimmed ? [{ type: 'text' as const, text: trimmed }] : []),
     ]
-  : input.trim();
+  : trimmed;
 ```
 
-`setPendingImage(null)` is called alongside clearing the input on send.
+`setPendingImage(null)` is called alongside clearing the input on send. The send button is enabled when either `pendingImage !== null` or `input.trim()` is non-empty (image-only sends are valid).
 
 ### Message history rendering
 
