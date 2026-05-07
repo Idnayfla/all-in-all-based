@@ -14,9 +14,21 @@ export interface FileNode {
   language: string;
 }
 
+export type ContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'; data: string };
+
 export interface Message {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | ContentBlock[];
+}
+
+export function contentToString(content: string | ContentBlock[]): string {
+  if (typeof content === 'string') return content;
+  return content
+    .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
+    .map(b => b.text)
+    .join('\n');
 }
 
 export interface Project {
