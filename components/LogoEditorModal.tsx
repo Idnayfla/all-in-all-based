@@ -123,7 +123,7 @@ export default function LogoEditorModal({ config, onSave, onClose }: {
               type="range" min="15" max="70" step="5"
               className="logo-editor-slider"
               value={draft.shimmerWidth}
-              onChange={e => patch({ shimmerWidth: parseInt(e.target.value) })}
+              onChange={e => patch({ shimmerWidth: parseInt(e.target.value, 10) })}
             />
             <span className="logo-slider-cap">Wide</span>
           </div>
