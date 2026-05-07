@@ -145,7 +145,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 .chat-input-area {
   padding: 16px 24px; border-top: 1px solid var(--border-subtle); background: var(--bg2);
-  display: flex; gap: 12px; align-items: flex-end;
+  display: flex; flex-direction: column; gap: 8px;
   padding-bottom: calc(16px + env(safe-area-inset-bottom));
 }
 .chat-textarea {
@@ -166,6 +166,36 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 .send-btn:hover { background: #6a58e0; }
 .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.chat-input-row {
+  display: flex; gap: 12px; align-items: flex-end;
+}
+
+.upload-btn {
+  padding: 12px; background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text2); font-size: 16px; cursor: pointer; border-radius: 8px;
+  transition: all 0.15s; flex-shrink: 0; line-height: 1;
+}
+.upload-btn:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); }
+.upload-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.chat-image-preview {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; background: var(--bg3);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+
+.img-clear-btn {
+  background: none; border: none; color: var(--text3); font-size: 14px;
+  cursor: pointer; padding: 2px 6px; border-radius: 4px; line-height: 1;
+  transition: color 0.15s;
+}
+.img-clear-btn:hover { color: var(--danger); }
+
+.chat-img-thumb {
+  width: 64px; height: 64px; object-fit: cover;
+  border-radius: 6px; border: 1px solid var(--border); display: block;
+}
 
 .editor-panel { display: flex; flex-direction: column; height: 100%; }
 .editor-header { padding: 10px 20px; background: var(--bg2); border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 8px; }
