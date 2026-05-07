@@ -263,20 +263,27 @@ function msgToString(content: string | ApiContentBlock[]): string {
     .join('\n');
 }
 
+type ClaudeTextBlock = { type: 'text'; text: string };
+type ClaudeImageBlock = {
+  type: 'image';
+  source: { type: 'base64'; media_type: string; data: string };
+};
+type ClaudeContentBlock = ClaudeTextBlock | ClaudeImageBlock;
+
 function toClaudeContent(
   content: string | ApiContentBlock[],
   appendText?: string
-): string | object[] {
+): string | ClaudeContentBlock[] {
   if (typeof content === 'string') {
     return appendText ? content + appendText : content;
   }
-  const blocks: object[] = content.map(block =>
+  const blocks: ClaudeContentBlock[] = content.map(block =>
     block.type === 'text'
-      ? { type: 'text' as const, text: block.text }
+      ? { type: 'text', text: block.text }
       : {
-          type: 'image' as const,
+          type: 'image',
           source: {
-            type: 'base64' as const,
+            type: 'base64',
             media_type: block.mediaType,
             data: block.data,
           },
