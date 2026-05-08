@@ -701,11 +701,18 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   white-space: nowrap;
 }
 
+@keyframes logo-shimmer-slide {
+  0%   { transform: translateX(-150%); }
+  70%  { transform: translateX(350%); }
+  100% { transform: translateX(350%); }
+}
+
 .logo-shimmer {
   position: absolute;
   top: 0; left: 0;
   height: 100%;
   pointer-events: none;
+  animation: logo-shimmer-slide var(--logo-speed, 4s) ease-in-out infinite;
 }
 
 .logo-edit-btn {
@@ -722,7 +729,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   padding: 0;
-  transition: color 0.15s, border-color 0.15s;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
   z-index: 10;
 }
 

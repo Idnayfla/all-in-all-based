@@ -3,7 +3,7 @@ import Anthropic from '@anthropic-ai/sdk';
 
 export const maxDuration = 300;
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const client = new Anthropic({ apiKey: process.env.APP_ANTHROPIC_API_KEY });
 
 const SYSTEM = `You are Based, the AI inside All in All Based — an elite coding assistant and personal dev studio. You build production-quality applications, games, and tools.
 
@@ -94,7 +94,14 @@ MOBILE & TOUCH:
 ARCHITECTURE PATTERNS:
 - Games: game state object, requestAnimationFrame loop, separate input/update/render phases
 - Dashboards: fetch → transform → render, loading/error states always
-- Forms: validate on submit, show inline errors, disable during processing`;
+- Forms: validate on submit, show inline errors, disable during processing
+
+IMAGE MANIPULATION:
+- When the user provides an image to edit/filter/transform: build a Canvas-based tool that applies the operation
+- Reference the user's image with the exact source string __BASED_IMAGE_SRC__ — the real base64 data URL will be injected at build time
+- Never use a placeholder URL like "image.jpg" or "your-image.png" — only __BASED_IMAGE_SRC__ for user-provided images
+- Load the image onto a canvas, apply the requested filter/transform, display the result immediately on page load
+- Always include a Download button that saves the canvas output as a PNG via canvas.toDataURL()`;
 
 const PLANNER_SYSTEM = `You are a software architect. Output ONLY a JSON array. No explanation. No markdown. Raw JSON only.
 
@@ -127,6 +134,10 @@ Output format:
 const FILE_GENERATOR_SYSTEM = `You are Based, an elite coding assistant. Generate ONE file as part of a larger project.
 
 Output ONLY the file content inside forge_file tags. Nothing else.
+
+IMAGE SOURCE RULE:
+- If this project uses a user-provided image: always write __BASED_IMAGE_SRC__ as the image src or data URL — this exact string will be replaced with the real base64 data URL at build time
+- Never invent a file path or URL for a user's uploaded image — only __BASED_IMAGE_SRC__
 
 Format:
 <forge_file name="FILENAME" language="LANGUAGE">
@@ -170,6 +181,16 @@ SCREEN TRANSITION — USE THIS EXACT PATTERN, NO VARIATIONS:
 
 - startGame() must call requestAnimationFrame to actually start the loop
 - Every ID in JS must exactly match the ID in the HTML — copy-paste, do not retype`;
+
+const PLANNER_SYSTEM_BLOCKS = [
+  { type: 'text' as const, text: PLANNER_SYSTEM, cache_control: { type: 'ephemeral' as const } },
+];
+
+const FILE_GENERATOR_SYSTEM_BLOCKS = [
+  { type: 'text' as const, text: FILE_GENERATOR_SYSTEM, cache_control: { type: 'ephemeral' as const } },
+];
+
+const IMAGE_SRC_PLACEHOLDER = '__BASED_IMAGE_SRC__';
 
 function sanitizeHTML(html: string): string {
   // Add defer to external scripts so they run after DOM is ready
@@ -264,9 +285,10 @@ function msgToString(content: string | ApiContentBlock[]): string {
 }
 
 type ClaudeTextBlock = { type: 'text'; text: string };
+type ImageMediaType = 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
 type ClaudeImageBlock = {
   type: 'image';
-  source: { type: 'base64'; media_type: string; data: string };
+  source: { type: 'base64'; media_type: ImageMediaType; data: string };
 };
 type ClaudeContentBlock = ClaudeTextBlock | ClaudeImageBlock;
 
@@ -284,7 +306,7 @@ function toClaudeContent(
           type: 'image',
           source: {
             type: 'base64',
-            media_type: block.mediaType,
+            media_type: block.mediaType as ImageMediaType,
             data: block.data,
           },
         }
@@ -321,6 +343,20 @@ export async function POST(req: NextRequest) {
     const lastUserMsg = recentMessages.filter((m: any) => m.role === 'user').pop();
     const lastUserMessage = msgToString(lastUserMsg?.content ?? '');
 
+    // Extract image blocks from the last user message for reuse in planner + file generators
+    const hasImage = Array.isArray(lastUserMsg?.content) &&
+      (lastUserMsg.content as any[]).some((b: any) => b.type === 'image');
+    const VALID_MEDIA_TYPES: ImageMediaType[] = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const imageBlocks: ClaudeImageBlock[] = hasImage
+      ? (lastUserMsg.content as ApiContentBlock[])
+          .filter((b): b is Extract<ApiContentBlock, { type: 'image' }> => b.type === 'image')
+          .filter(b => VALID_MEDIA_TYPES.includes(b.mediaType as ImageMediaType))
+          .map(b => ({
+            type: 'image' as const,
+            source: { type: 'base64' as const, media_type: b.mediaType as ImageMediaType, data: b.data },
+          }))
+      : [];
+
     const context = existingFiles?.length
       ? `\n\nCurrent project files:\n${existingFiles.map((f: any) => `--- ${f.name} (${f.language}) ---\n${f.content}`).join('\n\n')}`
       : '';
@@ -332,7 +368,13 @@ export async function POST(req: NextRequest) {
         : toClaudeContent(m.content),
     }));
 
-    const fullSystem = `${personality ? personality + '\n\n' : ''}${SYSTEM}${globalMemory ? `\n\nGLOBAL USER MEMORY:\n${globalMemory}` : ''}${memory ? `\n\nPROJECT MEMORY:\n${memory}` : ''}`;
+    // Static SYSTEM is first so it caches across all requests; dynamic parts appended after.
+    const systemBlocks: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> = [
+      { type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } },
+    ];
+    if (personality) systemBlocks.push({ type: 'text', text: `\nPERSONALITY:\n${personality}` });
+    if (globalMemory) systemBlocks.push({ type: 'text', text: `\nGLOBAL USER MEMORY:\n${globalMemory}` });
+    if (memory) systemBlocks.push({ type: 'text', text: `\nPROJECT MEMORY:\n${memory}` });
 
     const encoder = new TextEncoder();
 
@@ -342,9 +384,9 @@ export async function POST(req: NextRequest) {
           // Check if this is a code generation request
           if (!isCodeRequest(lastUserMessage)) {
             const stream = await client.messages.stream({
-              model: 'claude-opus-4-6',
+              model: 'claude-sonnet-4-6',
               max_tokens: 4096,
-              system: fullSystem,
+              system: systemBlocks,
               messages: anthropicMessages,
             });
             let fullText = '';
@@ -363,10 +405,15 @@ export async function POST(req: NextRequest) {
 
           // Step 1: Plan files silently
           const plannerResponse = await client.messages.create({
-            model: 'claude-opus-4-6',
+            model: 'claude-haiku-4-5',
             max_tokens: 1024,
-            system: PLANNER_SYSTEM,
-            messages: [{ role: 'user', content: lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '') }],
+            system: PLANNER_SYSTEM_BLOCKS,
+            messages: [{
+              role: 'user',
+              content: imageBlocks.length > 0
+                ? [...imageBlocks, { type: 'text' as const, text: lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '') }]
+                : lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : ''),
+            }],
           });
 
           let filePlan: { name: string; language: string; description: string }[] = [];
@@ -382,7 +429,7 @@ export async function POST(req: NextRequest) {
             const stream = await client.messages.stream({
               model: 'claude-opus-4-6',
               max_tokens: 16000,
-              system: fullSystem,
+              system: systemBlocks,
               messages: anthropicMessages,
             });
             let fullText = '';
@@ -414,6 +461,10 @@ export async function POST(req: NextRequest) {
               ? `\n\nExisting files to preserve:\n${existingFiles.map((f: any) => `--- ${f.name} ---\n${f.content.slice(0, 400)}\n...[truncated]`).join('\n\n')}`
               : '';
 
+            const imagePlaceholderNote = imageBlocks.length > 0
+              ? `\n\nThe user has provided an image. Wherever you need the image source, use exactly: ${IMAGE_SRC_PLACEHOLDER}\nDo NOT use any other URL or path — only ${IMAGE_SRC_PLACEHOLDER}. It will be replaced with the real base64 data URL at build time.`
+              : '';
+
             const filePrompt = `Project: ${lastUserMessage}
 
 Generate file: ${fileSpec.name}
@@ -421,7 +472,7 @@ Purpose: ${fileSpec.description}
 Language: ${fileSpec.language}
 
 All project files: ${filePlan.map(f => `${f.name} — ${f.description}`).join('\n')}
-${generatedContext}${existingContext}
+${generatedContext}${existingContext}${imagePlaceholderNote}
 
 Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
 
@@ -431,8 +482,8 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
             const fileStream = client.messages.stream({
               model: 'claude-opus-4-6',
               max_tokens: 16000,
-              system: FILE_GENERATOR_SYSTEM,
-              messages: [{ role: 'user', content: filePrompt }],
+              system: FILE_GENERATOR_SYSTEM_BLOCKS,
+              messages: [{ role: 'user', content: imageBlocks.length > 0 ? [...imageBlocks, { type: 'text' as const, text: filePrompt }] : filePrompt }],
             });
 
             let fileText = '';
@@ -450,9 +501,9 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
               const contStream = client.messages.stream({
                 model: 'claude-opus-4-6',
                 max_tokens: 16000,
-                system: FILE_GENERATOR_SYSTEM,
+                system: FILE_GENERATOR_SYSTEM_BLOCKS,
                 messages: [
-                  { role: 'user', content: filePrompt },
+                  { role: 'user', content: imageBlocks.length > 0 ? [...imageBlocks, { type: 'text' as const, text: filePrompt }] : filePrompt },
                   { role: 'assistant', content: fileText },
                 ],
               });
@@ -471,10 +522,18 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
               content: fileText.replace(/^<forge_file[^>]*>\n?/, '').trim() || fileText.trim(),
             }];
 
+            // Build the image data URL once for placeholder replacement
+            const imageDataUrl = imageBlocks.length > 0
+              ? `data:${imageBlocks[0].source.media_type};base64,${imageBlocks[0].source.data}`
+              : null;
+
             // Post-process HTML files to guarantee button wiring and script loading order
             for (const f of filesToAdd) {
+              let content = imageDataUrl
+                ? f.content.replaceAll(IMAGE_SRC_PLACEHOLDER, imageDataUrl)
+                : f.content;
               generatedFiles.push(
-                f.language === 'html' ? { ...f, content: sanitizeHTML(f.content) } : f
+                f.language === 'html' ? { ...f, content: sanitizeHTML(content) } : { ...f, content }
               );
             }
 
@@ -484,9 +543,9 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
 
           // Step 3: Brief summary
           const summaryResponse = await client.messages.create({
-            model: 'claude-opus-4-6',
+            model: 'claude-haiku-4-5',
             max_tokens: 200,
-            system: fullSystem,
+            system: systemBlocks,
             messages: [
               { role: 'user', content: lastUserMessage },
               { role: 'assistant', content: `Generated ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}` },

@@ -1,5 +1,4 @@
 'use client';
-import { motion } from 'framer-motion';
 import { LogoConfig } from '@/hooks/useLogoConfig';
 
 function BoltIcon({ color }: { color: string }) {
@@ -39,36 +38,29 @@ const ICONS = { bolt: BoltIcon, diamond: DiamondIcon, hex: HexIcon, circle: Circ
 
 export default function LogoDisplay({ config }: { config: LogoConfig }) {
   const IconComp = ICONS[config.iconShape];
-  // x end: shimmer needs to travel 100% of parent + its own width (shimmerWidth%)
-  // expressed as % of shimmer element: 100/fraction + 100 = (1 + 1/fraction) * 100
-  const shimmerEnd = `${Math.ceil((1 + 100 / config.shimmerWidth) * 100)}%`;
+  const totalDuration = config.speed + 1.2;
+  const movePct = Math.round((config.speed / totalDuration) * 100);
 
   return (
     <div
       className="animated-logo-wrap"
       style={{
         '--logo-shimmer-color': config.shimmerColor,
-        '--logo-speed': `${config.speed}s`,
+        '--logo-speed': `${totalDuration}s`,
         '--logo-icon-bg': config.iconBg,
         '--logo-shimmer-width': `${config.shimmerWidth}%`,
+        '--shimmer-move-pct': `${movePct}%`,
       } as React.CSSProperties}
     >
       <div className="logo-icon-svg" style={{ background: config.iconBg }}>
         <IconComp color={config.shimmerColor} />
       </div>
       <span className="animated-logo-text">{config.text}</span>
-      <motion.div
+      <div
         className="logo-shimmer"
         style={{
           width: `${config.shimmerWidth}%`,
           background: `linear-gradient(90deg, transparent, ${config.shimmerColor}55, ${config.shimmerColor}99, ${config.shimmerColor}55, transparent)`,
-        }}
-        animate={{ x: ['-150%', shimmerEnd] }}
-        transition={{
-          duration: config.speed,
-          repeat: Infinity,
-          ease: 'easeInOut',
-          repeatDelay: 1.2,
         }}
       />
     </div>

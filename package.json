@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "fuser -k 3000/tcp 3001/tcp 2>/dev/null; rm -f .next/dev/lock 2>/dev/null; next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -13,7 +13,7 @@
     "@monaco-editor/react": "^4.7.0",
     "e2b": "^2.13.0",
     "file-saver": "^2.0.5",
-    "framer-motion": "^12.38.0",
+    "framer-motion": "^11.18.2",
     "jszip": "^3.10.1",
     "monaco-editor": "^0.55.1",
     "next": "16.1.6",
