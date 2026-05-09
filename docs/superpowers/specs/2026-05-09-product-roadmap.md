@@ -76,6 +76,15 @@ Transform "All in All Based" from a single-user local dev tool into a publicly r
 - Audio player card in chat (similar to GeneratedVideoCard)
 - Download generated tracks
 
+### Phase 11 — Advanced Game & Web Development Engine
+- **3D game generation**: First-person shooter, third-person shooter, realistic 3D games using Three.js / Babylon.js / PlayCanvas
+- **Physics engines**: Cannon.js / Rapier for realistic game physics
+- **Advanced web generation**: Multi-section landing pages, scroll-driven animations, GSAP timelines, parallax, WebGL effects
+- **Game architecture planner**: Smarter Haiku planner that recognises game type and scaffolds correct engine, assets, controls, and game loop
+- **Iterative refinement**: Multi-round generation for complex projects (plan → generate → self-review → patch)
+- **Asset suggestions**: Prompt-guided placeholder assets (skyboxes, textures, sprites) using FAL image generation inline
+- **Extended file budget**: Allow larger projects (15–30 files) for complex games and professional sites
+
 ### Phase 10 — Memory Tab Redesign
 - Per-user memory (unlocked after Phase 1)
 - Timeline / history view of extracted memories
@@ -99,6 +108,7 @@ Transform "All in All Based" from a single-user local dev tool into a publicly r
 | 8 | Document export | Independent; high value, low dependency |
 | 9 | Music AI | Independent; depends on FAL availability |
 | 10 | Memory redesign | Better with per-user data from Phase 1 |
+| 11 | Advanced game & web engine | Independent; builds on existing generation pipeline |
 
 ---
 
@@ -116,7 +126,8 @@ Transform "All in All Based" from a single-user local dev tool into a publicly r
 | 8 — Document export | 3–5 days |
 | 9 — Music AI | 3–5 days |
 | 10 — Memory redesign | 3–5 days |
-| **Total** | **~3–4 months full-time** |
+| 11 — Advanced game & web engine | 1–2 weeks |
+| **Total** | **~4–5 months full-time** |
 
 ---
 
