@@ -18,6 +18,7 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [brushSize, setBrushSize] = useState(24);
+  const [isSourceLoading, setIsSourceLoading] = useState(false);
 
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -51,6 +52,7 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
   useEffect(() => {
     setResultUrl(null);
     setError(null);
+    strokeHistory.current = [];
     clearCanvas();
   }, [currentSourceUrl, mode, clearCanvas]);
 
@@ -77,7 +79,13 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
     const ctx = canvas.getContext('2d')!;
     strokeHistory.current.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
     isDrawing.current = true;
+    const rect = canvas.getBoundingClientRect();
     const pos = getPos(e);
+    const radius = (brushSize / 2) * (canvas.width / rect.width);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+    ctx.fill();
     ctx.beginPath();
     ctx.moveTo(pos.x, pos.y);
   };
@@ -125,7 +133,7 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
         body: JSON.stringify({ mode, sourceImageUrl: currentSourceUrl, prompt, maskDataUrl }),
       });
       const data = await res.json();
-      if (data.error) throw new Error(data.error);
+      if (!res.ok || data.error) throw new Error(data.error ?? 'Server error');
       setResultUrl(data.url);
     } catch (err: any) {
       setError(err.message ?? 'Generation failed');
@@ -136,8 +144,8 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
 
   const handleChain = () => {
     if (!resultUrl) return;
+    setIsSourceLoading(true);
     setCurrentSourceUrl(resultUrl);
-    // useEffect on currentSourceUrl clears result + canvas
   };
 
   const handleConfirm = () => {
@@ -172,7 +180,7 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
               src={currentSourceUrl}
               alt="source"
               className="image-editor-source"
-              onLoad={positionCanvas}
+              onLoad={() => { setIsSourceLoading(false); positionCanvas(); }}
               draggable={false}
             />
             {mode === 'inpaint' && (
@@ -249,9 +257,9 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
         <button
           className="image-editor-generate-btn"
           onClick={handleGenerate}
-          disabled={isGenerating || !prompt.trim()}
+          disabled={isGenerating || isSourceLoading || !prompt.trim()}
         >
-          {isGenerating ? '⏳' : 'Generate'}
+          {isGenerating ? '⏳' : isSourceLoading ? '⏳' : 'Generate'}
         </button>
         <button
           className="image-editor-confirm-btn"
