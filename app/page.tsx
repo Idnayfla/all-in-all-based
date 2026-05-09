@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import ChatPanel from '@/components/ChatPanel';
 import EditorPanel from '@/components/EditorPanel';
 import PreviewPanel from '@/components/PreviewPanel';
-import Sidebar from '@/components/Sidebar';
+import SidebarTrigger from '@/components/SidebarTrigger';
 import DebugPanel from '@/components/DebugPanel';
 import LogoDisplay from '@/components/LogoDisplay';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
@@ -174,7 +174,7 @@ useEffect(() => { fetchMemory(); }, []);
       </header>
 
       <div className="app-body">
-        <Sidebar
+        <SidebarTrigger
           files={files}
           activeFile={activeFile}
           onSelectFile={setActiveFile}
