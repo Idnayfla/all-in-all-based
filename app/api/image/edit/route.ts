@@ -37,12 +37,11 @@ export async function POST(req: NextRequest) {
           image_url: sourceImageUrl,
           prompt,
           strength: 0.85,
-          image_size: 'landscape_4_3',
           num_inference_steps: 28,
           guidance_scale: 3.5,
           num_images: 1,
           enable_safety_checker: true,
-        } as any,
+        },
       });
       const url = (result.data as any).images?.[0]?.url;
       if (!url) return NextResponse.json({ error: 'No image returned' }, { status: 500 });
@@ -55,13 +54,13 @@ export async function POST(req: NextRequest) {
     const maskBlob = new Blob([buffer], { type: 'image/png' });
     const maskUrl = await fal.storage.upload(maskBlob);
 
-    const result = await fal.subscribe('fal-ai/flux-pro/inpainting', {
+    const result = await fal.subscribe('fal-ai/flux-pro/v1/fill', {
       input: {
         image_url: sourceImageUrl,
         mask_url: maskUrl,
         prompt,
         num_images: 1,
-        enable_safety_checker: true,
+        safety_tolerance: '2',
       },
     });
     const url = (result.data as any).images?.[0]?.url;
