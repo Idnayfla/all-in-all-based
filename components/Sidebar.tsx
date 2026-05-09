@@ -9,7 +9,7 @@ const langIcon: Record<string, string> = {
   html: 'HT', css: 'CS', json: 'JS', python: 'PY', default: '◻'
 };
 
-export default function Sidebar({ files, activeFile, onSelectFile, projects, currentProject, onNewProject, onLoadProject, onDeleteProject, onRenameProject, isOpen }: {
+export default function Sidebar({ files, activeFile, onSelectFile, projects, currentProject, onNewProject, onLoadProject, onDeleteProject, onRenameProject }: {
   files: FileNode[];
   activeFile: FileNode | null;
   onSelectFile: (f: FileNode) => void;
@@ -19,7 +19,6 @@ export default function Sidebar({ files, activeFile, onSelectFile, projects, cur
   onLoadProject: (p: Project) => void;
   onDeleteProject: (id: string) => void;
   onRenameProject: (id: string, name: string) => void;
-  isOpen?: boolean;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -47,7 +46,7 @@ export default function Sidebar({ files, activeFile, onSelectFile, projects, cur
   };
 
   return (
-    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
+    <aside className="sidebar">
       <div className="sidebar-section">
         <div className="sidebar-header-row">
           <span className="sidebar-header">Projects</span>
