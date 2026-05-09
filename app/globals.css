@@ -235,6 +235,24 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .upload-btn:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); }
 .upload-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* ── Audio Toggle ── */
+.audio-toggle-btn {
+  flex-shrink: 0;
+  height: 36px;
+  padding: 0 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s;
+}
+.audio-toggle-btn:hover { border-color: var(--accent); background: var(--bg); }
+.audio-toggle-btn--on { background: rgba(124,106,247,0.12); border-color: var(--accent); }
+.audio-toggle-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
 /* ── Mode Dropdown ── */
 .mode-dropdown { position: relative; flex-shrink: 0; }
 

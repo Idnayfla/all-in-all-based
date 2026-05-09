@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'FAL_KEY not configured' }, { status: 500 });
   }
 
-  const { prompt, imageData, mediaType } = await req.json();
+  const { prompt, imageData, mediaType, generateAudio } = await req.json();
   if (!prompt?.trim()) {
     return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
   }
@@ -21,12 +21,12 @@ export async function POST(req: NextRequest) {
       const blob = new Blob([buffer], { type: mediaType ?? 'image/png' });
       const imageUrl = await fal.storage.upload(blob);
       const result = await fal.subscribe('bytedance/seedance-2.0/image-to-video', {
-        input: { image_url: imageUrl, prompt },
+        input: { image_url: imageUrl, prompt, generate_audio: !!generateAudio },
       });
       url = (result.data as any).video?.url ?? (result.data as any).videos?.[0]?.url;
     } else {
       const result = await fal.subscribe('bytedance/seedance-2.0/text-to-video', {
-        input: { prompt },
+        input: { prompt, generate_audio: !!generateAudio },
       });
       url = (result.data as any).video?.url ?? (result.data as any).videos?.[0]?.url;
     }

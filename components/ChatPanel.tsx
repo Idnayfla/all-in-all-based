@@ -112,6 +112,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
   const [generationMode, setGenerationMode] = useState<GenerationMode>('chat');
   const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
+  const [generateAudio, setGenerateAudio] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -215,7 +216,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     const loadingMsg: Message = { role: 'assistant', content: [{ type: 'text', text: '__generating-video__' }] };
     setMessages(prev => [...prev, userMsg, loadingMsg]);
 
-    const body: Record<string, string> = { prompt };
+    const body: Record<string, string | boolean> = { prompt, generateAudio };
     if (pendingImage) {
       body.imageData = pendingImage.data;
       body.mediaType = pendingImage.mediaType;
@@ -543,6 +544,24 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             onChange={setGenerationMode}
             disabled={isGenerating || isGeneratingMedia}
           />
+          <AnimatePresence>
+            {generationMode === 'seedance' && (
+              <motion.button
+                key="audio-toggle"
+                className={`audio-toggle-btn${generateAudio ? ' audio-toggle-btn--on' : ''}`}
+                onClick={() => setGenerateAudio(v => !v)}
+                title={generateAudio ? 'Audio: on (2× cost) — click to disable' : 'Audio: off — click to enable'}
+                initial={{ opacity: 0, scale: 0.8, width: 0 }}
+                animate={{ opacity: 1, scale: 1, width: 'auto' }}
+                exit={{ opacity: 0, scale: 0.8, width: 0 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                whileTap={{ scale: 0.92 }}
+                disabled={isGenerating || isGeneratingMedia}
+              >
+                {generateAudio ? '🔊' : '🔇'}
+              </motion.button>
+            )}
+          </AnimatePresence>
           <textarea
             ref={textareaRef}
             className="chat-textarea"
