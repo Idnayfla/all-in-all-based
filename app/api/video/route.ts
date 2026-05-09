@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fal } from '@fal-ai/client';
+import { friendlyFalError } from '../_falError';
 
 if (process.env.FAL_KEY) fal.config({ credentials: process.env.FAL_KEY });
 
@@ -35,7 +36,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url, prompt });
   } catch (err: any) {
     console.error('[video] FAL error — status:', err.status, '| body:', JSON.stringify(err.body), '| message:', err.message);
-    const detail = err.body ? JSON.stringify(err.body) : (err.message ?? 'Video generation failed');
-    return NextResponse.json({ error: detail }, { status: 500 });
+    return NextResponse.json({ error: friendlyFalError(err, 'Video generation failed — please try again.') }, { status: 500 });
   }
 }

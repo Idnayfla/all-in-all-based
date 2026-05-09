@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fal } from '@fal-ai/client';
+import { friendlyFalError } from '../_falError';
 
 if (process.env.FAL_KEY) fal.config({ credentials: process.env.FAL_KEY });
 
@@ -67,8 +68,7 @@ export async function POST(req: NextRequest) {
     if (!url) return NextResponse.json({ error: 'No image returned' }, { status: 500 });
     return NextResponse.json({ url, prompt });
   } catch (err: any) {
-    const detail = err.body ? JSON.stringify(err.body) : (err.message ?? 'Generation failed');
-    console.error('[image] FAL error:', err.status, detail);
-    return NextResponse.json({ error: detail }, { status: 500 });
+    console.error('[image] FAL error — status:', err.status, '| body:', JSON.stringify(err.body), '| message:', err.message);
+    return NextResponse.json({ error: friendlyFalError(err, 'Image generation failed — please try again.') }, { status: 500 });
   }
 }
