@@ -1,74 +1,136 @@
-# All in All Based (AIAB)
+<div align="center">
 
-**An AI-powered coding and productivity studio — one app for everything.**
+# ⚡ All-In-All-Based (AIAB)
 
-🌐 **Live Demo:** [all-in-all-based.vercel.app](https://all-in-all-based.vercel.app)
+### A browser-based AI coding studio — built solo from scratch.
+
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-all--in--all--based.vercel.app-7c6af7?style=for-the-badge&logo=vercel)](https://all-in-all-based.vercel.app)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
+[![Anthropic](https://img.shields.io/badge/Claude%20API-Anthropic-cc785c?style=for-the-badge)](https://www.anthropic.com/)
+[![Deployed on Vercel](https://img.shields.io/badge/Deployed-Vercel-000000?style=for-the-badge&logo=vercel)](https://vercel.com/)
+
+</div>
 
 ---
 
 ## What is AIAB?
 
-AIAB is a full-stack AI studio built to handle any task — from building websites and debugging code to answering questions and conducting deep research. Instead of juggling multiple tools, everything lives in one place.
+**AIAB** is a self-built AI-powered coding studio that runs entirely in the browser. Think Replit or Bolt.new — but designed, architected, and built solo.
+
+Describe what you want to build. AIAB plans it, generates multi-file code, executes it in a live sandbox, and lets you iterate — all within a single interface.
 
 ---
 
-## Features
+## ✨ Features
 
-- 🌐 **Website Builder** — Generate and preview full web applications through conversation
-- 💬 **AI Chat** — Answer questions, plan projects, and assist with research in real time
-- 🧠 **Dual Memory System** — Global Memory persists user preferences across all sessions; Project Memory is scoped per project
-- 🐛 **Debug Log** — Tracks errors and auto-retries with alternative approaches when fixes fail
-- 🖥️ **Code Editor** — Built-in editor to view, edit, and manage generated code
-- 👁️ **Live Preview** — Instantly preview generated applications without leaving the app
-- 💾 **Saved Projects** — Organize and revisit all your work in one place
-- 📥 **Downloadable Files** — Export generated code and files directly
-- 🔗 **Shareable Links** — Share projects with a single link
-- 🎭 **Personality Mode** — Customise the AI's tone and behaviour
-- 🕵️ **Incognito Mode** — Use the app without saving history or memory
+### 🤖 Chat & AI
+- Real-time streaming responses via Claude (Anthropic)
+- Image attachments in chat (JPEG, PNG, WebP, GIF)
+- Customizable AI personality via editable system prompt
+- Context-aware suggestions on new projects
+
+### 🧠 Multi-Model Architecture
+- **Haiku** — planning, memory extraction, file structuring
+- **Sonnet** — conversational chat
+- **Opus** — full code generation per file
+
+### 💻 Code Generation
+- Multi-file generation with per-file progress tracking
+- Supports HTML/CSS/JS, Python, and Node.js projects
+- Files auto-split at ~600 lines
+- Post-generation HTML sanitization and safety injection
+
+### 📁 Project & File Management
+- Create, rename, delete, and switch between named projects
+- Auto-save to localStorage on every change
+- Monaco Editor with full syntax highlighting (TS, JS, HTML, CSS, Python, JSON)
+- Download individual files or full project as ZIP
+
+### 🧪 Execution & Preview
+- Live sandboxed iframe preview for HTML projects
+- Python + Node.js execution via E2B sandbox (stdout/stderr output)
+- Publish HTML projects to Netlify — returns a live public URL
+
+### 🧩 Memory System
+- **Global memory** — auto-extracted by Haiku after each conversation, stored in Redis
+- **Per-project memory** — stored in localStorage, editable in Settings
+- Memory injected into every AI request as context
+
+### 🕵️ Incognito Mode
+- No messages saved, memory not updated
+- All messages wiped on toggle-off
+- Session banner displayed during incognito
+
+### 🐛 Debug Panel
+- Stream event log (chunk / done / error / info), last 200 events
+- Raw stream content viewer
+- Event counters, auto-scroll, clear button
 
 ---
 
-## Tech Stack
+## 🛠 Tech Stack
 
 | Layer | Technology |
-|-------|-----------|
-| Framework | Next.js 14, React |
-| Language | TypeScript |
-| AI | Anthropic Claude API (streaming) |
-| Memory | Redis (global session state) |
-| Database | PostgreSQL |
-| Deployment | Vercel |
-| PWA | Progressive Web App — installable on mobile |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| Language | TypeScript 5 |
+| AI Models | Anthropic Claude (Haiku, Sonnet, Opus) |
+| Code Editor | Monaco Editor |
+| Code Execution | E2B Sandbox |
+| Memory Storage | Redis |
+| Deployment | Vercel + Netlify (publish target) |
+| Animations | Framer Motion |
+| Styling | Tailwind CSS v4 |
 
 ---
 
-## Architecture Highlights
+## 🚀 Getting Started
 
-- **Streaming Architecture** — Custom buffer management handles Anthropic's API event structure for real-time response delivery
-- **Auto-Retry Logic** — Detects ineffective AI fixes and automatically triggers full rewrites with alternative approaches
-- **Redis Global Memory** — Persists user context across sessions so the AI learns and adapts over time
-- **PWA Support** — Fully installable on mobile with custom app icons and offline-ready structure
+### Prerequisites
+- Node.js 18+
+- Anthropic API Key → [console.anthropic.com](https://console.anthropic.com)
+- E2B API Key → [e2b.dev](https://e2b.dev)
+- Redis instance (local or Upstash)
+- Netlify API Token (optional, for publish feature)
 
----
-
-## Getting Started
+### Installation
 
 ```bash
 git clone https://github.com/Idnayfla/all-in-all-based.git
 cd all-in-all-based
 npm install
+```
+
+### Environment Variables
+
+Create a `.env.local` file in the root:
+
+```env
+ANTHROPIC_API_KEY=your_anthropic_api_key
+E2B_API_KEY=your_e2b_api_key
+REDIS_URL=your_redis_url
+NETLIFY_API_TOKEN=your_netlify_token
+```
+
+### Run Locally
+
+```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to run locally.
-
-> **Note:** You will need your own Anthropic API key, Redis instance, and PostgreSQL database. Environment variable setup instructions coming soon.
+Open [http://localhost:3000](http://localhost:3000)
 
 ---
 
-## About the Developer
+## 👤 Author
 
-Built solo by **Mohamad Hus Alfyandi** — a full-stack developer transitioning into software engineering post-NS.
+**Mohamad Hus Alfyandi**
+- GitHub: [@Idnayfla](https://github.com/Idnayfla)
+- LinkedIn: [linkedin.com/in/hus-alfyandi](https://linkedin.com/in/hus-alfyandi)
 
-- 🔗 [LinkedIn](https://linkedin.com/in/hus-alfyandi-51a320271)
-- 🌐 [Live App](https://all-in-all-based.vercel.app)
+---
+
+<div align="center">
+  Built with curiosity and too many late nights. ⚡
+</div>
