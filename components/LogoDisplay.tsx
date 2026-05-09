@@ -61,9 +61,9 @@ export default function LogoDisplay({ config }: { config: LogoConfig }) {
             border: 'none',
             fontFamily: 'var(--font-mono)',
             fontWeight: 700,
-            fontSize: '11px',
+            fontSize: '13px',
             color: 'var(--bg)',
-            letterSpacing: 0,
+            letterSpacing: '0px',
           }}
         >
           B&gt;
