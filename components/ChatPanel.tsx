@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import ImageEditorModal from './ImageEditorModal';
 import ModeDropdown, { GenerationMode } from './ModeDropdown';
 import GeneratedVideoCard from './GeneratedVideoCard';
+import GeneratingCard from './GeneratingCard';
 
 const SUGGESTIONS = [
   'Build a todo app with React',
@@ -135,7 +136,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     setIsGeneratingMedia(true);
 
     const userMsg: Message = { role: 'user', content: prompt };
-    const loadingMsg: Message = { role: 'assistant', content: [{ type: 'text', text: '🎨 Generating image...' }] };
+    const loadingMsg: Message = { role: 'assistant', content: [{ type: 'text', text: '__generating-image__' }] };
     setMessages(prev => [...prev, userMsg, loadingMsg]);
 
     const body: Record<string, string> = { prompt, model: generationMode === 'nano-banana' ? 'nano-banana' : 'flux' };
@@ -174,7 +175,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     setIsGeneratingMedia(true);
 
     const userMsg: Message = { role: 'user', content: prompt };
-    const loadingMsg: Message = { role: 'assistant', content: [{ type: 'text', text: '🎬 Generating video...' }] };
+    const loadingMsg: Message = { role: 'assistant', content: [{ type: 'text', text: '__generating-video__' }] };
     setMessages(prev => [...prev, userMsg, loadingMsg]);
 
     const body: Record<string, string> = { prompt };
@@ -409,6 +410,12 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           }
           if (block.type === 'generated-video') {
             return <GeneratedVideoCard key={i} url={block.url} prompt={block.prompt} />;
+          }
+          if (block.type === 'text' && block.text === '__generating-image__') {
+            return <GeneratingCard key={i} type="image" />;
+          }
+          if (block.type === 'text' && block.text === '__generating-video__') {
+            return <GeneratingCard key={i} type="video" />;
           }
           if (block.type === 'text') {
             return <ReactMarkdown key={i}>{block.text}</ReactMarkdown>;
