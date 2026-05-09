@@ -74,7 +74,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   const [input, setInput] = useState('');
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
   const [generationMode, setGenerationMode] = useState<GenerationMode>('chat');
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -130,9 +130,9 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
 
   const sendImage = async () => {
     const prompt = input.trim();
-    if (!prompt || isGenerating || isGeneratingImage) return;
+    if (!prompt || isGenerating || isGeneratingMedia) return;
     setInput('');
-    setIsGeneratingImage(true);
+    setIsGeneratingMedia(true);
 
     const userMsg: Message = { role: 'user', content: prompt };
     const loadingMsg: Message = { role: 'assistant', content: [{ type: 'text', text: '🎨 Generating image...' }] };
@@ -163,15 +163,15 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         { role: 'assistant', content: `❌ Image generation failed: ${err.message}` },
       ]);
     } finally {
-      setIsGeneratingImage(false);
+      setIsGeneratingMedia(false);
     }
   };
 
   const sendVideo = async () => {
     const prompt = input.trim();
-    if (!prompt || isGenerating || isGeneratingImage) return;
+    if (!prompt || isGenerating || isGeneratingMedia) return;
     setInput('');
-    setIsGeneratingImage(true);
+    setIsGeneratingMedia(true);
 
     const userMsg: Message = { role: 'user', content: prompt };
     const loadingMsg: Message = { role: 'assistant', content: [{ type: 'text', text: '🎬 Generating video...' }] };
@@ -202,7 +202,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         { role: 'assistant', content: `❌ Video generation failed: ${err.message}` },
       ]);
     } finally {
-      setIsGeneratingImage(false);
+      setIsGeneratingMedia(false);
     }
   };
 
@@ -497,7 +497,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           <ModeDropdown
             mode={generationMode}
             onChange={setGenerationMode}
-            disabled={isGenerating || isGeneratingImage}
+            disabled={isGenerating || isGeneratingMedia}
           />
           <textarea
             ref={textareaRef}
@@ -511,7 +511,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               'Ask Based anything...'
             }
             rows={1}
-            disabled={isGenerating || isGeneratingImage}
+            disabled={isGenerating || isGeneratingMedia}
           />
           <motion.button
             className={`send-btn${generationMode !== 'chat' ? ' send-btn-image' : ''}`}
@@ -520,10 +520,10 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               else if (generationMode !== 'chat') sendImage();
               else send();
             }}
-            disabled={isGenerating || isGeneratingImage || (!input.trim() && !pendingImage)}
+            disabled={isGenerating || isGeneratingMedia || (!input.trim() && !pendingImage)}
             whileTap={{ scale: 0.95 }}
           >
-            {isGeneratingImage ? '⏳' : generationMode !== 'chat' ? 'Generate' : 'Send'}
+            {isGeneratingMedia ? '⏳' : generationMode !== 'chat' ? 'Generate' : 'Send'}
           </motion.button>
         </div>
       </div>

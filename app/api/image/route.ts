@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fal } from '@fal-ai/client';
 
+if (process.env.FAL_KEY) fal.config({ credentials: process.env.FAL_KEY });
+
 export async function POST(req: NextRequest) {
   if (!process.env.FAL_KEY) {
     return NextResponse.json({ error: 'FAL_KEY not configured' }, { status: 500 });
@@ -10,8 +12,6 @@ export async function POST(req: NextRequest) {
   if (!prompt?.trim()) {
     return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
   }
-
-  fal.config({ credentials: process.env.FAL_KEY });
 
   try {
     let imageUrl: string | undefined;

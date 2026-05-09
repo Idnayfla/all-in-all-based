@@ -19,7 +19,7 @@ export default function GeneratedVideoCard({ url, prompt }: GeneratedVideoCardPr
     >
       <div className="generated-video-thumb">
         {playing ? (
-          <video src={url} autoPlay controls className="generated-video-player" />
+          <video src={url} autoPlay controls loop className="generated-video-player" />
         ) : (
           <motion.button
             className="generated-video-play-btn"
