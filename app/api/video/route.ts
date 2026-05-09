@@ -21,12 +21,12 @@ export async function POST(req: NextRequest) {
       const blob = new Blob([buffer], { type: mediaType ?? 'image/png' });
       const imageUrl = await fal.storage.upload(blob);
       const result = await fal.subscribe('bytedance/seedance-2.0/image-to-video', {
-        input: { image_url: imageUrl, prompt, resolution: '720p', duration: '5' },
+        input: { image_url: imageUrl, prompt },
       });
       url = (result.data as any).video?.url ?? (result.data as any).videos?.[0]?.url;
     } else {
       const result = await fal.subscribe('bytedance/seedance-2.0/text-to-video', {
-        input: { prompt, resolution: '720p', duration: '5', aspect_ratio: '16:9' },
+        input: { prompt },
       });
       url = (result.data as any).video?.url ?? (result.data as any).videos?.[0]?.url;
     }
@@ -34,8 +34,8 @@ export async function POST(req: NextRequest) {
     if (!url) return NextResponse.json({ error: 'No video returned' }, { status: 500 });
     return NextResponse.json({ url, prompt });
   } catch (err: any) {
+    console.error('[video] FAL error — status:', err.status, '| body:', JSON.stringify(err.body), '| message:', err.message);
     const detail = err.body ? JSON.stringify(err.body) : (err.message ?? 'Video generation failed');
-    console.error('[video] FAL error:', err.status, detail);
     return NextResponse.json({ error: detail }, { status: 500 });
   }
 }
