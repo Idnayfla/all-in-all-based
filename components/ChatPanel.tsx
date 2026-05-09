@@ -38,7 +38,11 @@ function ProgressBar({ progress }: { progress: GenerationProgress }) {
         <span className="gen-progress-count">{progress.completed}/{progress.total}</span>
       </div>
       <div className="gen-progress-bar-track">
-        <div className="gen-progress-bar-fill" style={{ width: `${pct}%` }} />
+        <motion.div
+          className="gen-progress-bar-fill"
+          animate={{ width: `${pct}%` }}
+          transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+        />
       </div>
       <div className="gen-progress-pct">{pct}%</div>
       <div className="gen-progress-files">
@@ -387,14 +391,20 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           }
           if (block.type === 'generated-image') {
             return (
-              <div key={i} className="generated-image-wrap">
+              <motion.div
+                key={i}
+                className="generated-image-wrap"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+              >
                 <img className="generated-image" src={block.url} alt={block.prompt} />
                 <div className="generated-image-prompt">{block.prompt}</div>
                 <div className="generated-image-actions">
                   <a className="generated-image-download" href={block.url} download target="_blank" rel="noreferrer">↓ Download</a>
                   <button className="generated-image-edit-btn" onClick={() => setEditingImageUrl(block.url)}>✏ Edit</button>
                 </div>
-              </div>
+              </motion.div>
             );
           }
           if (block.type === 'generated-video') {
@@ -418,33 +428,58 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             <div className="chat-empty-title">BASED</div>
             <div className="chat-empty-sub">Your AI coding assistant. Describe what you want to build.</div>
             <div className="chat-suggestions">
-              {SUGGESTIONS.map(s => (
-                <button key={s} className="suggestion-btn" onClick={() => send(s)}>{s}</button>
+              {SUGGESTIONS.map((s, index) => (
+                <motion.button
+                  key={s}
+                  className="suggestion-btn"
+                  onClick={() => send(s)}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.06, type: 'spring', stiffness: 400, damping: 30 }}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                >{s}</motion.button>
               ))}
             </div>
           </div>
         ) : (
-          messages.map((m, i) => (
-            <div key={i} className={`message ${m.role}`}>
-              <div className="message-role">{m.role === 'user' ? 'YOU' : 'BASED'}</div>
-              <div className="message-content">
-                {m.role === 'assistant' && genProgress && i === messages.length - 1
-                  ? <ProgressBar progress={genProgress} />
-                  : renderContent(m.content)
-                }
-              </div>
-            </div>
-          ))
+          <AnimatePresence initial={false}>
+            {messages.map((m, i) => (
+              <motion.div
+                key={i}
+                className={`message ${m.role}`}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+              >
+                <div className="message-role">{m.role === 'user' ? 'YOU' : 'BASED'}</div>
+                <div className="message-content">
+                  {m.role === 'assistant' && genProgress && i === messages.length - 1
+                    ? <ProgressBar progress={genProgress} />
+                    : renderContent(m.content)
+                  }
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
         )}
         <div ref={bottomRef} />
       </div>
       <div className="chat-input-area">
-        {pendingImage && (
-          <div className="chat-image-preview">
-            <img className="chat-img-thumb" src={pendingImage.previewUrl} alt="pending upload" />
-            <button className="img-clear-btn" onClick={clearPendingImage} title="Remove image">✕</button>
-          </div>
-        )}
+        <AnimatePresence>
+          {pendingImage && (
+            <motion.div
+              className="chat-image-preview"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            >
+              <img className="chat-img-thumb" src={pendingImage.previewUrl} alt="pending upload" />
+              <button className="img-clear-btn" onClick={clearPendingImage} title="Remove image">✕</button>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <div className="chat-input-row">
           <input
             type="file"
@@ -478,7 +513,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             rows={1}
             disabled={isGenerating || isGeneratingImage}
           />
-          <button
+          <motion.button
             className={`send-btn${generationMode !== 'chat' ? ' send-btn-image' : ''}`}
             onClick={() => {
               if (generationMode === 'seedance') sendVideo();
@@ -486,9 +521,10 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               else send();
             }}
             disabled={isGenerating || isGeneratingImage || (!input.trim() && !pendingImage)}
+            whileTap={{ scale: 0.95 }}
           >
             {isGeneratingImage ? '⏳' : generationMode !== 'chat' ? 'Generate' : 'Send'}
-          </button>
+          </motion.button>
         </div>
       </div>
       {editingImageUrl && (
