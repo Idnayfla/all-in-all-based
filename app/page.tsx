@@ -6,7 +6,8 @@ import EditorPanel from '@/components/EditorPanel';
 import PreviewPanel from '@/components/PreviewPanel';
 import Sidebar from '@/components/Sidebar';
 import DebugPanel from '@/components/DebugPanel';
-import AnimatedLogo from '@/components/AnimatedLogo';
+import LogoDisplay from '@/components/LogoDisplay';
+import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
 
 export interface FileNode {
   name: string;
@@ -49,7 +50,6 @@ export default function Home() {
   const [personality, setPersonality] = useState('You are Based, the AI inside All in All Based — a sharp, witty, and direct coding assistant. You are confident, occasionally funny, and always helpful. You treat the user like a smart friend, not a customer. You get straight to the point, never over-explain, and celebrate when things work.');
   const [showSettings, setShowSettings] = useState(false);
   const [globalMemory, setGlobalMemory] = useState('');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [incognito, setIncognito] = useState(false);
   const [incognitoMessages, setIncognitoMessages] = useState<Message[]>([]);
   const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview'>('chat');
@@ -110,7 +110,6 @@ useEffect(() => { fetchMemory(); }, []);
     localStorage.setItem('forge_projects', JSON.stringify(updated));
     setCurrentProject(project);
     setFiles([]); setMessages([]); setActiveFile(null); setActivePanel('chat');
-    setSidebarOpen(false);
   };
 
   const loadProject = (project: Project) => {
@@ -119,7 +118,6 @@ useEffect(() => { fetchMemory(); }, []);
     setMessages(project.messages);
     setActiveFile(project.files[0] ?? null);
     setActivePanel('chat');
-    setSidebarOpen(false);
   };
 
   const deleteProject = (id: string) => {
@@ -151,8 +149,7 @@ useEffect(() => { fetchMemory(); }, []);
     <div className="app-root">
       <header className="app-header">
         <div className="logo">
-          <button className="hamburger" onClick={() => setSidebarOpen(s => !s)}>☰</button>
-          <AnimatedLogo />
+          <LogoDisplay config={LOGO_DEFAULTS} />
           {currentProject && <span className="project-name-display">{currentProject.name}</span>}
         </div>
         <nav className="header-nav">
@@ -177,7 +174,6 @@ useEffect(() => { fetchMemory(); }, []);
       </header>
 
       <div className="app-body">
-        {sidebarOpen && <div onClick={() => setSidebarOpen(false)} style={{position:'fixed',inset:0,zIndex:199,background:'rgba(0,0,0,0.5)'}} />}
         <Sidebar
           files={files}
           activeFile={activeFile}
@@ -188,7 +184,6 @@ useEffect(() => { fetchMemory(); }, []);
           onLoadProject={loadProject}
           onDeleteProject={deleteProject}
           onRenameProject={renameProject}
-          isOpen={sidebarOpen}
         />
 
         <main className="main-content">

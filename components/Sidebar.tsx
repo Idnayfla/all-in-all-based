@@ -19,7 +19,7 @@ export default function Sidebar({ files, activeFile, onSelectFile, projects, cur
   onLoadProject: (p: Project) => void;
   onDeleteProject: (id: string) => void;
   onRenameProject: (id: string, name: string) => void;
-  isOpen: boolean;
+  isOpen?: boolean;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
