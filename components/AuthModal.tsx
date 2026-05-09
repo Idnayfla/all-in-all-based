@@ -54,7 +54,11 @@ export default function AuthModal() {
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
     setLoading(false);
-    if (error) setError(error.message);
+    if (error) setError(
+      error.message.toLowerCase().includes('rate limit')
+        ? 'Too many emails sent recently — please wait a few minutes and try again.'
+        : error.message
+    );
     else setMessage('Check your inbox to verify your email.');
   };
 
@@ -63,7 +67,11 @@ export default function AuthModal() {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/callback`,
     });
-    if (error) setError(error.message);
+    if (error) setError(
+      error.message.toLowerCase().includes('rate limit')
+        ? 'Too many emails sent recently — please wait a few minutes and try again.'
+        : error.message
+    );
     else setMessage('Password reset email sent.');
   };
 
