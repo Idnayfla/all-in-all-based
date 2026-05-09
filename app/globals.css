@@ -110,9 +110,11 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   justify-content: center; gap: 14px; color: var(--text3);
 }
 .chat-empty-logo {
-  width: 48px; height: 48px;
-  background: linear-gradient(135deg, rgba(124,106,247,0.25), rgba(106,247,200,0.15));
-  border-radius: 14px; border: 1px solid rgba(124,106,247,0.3);
+  width: 56px; height: 56px;
+  background: linear-gradient(135deg, var(--accent), var(--accent3));
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-weight: 700; font-size: 22px; color: var(--bg);
 }
 .chat-empty-title {
   font-family: var(--font-mono); font-size: 16px; font-weight: 700;
