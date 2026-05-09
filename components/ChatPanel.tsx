@@ -9,12 +9,48 @@ import ModeDropdown, { GenerationMode } from './ModeDropdown';
 import GeneratedVideoCard from './GeneratedVideoCard';
 import GeneratingCard from './GeneratingCard';
 
-const SUGGESTIONS = [
-  'Build a todo app with React',
+const SUGGESTION_POOL = [
+  'Build a todo app with drag & drop',
   'Create a Snake game in JS',
-  'Make a weather dashboard',
-  'Build a Markdown editor',
+  'Make a real-time weather dashboard',
+  'Build a Markdown editor with preview',
+  'Create a Pomodoro timer with sounds',
+  'Build a pixel art editor',
+  'Make a music visualizer with WebAudio',
+  'Create a 2048 game clone',
+  'Build a CSS gradient generator',
+  'Make a typing speed test app',
+  'Create a Tetris clone',
+  'Build a quiz game with scoring',
+  'Make a drawing canvas app',
+  'Create a password generator',
+  'Build a currency converter',
+  'Make a GitHub profile card',
+  'Create a calendar event planner',
+  'Build a flashcard study app',
+  'Make an ASCII art generator',
+  'Create a color palette generator',
+  'Build a Kanban board',
+  'Make a recipe search app',
+  'Create a countdown timer',
+  'Build a BMI calculator dashboard',
+  'Make a memory card flip game',
+  'Create a mini code editor',
+  'Build a virtual piano',
+  'Make a spinning fidget cube',
+  'Create a habit tracker',
+  'Build a random quote machine',
+  'Make a Pac-Man style maze game',
+  'Create a binary/hex converter',
+  'Build a live CSS animation playground',
+  'Make a star rating component',
+  'Create a dice roller simulator',
 ];
+
+function getRandomSuggestions() {
+  const shuffled = [...SUGGESTION_POOL].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, 4);
+}
 
 interface GenerationProgress {
   files: string[];
@@ -85,6 +121,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     previewUrl: string;
   } | null>(null);
   const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
+  const [suggestions] = useState(getRandomSuggestions);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
@@ -435,7 +472,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             <div className="chat-empty-title">BASED</div>
             <div className="chat-empty-sub">Your AI coding assistant. Describe what you want to build.</div>
             <div className="chat-suggestions">
-              {SUGGESTIONS.map((s, index) => (
+              {suggestions.map((s, index) => (
                 <motion.button
                   key={s}
                   className="suggestion-btn"

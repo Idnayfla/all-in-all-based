@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import ChatPanel from '@/components/ChatPanel';
 import EditorPanel from '@/components/EditorPanel';
 import PreviewPanel from '@/components/PreviewPanel';
 import SidebarTrigger from '@/components/SidebarTrigger';
 import DebugPanel from '@/components/DebugPanel';
 import LogoDisplay from '@/components/LogoDisplay';
+import ProjectNameModal from '@/components/ProjectNameModal';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
 
 export interface FileNode {
@@ -57,6 +59,7 @@ export default function Home() {
   const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview' | 'debug'>('chat');
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
+  const [projectModal, setProjectModal] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('forge_projects');
@@ -101,8 +104,11 @@ useEffect(() => { fetchMemory(); }, []);
   }, [files, messages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const newProject = () => {
-    const name = prompt('Project name:');
-    if (!name?.trim()) return;
+    setProjectModal(true);
+  };
+
+  const createProject = (name: string) => {
+    setProjectModal(false);
     const project: Project = {
       id: Date.now().toString(),
       name: name.trim(),
@@ -307,6 +313,14 @@ useEffect(() => { fetchMemory(); }, []);
           )}
         </main>
       </div>
+      <AnimatePresence>
+        {projectModal && (
+          <ProjectNameModal
+            onConfirm={createProject}
+            onCancel={() => setProjectModal(false)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
