@@ -336,7 +336,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               <div key={i} className="generated-image-wrap">
                 <img className="generated-image" src={block.url} alt={block.prompt} />
                 <div className="generated-image-prompt">{block.prompt}</div>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div className="generated-image-actions">
                   <a className="generated-image-download" href={block.url} download target="_blank" rel="noreferrer">↓ Download</a>
                   <button className="generated-image-edit-btn" onClick={() => setEditingImageUrl(block.url)}>✏ Edit</button>
                 </div>
