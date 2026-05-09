@@ -5,8 +5,8 @@ import LogoDisplay from './LogoDisplay';
 
 const SHIMMER_SWATCHES = ['#a89aff', '#6af7c8', '#f7c86a', '#ff6b6b', '#ffffff', '#6af7f7'];
 const ICON_BG_SWATCHES = ['#0a0a0f', '#15102a', '#0a1020', '#1a1018'];
-const SHAPES: LogoConfig['iconShape'][] = ['bolt', 'diamond', 'hex', 'circle'];
-const SHAPE_LABELS: Record<string, string> = { bolt: '⚡', diamond: '◆', hex: '⬡', circle: '●' };
+const SHAPES: LogoConfig['iconShape'][] = ['terminal', 'bolt', 'diamond', 'hex', 'circle'];
+const SHAPE_LABELS: Record<string, string> = { terminal: 'B>', bolt: '⚡', diamond: '◆', hex: '⬡', circle: '●' };
 
 export default function LogoEditorModal({ config, onSave, onClose }: {
   config: LogoConfig;
