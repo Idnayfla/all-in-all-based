@@ -1,0 +1,158 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap');
+
+.page { max-width: 860px; margin: 0 auto; padding: 8px 0 40px; }
+.page h2 { font-size: 18px; margin-bottom: 6px; }
+.page .subtitle { margin-bottom: 24px; }
+.section { margin-bottom: 36px; }
+.section-label { font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 2px; color: #4a4a6a; text-transform: uppercase; margin-bottom: 12px; }
+
+/* ─── App frame ─── */
+.app-frame { background: #0a0a0f; border-radius: 12px; overflow: hidden; border: 1px solid #1e1e2a; height: 280px; display: flex; flex-direction: column; position: relative; }
+.app-hdr { height: 48px; background: #111118; border-bottom: 1px solid #2a2a3a; display: flex; align-items: center; gap: 10px; padding: 0 20px; flex-shrink: 0; }
+.logo-tile { width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg, #7c6af7, #6af7c8); display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 10px; color: #0a0a0f; }
+.logo-word { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 12px; letter-spacing: 2px; color: #e8e8f0; }
+.hdr-spacer { flex: 1; }
+.hdr-tabs { background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 7px; padding: 3px; display: flex; gap: 1px; }
+.hdr-tab { padding: 4px 14px; font-family: 'Space Mono', monospace; font-size: 10px; border-radius: 4px; color: #8888aa; }
+.hdr-tab.active { background: #7c6af7; color: #fff; }
+
+.app-body { flex: 1; display: flex; position: relative; overflow: hidden; }
+.app-content { flex: 1; display: flex; align-items: center; justify-content: center; background: #0a0a0f; }
+.content-placeholder { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.content-tile { width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #7c6af7, #6af7c8); display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 14px; color: #0a0a0f; }
+.content-text { font-family: 'Space Mono', monospace; font-size: 10px; color: #4a4a6a; letter-spacing: 1px; }
+
+/* ─── Gradient tab ─── */
+.gradient-tab {
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 20px; height: 64px; z-index: 20;
+  background: linear-gradient(180deg, #7c6af7, #6af7c8);
+  border-radius: 0 10px 10px 0;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: 2px 0 12px rgba(124,106,247,0.3);
+}
+.tab-chevron { font-size: 10px; color: #0a0a0f; font-weight: 900; line-height: 1; transition: transform 0.3s; }
+.gradient-tab.open .tab-chevron { transform: rotate(180deg); }
+
+/* ─── Backdrop ─── */
+.sidebar-backdrop {
+  position: absolute; inset: 0; z-index: 10;
+  background: rgba(0,0,0,0.55);
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+.sidebar-backdrop.visible { opacity: 1; pointer-events: all; }
+
+/* ─── Panel ─── */
+.sidebar-panel {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 200px; z-index: 15;
+  background: rgba(17,17,24,0.92);
+  border-right: 1px solid rgba(42,42,58,0.8);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 12px 0;
+  transform: translateX(-200px);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex; flex-direction: column; gap: 0;
+}
+.sidebar-panel.open { transform: translateX(0); }
+
+.panel-section-hdr { padding: 4px 14px 6px; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: 2px; color: #4a4a6a; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between; }
+.panel-new-btn { color: #4a4a6a; font-size: 14px; cursor: pointer; transition: color 0.15s; line-height: 1; }
+.panel-item { padding: 6px 14px; font-family: 'Space Mono', monospace; font-size: 10px; color: #8888aa; display: flex; align-items: center; gap: 8px; cursor: pointer; transition: background 0.12s; border-radius: 4px; margin: 0 6px; }
+.panel-item.active { background: rgba(124,106,247,0.14); color: #e8e8f0; }
+.panel-item-dot { width: 5px; height: 5px; border-radius: 2px; background: #7c6af7; flex-shrink: 0; }
+.panel-divider { height: 1px; background: #1e1e2a; margin: 8px 12px; }
+
+/* ─── States split ─── */
+.states-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.state-label { font-family: 'Space Mono', monospace; font-size: 10px; color: #4a4a6a; text-align: center; margin-top: 8px; }
+
+/* ─── Logo cleanup note ─── */
+.cleanup-box { background: #111118; border: 1px solid #2a2a3a; border-radius: 10px; padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+.cleanup-row { display: flex; align-items: flex-start; gap: 12px; }
+.cleanup-icon { width: 6px; height: 6px; border-radius: 2px; background: #ff6b6b; flex-shrink: 0; margin-top: 5px; }
+.cleanup-icon.green { background: #6af7c8; }
+.cleanup-text { font-family: 'Space Mono', monospace; font-size: 10px; color: #8888aa; line-height: 1.6; }
+.cleanup-text strong { color: #e8e8f0; }
+</style>
+
+<div class="page">
+  <h2>Final Design</h2>
+  <p class="subtitle">Two changes: (1) sidebar overlay with gradient tab, (2) logo customisation removed. Approve to move to implementation.</p>
+
+  <!-- Sidebar: closed state -->
+  <div class="section">
+    <div class="section-label">Sidebar — closed state (default)</div>
+    <div class="app-frame">
+      <div class="app-hdr">
+        <div class="logo-tile">B&gt;</div>
+        <div class="logo-word">BASED</div>
+        <div class="hdr-spacer"></div>
+        <div class="hdr-tabs"><div class="hdr-tab active">Chat</div><div class="hdr-tab">Preview</div></div>
+      </div>
+      <div class="app-body">
+        <div class="gradient-tab"><div class="tab-chevron">›</div></div>
+        <div class="app-content">
+          <div class="content-placeholder">
+            <div class="content-tile">B&gt;</div>
+            <div class="content-text">BASED — full width</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="state-label">Gradient tab peeks from left edge. Content uses full width.</div>
+  </div>
+
+  <!-- Sidebar: open state -->
+  <div class="section">
+    <div class="section-label">Sidebar — open state (panel slid in + backdrop)</div>
+    <div class="app-frame">
+      <div class="app-hdr">
+        <div class="logo-tile">B&gt;</div>
+        <div class="logo-word">BASED</div>
+        <div class="hdr-spacer"></div>
+        <div class="hdr-tabs"><div class="hdr-tab active">Chat</div><div class="hdr-tab">Preview</div></div>
+      </div>
+      <div class="app-body">
+        <div class="gradient-tab open"><div class="tab-chevron">›</div></div>
+        <div class="sidebar-backdrop visible"></div>
+        <div class="sidebar-panel open">
+          <div class="panel-section-hdr">Projects <span class="panel-new-btn">+</span></div>
+          <div class="panel-item active"><div class="panel-item-dot"></div>My App</div>
+          <div class="panel-item">Landing Page</div>
+          <div class="panel-item">Portfolio</div>
+          <div class="panel-divider"></div>
+          <div class="panel-section-hdr">Files <span class="panel-new-btn">↓</span></div>
+          <div class="panel-item">index.html</div>
+          <div class="panel-item">style.css</div>
+          <div class="panel-item">app.js</div>
+        </div>
+        <div class="app-content">
+          <div class="content-placeholder">
+            <div class="content-tile">B&gt;</div>
+            <div class="content-text">content dimmed behind</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="state-label">Panel slides in (framer-motion spring). Backdrop dims content. Click backdrop to dismiss. Tab chevron flips.</div>
+  </div>
+
+  <!-- Logo cleanup -->
+  <div class="section">
+    <div class="section-label">Logo cleanup — what gets removed vs kept</div>
+    <div class="cleanup-box">
+      <div class="cleanup-row"><div class="cleanup-icon"></div><div class="cleanup-text"><strong>Delete AnimatedLogo.tsx</strong> — the hover wrapper + edit button shell</div></div>
+      <div class="cleanup-row"><div class="cleanup-icon"></div><div class="cleanup-text"><strong>Delete LogoEditorModal.tsx</strong> — the full customisation modal</div></div>
+      <div class="cleanup-row"><div class="cleanup-icon"></div><div class="cleanup-text"><strong>Simplify useLogoConfig.ts</strong> — remove the hook + localStorage. Keep only the <code>LOGO_DEFAULTS</code> const export</div></div>
+      <div class="cleanup-row"><div class="cleanup-icon"></div><div class="cleanup-text"><strong>Remove logo-editor CSS</strong> from globals.css (~60 lines of editor panel styles)</div></div>
+      <div class="cleanup-row"><div class="cleanup-icon green"></div><div class="cleanup-text"><strong>Keep LogoDisplay.tsx</strong> — still renders the B&gt; tile + wordmark (used in header + empty states)</div></div>
+      <div class="cleanup-row"><div class="cleanup-icon green"></div><div class="cleanup-text"><strong>Header gets simpler</strong> — replace &lt;AnimatedLogo /&gt; with &lt;LogoDisplay config={LOGO_DEFAULTS} /&gt; directly</div></div>
+    </div>
+  </div>
+
+  <p class="subtitle" style="font-size:11px;">Does this look right? Say "approve" and I'll write the spec.</p>
+</div>

@@ -1,0 +1,6 @@
+{"type":"server-started","port":59469,"host":"0.0.0.0","url_host":"localhost","url":"http://localhost:59469","screen_dir":"/workspaces/all-in-all-based/.superpowers/brainstorm/63333-1778124666/content","state_dir":"/workspaces/all-in-all-based/.superpowers/brainstorm/63333-1778124666/state"}
+{"type":"screen-added","file":"/workspaces/all-in-all-based/.superpowers/brainstorm/63333-1778124666/content/animation-styles.html"}
+{"type":"screen-added","file":"/workspaces/all-in-all-based/.superpowers/brainstorm/63333-1778124666/content/waiting-1.html"}
+{"type":"screen-added","file":"/workspaces/all-in-all-based/.superpowers/brainstorm/63333-1778124666/content/panel-placement.html"}
+{"type":"screen-added","file":"/workspaces/all-in-all-based/.superpowers/brainstorm/63333-1778124666/content/waiting-2.html"}
+{"type":"server-stopped","reason":"idle timeout"}

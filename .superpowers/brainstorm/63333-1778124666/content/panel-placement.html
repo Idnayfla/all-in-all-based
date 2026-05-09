@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Settings Panel Placement</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@800&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a0f; color: #e8e8f0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 28px 20px; }
+  h2 { font-size: 19px; font-weight: 600; margin-bottom: 5px; }
+  .subtitle { font-size: 13px; color: #8888aa; margin-bottom: 28px; }
+
+  .cards { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; max-width: 960px; margin: 0 auto; }
+  .card { background: #111118; border: 2px solid #2a2a3a; border-radius: 14px; overflow: hidden; cursor: pointer; transition: border-color 0.2s, transform 0.15s; }
+  .card:hover { border-color: #7c6af7; transform: translateY(-2px); }
+  .card.selected { border-color: #7c6af7; background: #14142a; }
+
+  .card-preview { height: 200px; position: relative; background: #0d0d16; border-bottom: 1px solid #1e1e2a; overflow: hidden; }
+
+  /* Shared app chrome */
+  .app-chrome { position: absolute; inset: 0; display: flex; flex-direction: column; }
+  .mock-header {
+    height: 38px; background: #111118; border-bottom: 1px solid #2a2a3a;
+    display: flex; align-items: center; padding: 0 10px; gap: 8px; flex-shrink: 0;
+  }
+  .mock-logo { display: flex; align-items: center; gap: 6px; }
+  .mock-icon { width: 22px; height: 22px; border-radius: 5px; background: linear-gradient(135deg,#1a1a2e,#0a0a0f); border: 1px solid #3a3060; display:flex;align-items:center;justify-content:center;font-size:10px;position:relative;overflow:hidden; }
+  .mock-icon::after { content:''; position:absolute;top:0;left:-100%;width:50%;height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent); animation: shimmer 2.4s ease-in-out infinite; }
+  @keyframes shimmer { 0%{left:-100%} 40%,100%{left:150%} }
+  .mock-logo-text { font-family:'Syne',sans-serif; font-weight:800; font-size:11px; letter-spacing:2px; color:#e8e8f0; }
+  .mock-nav { margin-left: auto; display: flex; gap: 3px; }
+  .mock-nav-btn { background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 4px; padding: 3px 7px; font-size: 9px; color: #8888aa; }
+  .mock-gear { width: 20px; height: 20px; border-radius: 4px; background: transparent; border: 1px solid #2a2a3a; display:flex;align-items:center;justify-content:center; font-size:11px; color:#8888aa; }
+  .mock-body { flex: 1; background: #0a0a0f; position: relative; }
+
+  /* ── Option A: inside ⚙ panel ── */
+  .settings-drawer {
+    position: absolute; right: 0; top: 0; width: 110px; height: 100%;
+    background: #111118; border-left: 1px solid #2a2a3a; padding: 8px;
+  }
+  .settings-section { font-size: 8px; text-transform: uppercase; letter-spacing: 1px; color: #4a4a6a; margin-bottom: 5px; }
+  .settings-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+  .settings-label { font-size: 8px; color: #8888aa; }
+  .color-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .mini-slider { width: 45px; height: 4px; background: #2a2a3a; border-radius: 2px; position:relative; }
+  .mini-slider-fill { height: 100%; border-radius: 2px; background: #7c6af7; }
+  .mini-thumb { width: 8px; height: 8px; border-radius: 50%; background: #e8e8f0; border: 1px solid #7c6af7; position:absolute; top:-2px; }
+  .mini-input { background: #0a0a0f; border: 1px solid #2a2a3a; border-radius: 3px; padding: 2px 4px; font-size: 8px; color: #e8e8f0; width: 68px; }
+  .arrow { font-size: 7px; color: #4a4a6a; margin-left: 2px; }
+
+  /* ── Option B: logo click popover ── */
+  .logo-popover {
+    position: absolute; left: 8px; top: 44px;
+    background: #1a1a24; border: 1px solid #3a3060; border-radius: 10px;
+    padding: 10px 11px; width: 130px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+  }
+  .popover-title { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #7c6af7; margin-bottom: 8px; }
+  .swatch-row { display: flex; gap: 4px; margin-bottom: 6px; }
+  .swatch { width: 16px; height: 16px; border-radius: 4px; cursor: pointer; }
+  .swatch.active { outline: 2px solid white; outline-offset: 1px; }
+
+  /* ── Option C: hover overlay ── */
+  .hover-overlay {
+    position: absolute; inset: 0;
+    background: rgba(10,10,15,0.75);
+    backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .hover-panel {
+    background: #1a1a24; border: 1px solid #3a3060; border-radius: 12px;
+    padding: 12px 16px; width: 160px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.6);
+  }
+  .hover-title { font-size: 9px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #7c6af7; margin-bottom: 10px; }
+
+  .card-label { padding: 12px 16px; }
+  .card-label h3 { font-size: 14px; font-weight: 600; color: #e8e8f0; margin-bottom: 3px; }
+  .card-label p { font-size: 11px; color: #8888aa; line-height: 1.5; }
+
+  .selected-badge { display:none; position:absolute; top:8px; right:8px; background:#7c6af7; color:#fff; font-size:10px; font-weight:700; padding:2px 7px; border-radius:20px; }
+  .card.selected .selected-badge { display:block; }
+  .hint { text-align:center; margin-top:22px; font-size:12px; color:#4a4a6a; }
+</style>
+</head>
+<body>
+<h2>Where should the logo settings live?</h2>
+<p class="subtitle">Pick the placement that feels most natural.</p>
+
+<div class="cards">
+
+  <!-- A: Inside existing ⚙ settings panel -->
+  <div class="card" data-choice="settings-panel" onclick="pick(this)">
+    <div class="card-preview">
+      <span class="selected-badge">✓</span>
+      <div class="app-chrome">
+        <div class="mock-header">
+          <div class="mock-logo">
+            <div class="mock-icon">⚡</div>
+            <span class="mock-logo-text">BASED</span>
+          </div>
+          <div class="mock-nav">
+            <div class="mock-nav-btn">Chat</div>
+            <div class="mock-nav-btn">Editor</div>
+          </div>
+          <div class="mock-gear" style="border-color:#7c6af7;color:#7c6af7;">⚙</div>
+        </div>
+        <div class="mock-body">
+          <div class="settings-drawer">
+            <div class="settings-section">Logo</div>
+            <div class="settings-row">
+              <span class="settings-label">Text</span>
+              <input class="mini-input" value="BASED" readonly>
+            </div>
+            <div class="settings-row" style="margin-bottom:3px;">
+              <span class="settings-label">Shimmer</span>
+            </div>
+            <div class="swatch-row" style="margin-left:0;margin-bottom:6px;">
+              <div class="swatch active" style="background:#7c6af7;"></div>
+              <div class="swatch" style="background:#6af7c8;"></div>
+              <div class="swatch" style="background:#f7a26a;"></div>
+              <div class="swatch" style="background:#f76a8a;"></div>
+            </div>
+            <div class="settings-row">
+              <span class="settings-label">Speed</span>
+            </div>
+            <div class="mini-slider" style="margin-bottom:6px;">
+              <div class="mini-slider-fill" style="width:55%;"></div>
+              <div class="mini-thumb" style="left:48%;"></div>
+            </div>
+            <div class="settings-section" style="margin-top:4px;">Other</div>
+            <div class="settings-row"><span class="settings-label">Memory</span><span class="arrow">›</span></div>
+            <div class="settings-row"><span class="settings-label">Model</span><span class="arrow">›</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">
+      <h3>A — Inside ⚙ Settings</h3>
+      <p>Logo section added to the existing settings panel. Discoverable, no extra UI surface.</p>
+    </div>
+  </div>
+
+  <!-- B: Logo click popover -->
+  <div class="card" data-choice="logo-popover" onclick="pick(this)">
+    <div class="card-preview">
+      <span class="selected-badge">✓</span>
+      <div class="app-chrome">
+        <div class="mock-header">
+          <div class="mock-logo" style="cursor:pointer;">
+            <div class="mock-icon" style="border-color:#7c6af7;">⚡</div>
+            <span class="mock-logo-text">BASED</span>
+          </div>
+          <div class="mock-nav" style="margin-left:auto;">
+            <div class="mock-nav-btn">Chat</div>
+            <div class="mock-nav-btn">Editor</div>
+            <div class="mock-gear">⚙</div>
+          </div>
+        </div>
+        <div class="mock-body">
+          <div class="logo-popover">
+            <div class="popover-title">Logo</div>
+            <div class="settings-label" style="margin-bottom:4px;font-size:8px;">Name</div>
+            <input class="mini-input" value="BASED" readonly style="width:100%;margin-bottom:7px;">
+            <div class="settings-label" style="margin-bottom:4px;font-size:8px;">Shimmer color</div>
+            <div class="swatch-row" style="margin-bottom:7px;">
+              <div class="swatch active" style="background:#7c6af7;"></div>
+              <div class="swatch" style="background:#6af7c8;"></div>
+              <div class="swatch" style="background:#f7a26a;"></div>
+              <div class="swatch" style="background:#f76a8a;"></div>
+            </div>
+            <div class="settings-label" style="margin-bottom:4px;font-size:8px;">Speed</div>
+            <div class="mini-slider">
+              <div class="mini-slider-fill" style="width:55%;"></div>
+              <div class="mini-thumb" style="left:48%;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">
+      <h3>B — Click Logo to Edit</h3>
+      <p>Clicking the logo opens a compact popover right below it. Direct and contextual.</p>
+    </div>
+  </div>
+
+  <!-- C: Logo hover overlay -->
+  <div class="card" data-choice="hover-overlay" onclick="pick(this)">
+    <div class="card-preview">
+      <span class="selected-badge">✓</span>
+      <div class="app-chrome">
+        <div class="mock-header">
+          <div class="mock-logo">
+            <div class="mock-icon">⚡</div>
+            <span class="mock-logo-text">BASED</span>
+          </div>
+          <div class="mock-nav" style="margin-left:auto;">
+            <div class="mock-nav-btn">Chat</div>
+            <div class="mock-nav-btn">Editor</div>
+            <div class="mock-gear">⚙</div>
+          </div>
+        </div>
+        <div class="mock-body">
+          <div class="hover-overlay">
+            <div class="hover-panel">
+              <div class="hover-title">Customize Logo</div>
+              <div class="settings-label" style="font-size:8px;margin-bottom:3px;">Name</div>
+              <input class="mini-input" value="BASED" readonly style="width:100%;margin-bottom:7px;">
+              <div class="settings-label" style="font-size:8px;margin-bottom:3px;">Shimmer</div>
+              <div class="swatch-row" style="margin-bottom:7px;">
+                <div class="swatch active" style="background:#7c6af7;"></div>
+                <div class="swatch" style="background:#6af7c8;"></div>
+                <div class="swatch" style="background:#f7a26a;"></div>
+                <div class="swatch" style="background:#f76a8a;"></div>
+                <div class="swatch" style="background:#fff;"></div>
+              </div>
+              <div class="settings-label" style="font-size:8px;margin-bottom:3px;">Speed</div>
+              <div class="mini-slider" style="width:100%;">
+                <div class="mini-slider-fill" style="width:55%;"></div>
+                <div class="mini-thumb" style="left:50%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-label">
+      <h3>C — Dedicated Modal</h3>
+      <p>A centred modal overlay, opened from a small edit button that appears on logo hover.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="hint">Click to select — then tell me in the terminal.</p>
+
+<script>
+function pick(el) {
+  document.querySelectorAll('.card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  const choice = el.dataset.choice;
+  try {
+    fetch('/event', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({type:'click', choice, text: el.querySelector('h3').textContent, timestamp: Date.now()})
+    }).catch(()=>{});
+  } catch(e){}
+}
+</script>
+</body>
+</html>

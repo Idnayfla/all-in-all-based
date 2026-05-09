@@ -427,7 +427,7 @@ export async function POST(req: NextRequest) {
           } catch (e) {
             // Fallback to single request
             const stream = await client.messages.stream({
-              model: 'claude-opus-4-6',
+              model: 'claude-opus-4-7',
               max_tokens: 16000,
               system: systemBlocks,
               messages: anthropicMessages,
@@ -480,7 +480,7 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`));
 
             const fileStream = client.messages.stream({
-              model: 'claude-opus-4-6',
+              model: 'claude-opus-4-7',
               max_tokens: 16000,
               system: FILE_GENERATOR_SYSTEM_BLOCKS,
               messages: [{ role: 'user', content: imageBlocks.length > 0 ? [...imageBlocks, { type: 'text' as const, text: filePrompt }] : filePrompt }],
@@ -499,7 +499,7 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
             // If the model was cut off before closing the forge_file tag, continue from where it stopped
             if (fileResult.stop_reason === 'max_tokens' && !fileText.includes('</forge_file>')) {
               const contStream = client.messages.stream({
-                model: 'claude-opus-4-6',
+                model: 'claude-opus-4-7',
                 max_tokens: 16000,
                 system: FILE_GENERATOR_SYSTEM_BLOCKS,
                 messages: [

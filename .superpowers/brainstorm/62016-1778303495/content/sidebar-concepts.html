@@ -1,0 +1,219 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap');
+
+.page { max-width: 900px; margin: 0 auto; padding: 8px 0 32px; }
+.page h2 { font-size: 18px; margin-bottom: 6px; }
+.page .subtitle { margin-bottom: 28px; }
+
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+.card {
+  background: #111118; border: 2px solid #2a2a3a; border-radius: 14px;
+  overflow: hidden; cursor: pointer;
+  transition: border-color 0.2s, transform 0.15s; position: relative;
+}
+.card:hover { border-color: #7c6af7; transform: translateY(-2px); }
+.card.selected { border-color: #7c6af7; box-shadow: 0 0 0 1px #7c6af7; }
+.select-badge {
+  position: absolute; top: 10px; right: 10px;
+  background: #7c6af7; color: #fff;
+  font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: 1px;
+  padding: 2px 7px; border-radius: 4px; opacity: 0; transition: opacity 0.2s;
+}
+.card.selected .select-badge { opacity: 1; }
+
+.preview { background: #0a0a0f; border-bottom: 1px solid #1e1e2a; padding: 0; height: 200px; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+
+/* App chrome */
+.mock-header {
+  height: 38px; background: #111118; border-bottom: 1px solid #2a2a3a;
+  display: flex; align-items: center; gap: 8px; padding: 0 12px; flex-shrink: 0;
+}
+.mock-logo-tile { width: 22px; height: 22px; border-radius: 5px; background: linear-gradient(135deg, #7c6af7, #6af7c8); display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-size: 7px; font-weight: 700; color: #0a0a0f; }
+.mock-wordmark { font-family: 'Space Mono', monospace; font-size: 9px; font-weight: 700; letter-spacing: 2px; color: #e8e8f0; }
+.mock-hdr-spacer { flex: 1; }
+.mock-tabs { background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 6px; padding: 2px; display: flex; gap: 1px; }
+.mock-tab { padding: 3px 10px; font-family: 'Space Mono', monospace; font-size: 8px; border-radius: 4px; color: #8888aa; }
+.mock-tab.active { background: #7c6af7; color: #fff; }
+.mock-body { flex: 1; display: flex; position: relative; overflow: hidden; }
+
+/* Content area */
+.mock-content { flex: 1; background: #0a0a0f; display: flex; align-items: center; justify-content: center; }
+.mock-content-inner { text-align: center; }
+.mock-content-logo { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, #7c6af7, #6af7c8); display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-size: 10px; font-weight: 700; color: #0a0a0f; margin: 0 auto 6px; }
+.mock-content-text { font-family: 'Space Mono', monospace; font-size: 8px; color: #4a4a6a; letter-spacing: 1px; }
+
+/* === OPTION A: Slide-out with vertical tab === */
+.sidebar-a {
+  width: 140px; background: #111118; border-right: 1px solid #2a2a3a;
+  display: flex; flex-direction: column; flex-shrink: 0; position: relative;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sidebar-a.closed { width: 0; border-right: none; overflow: visible; }
+.sidebar-a-content { padding: 8px 0; min-width: 140px; overflow: hidden; }
+.sidebar-a-section { padding: 4px 8px; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: 2px; color: #4a4a6a; text-transform: uppercase; margin-bottom: 4px; }
+.sidebar-a-item { padding: 5px 8px; font-family: 'Space Mono', monospace; font-size: 9px; color: #8888aa; border-radius: 4px; display: flex; align-items: center; gap: 6px; }
+.sidebar-a-item.active { background: rgba(124,106,247,0.12); color: #e8e8f0; }
+.sidebar-a-dot { width: 6px; height: 6px; border-radius: 2px; background: #7c6af7; flex-shrink: 0; }
+
+/* Vertical tab for A */
+.sidebar-a-tab {
+  position: absolute; right: -22px; top: 50%; transform: translateY(-50%);
+  width: 22px; height: 60px;
+  background: #111118; border: 1px solid #2a2a3a; border-left: none;
+  border-radius: 0 6px 6px 0;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; z-index: 10;
+  writing-mode: vertical-rl;
+  font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: 1px; color: #4a4a6a;
+  transition: color 0.15s, background 0.15s;
+}
+.sidebar-a-tab:hover { color: #7c6af7; background: #1a1a24; }
+
+/* === OPTION B: Icon rail === */
+.sidebar-b {
+  width: 36px; background: #111118; border-right: 1px solid #2a2a3a;
+  display: flex; flex-direction: column; align-items: center; padding: 8px 0; gap: 4px; flex-shrink: 0;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sidebar-b.expanded { width: 140px; }
+.rail-icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-size: 8px; font-weight: 700; color: #4a4a6a; cursor: pointer; transition: all 0.15s; }
+.rail-icon:hover { background: rgba(124,106,247,0.12); color: #7c6af7; }
+.rail-icon.active { background: rgba(124,106,247,0.15); color: #a89aff; }
+.rail-divider { width: 20px; height: 1px; background: #2a2a3a; margin: 2px 0; }
+
+/* === OPTION C: Floating panel === */
+.sidebar-c-tab {
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 18px; height: 56px;
+  background: linear-gradient(180deg, #7c6af7, #6af7c8);
+  border-radius: 0 8px 8px 0; cursor: pointer; z-index: 10;
+  display: flex; align-items: center; justify-content: center;
+}
+.sidebar-c-tab::after {
+  content: '›'; font-size: 12px; color: #0a0a0f; font-weight: 700;
+}
+.sidebar-c-panel {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 130px;
+  background: rgba(17, 17, 24, 0.95); border-right: 1px solid #2a2a3a;
+  backdrop-filter: blur(12px); z-index: 9; padding: 8px 0;
+  transform: translateX(-130px);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex; flex-direction: column;
+}
+.sidebar-c-panel.open { transform: translateX(0); }
+.sidebar-c-section { padding: 4px 8px; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: 2px; color: #4a4a6a; text-transform: uppercase; margin-bottom: 4px; }
+.sidebar-c-item { padding: 5px 8px; font-family: 'Space Mono', monospace; font-size: 9px; color: #8888aa; border-radius: 4px; display: flex; align-items: center; gap: 6px; }
+.sidebar-c-item.active { background: rgba(124,106,247,0.12); color: #e8e8f0; }
+
+.card-body { padding: 12px 14px 14px; }
+.card-label { font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 1px; color: #e8e8f0; margin-bottom: 4px; }
+.card-desc { font-family: 'Space Mono', monospace; font-size: 10px; color: #8888aa; line-height: 1.6; }
+</style>
+
+<div class="page">
+  <h2>Sidebar Animation Concept</h2>
+  <p class="subtitle">Three approaches to an animated collapsible sidebar. Each preview shows the sidebar in its "open" state. Click to select.</p>
+
+  <div class="cards">
+
+    <!-- A: Slide with vertical tab -->
+    <div class="card" data-choice="a" onclick="toggleSelect(this)">
+      <div class="select-badge">SELECTED</div>
+      <div class="preview">
+        <div class="mock-header">
+          <div class="mock-logo-tile">B&gt;</div>
+          <div class="mock-wordmark">BASED</div>
+          <div class="mock-hdr-spacer"></div>
+          <div class="mock-tabs"><div class="mock-tab active">Chat</div><div class="mock-tab">Preview</div></div>
+        </div>
+        <div class="mock-body">
+          <div class="sidebar-a">
+            <div class="sidebar-a-content">
+              <div class="sidebar-a-section">Projects</div>
+              <div class="sidebar-a-item active"><div class="sidebar-a-dot"></div>My App</div>
+              <div class="sidebar-a-item">Landing Page</div>
+              <div class="sidebar-a-section" style="margin-top:6px">Files</div>
+              <div class="sidebar-a-item">index.html</div>
+              <div class="sidebar-a-item">style.css</div>
+            </div>
+            <div class="sidebar-a-tab">MENU</div>
+          </div>
+          <div class="mock-content">
+            <div class="mock-content-inner">
+              <div class="mock-content-text">Chat area</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-label">A — Slide + Vertical Tab</div>
+        <div class="card-desc">Sidebar slides in/out. A thin tab stays pinned to the left edge when closed. Clean, familiar pattern (like Notion or Linear).</div>
+      </div>
+    </div>
+
+    <!-- B: Icon rail -->
+    <div class="card" data-choice="b" onclick="toggleSelect(this)">
+      <div class="select-badge">SELECTED</div>
+      <div class="preview">
+        <div class="mock-header">
+          <div class="mock-logo-tile">B&gt;</div>
+          <div class="mock-wordmark">BASED</div>
+          <div class="mock-hdr-spacer"></div>
+          <div class="mock-tabs"><div class="mock-tab active">Chat</div><div class="mock-tab">Preview</div></div>
+        </div>
+        <div class="mock-body">
+          <div class="sidebar-b">
+            <div class="rail-icon active">⬡</div>
+            <div class="rail-icon">◻</div>
+            <div class="rail-divider"></div>
+            <div class="rail-icon" style="font-size:10px">↓</div>
+          </div>
+          <div class="mock-content">
+            <div class="mock-content-inner">
+              <div class="mock-content-text">Chat area</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-label">B — Icon Rail</div>
+        <div class="card-desc">Sidebar collapses to a 36px icon strip. Click an icon to expand to full 220px. Feels like VS Code or Figma — very "tool" native.</div>
+      </div>
+    </div>
+
+    <!-- C: Gradient accent tab + floating panel -->
+    <div class="card" data-choice="c" onclick="toggleSelect(this)">
+      <div class="select-badge">SELECTED</div>
+      <div class="preview">
+        <div class="mock-header">
+          <div class="mock-logo-tile">B&gt;</div>
+          <div class="mock-wordmark">BASED</div>
+          <div class="mock-hdr-spacer"></div>
+          <div class="mock-tabs"><div class="mock-tab active">Chat</div><div class="mock-tab">Preview</div></div>
+        </div>
+        <div class="mock-body" style="position:relative">
+          <div class="sidebar-c-tab"></div>
+          <div class="sidebar-c-panel open">
+            <div class="sidebar-c-section">Projects</div>
+            <div class="sidebar-c-item active">My App</div>
+            <div class="sidebar-c-item">Landing Page</div>
+            <div class="sidebar-c-section" style="margin-top:6px">Files</div>
+            <div class="sidebar-c-item">index.html</div>
+            <div class="sidebar-c-item">style.css</div>
+          </div>
+          <div class="mock-content" style="margin-left:130px">
+            <div class="mock-content-inner">
+              <div class="mock-content-text">Chat area</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-label">C — Gradient Tab + Overlay</div>
+        <div class="card-desc">A gradient accent tab (matching the logo) is always visible on the left edge. Click it to slide in a frosted-glass overlay panel — content stays full-width underneath.</div>
+      </div>
+    </div>
+
+  </div>
+</div>

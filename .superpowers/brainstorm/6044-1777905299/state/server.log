@@ -1,0 +1,8 @@
+{"type":"server-started","port":53389,"host":"0.0.0.0","url_host":"localhost","url":"http://localhost:53389","screen_dir":"/workspaces/all-in-all-based/.superpowers/brainstorm/6044-1777905299/content","state_dir":"/workspaces/all-in-all-based/.superpowers/brainstorm/6044-1777905299/state"}
+{"type":"screen-added","file":"/workspaces/all-in-all-based/.superpowers/brainstorm/6044-1777905299/content/design-direction.html"}
+{"type":"screen-added","file":"/workspaces/all-in-all-based/.superpowers/brainstorm/6044-1777905299/content/color-palette.html"}
+{"type":"screen-added","file":"/workspaces/all-in-all-based/.superpowers/brainstorm/6044-1777905299/content/typography.html"}
+{"type":"screen-added","file":"/workspaces/all-in-all-based/.superpowers/brainstorm/6044-1777905299/content/waiting-1.html"}
+{"type":"screen-added","file":"/workspaces/all-in-all-based/.superpowers/brainstorm/6044-1777905299/content/approach-comparison.html"}
+{"type":"screen-added","file":"/workspaces/all-in-all-based/.superpowers/brainstorm/6044-1777905299/content/full-design.html"}
+{"type":"server-stopped","reason":"idle timeout"}

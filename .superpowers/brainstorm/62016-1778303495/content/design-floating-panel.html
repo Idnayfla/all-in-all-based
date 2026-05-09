@@ -1,0 +1,158 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+
+.page { max-width: 860px; margin: 0 auto; padding: 8px 0 40px; }
+.page h2 { font-size: 18px; margin-bottom: 6px; }
+.page .subtitle { margin-bottom: 24px; }
+.section { margin-bottom: 32px; }
+.section-label { font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 2px; color: #4a4a6a; text-transform: uppercase; margin-bottom: 10px; }
+.state-label { font-family: 'Space Mono', monospace; font-size: 10px; color: #4a4a6a; text-align: center; margin-top: 8px; line-height: 1.6; }
+
+.states-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+/* App frame */
+.app-frame { background: #0a0a0f; border-radius: 12px; overflow: hidden; border: 1px solid #1e1e2a; height: 300px; display: flex; flex-direction: column; position: relative; }
+.app-hdr { height: 44px; background: #111118; border-bottom: 1px solid #2a2a3a; display: flex; align-items: center; gap: 10px; padding: 0 20px; flex-shrink: 0; z-index: 1; position: relative; }
+.logo-tile { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #7c6af7, #6af7c8); display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 9px; color: #0a0a0f; }
+.logo-word { font-family: 'Space Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 2px; color: #e8e8f0; }
+.hdr-spacer { flex: 1; }
+.hdr-tabs { background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 6px; padding: 2px; display: flex; }
+.hdr-tab { padding: 3px 12px; font-family: 'Space Mono', monospace; font-size: 9px; border-radius: 4px; color: #8888aa; }
+.hdr-tab.active { background: #7c6af7; color: #fff; }
+
+.app-body { flex: 1; position: relative; overflow: hidden; }
+.app-content { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; }
+.content-tile { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #7c6af7, #6af7c8); display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-weight: 700; font-size: 13px; color: #0a0a0f; margin: 0 auto 6px; }
+.content-text { font-family: 'Space Mono', monospace; font-size: 9px; color: #4a4a6a; text-align: center; }
+
+/* Backdrop */
+.backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.5); z-index: 5; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+.backdrop.on { opacity: 1; }
+
+/* ── The tab+panel unit — moves together ── */
+.sidebar-unit {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+}
+
+/* Gradient tab — always visible */
+.gradient-tab {
+  width: 20px;
+  height: 64px;
+  background: linear-gradient(180deg, #7c6af7, #6af7c8);
+  border-radius: 0 10px 10px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 2px 0 14px rgba(124,106,247,0.35);
+  order: 2; /* tab on the right of the panel */
+}
+.chevron { font-size: 11px; color: #0a0a0f; font-weight: 900; display: block; transition: transform 0.3s cubic-bezier(0.16,1,0.3,1); }
+.open .chevron { transform: rotate(180deg); }
+
+/* Floating panel — to the left of tab, same vertical center */
+.floating-panel {
+  width: 0;
+  height: 240px;
+  background: rgba(17,17,24,0.95);
+  border: 1px solid rgba(42,42,58,0.9);
+  border-right: none;
+  backdrop-filter: blur(16px);
+  border-radius: 12px 0 0 12px;
+  overflow: hidden;
+  transition: width 0.3s cubic-bezier(0.16,1,0.3,1);
+  display: flex;
+  flex-direction: column;
+  order: 1; /* panel to the left of tab */
+}
+.sidebar-unit.open .floating-panel { width: 180px; }
+
+.panel-inner { min-width: 180px; padding: 10px 0; display: flex; flex-direction: column; }
+.panel-section-hdr { padding: 3px 12px 5px; font-family: 'Space Mono', monospace; font-size: 8px; letter-spacing: 2px; color: #4a4a6a; text-transform: uppercase; display: flex; align-items: center; justify-content: space-between; }
+.panel-new { font-size: 13px; color: #4a4a6a; }
+.panel-item { padding: 5px 12px; font-family: 'Space Mono', monospace; font-size: 9px; color: #8888aa; display: flex; align-items: center; gap: 7px; border-radius: 4px; margin: 0 5px; }
+.panel-item.active { background: rgba(124,106,247,0.14); color: #e8e8f0; }
+.item-dot { width: 5px; height: 5px; border-radius: 2px; background: #7c6af7; flex-shrink: 0; }
+.panel-divider { height: 1px; background: #1e1e2a; margin: 6px 10px; }
+</style>
+
+<div class="page">
+  <h2>Floating Panel — attached to tab</h2>
+  <p class="subtitle">The panel and tab move as one unit, centered vertically. The panel grows leftward out of the tab.</p>
+
+  <div class="states-row">
+
+    <!-- Closed -->
+    <div>
+      <div class="section-label">Closed</div>
+      <div class="app-frame">
+        <div class="app-hdr">
+          <div class="logo-tile">B&gt;</div>
+          <div class="logo-word">BASED</div>
+          <div class="hdr-spacer"></div>
+          <div class="hdr-tabs"><div class="hdr-tab active">Chat</div><div class="hdr-tab">Preview</div></div>
+        </div>
+        <div class="app-body">
+          <div class="app-content">
+            <div>
+              <div class="content-tile">B&gt;</div>
+              <div class="content-text">full width</div>
+            </div>
+          </div>
+          <div class="sidebar-unit">
+            <div class="floating-panel"><div class="panel-inner"></div></div>
+            <div class="gradient-tab"><span class="chevron">›</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="state-label">Only the gradient tab is visible,<br>centered on the left edge.</div>
+    </div>
+
+    <!-- Open -->
+    <div>
+      <div class="section-label">Open</div>
+      <div class="app-frame">
+        <div class="app-hdr">
+          <div class="logo-tile">B&gt;</div>
+          <div class="logo-word">BASED</div>
+          <div class="hdr-spacer"></div>
+          <div class="hdr-tabs"><div class="hdr-tab active">Chat</div><div class="hdr-tab">Preview</div></div>
+        </div>
+        <div class="app-body">
+          <div class="backdrop on"></div>
+          <div class="app-content">
+            <div>
+              <div class="content-tile">B&gt;</div>
+              <div class="content-text">dimmed behind</div>
+            </div>
+          </div>
+          <div class="sidebar-unit open">
+            <div class="floating-panel">
+              <div class="panel-inner">
+                <div class="panel-section-hdr">Projects <span class="panel-new">+</span></div>
+                <div class="panel-item active"><div class="item-dot"></div>My App</div>
+                <div class="panel-item">Landing Page</div>
+                <div class="panel-item">Portfolio</div>
+                <div class="panel-divider"></div>
+                <div class="panel-section-hdr">Files <span class="panel-new">↓</span></div>
+                <div class="panel-item">index.html</div>
+                <div class="panel-item">style.css</div>
+                <div class="panel-item">app.js</div>
+              </div>
+            </div>
+            <div class="gradient-tab open"><span class="chevron">›</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="state-label">Panel grows leftward from the tab.<br>Backdrop click dismisses. Chevron flips.</div>
+    </div>
+
+  </div>
+</div>

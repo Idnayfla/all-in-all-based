@@ -1,0 +1,154 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+
+.page { max-width: 860px; margin: 0 auto; padding: 8px 0 40px; }
+.page h2 { font-size: 18px; margin-bottom: 6px; }
+.page .subtitle { margin-bottom: 28px; }
+
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.card {
+  background: #111118; border: 2px solid #2a2a3a; border-radius: 14px;
+  overflow: hidden; cursor: pointer;
+  transition: border-color 0.2s, transform 0.15s; position: relative;
+}
+.card:hover { border-color: #7c6af7; transform: translateY(-2px); }
+.card.selected { border-color: #7c6af7; box-shadow: 0 0 0 1px #7c6af7; }
+.select-badge {
+  position: absolute; top: 10px; right: 10px;
+  background: #7c6af7; color: #fff;
+  font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: 1px;
+  padding: 2px 7px; border-radius: 4px; opacity: 0; transition: opacity 0.2s;
+}
+.card.selected .select-badge { opacity: 1; }
+
+.preview {
+  background: #0a0a0f; border-bottom: 1px solid #1e1e2a;
+  height: 180px; position: relative; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Shared tab base */
+.tab-wrap {
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  display: flex; align-items: center;
+}
+.tab {
+  width: 20px; height: 64px;
+  border-radius: 0 10px 10px 0;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; position: relative; overflow: hidden;
+}
+.chevron { font-size: 11px; font-weight: 900; display: block; position: relative; z-index: 1; }
+
+/* Fake content */
+.mock-content { font-family: 'Space Mono', monospace; font-size: 9px; color: #2a2a3a; letter-spacing: 1px; }
+
+/* ── A: Fade to transparent at edges (top + bottom) ── */
+.tab-a {
+  background: linear-gradient(180deg,
+    transparent 0%,
+    rgba(124,106,247,0.6) 20%,
+    #7c6af7 40%,
+    #6af7c8 60%,
+    rgba(106,247,200,0.6) 80%,
+    transparent 100%
+  );
+}
+.tab-a .chevron { color: rgba(240,240,255,0.9); }
+
+/* ── B: Animated flowing/shifting gradient ── */
+@keyframes flow {
+  0%   { background-position: 0% 0%; }
+  50%  { background-position: 0% 100%; }
+  100% { background-position: 0% 0%; }
+}
+.tab-b {
+  background: linear-gradient(180deg,
+    #a89aff, #7c6af7, #6af7c8, #a89aff, #7c6af7
+  );
+  background-size: 100% 300%;
+  animation: flow 3s ease-in-out infinite;
+}
+.tab-b::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(10,10,15,0.6) 0%, transparent 20%, transparent 80%, rgba(10,10,15,0.6) 100%);
+}
+.tab-b .chevron { color: rgba(240,240,255,0.9); }
+
+/* ── C: Glow pulse + soft edges ── */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px 1px rgba(124,106,247,0.4), 2px 0 16px rgba(124,106,247,0.2); opacity: 0.85; }
+  50%       { box-shadow: 0 0 16px 3px rgba(106,247,200,0.5), 2px 0 24px rgba(106,247,200,0.25); opacity: 1; }
+}
+.tab-c {
+  background: linear-gradient(180deg,
+    transparent 0%,
+    rgba(124,106,247,0.45) 15%,
+    rgba(124,106,247,0.85) 35%,
+    rgba(106,247,200,0.85) 65%,
+    rgba(106,247,200,0.45) 85%,
+    transparent 100%
+  );
+  animation: glow-pulse 2.4s ease-in-out infinite;
+}
+.tab-c .chevron { color: rgba(240,255,250,0.95); text-shadow: 0 0 6px rgba(106,247,200,0.8); }
+
+.card-body { padding: 12px 14px 14px; }
+.card-label { font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; letter-spacing: 1px; color: #e8e8f0; margin-bottom: 4px; }
+.card-desc { font-family: 'Space Mono', monospace; font-size: 10px; color: #8888aa; line-height: 1.6; }
+</style>
+
+<div class="page">
+  <h2>Tab — Blend & Fade Variants</h2>
+  <p class="subtitle">Three ways to make the tab feel less flat. All fade to transparent at top and bottom edges. Click to select.</p>
+
+  <div class="cards">
+
+    <!-- A: Fade edges -->
+    <div class="card" data-choice="a" onclick="toggleSelect(this)">
+      <div class="select-badge">SELECTED</div>
+      <div class="preview">
+        <div class="mock-content">CHAT AREA</div>
+        <div class="tab-wrap">
+          <div class="tab tab-a"><span class="chevron">›</span></div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-label">A — Fade to transparent</div>
+        <div class="card-desc">Gradient fades to transparent at top and bottom, blending into the background. Subtle and elegant — feels like it grows out of the dark.</div>
+      </div>
+    </div>
+
+    <!-- B: Flowing/animated -->
+    <div class="card" data-choice="b" onclick="toggleSelect(this)">
+      <div class="select-badge">SELECTED</div>
+      <div class="preview">
+        <div class="mock-content">CHAT AREA</div>
+        <div class="tab-wrap">
+          <div class="tab tab-b"><span class="chevron">›</span></div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-label">B — Animated flow</div>
+        <div class="card-desc">Gradient slowly scrolls/shifts between purple and teal — alive and moving. Edges darken to blend in. Feels like a signal or pulse.</div>
+      </div>
+    </div>
+
+    <!-- C: Glow pulse -->
+    <div class="card" data-choice="c" onclick="toggleSelect(this)">
+      <div class="select-badge">SELECTED</div>
+      <div class="preview">
+        <div class="mock-content">CHAT AREA</div>
+        <div class="tab-wrap">
+          <div class="tab tab-c"><span class="chevron">›</span></div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="card-label">C — Glow pulse</div>
+        <div class="card-desc">Fades at edges AND pulses a soft glow outward — alternates purple→teal. The tab breathes. Most expressive of the three.</div>
+      </div>
+    </div>
+
+  </div>
+</div>

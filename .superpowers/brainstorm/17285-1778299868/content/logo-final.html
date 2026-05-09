@@ -1,0 +1,181 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap');
+
+.page { max-width: 780px; margin: 0 auto; padding: 8px 0 32px; }
+.page h2 { font-size: 18px; margin-bottom: 6px; }
+.page .subtitle { margin-bottom: 28px; }
+
+.section { margin-bottom: 32px; }
+.section-label {
+  font-family: 'Space Mono', monospace; font-size: 10px; letter-spacing: 2px;
+  color: #4a4a6a; text-transform: uppercase; margin-bottom: 12px;
+}
+
+/* ── Tile ── */
+.tile {
+  background: linear-gradient(135deg, #7c6af7, #6af7c8);
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Space Mono', monospace; font-weight: 700; color: #0a0a0f;
+  flex-shrink: 0;
+}
+.word {
+  font-family: 'Space Mono', monospace; font-weight: 700;
+  letter-spacing: 3px; color: #e8e8f0;
+}
+
+/* ── Header preview ── */
+.app-frame {
+  background: #0a0a0f; border-radius: 12px; overflow: hidden;
+  border: 1px solid #1e1e2a;
+}
+.app-hdr {
+  background: #111118; border-bottom: 1px solid #2a2a3a;
+  padding: 10px 20px; display: flex; align-items: center; gap: 10px; height: 52px;
+}
+.app-hdr-spacer { flex: 1; }
+.app-hdr-tabs {
+  background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 8px;
+  padding: 3px; display: flex; gap: 1px;
+}
+.tab {
+  padding: 5px 16px; font-family: 'Space Mono', monospace; font-size: 10px;
+  letter-spacing: 1px; border-radius: 5px; color: #8888aa;
+}
+.tab.active { background: #7c6af7; color: #fff; }
+.app-body-mock {
+  display: flex; height: 260px;
+}
+.app-sidebar {
+  width: 200px; background: #111118; border-right: 1px solid #1e1e2a;
+  padding: 16px 12px; flex-shrink: 0;
+}
+.sidebar-item {
+  height: 12px; background: #1a1a24; border-radius: 4px; margin-bottom: 8px;
+}
+.sidebar-item:first-child { width: 60%; }
+.sidebar-item:nth-child(2) { width: 80%; }
+.sidebar-item:nth-child(3) { width: 50%; }
+.app-main {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  background: #0a0a0f;
+}
+
+/* Empty state */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.empty-title {
+  font-family: 'Space Mono', monospace; font-weight: 700; font-size: 16px;
+  letter-spacing: 3px; color: #e8e8f0;
+}
+.empty-sub {
+  font-family: 'Space Mono', monospace; font-size: 11px; color: #4a4a6a;
+  text-align: center; max-width: 240px; line-height: 1.7;
+}
+.new-btn {
+  background: transparent; border: 1px solid #2a2a3a; border-radius: 6px;
+  padding: 7px 20px; font-family: 'Space Mono', monospace; font-size: 11px; color: #8888aa;
+  margin-top: 4px;
+}
+
+/* ── Sizes reference ── */
+.sizes-row {
+  display: flex; align-items: flex-end; gap: 28px;
+  background: #111118; border: 1px solid #2a2a3a; border-radius: 12px;
+  padding: 24px 28px;
+}
+.size-item { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.size-label { font-family: 'Space Mono', monospace; font-size: 9px; color: #4a4a6a; letter-spacing: 1px; }
+
+/* ── Token table ── */
+.token-table {
+  width: 100%; border-collapse: collapse;
+  font-family: 'Space Mono', monospace; font-size: 11px;
+}
+.token-table td {
+  padding: 8px 12px; border-bottom: 1px solid #1e1e2a; color: #8888aa;
+}
+.token-table td:first-child { color: #e8e8f0; width: 180px; }
+.token-swatch {
+  display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+  margin-right: 6px; vertical-align: middle;
+}
+</style>
+
+<div class="page">
+  <h2>Final Design: Based Logo — C3 "B>"</h2>
+  <p class="subtitle">The official logo applied in both header and empty-state contexts. Approve to move to implementation.</p>
+
+  <!-- Full app preview -->
+  <div class="section">
+    <div class="section-label">Full app preview</div>
+    <div class="app-frame">
+      <div class="app-hdr">
+        <!-- Logo: tile + wordmark -->
+        <div class="tile" style="width:30px;height:30px;border-radius:7px;font-size:11px;">B&gt;</div>
+        <div class="word" style="font-size:13px;letter-spacing:2px;">BASED</div>
+        <div class="app-hdr-spacer"></div>
+        <div class="app-hdr-tabs">
+          <div class="tab active">Chat</div>
+          <div class="tab">Preview</div>
+        </div>
+      </div>
+      <div class="app-body-mock">
+        <div class="app-sidebar">
+          <div class="sidebar-item"></div>
+          <div class="sidebar-item"></div>
+          <div class="sidebar-item"></div>
+        </div>
+        <div class="app-main">
+          <!-- Empty state with large logo -->
+          <div class="empty-state">
+            <div class="tile" style="width:56px;height:56px;font-size:22px;">B&gt;</div>
+            <div class="empty-title">BASED</div>
+            <div class="empty-sub">Open a project or start a new one.</div>
+            <div class="new-btn">+ New Project</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sizes reference -->
+  <div class="section">
+    <div class="section-label">Icon sizes</div>
+    <div class="sizes-row">
+      <div class="size-item">
+        <div class="tile" style="width:20px;height:20px;border-radius:4px;font-size:7px;">B&gt;</div>
+        <div class="size-label">favicon<br>20px</div>
+      </div>
+      <div class="size-item">
+        <div class="tile" style="width:30px;height:30px;border-radius:7px;font-size:11px;">B&gt;</div>
+        <div class="size-label">header<br>30px</div>
+      </div>
+      <div class="size-item">
+        <div class="tile" style="width:56px;height:56px;font-size:22px;">B&gt;</div>
+        <div class="size-label">empty state<br>56px</div>
+      </div>
+      <div class="size-item">
+        <div class="tile" style="width:96px;height:96px;font-size:38px;">B&gt;</div>
+        <div class="size-label">PWA icon<br>96px+</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Token table -->
+  <div class="section">
+    <div class="section-label">Design tokens</div>
+    <table class="token-table">
+      <tr><td>Gradient start</td><td><span class="token-swatch" style="background:#7c6af7"></span>#7c6af7 (--accent)</td></tr>
+      <tr><td>Gradient end</td><td><span class="token-swatch" style="background:#6af7c8"></span>#6af7c8 (--accent3)</td></tr>
+      <tr><td>Gradient direction</td><td>135° (top-left → bottom-right)</td></tr>
+      <tr><td>Icon text</td><td>B&gt; — Space Mono Bold, color #0a0a0f</td></tr>
+      <tr><td>Wordmark</td><td>BASED — Space Mono Bold, letter-spacing 2-3px</td></tr>
+      <tr><td>Border radius (sm)</td><td>7px (header)</td></tr>
+      <tr><td>Border radius (lg)</td><td>14px (empty state, PWA)</td></tr>
+    </table>
+  </div>
+
+  <p class="subtitle" style="font-size:11px; margin-top:8px;">Does this look right? Say "approve" to move to the implementation plan.</p>
+</div>

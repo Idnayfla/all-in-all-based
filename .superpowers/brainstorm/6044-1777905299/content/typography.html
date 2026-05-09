@@ -1,0 +1,52 @@
+<h2>Chat message typography</h2>
+<p class="subtitle">The app currently uses Space Mono (monospace) for everything. For readability, we can mix fonts — keeping mono for code and UI chrome, switching to a readable font for chat prose.</p>
+
+<div class="split">
+
+  <div class="mockup">
+    <div class="mockup-header">A — All monospace (current)</div>
+    <div class="mockup-body" style="background:#0d0d14;padding:16px;display:flex;flex-direction:column;gap:14px;" onclick="selectMockup(this,'mono')" data-choice="mono">
+      <div>
+        <div style="font-size:9px;color:#7c6af7;letter-spacing:2px;font-family:'Courier New',monospace;margin-bottom:5px;">YOU</div>
+        <div style="font-family:'Courier New',monospace;font-size:12px;color:#e8e8f0;line-height:1.7;padding:10px 12px;background:transparent;border-left:2px solid rgba(124,106,247,0.4);">Build me a weather dashboard with live data and a 5-day forecast.</div>
+      </div>
+      <div>
+        <div style="font-size:9px;color:#6af7c8;letter-spacing:2px;font-family:'Courier New',monospace;margin-bottom:5px;">BASED</div>
+        <div style="font-family:'Courier New',monospace;font-size:12px;color:#b0b0c8;line-height:1.7;padding:10px 12px;background:transparent;border-left:2px solid rgba(106,247,200,0.3);">Here's a clean weather dashboard. It fetches from the Open-Meteo API (no key needed) and displays current conditions plus a 5-day forecast with icons.
+          <br><br>
+          The layout is responsive and works great on mobile too.
+        </div>
+      </div>
+      <div style="font-family:'Courier New',monospace;font-size:10px;color:#4a4a6a;margin-top:4px;">Monospace everywhere — technical feel, harder to scan long responses.</div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">B — Mixed (mono for UI, sans for prose)</div>
+    <div class="mockup-body" style="background:#0d0d14;padding:16px;display:flex;flex-direction:column;gap:14px;" onclick="selectMockup(this,'mixed')" data-choice="mixed">
+      <div>
+        <div style="font-size:9px;color:#7c6af7;letter-spacing:2px;font-family:'Courier New',monospace;margin-bottom:5px;">YOU</div>
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#e8e8f0;line-height:1.7;padding:10px 12px;background:transparent;border-left:2px solid rgba(124,106,247,0.4);">Build me a weather dashboard with live data and a 5-day forecast.</div>
+      </div>
+      <div>
+        <div style="font-size:9px;color:#6af7c8;letter-spacing:2px;font-family:'Courier New',monospace;margin-bottom:5px;">BASED</div>
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;color:#c0c0d8;line-height:1.7;padding:10px 12px;background:transparent;border-left:2px solid rgba(106,247,200,0.3);">Here's a clean weather dashboard. It fetches from the Open-Meteo API (no key needed) and displays current conditions plus a 5-day forecast with icons.
+          <br><br>
+          The layout is responsive and works great on mobile too.
+        </div>
+      </div>
+      <div style="font-family:'Courier New',monospace;font-size:10px;color:#4a4a6a;margin-top:4px;">Sans-serif for prose — easier to read, code blocks stay monospace.</div>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px;text-align:center;">Click a panel to select. UI chrome (header, labels, buttons) stays monospace either way.</p>
+
+<script>
+function selectMockup(el, choice) {
+  document.querySelectorAll('.mockup-body').forEach(m => m.style.outline = 'none');
+  el.style.outline = '2px solid #7c6af7';
+  if (window.recordSelection) window.recordSelection(choice, el.closest('.mockup').querySelector('.mockup-header').textContent);
+}
+</script>

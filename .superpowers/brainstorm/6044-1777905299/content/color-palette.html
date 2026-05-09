@@ -1,0 +1,81 @@
+<h2>How much color?</h2>
+<p class="subtitle">The current app uses three accents: purple, teal, and pink. For a cleaner look, we can simplify.</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="single" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0d0d14;padding:20px;border-radius:6px;min-height:180px;display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div style="width:10px;height:10px;background:#7c6af7;border-radius:50%;"></div>
+        <span style="color:#7c6af7;font-size:10px;letter-spacing:2px;font-family:monospace;">YOU</span>
+      </div>
+      <div style="color:#e8e8f0;font-size:12px;line-height:1.6;font-family:monospace;">Build me a todo app</div>
+      <div style="height:1px;background:#1e1e2a;"></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div style="width:10px;height:10px;background:#7c6af7;border-radius:50%;opacity:0.6;"></div>
+        <span style="color:#7c6af7;font-size:10px;letter-spacing:2px;font-family:monospace;opacity:0.7;">BASED</span>
+      </div>
+      <div style="color:#b0b0c8;font-size:12px;line-height:1.6;font-family:monospace;">Here's a clean todo app...</div>
+      <div style="display:flex;gap:6px;margin-top:4px;">
+        <div style="padding:4px 12px;background:#7c6af7;color:#fff;border-radius:4px;font-size:10px;font-family:monospace;">Send</div>
+        <div style="padding:4px 12px;border:1px solid #7c6af7;color:#7c6af7;border-radius:4px;font-size:10px;font-family:monospace;">Publish</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — One accent (purple only)</h3>
+      <p>Everything uses one color. Clean, unified, no visual noise. Purple for interactive elements, the rest in neutral grays.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="two" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0d0d14;padding:20px;border-radius:6px;min-height:180px;display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div style="width:10px;height:10px;background:#7c6af7;border-radius:50%;"></div>
+        <span style="color:#7c6af7;font-size:10px;letter-spacing:2px;font-family:monospace;">YOU</span>
+      </div>
+      <div style="color:#e8e8f0;font-size:12px;line-height:1.6;font-family:monospace;">Build me a todo app</div>
+      <div style="height:1px;background:#1e1e2a;"></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div style="width:10px;height:10px;background:#6af7c8;border-radius:50%;"></div>
+        <span style="color:#6af7c8;font-size:10px;letter-spacing:2px;font-family:monospace;">BASED</span>
+      </div>
+      <div style="color:#b0b0c8;font-size:12px;line-height:1.6;font-family:monospace;">Here's a clean todo app...</div>
+      <div style="display:flex;gap:6px;margin-top:4px;">
+        <div style="padding:4px 12px;background:#7c6af7;color:#fff;border-radius:4px;font-size:10px;font-family:monospace;">Send</div>
+        <div style="padding:4px 12px;border:1px solid #6af7c8;color:#6af7c8;border-radius:4px;font-size:10px;font-family:monospace;">Publish</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Two accents (purple + teal)</h3>
+      <p>Purple for your messages and actions, teal for AI responses and secondary actions. Clear visual distinction without clutter.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="three" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0d0d14;padding:20px;border-radius:6px;min-height:180px;display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div style="width:10px;height:10px;background:#7c6af7;border-radius:50%;"></div>
+        <span style="color:#7c6af7;font-size:10px;letter-spacing:2px;font-family:monospace;">YOU</span>
+      </div>
+      <div style="color:#e8e8f0;font-size:12px;line-height:1.6;font-family:monospace;">Build me a todo app</div>
+      <div style="height:1px;background:#1e1e2a;"></div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <div style="width:10px;height:10px;background:#6af7c8;border-radius:50%;"></div>
+        <span style="color:#6af7c8;font-size:10px;letter-spacing:2px;font-family:monospace;">BASED</span>
+      </div>
+      <div style="color:#b0b0c8;font-size:12px;line-height:1.6;font-family:monospace;">Here's a clean todo app...</div>
+      <div style="display:flex;gap:6px;margin-top:4px;">
+        <div style="padding:4px 12px;background:#7c6af7;color:#fff;border-radius:4px;font-size:10px;font-family:monospace;">Send</div>
+        <div style="padding:4px 12px;border:1px solid #6af7c8;color:#6af7c8;border-radius:4px;font-size:10px;font-family:monospace;">Publish</div>
+        <div style="padding:4px 12px;border:1px solid #f76a8a;color:#f76a8a;border-radius:4px;font-size:10px;font-family:monospace;">✕</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Keep all three (purple + teal + pink)</h3>
+      <p>Current palette stays. Purple for you, teal for AI, pink for destructive/warning actions. More expressive but needs careful use to stay clean.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px;text-align:center;">At <strong>http://localhost:53389</strong> — click your preference.</p>

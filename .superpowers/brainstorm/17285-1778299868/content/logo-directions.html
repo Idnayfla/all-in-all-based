@@ -1,0 +1,265 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap');
+
+.logo-page { max-width: 860px; margin: 0 auto; padding: 8px 0 32px; }
+.logo-page h2 { font-size: 18px; margin-bottom: 6px; }
+.logo-page .subtitle { margin-bottom: 28px; }
+
+.logo-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 32px; }
+
+.logo-card {
+  background: #111118;
+  border: 2px solid #2a2a3a;
+  border-radius: 14px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.15s;
+  position: relative;
+}
+.logo-card:hover { border-color: #7c6af7; transform: translateY(-2px); }
+.logo-card.selected { border-color: #7c6af7; box-shadow: 0 0 0 1px #7c6af7; }
+
+.logo-preview-area {
+  background: #0a0a0f;
+  border-bottom: 1px solid #1e1e2a;
+  padding: 28px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+/* Header context strip */
+.preview-header {
+  background: #111118;
+  border: 1px solid #2a2a3a;
+  border-radius: 8px;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+/* Empty state context */
+.preview-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0 4px;
+}
+.preview-empty-sub { font-family: 'Space Mono', monospace; font-size: 9px; color: #4a4a6a; letter-spacing: 0.5px; }
+.preview-empty-btn {
+  background: transparent; border: 1px solid #2a2a3a; border-radius: 6px;
+  padding: 4px 10px; font-family: 'Space Mono', monospace; font-size: 9px; color: #8888aa;
+}
+
+.logo-card-body { padding: 14px 16px 16px; }
+.logo-card-label { font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: 1px; color: #e8e8f0; font-weight: 700; margin-bottom: 4px; }
+.logo-card-desc { font-family: 'Space Mono', monospace; font-size: 10px; color: #8888aa; line-height: 1.5; }
+
+/* ── OPTION A: Bolt + Shimmer ── */
+.logo-a-icon {
+  width: 32px; height: 32px;
+  background: #0a0a0f;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+}
+.logo-a-word {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 3px;
+  color: #e8e8f0;
+  position: relative; overflow: hidden;
+}
+@keyframes shimmer-a {
+  0% { transform: translateX(-120%) skewX(-15deg); }
+  100% { transform: translateX(320%) skewX(-15deg); }
+}
+.shimmer-a {
+  position: absolute; top: 0; left: 0; height: 100%; width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(168,154,255,0.7), transparent);
+  animation: shimmer-a 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Large versions for empty state */
+.logo-a-icon-lg {
+  width: 52px; height: 52px;
+  background: #0a0a0f;
+  border-radius: 14px;
+  border: 1px solid rgba(124,106,247,0.35);
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+}
+@keyframes shimmer-ring {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124,106,247,0); }
+  50% { box-shadow: 0 0 0 4px rgba(124,106,247,0.12); }
+}
+.logo-a-icon-lg { animation: shimmer-ring 2.8s ease-in-out infinite; }
+.logo-a-word-lg {
+  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 20px;
+  letter-spacing: 4px; color: #e8e8f0; position: relative; overflow: hidden;
+}
+.shimmer-a-lg {
+  position: absolute; top: 0; left: 0; height: 100%; width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(168,154,255,0.55), transparent);
+  animation: shimmer-a 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ── OPTION B: Hex B monogram ── */
+.logo-b-mark {
+  width: 32px; height: 32px;
+  display: flex; align-items: center; justify-content: center;
+}
+.logo-b-word {
+  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 15px;
+  letter-spacing: 3px; color: #e8e8f0;
+}
+.logo-b-word-lg {
+  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 20px;
+  letter-spacing: 4px; color: #e8e8f0;
+}
+.logo-b-mark-lg {
+  width: 52px; height: 52px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* ── OPTION C: Terminal cursor ── */
+.logo-c-mark {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, #7c6af7, #6af7c8);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Space Mono', monospace; font-size: 13px; font-weight: 700; color: #0a0a0f;
+}
+.logo-c-word {
+  font-family: 'Space Mono', monospace; font-weight: 700; font-size: 12px;
+  letter-spacing: 2px; color: #e8e8f0;
+}
+.logo-c-mark-lg {
+  width: 52px; height: 52px;
+  background: linear-gradient(135deg, #7c6af7, #6af7c8);
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Space Mono', monospace; font-size: 22px; font-weight: 700; color: #0a0a0f;
+}
+.logo-c-word-lg {
+  font-family: 'Space Mono', monospace; font-weight: 700; font-size: 16px;
+  letter-spacing: 3px; color: #e8e8f0;
+}
+
+.select-badge {
+  position: absolute; top: 10px; right: 10px;
+  background: #7c6af7; color: #fff;
+  font-family: 'Space Mono', monospace; font-size: 9px; letter-spacing: 1px;
+  padding: 2px 7px; border-radius: 4px; opacity: 0;
+  transition: opacity 0.2s;
+}
+.logo-card.selected .select-badge { opacity: 1; }
+</style>
+
+<div class="logo-page">
+  <h2>Logo Direction</h2>
+  <p class="subtitle">Each option shown in header context (top) and empty-state context (bottom). Click to select.</p>
+
+  <div class="logo-cards">
+
+    <!-- OPTION A: Bolt shimmer (refined current) -->
+    <div class="logo-card" data-choice="a" onclick="toggleSelect(this)">
+      <div class="select-badge">SELECTED</div>
+      <div class="logo-preview-area">
+        <!-- Header strip -->
+        <div class="preview-header">
+          <div class="logo-a-icon">
+            <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
+              <polygon points="14,3 7,13 11.5,13 9.5,21 17,11 12.5,11" fill="#a89aff"/>
+            </svg>
+          </div>
+          <div class="logo-a-word">
+            BASED
+            <div class="shimmer-a"></div>
+          </div>
+        </div>
+        <!-- Empty state -->
+        <div class="preview-empty">
+          <div class="logo-a-icon-lg">
+            <svg viewBox="0 0 24 24" fill="none" width="28" height="28">
+              <polygon points="14,3 7,13 11.5,13 9.5,21 17,11 12.5,11" fill="#a89aff"/>
+            </svg>
+          </div>
+          <div class="logo-a-word-lg">
+            BASED
+            <div class="shimmer-a-lg"></div>
+          </div>
+          <div class="preview-empty-sub">Open a project or start a new one.</div>
+          <div class="preview-empty-btn">+ New Project</div>
+        </div>
+      </div>
+      <div class="logo-card-body">
+        <div class="logo-card-label">A — Bolt + Shimmer</div>
+        <div class="logo-card-desc">Refined version of the current default. Bolt icon, animated shimmer on "BASED" in Syne. Feels energetic and technical.</div>
+      </div>
+    </div>
+
+    <!-- OPTION B: Hex B monogram -->
+    <div class="logo-card" data-choice="b" onclick="toggleSelect(this)">
+      <div class="select-badge">SELECTED</div>
+      <div class="logo-preview-area">
+        <div class="preview-header">
+          <div class="logo-b-mark">
+            <svg viewBox="0 0 32 32" width="32" height="32">
+              <polygon points="16,3 27,9.5 27,22.5 16,29 5,22.5 5,9.5" fill="none" stroke="#7c6af7" stroke-width="2"/>
+              <text x="16" y="21" text-anchor="middle" font-family="Syne,sans-serif" font-weight="800" font-size="13" fill="#a89aff">B</text>
+            </svg>
+          </div>
+          <div class="logo-b-word">BASED</div>
+        </div>
+        <div class="preview-empty">
+          <div class="logo-b-mark-lg">
+            <svg viewBox="0 0 52 52" width="52" height="52">
+              <polygon points="26,5 44,15.5 44,36.5 26,47 8,36.5 8,15.5" fill="none" stroke="#7c6af7" stroke-width="2.5"/>
+              <polygon points="26,5 44,15.5 44,36.5 26,47 8,36.5 8,15.5" fill="rgba(124,106,247,0.07)"/>
+              <text x="26" y="34" text-anchor="middle" font-family="Syne,sans-serif" font-weight="800" font-size="21" fill="#a89aff">B</text>
+            </svg>
+          </div>
+          <div class="logo-b-word-lg">BASED</div>
+          <div class="preview-empty-sub">Open a project or start a new one.</div>
+          <div class="preview-empty-btn">+ New Project</div>
+        </div>
+      </div>
+      <div class="logo-card-body">
+        <div class="logo-card-label">B — Hex Monogram</div>
+        <div class="logo-card-desc">Hexagon with a "B" inside. Geometric and bold — reads as a proper app icon. Works well at all sizes.</div>
+      </div>
+    </div>
+
+    <!-- OPTION C: Terminal gradient -->
+    <div class="logo-card" data-choice="c" onclick="toggleSelect(this)">
+      <div class="select-badge">SELECTED</div>
+      <div class="logo-preview-area">
+        <div class="preview-header">
+          <div class="logo-c-mark">B/</div>
+          <div class="logo-c-word">BASED</div>
+        </div>
+        <div class="preview-empty">
+          <div class="logo-c-mark-lg">B/</div>
+          <div class="logo-c-word-lg">BASED</div>
+          <div class="preview-empty-sub">Open a project or start a new one.</div>
+          <div class="preview-empty-btn">+ New Project</div>
+        </div>
+      </div>
+      <div class="logo-card-body">
+        <div class="logo-card-label">C — Terminal Mark</div>
+        <div class="logo-card-desc">Gradient tile with "B/" as a terminal-style prompt. Monospace wordmark. Leans into the dev-tool identity explicitly.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <p class="subtitle" style="font-size:11px;">Once you pick a direction, we'll refine the details (colors, sizing, icon treatment) and apply it consistently across the header and empty state.</p>
+</div>

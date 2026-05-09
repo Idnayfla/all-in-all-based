@@ -1,0 +1,106 @@
+<h2>Full redesign — approach C</h2>
+<p class="subtitle">Complete visual overview. Every changed area shown in context.</p>
+
+<div class="section">
+  <h3 style="margin-bottom:4px;">1. Header</h3>
+  <p class="subtitle" style="margin-bottom:10px;">Pill tab switcher replaces individual nav buttons. Incognito + settings moved to a secondary cluster on the right.</p>
+  <div class="mockup">
+    <div class="mockup-header">New header</div>
+    <div class="mockup-body" style="background:#111118;padding:0 20px;height:52px;display:flex;align-items:center;gap:16px;">
+      <!-- hamburger (mobile only, hidden on desktop) -->
+      <!-- Logo -->
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:32px;height:32px;background:linear-gradient(135deg,#7c6af7,#6af7c8);border-radius:8px;flex-shrink:0;"></div>
+        <span style="color:#e8e8f0;font-weight:800;font-size:15px;font-family:monospace;letter-spacing:3px;">BASED</span>
+      </div>
+      <!-- Project name -->
+      <div style="font-size:12px;color:#4a4a6a;font-family:monospace;border-left:1px solid #2a2a3a;padding-left:16px;">my-project</div>
+      <!-- Pill tab switcher -->
+      <div style="margin-left:auto;display:flex;gap:1px;background:#1a1a24;border:1px solid #2a2a3a;border-radius:8px;padding:3px;">
+        <div style="padding:5px 16px;background:#7c6af7;color:#fff;border-radius:5px;font-size:11px;font-family:monospace;letter-spacing:1px;">Chat</div>
+        <div style="padding:5px 16px;color:#8888aa;border-radius:5px;font-size:11px;font-family:monospace;letter-spacing:1px;">Editor</div>
+        <div style="padding:5px 16px;color:#8888aa;border-radius:5px;font-size:11px;font-family:monospace;letter-spacing:1px;">Preview</div>
+      </div>
+      <!-- Secondary controls -->
+      <div style="display:flex;gap:4px;align-items:center;">
+        <div style="padding:5px 8px;border:1px solid #2a2a3a;color:#8888aa;border-radius:6px;font-size:12px;cursor:pointer;">🕵️</div>
+        <div style="padding:5px 8px;border:1px solid #2a2a3a;color:#8888aa;border-radius:6px;font-size:12px;cursor:pointer;">⚙</div>
+        <div style="display:flex;align-items:center;gap:6px;padding:0 0 0 8px;border-left:1px solid #2a2a3a;">
+          <div style="width:6px;height:6px;background:#6af7c8;border-radius:50%;"></div>
+          <span style="font-size:10px;color:#4a4a6a;font-family:monospace;">Ready</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3 style="margin-bottom:4px;">2. Chat messages</h3>
+  <p class="subtitle" style="margin-bottom:10px;">Left-border accent replaces boxes. Sans-serif prose. Purple = you, teal = Based.</p>
+  <div class="mockup">
+    <div class="mockup-header">Chat panel</div>
+    <div class="mockup-body" style="background:#0a0a0f;padding:24px;display:flex;flex-direction:column;gap:20px;">
+      <div style="border-left:2px solid rgba(124,106,247,0.5);padding:2px 18px;">
+        <div style="font-size:10px;color:#7c6af7;font-family:monospace;letter-spacing:2px;margin-bottom:6px;">YOU</div>
+        <div style="font-size:14px;color:#e8e8f0;font-family:system-ui,sans-serif;line-height:1.8;">Build me a weather dashboard with live data and a 5-day forecast.</div>
+      </div>
+      <div style="border-left:2px solid rgba(106,247,200,0.4);padding:2px 18px;">
+        <div style="font-size:10px;color:#6af7c8;font-family:monospace;letter-spacing:2px;margin-bottom:6px;">BASED</div>
+        <div style="font-size:14px;color:#c0c0d8;font-family:system-ui,sans-serif;line-height:1.8;">Here's a clean weather dashboard. It fetches from the Open-Meteo API — no key needed — and shows current conditions plus a 5-day forecast with icons.</div>
+      </div>
+      <div style="border-left:2px solid rgba(106,247,200,0.4);padding:2px 18px;">
+        <div style="font-size:10px;color:#6af7c8;font-family:monospace;letter-spacing:2px;margin-bottom:6px;">BASED</div>
+        <div style="font-size:14px;color:#c0c0d8;font-family:system-ui,sans-serif;line-height:1.8;">Here's a code block example:
+          <div style="background:#0d0d14;border:1px solid #2a2a3a;border-radius:6px;padding:12px 14px;margin-top:10px;font-family:monospace;font-size:12px;color:#a8b1c2;line-height:1.7;">const weather = await fetch(API_URL);<br>const data = await weather.json();</div>
+        </div>
+      </div>
+      <!-- Input area -->
+      <div style="display:flex;gap:10px;align-items:flex-end;padding-top:8px;border-top:1px solid #1e1e2a;margin-top:4px;">
+        <div style="flex:1;background:#111118;border:1px solid #2a2a3a;border-radius:8px;padding:12px 14px;font-size:13px;color:#4a4a6a;font-family:system-ui,sans-serif;">Ask Based anything...</div>
+        <div style="padding:11px 20px;background:#7c6af7;color:#fff;border-radius:8px;font-size:12px;font-family:monospace;letter-spacing:1px;flex-shrink:0;">Send</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3 style="margin-bottom:4px;">3. Welcome screen</h3>
+  <p class="subtitle" style="margin-bottom:10px;">Cleaner icon, fixed copy, readable suggestion chips.</p>
+  <div class="mockup">
+    <div class="mockup-header">Empty state (no project selected)</div>
+    <div class="mockup-body" style="background:#0a0a0f;padding:40px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;min-height:220px;">
+      <div style="width:48px;height:48px;background:linear-gradient(135deg,rgba(124,106,247,0.25),rgba(106,247,200,0.15));border-radius:14px;border:1px solid rgba(124,106,247,0.3);display:flex;align-items:center;justify-content:center;">
+        <div style="width:16px;height:16px;background:#7c6af7;border-radius:4px;opacity:0.7;"></div>
+      </div>
+      <div style="font-family:monospace;font-size:16px;color:#e8e8f0;font-weight:700;letter-spacing:3px;">BASED</div>
+      <div style="font-size:14px;color:#6666aa;font-family:system-ui,sans-serif;text-align:center;max-width:280px;line-height:1.7;">Your AI coding assistant. Open a project or start a new one.</div>
+      <div style="padding:11px 28px;background:#7c6af7;color:#fff;border-radius:8px;font-size:13px;font-family:monospace;margin-top:4px;">+ New Project</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3 style="margin-bottom:4px;">4. Sidebar</h3>
+  <p class="subtitle" style="margin-bottom:10px;">Better spacing, cleaner section labels, left-border on active items.</p>
+  <div class="mockup">
+    <div class="mockup-header">Sidebar</div>
+    <div class="mockup-body" style="background:#111118;width:220px;padding:0;display:flex;flex-direction:column;">
+      <div style="padding:16px 20px 8px;font-size:10px;color:#4a4a6a;font-family:monospace;letter-spacing:3px;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;">
+        Projects
+        <span style="width:18px;height:18px;border:1px solid #2a2a3a;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#8888aa;cursor:pointer;">+</span>
+      </div>
+      <div style="padding:4px 12px 12px;display:flex;flex-direction:column;gap:2px;">
+        <div style="padding:9px 12px;border-radius:6px;border-left:2px solid #7c6af7;background:rgba(124,106,247,0.08);font-size:13px;color:#7c6af7;font-family:monospace;">⬡ my-project</div>
+        <div style="padding:9px 12px;border-radius:6px;border-left:2px solid transparent;font-size:13px;color:#8888aa;font-family:monospace;">⬡ snake-game</div>
+      </div>
+      <div style="height:1px;background:#1e1e2a;margin:0 12px;"></div>
+      <div style="padding:16px 20px 8px;font-size:10px;color:#4a4a6a;font-family:monospace;letter-spacing:3px;text-transform:uppercase;">Files</div>
+      <div style="padding:4px 12px 12px;display:flex;flex-direction:column;gap:2px;">
+        <div style="padding:9px 12px;border-radius:6px;border-left:2px solid #6af7c8;background:rgba(106,247,200,0.06);font-size:12px;color:#6af7c8;font-family:monospace;display:flex;align-items:center;gap:8px;"><span style="font-size:10px;">HT</span> index.html</div>
+        <div style="padding:9px 12px;border-radius:6px;border-left:2px solid transparent;font-size:12px;color:#8888aa;font-family:monospace;display:flex;align-items:center;gap:8px;"><span style="font-size:10px;">CS</span> styles.css</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:8px;text-align:center;">Does this design look right? Reply in terminal to approve or request changes.</p>
