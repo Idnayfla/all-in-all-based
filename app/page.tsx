@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import ChatPanel from '@/components/ChatPanel';
 import EditorPanel from '@/components/EditorPanel';
@@ -9,6 +9,8 @@ import SidebarTrigger from '@/components/SidebarTrigger';
 import DebugPanel from '@/components/DebugPanel';
 import LogoDisplay from '@/components/LogoDisplay';
 import ProjectNameModal from '@/components/ProjectNameModal';
+import AuthModal from '@/components/AuthModal';
+import { supabase } from '@/lib/supabase';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
 
 export interface FileNode {
@@ -45,49 +47,141 @@ export interface Project {
   memory?: string;
 }
 
+const DEFAULT_PERSONALITY = 'You are Based, the AI inside All in All Based — a sharp, witty, and direct coding assistant. You are confident, occasionally funny, and always helpful. You treat the user like a smart friend, not a customer. You get straight to the point, never over-explain, and celebrate when things work.';
+
 export default function Home() {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [files, setFiles] = useState<FileNode[]>([]);
-  const [activeFile, setActiveFile] = useState<FileNode | null>(null);
+  const [messages, setMessages]       = useState<Message[]>([]);
+  const [files, setFiles]             = useState<FileNode[]>([]);
+  const [activeFile, setActiveFile]   = useState<FileNode | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [projectType, setProjectType] = useState('html');
-  const [personality, setPersonality] = useState('You are Based, the AI inside All in All Based — a sharp, witty, and direct coding assistant. You are confident, occasionally funny, and always helpful. You treat the user like a smart friend, not a customer. You get straight to the point, never over-explain, and celebrate when things work.');
+  const [personality, setPersonality] = useState(DEFAULT_PERSONALITY);
   const [showSettings, setShowSettings] = useState(false);
   const [globalMemory, setGlobalMemory] = useState('');
-  const [incognito, setIncognito] = useState(false);
+  const [incognito, setIncognito]     = useState(false);
   const [incognitoMessages, setIncognitoMessages] = useState<Message[]>([]);
   const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview' | 'debug'>('chat');
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects]       = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [projectModal, setProjectModal] = useState(false);
+  const [user, setUser]               = useState<any>(null);
+  const [authReady, setAuthReady]     = useState(false);
 
-  useEffect(() => {
-    const saved = localStorage.getItem('forge_projects');
-    if (saved) setProjects(JSON.parse(saved));
+  // ── Auth headers helper ──────────────────────────────────────────────────
+  const getHeaders = useCallback(async (): Promise<HeadersInit> => {
+    const { data: { session } } = await supabase.auth.getSession();
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session?.access_token ?? ''}`,
+    };
   }, []);
 
-  useEffect(() => {
-    const saved = localStorage.getItem('forge_personality');
-    if (saved) setPersonality(saved);
+  // ── Load user data from cloud ────────────────────────────────────────────
+  const loadCloudData = useCallback(async () => {
+    const headers = await getHeaders();
+    const [projectsRes, settingsRes] = await Promise.all([
+      fetch('/api/projects', { headers }),
+      fetch('/api/settings', { headers }),
+    ]);
+    if (projectsRes.ok) {
+      const { projects } = await projectsRes.json();
+      setProjects(projects ?? []);
+    }
+    if (settingsRes.ok) {
+      const { personality: p, globalMemory: m } = await settingsRes.json();
+      if (p) setPersonality(p);
+      if (m) setGlobalMemory(m);
+    }
+  }, [getHeaders]);
+
+  // ── Run localStorage migration on first login ────────────────────────────
+  const runMigration = useCallback(async (headers: HeadersInit) => {
+    const raw = localStorage.getItem('forge_projects');
+    if (!raw) return;
+    try {
+      const localProjects = JSON.parse(raw);
+      const localPersonality = localStorage.getItem('forge_personality') ?? '';
+      await fetch('/api/migrate', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          projects: localProjects,
+          personality: localPersonality,
+          globalMemory: '',
+        }),
+      });
+      localStorage.removeItem('forge_projects');
+      localStorage.removeItem('forge_personality');
+    } catch {
+      // Migration failure: leave localStorage intact so user's data is safe
+    }
   }, []);
 
+  // ── Auth state listener ──────────────────────────────────────────────────
   useEffect(() => {
-  const handler = () => fetchMemory();
-  window.addEventListener('memory-updated', handler);
-  return () => window.removeEventListener('memory-updated', handler);
-  }, []);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      setAuthReady(true);
+      if (currentUser) {
+        const headers = await getHeaders();
+        // Check if first login (no cloud projects + local data exists)
+        const res = await fetch('/api/projects', { headers });
+        if (res.ok) {
+          const { projects: cloudProjects } = await res.json();
+          const hasLocalProjects = !!localStorage.getItem('forge_projects');
+          if (cloudProjects.length === 0 && hasLocalProjects) {
+            await runMigration(headers);
+          }
+        }
+        await loadCloudData();
+      }
+    });
 
-  const fetchMemory = () => {
-  fetch('/api/memory')
-    .then(r => r.ok ? r.json() : Promise.resolve({ memory: '' }))
-    .then(d => setGlobalMemory(d.memory ?? ''))
-    .catch(() => {});
-};
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (event === 'SIGNED_IN' && currentUser) {
+        const headers = await getHeaders();
+        const res = await fetch('/api/projects', { headers });
+        if (res.ok) {
+          const { projects: cloudProjects } = await res.json();
+          const hasLocalProjects = !!localStorage.getItem('forge_projects');
+          if (cloudProjects.length === 0 && hasLocalProjects) {
+            await runMigration(headers);
+          }
+        }
+        await loadCloudData();
+      }
+      if (event === 'SIGNED_OUT') {
+        setProjects([]); setCurrentProject(null);
+        setFiles([]); setMessages([]); setActiveFile(null);
+        setGlobalMemory(''); setPersonality(DEFAULT_PERSONALITY);
+      }
+    });
 
-useEffect(() => { fetchMemory(); }, []);
+    return () => subscription.unsubscribe();
+  }, [getHeaders, loadCloudData, runMigration]);
 
+  // ── Memory updated event ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!currentProject || (files.length === 0 && messages.length === 0)) return;
+    const handler = async () => {
+      if (!user) return;
+      const headers = await getHeaders();
+      const res = await fetch('/api/settings', { headers });
+      if (res.ok) {
+        const { globalMemory: m } = await res.json();
+        setGlobalMemory(m ?? '');
+      }
+    };
+    window.addEventListener('memory-updated', handler);
+    return () => window.removeEventListener('memory-updated', handler);
+  }, [user, getHeaders]);
+
+  // ── Auto-save project on files/messages change ───────────────────────────
+  useEffect(() => {
+    if (!currentProject || !user) return;
+    if (files.length === 0 && messages.length === 0) return;
     const strippedMessages = messages.map(m => ({
       ...m,
       content: Array.isArray(m.content)
@@ -96,27 +190,30 @@ useEffect(() => { fetchMemory(); }, []);
     }));
     const updated: Project = { ...currentProject, files, messages: strippedMessages, updatedAt: Date.now() };
     setCurrentProject(updated);
-    const allProjects = projects.map(p => p.id === updated.id ? updated : p);
-    const exists = projects.find(p => p.id === updated.id);
-    const final = exists ? allProjects : [...projects, updated];
-    setProjects(final);
-    localStorage.setItem('forge_projects', JSON.stringify(final));
+    setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
+    getHeaders().then(headers => {
+      fetch(`/api/projects/${currentProject.id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ files, messages: strippedMessages }),
+      }).catch(() => {});
+    });
   }, [files, messages]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const newProject = () => {
-    setProjectModal(true);
-  };
+  // ── Project CRUD ─────────────────────────────────────────────────────────
+  const newProject = () => setProjectModal(true);
 
-  const createProject = (name: string) => {
+  const createProject = async (name: string) => {
     setProjectModal(false);
-    const project: Project = {
-      id: Date.now().toString(),
-      name: name.trim(),
-      files: [], messages: [], updatedAt: Date.now(),
-    };
-    const updated = [...projects, project];
-    setProjects(updated);
-    localStorage.setItem('forge_projects', JSON.stringify(updated));
+    const headers = await getHeaders();
+    const res = await fetch('/api/projects', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ name: name.trim() }),
+    });
+    if (!res.ok) return;
+    const { project } = await res.json();
+    setProjects(prev => [project, ...prev]);
     setCurrentProject(project);
     setFiles([]); setMessages([]); setActiveFile(null); setActivePanel('chat');
   };
@@ -129,19 +226,23 @@ useEffect(() => { fetchMemory(); }, []);
     setActivePanel('chat');
   };
 
-  const deleteProject = (id: string) => {
-    const updated = projects.filter(p => p.id !== id);
-    setProjects(updated);
-    localStorage.setItem('forge_projects', JSON.stringify(updated));
+  const deleteProject = async (id: string) => {
+    const headers = await getHeaders();
+    fetch(`/api/projects/${id}`, { method: 'DELETE', headers }).catch(() => {});
+    setProjects(prev => prev.filter(p => p.id !== id));
     if (currentProject?.id === id) {
       setCurrentProject(null); setFiles([]); setMessages([]); setActiveFile(null);
     }
   };
 
-  const renameProject = (id: string, name: string) => {
-    const updated = projects.map(p => p.id === id ? { ...p, name } : p);
-    setProjects(updated);
-    localStorage.setItem('forge_projects', JSON.stringify(updated));
+  const renameProject = async (id: string, name: string) => {
+    const headers = await getHeaders();
+    fetch(`/api/projects/${id}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ name }),
+    }).catch(() => {});
+    setProjects(prev => prev.map(p => p.id === id ? { ...p, name } : p));
     if (currentProject?.id === id) setCurrentProject(prev => prev ? { ...prev, name } : prev);
   };
 
@@ -153,6 +254,17 @@ useEffect(() => { fetchMemory(); }, []);
     });
     setActiveFile(updated);
   };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setShowSettings(false);
+  };
+
+  // Avatar: show provider picture or initials
+  const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
+  const avatarInitial = (user?.email as string | undefined)?.[0]?.toUpperCase() ?? '?';
+
+  if (!authReady) return null; // Prevent flash before session check
 
   return (
     <div className="app-root">
@@ -175,6 +287,17 @@ useEffect(() => { fetchMemory(); }, []);
               title="Temp chat — no memory saved"
             >🕵️</button>
             <button className={`icon-btn ${showSettings ? 'active' : ''}`} onClick={() => setShowSettings(s => !s)} title="Settings" aria-label="Toggle settings">⚙</button>
+            {user && (
+              <button
+                className="user-avatar-btn"
+                onClick={() => setShowSettings(s => !s)}
+                title={user.email}
+              >
+                {avatarUrl
+                  ? <img src={avatarUrl} alt="avatar" />
+                  : avatarInitial}
+              </button>
+            )}
             <div className="header-status">
               <span className={`status-dot ${isGenerating ? 'generating' : 'ready'}`}>●</span>
               <span className="status-text">{isGenerating ? 'Generating...' : 'Ready'}</span>
@@ -205,29 +328,38 @@ useEffect(() => { fetchMemory(); }, []);
                 <textarea
                   className="settings-textarea"
                   value={personality}
-                  onChange={e => { setPersonality(e.target.value); localStorage.setItem('forge_personality', e.target.value); }}
+                  onChange={async e => {
+                    setPersonality(e.target.value);
+                    const headers = await getHeaders();
+                    fetch('/api/settings', {
+                      method: 'PUT',
+                      headers,
+                      body: JSON.stringify({ personality: e.target.value }),
+                    }).catch(() => {});
+                  }}
                   rows={6}
                   placeholder="Describe how Based should behave..."
                 />
                 <div className="settings-hint">This shapes how Based talks and thinks. Changes apply immediately.</div>
-                <div className="settings-section">
-                  <label className="settings-label">Global Memory</label>
-                  <textarea
-                    className="settings-textarea"
-                    value={globalMemory}
-                    onChange={e => setGlobalMemory(e.target.value)}
-                    rows={8}
-                    placeholder="Based will learn about you as you chat..."
-                  />
-                  <div className="settings-hint">Auto-updated after each conversation. Based remembers this across all projects.</div>
-                  <button className="run-btn" style={{marginTop: 8}} onClick={async () => {
-                    await fetch('/api/memory/save', {
-                      method: 'POST',
-                      headers: {'Content-Type': 'application/json'},
-                      body: JSON.stringify({ memory: globalMemory }),
-                    });
-                  }}>Save Memory</button>
-                </div>
+              </div>
+              <div className="settings-section">
+                <label className="settings-label">Global Memory</label>
+                <textarea
+                  className="settings-textarea"
+                  value={globalMemory}
+                  onChange={e => setGlobalMemory(e.target.value)}
+                  rows={8}
+                  placeholder="Based will learn about you as you chat..."
+                />
+                <div className="settings-hint">Auto-updated after each conversation. Based remembers this across all projects.</div>
+                <button className="run-btn" style={{ marginTop: 8 }} onClick={async () => {
+                  const headers = await getHeaders();
+                  await fetch('/api/memory/save', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ memory: globalMemory }),
+                  });
+                }}>Save Memory</button>
               </div>
               {currentProject && (
                 <div className="settings-section">
@@ -235,21 +367,31 @@ useEffect(() => { fetchMemory(); }, []);
                   <textarea
                     className="settings-textarea"
                     value={currentProject.memory ?? ''}
-                    onChange={e => {
+                    onChange={async e => {
                       const updated = { ...currentProject, memory: e.target.value };
                       setCurrentProject(updated);
-                      const all = projects.map(p => p.id === updated.id ? updated : p);
-                      setProjects(all);
-                      localStorage.setItem('forge_projects', JSON.stringify(all));
+                      setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
+                      const headers = await getHeaders();
+                      fetch(`/api/projects/${currentProject.id}`, {
+                        method: 'PUT',
+                        headers,
+                        body: JSON.stringify({ memory: e.target.value }),
+                      }).catch(() => {});
                     }}
                     rows={4}
                     placeholder="Tell Based things to always remember about this project..."
                   />
                   <div className="settings-hint">Based will remember this for every message in this project.</div>
-                            </div>
-                          )}
-                        </div>
-                      )}
+                </div>
+              )}
+              {user && (
+                <div className="settings-section">
+                  <div className="settings-hint" style={{ marginBottom: 4 }}>Signed in as {user.email}</div>
+                  <button className="auth-signout-btn" onClick={signOut}>Sign Out</button>
+                </div>
+              )}
+            </div>
+          )}
 
           {incognito ? (
             <div className="panel panel-active">
@@ -285,8 +427,7 @@ useEffect(() => { fetchMemory(); }, []);
                       const merged = [...prev];
                       newFiles.forEach(newFile => {
                         const idx = merged.findIndex(f => f.name === newFile.name);
-                        if (idx >= 0) merged[idx] = newFile;
-                        else merged.push(newFile);
+                        if (idx >= 0) merged[idx] = newFile; else merged.push(newFile);
                       });
                       return merged;
                     });
@@ -313,12 +454,16 @@ useEffect(() => { fetchMemory(); }, []);
           )}
         </main>
       </div>
+
       <AnimatePresence>
         {projectModal && (
           <ProjectNameModal
             onConfirm={createProject}
             onCancel={() => setProjectModal(false)}
           />
+        )}
+        {authReady && !user && (
+          <AuthModal key="auth-modal" />
         )}
       </AnimatePresence>
     </div>
