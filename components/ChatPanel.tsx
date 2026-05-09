@@ -65,6 +65,8 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
 }) {
   const [input, setInput] = useState('');
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
+  const [imageMode, setImageMode] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -115,6 +117,38 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       if (nameMatch && langMatch) forgeFiles.push({ name: nameMatch[1], language: langMatch[1], content });
     }
     return forgeFiles;
+  };
+
+  const sendImage = async () => {
+    const prompt = input.trim();
+    if (!prompt || isGenerating || isGeneratingImage) return;
+    setInput('');
+    setIsGeneratingImage(true);
+
+    const userMsg: Message = { role: 'user', content: prompt };
+    const loadingMsg: Message = { role: 'assistant', content: [{ type: 'text', text: '🎨 Generating image...' }] };
+    setMessages(prev => [...prev, userMsg, loadingMsg]);
+
+    try {
+      const res = await fetch('/api/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setMessages(prev => [
+        ...prev.slice(0, -1),
+        { role: 'assistant', content: [{ type: 'generated-image', url: data.url, prompt }] },
+      ]);
+    } catch (err: any) {
+      setMessages(prev => [
+        ...prev.slice(0, -1),
+        { role: 'assistant', content: `❌ Image generation failed: ${err.message}` },
+      ]);
+    } finally {
+      setIsGeneratingImage(false);
+    }
   };
 
   const send = async (text?: string) => {
@@ -295,6 +329,15 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           if (block.type === 'image') {
             return <img key={i} className="chat-img-thumb" src={`data:${block.mediaType};base64,${block.data}`} alt="uploaded image" />;
           }
+          if (block.type === 'generated-image') {
+            return (
+              <div key={i} className="generated-image-wrap">
+                <img className="generated-image" src={block.url} alt={block.prompt} />
+                <div className="generated-image-prompt">{block.prompt}</div>
+                <a className="generated-image-download" href={block.url} download target="_blank" rel="noreferrer">↓ Download</a>
+              </div>
+            );
+          }
           if (block.type === 'text') {
             return <ReactMarkdown key={i}>{block.text}</ReactMarkdown>;
           }
@@ -351,25 +394,36 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           <button
             className="upload-btn"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isGenerating}
+            disabled={isGenerating || imageMode}
             title="Attach image"
           >📎</button>
+          <button
+            className={`image-mode-btn${imageMode ? ' active' : ''}`}
+            onClick={() => setImageMode(m => !m)}
+            disabled={isGenerating || isGeneratingImage}
+            title={imageMode ? 'Switch to chat mode' : 'Switch to image generation mode'}
+          >🎨</button>
           <textarea
             ref={textareaRef}
             className="chat-textarea"
             value={input}
             onChange={e => { setInput(e.target.value); autoResize(); }}
-            onKeyDown={handleKey}
-            placeholder="Ask Based anything..."
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                imageMode ? sendImage() : send();
+              }
+            }}
+            placeholder={imageMode ? 'Describe an image to generate...' : 'Ask Based anything...'}
             rows={1}
-            disabled={isGenerating}
+            disabled={isGenerating || isGeneratingImage}
           />
           <button
-            className="send-btn"
-            onClick={() => send()}
-            disabled={isGenerating || (!input.trim() && !pendingImage)}
+            className={`send-btn${imageMode ? ' send-btn-image' : ''}`}
+            onClick={() => imageMode ? sendImage() : send()}
+            disabled={isGenerating || isGeneratingImage || (!input.trim() && !pendingImage)}
           >
-            Send
+            {isGeneratingImage ? '⏳' : imageMode ? 'Generate' : 'Send'}
           </button>
         </div>
       </div>

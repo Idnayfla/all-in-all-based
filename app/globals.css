@@ -235,6 +235,35 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .upload-btn:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); }
 .upload-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+.image-mode-btn {
+  padding: 12px; background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text2); font-size: 16px; cursor: pointer; border-radius: 8px;
+  transition: all 0.15s; flex-shrink: 0; line-height: 1;
+}
+.image-mode-btn:hover { background: var(--bg); border-color: #e879f9; color: #e879f9; }
+.image-mode-btn.active { background: rgba(232,121,249,0.12); border-color: #e879f9; color: #e879f9; }
+.image-mode-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.send-btn-image { background: #9333ea !important; }
+.send-btn-image:hover:not(:disabled) { background: #7e22ce !important; }
+
+.generated-image-wrap {
+  display: flex; flex-direction: column; gap: 8px; max-width: 480px;
+}
+.generated-image {
+  width: 100%; border-radius: 10px; border: 1px solid var(--border);
+  display: block; background: var(--bg3);
+}
+.generated-image-prompt {
+  font-size: 11px; color: var(--text3); font-style: italic; line-height: 1.4;
+}
+.generated-image-download {
+  font-size: 11px; color: var(--accent); text-decoration: none;
+  align-self: flex-start; padding: 4px 8px; border: 1px solid var(--accent);
+  border-radius: 5px; transition: all 0.15s;
+}
+.generated-image-download:hover { background: rgba(124,106,247,0.15); }
+
 .chat-image-preview {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 12px; background: var(--bg3);
