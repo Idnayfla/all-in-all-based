@@ -3,6 +3,7 @@ import { useRef, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { Message, FileNode, ContentBlock } from '@/app/page';
 import ReactMarkdown from 'react-markdown';
+import ImageEditorModal from './ImageEditorModal';
 
 const SUGGESTIONS = [
   'Build a todo app with React',
@@ -75,6 +76,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
     previewUrl: string;
   } | null>(null);
+  const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
@@ -334,7 +336,10 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               <div key={i} className="generated-image-wrap">
                 <img className="generated-image" src={block.url} alt={block.prompt} />
                 <div className="generated-image-prompt">{block.prompt}</div>
-                <a className="generated-image-download" href={block.url} download target="_blank" rel="noreferrer">↓ Download</a>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <a className="generated-image-download" href={block.url} download target="_blank" rel="noreferrer">↓ Download</a>
+                  <button className="generated-image-edit-btn" onClick={() => setEditingImageUrl(block.url)}>✏ Edit</button>
+                </div>
               </div>
             );
           }
@@ -427,6 +432,19 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           </button>
         </div>
       </div>
+      {editingImageUrl && (
+        <ImageEditorModal
+          sourceImageUrl={editingImageUrl}
+          onConfirm={(resultUrl, confirmedPrompt) => {
+            setMessages(prev => [
+              ...prev,
+              { role: 'assistant', content: [{ type: 'generated-image', url: resultUrl, prompt: confirmedPrompt }] },
+            ]);
+            setEditingImageUrl(null);
+          }}
+          onClose={() => setEditingImageUrl(null)}
+        />
+      )}
     </div>
   );
 }
