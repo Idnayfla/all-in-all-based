@@ -2,7 +2,7 @@
 
 # ⚡ All-In-All-Based (AIAB)
 
-### A browser-based AI coding studio — built solo from scratch.
+### An AI-powered creative and development platform — built solo from scratch.
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-all--in--all--based.vercel.app-7c6af7?style=for-the-badge&logo=vercel)](https://all-in-all-based.vercel.app)
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
@@ -16,56 +16,74 @@
 
 ## What is AIAB?
 
-**AIAB** is a self-built AI-powered coding studio that runs entirely in the browser. Think Replit or Bolt.new — but designed, architected, and built solo.
+**AIAB** is a self-built AI platform that combines code generation, image creation, video generation, and live execution — all in one browser-based interface.
 
-Describe what you want to build. AIAB plans it, generates multi-file code, executes it in a live sandbox, and lets you iterate — all within a single interface.
+Describe what you want. AIAB plans it, builds it, runs it, and lets you publish it — without leaving the tab.
+
+~45 features. 1 developer.
 
 ---
 
 ## ✨ Features
 
-### 🤖 Chat & AI
-- Real-time streaming responses via Claude (Anthropic)
-- Image attachments in chat (JPEG, PNG, WebP, GIF)
-- Customizable AI personality via editable system prompt
-- Context-aware suggestions on new projects
-
 ### 🧠 Multi-Model Architecture
-- **Haiku** — planning, memory extraction, file structuring
-- **Sonnet** — conversational chat
-- **Opus** — full code generation per file
+- **Haiku** — file planning, memory extraction, post-generation summaries
+- **Sonnet** — general conversation
+- **Opus** — full multi-file code generation
+- **FLUX / Nano Banana 2** — text-to-image and image-to-image via fal.ai
+- **Seedance 2.0** — text-to-video and image-to-video via ByteDance (with audio toggle)
 
 ### 💻 Code Generation
-- Multi-file generation with per-file progress tracking
-- Supports HTML/CSS/JS, Python, and Node.js projects
+- 3-step pipeline: Haiku plans → Opus generates → Haiku summarises
+- Multi-file output with live progress bar (per-file status + %)
+- Supports HTML/CSS/JS, Python, Node.js
 - Files auto-split at ~600 lines
 - Post-generation HTML sanitization and safety injection
 
+### 🎨 Image Generation & Editing
+- Text-to-image and image-to-image (FLUX, Nano Banana 2)
+- **Image Editor Modal:**
+  - Transform mode — image-to-image with FLUX
+  - Inpaint mode — draw mask on canvas (adjustable brush 8–60px, undo, clear) → Flux Pro Fill
+  - Chain editing — use any result as new source image
+  - Download from modal
+
+### 🎬 Video Generation
+- Text-to-video and image-to-video via Seedance 2.0
+- Audio toggle (off by default)
+- Autoplay, controls, loop, download
+
 ### 📁 Project & File Management
-- Create, rename, delete, and switch between named projects
+- Create (custom name modal), load, rename, delete projects
 - Auto-save to localStorage on every change
-- Monaco Editor with full syntax highlighting (TS, JS, HTML, CSS, Python, JSON)
-- Download individual files or full project as ZIP
+- Projects and files sorted by recency
+- Export full project as ZIP via JSZip
 
 ### 🧪 Execution & Preview
-- Live sandboxed iframe preview for HTML projects
-- Python + Node.js execution via E2B sandbox (stdout/stderr output)
-- Publish HTML projects to Netlify — returns a live public URL
+- Live HTML iframe preview with inline CSS/JS injection
+- Python + Node.js execution via E2B sandbox (terminal output)
+- Publish to Netlify — SHA-1 hashing, multi-file deploy, returns live URL
 
 ### 🧩 Memory System
-- **Global memory** — auto-extracted by Haiku after each conversation, stored in Redis
-- **Per-project memory** — stored in localStorage, editable in Settings
-- Memory injected into every AI request as context
+- **Global memory** — auto-extracted by Haiku, stored in Redis, injected into every request
+- **Per-project memory** — localStorage, editable in Settings
+- Manual save via Settings panel
 
 ### 🕵️ Incognito Mode
-- No messages saved, memory not updated
+- No memory saved, no messages persisted
 - All messages wiped on toggle-off
-- Session banner displayed during incognito
+- Session banner displayed
 
-### 🐛 Debug Panel
-- Stream event log (chunk / done / error / info), last 200 events
-- Raw stream content viewer
-- Event counters, auto-scroll, clear button
+### 🎨 UI & Animations
+- Framer Motion throughout — message slide-ins, chip staggers, modal zooms, spring interactions
+- Shimmer loading cards during image/video generation
+- Animated BASED logo with configurable shape and colour
+- Debug panel — raw SSE event stream, colour-coded, timestamped, clearable
+- 4-panel layout: Chat / Editor / Preview / Debug with animated tab switching
+- Mobile-optimised sidebar with spring slide-out animation
+
+### 🛡 Error Handling
+- Friendly FAL error mapping (no_media_generated, balance exhausted, rate limits → plain English)
 
 ---
 
@@ -75,10 +93,13 @@ Describe what you want to build. AIAB plans it, generates multi-file code, execu
 |---|---|
 | Framework | Next.js 16 (App Router) |
 | Language | TypeScript 5 |
-| AI Models | Anthropic Claude (Haiku, Sonnet, Opus) |
+| AI — Text | Anthropic Claude (Haiku, Sonnet, Opus) |
+| AI — Image | fal.ai (FLUX, Nano Banana 2, Flux Pro Fill) |
+| AI — Video | ByteDance Seedance 2.0 via fal.ai |
 | Code Editor | Monaco Editor |
 | Code Execution | E2B Sandbox |
 | Memory Storage | Redis |
+| File Export | JSZip |
 | Deployment | Vercel + Netlify (publish target) |
 | Animations | Framer Motion |
 | Styling | Tailwind CSS v4 |
@@ -91,6 +112,7 @@ Describe what you want to build. AIAB plans it, generates multi-file code, execu
 - Node.js 18+
 - Anthropic API Key → [console.anthropic.com](https://console.anthropic.com)
 - E2B API Key → [e2b.dev](https://e2b.dev)
+- fal.ai API Key → [fal.ai](https://fal.ai)
 - Redis instance (local or Upstash)
 - Netlify API Token (optional, for publish feature)
 
@@ -109,6 +131,7 @@ Create a `.env.local` file in the root:
 ```env
 ANTHROPIC_API_KEY=your_anthropic_api_key
 E2B_API_KEY=your_e2b_api_key
+FAL_KEY=your_fal_api_key
 REDIS_URL=your_redis_url
 NETLIFY_API_TOKEN=your_netlify_token
 ```
