@@ -122,7 +122,7 @@ export default function AuthModal() {
         {message ? (
           <div className="auth-message">{message}</div>
         ) : (
-          <form onSubmit={tab === 'signin' ? handleSignIn : handleSignUp}>
+          <form onSubmit={tab === 'signin' ? handleSignIn : handleSignUp} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             <input
               className="auth-input"
               type="email"
@@ -158,6 +158,7 @@ export default function AuthModal() {
               type="submit"
               disabled={loading}
               whileTap={{ scale: 0.97 }}
+              style={{ marginTop: 6 }}
             >
               {loading ? '...' : tab === 'signin' ? 'Sign In' : 'Create Account'}
             </motion.button>
@@ -166,6 +167,7 @@ export default function AuthModal() {
                 type="button"
                 className="auth-forgot"
                 onClick={handleForgotPassword}
+                style={{ marginTop: 2 }}
               >
                 Forgot password?
               </button>
