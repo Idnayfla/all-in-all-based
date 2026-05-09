@@ -52,7 +52,7 @@ export default function Home() {
   const [globalMemory, setGlobalMemory] = useState('');
   const [incognito, setIncognito] = useState(false);
   const [incognitoMessages, setIncognitoMessages] = useState<Message[]>([]);
-  const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview'>('chat');
+  const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview' | 'debug'>('chat');
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
 
@@ -74,8 +74,9 @@ export default function Home() {
 
   const fetchMemory = () => {
   fetch('/api/memory')
-    .then(r => r.json())
-    .then(d => setGlobalMemory(d.memory ?? ''));
+    .then(r => r.ok ? r.json() : Promise.resolve({ memory: '' }))
+    .then(d => setGlobalMemory(d.memory ?? ''))
+    .catch(() => {});
 };
 
 useEffect(() => { fetchMemory(); }, []);
@@ -157,6 +158,7 @@ useEffect(() => { fetchMemory(); }, []);
             <button className={`tab-btn ${activePanel === 'chat' ? 'active' : ''}`} onClick={() => setActivePanel('chat')}>Chat</button>
             <button className={`tab-btn ${activePanel === 'editor' ? 'active' : ''}`} onClick={() => setActivePanel('editor')}>Editor</button>
             <button className={`tab-btn ${activePanel === 'preview' ? 'active' : ''}`} onClick={() => setActivePanel('preview')}>Preview</button>
+            <button className={`tab-btn tab-btn-debug ${activePanel === 'debug' ? 'active' : ''}`} onClick={() => setActivePanel('debug')} title="Debug stream">⚡</button>
           </div>
           <div className="header-controls">
             <button
@@ -296,11 +298,13 @@ useEffect(() => { fetchMemory(); }, []);
               <div className={`panel ${activePanel === 'preview' ? 'panel-active' : ''}`}>
                 <PreviewPanel files={files} projectType={projectType} />
               </div>
+              <div className={`panel ${activePanel === 'debug' ? 'panel-active' : ''}`}>
+                <DebugPanel />
+              </div>
             </>
           )}
         </main>
       </div>
-      <DebugPanel enabled={true} />
     </div>
   );
 }

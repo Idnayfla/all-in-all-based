@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { createClient } from 'redis';
 
-const anthropic = new Anthropic({ apiKey: process.env.APP_ANTHROPIC_API_KEY });
-
 function contentToText(content: unknown): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
@@ -15,21 +13,31 @@ function contentToText(content: unknown): string {
   return '';
 }
 
-export async function GET() {
+async function readMemory(): Promise<string> {
+  if (!process.env.REDIS_URL) return '';
   const redis = createClient({ url: process.env.REDIS_URL });
+  redis.on('error', () => {});
+  const timeout = new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000));
   try {
-    await redis.connect();
+    await Promise.race([redis.connect(), timeout]);
     const memory = await redis.get('based_memory');
-    await redis.disconnect();
-    return NextResponse.json({ memory: memory ?? '' });
-  } catch (err: any) {
-    try { await redis.disconnect(); } catch {}
-    return NextResponse.json({ memory: '' });
+    redis.disconnect().catch(() => {});
+    return memory ?? '';
+  } catch {
+    redis.disconnect().catch(() => {});
+    return '';
   }
 }
 
+export async function GET() {
+  const memory = await readMemory();
+  return NextResponse.json({ memory });
+}
+
 export async function POST(req: NextRequest) {
-  const redis = createClient({ url: process.env.REDIS_URL });
+  const anthropic = new Anthropic({ apiKey: process.env.APP_ANTHROPIC_API_KEY });
+  const redis = createClient({ url: process.env.REDIS_URL, socket: { connectTimeout: 2000 } });
+  redis.on('error', () => {});
   try {
     const { messages } = await req.json();
 

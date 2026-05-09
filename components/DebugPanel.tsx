@@ -7,15 +7,13 @@ interface DebugEvent {
   data: string;
 }
 
-export default function DebugPanel({ enabled }: { enabled: boolean }) {
+export default function DebugPanel() {
   const [events, setEvents] = useState<DebugEvent[]>([]);
-  const [visible, setVisible] = useState(false);
+  const [tab, setTab] = useState<'events' | 'raw'>('events');
   const [rawStream, setRawStream] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!enabled) return;
-
     const handleDebug = (e: CustomEvent) => {
       const { type, data } = e.detail;
       const time = new Date().toISOString().split('T')[1].slice(0, 12);
@@ -23,95 +21,49 @@ export default function DebugPanel({ enabled }: { enabled: boolean }) {
       if (type === 'chunk') setRawStream(prev => prev + data);
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
-
     window.addEventListener('debug-event', handleDebug as EventListener);
     return () => window.removeEventListener('debug-event', handleDebug as EventListener);
-  }, [enabled]);
-
-  if (!enabled) return null;
+  }, []);
 
   return (
-    <>
-      <button
-        onClick={() => setVisible(v => !v)}
-        style={{
-          position: 'fixed', bottom: 60, right: 16, zIndex: 9999,
-          background: '#1a1a2e', border: '1px solid #ff6b6b',
-          color: '#ff6b6b', padding: '6px 12px', borderRadius: 6,
-          fontSize: 11, cursor: 'pointer', fontFamily: 'monospace'
-        }}
-      >
-        {visible ? '✕ Debug' : '⚡ Debug'}
-      </button>
+    <div className="debug-panel">
+      <div className="debug-header">
+        <span className="debug-title">Stream Debug</span>
+        <button className="debug-clear" onClick={() => { setEvents([]); setRawStream(''); }}>Clear</button>
+      </div>
 
-      {visible && (
-        <div style={{
-          position: 'fixed', bottom: 100, right: 16, width: 480, height: 400,
-          background: '#0d0d1a', border: '1px solid #333', borderRadius: 8,
-          zIndex: 9998, display: 'flex', flexDirection: 'column',
-          fontFamily: 'monospace', fontSize: 11
-        }}>
-          <div style={{
-            padding: '8px 12px', borderBottom: '1px solid #333',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            background: '#111'
-          }}>
-            <span style={{ color: '#888' }}>Stream Debug</span>
-            <button
-              onClick={() => { setEvents([]); setRawStream(''); }}
-              style={{ background: 'none', border: '1px solid #444', color: '#888', padding: '2px 8px', borderRadius: 4, cursor: 'pointer', fontSize: 10 }}
-            >
-              Clear
-            </button>
-          </div>
+      <div className="debug-tabs">
+        <button className={`debug-tab${tab === 'events' ? ' active' : ''}`} onClick={() => setTab('events')}>Events</button>
+        <button className={`debug-tab${tab === 'raw' ? ' active' : ''}`} onClick={() => setTab('raw')}>Raw Stream</button>
+      </div>
 
-          <div style={{ display: 'flex', borderBottom: '1px solid #222', fontSize: 10 }}>
-            {['Events', 'Raw Stream'].map((tab, i) => (
-              <button key={tab} style={{
-                flex: 1, padding: '4px', background: 'none',
-                border: 'none', color: '#666', cursor: 'pointer'
-              }}
-                onClick={e => {
-                  const parent = (e.target as HTMLElement).closest('div')!.nextSibling as HTMLElement;
-                  const panels = parent.querySelectorAll('[data-panel]');
-                  panels.forEach((p, pi) => (p as HTMLElement).style.display = pi === i ? 'block' : 'none');
-                }}
-              >{tab}</button>
+      <div className="debug-body">
+        {tab === 'events' && (
+          <div className="debug-scroll">
+            {events.length === 0 && <div className="debug-empty">No events yet. Send a message.</div>}
+            {events.map((ev, i) => (
+              <div key={i} className={`debug-event debug-event-${ev.type}`}>
+                <span className="debug-time">{ev.time} </span>
+                <span className="debug-type">[{ev.type.toUpperCase()}]</span>
+                {' '}
+                <span className="debug-data">
+                  {ev.type === 'chunk' ? ev.data.slice(0, 80) + (ev.data.length > 80 ? '…' : '') : ev.data}
+                </span>
+              </div>
             ))}
+            <div ref={bottomRef} />
           </div>
-
-          <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
-            <div data-panel="0" style={{ height: '100%', overflowY: 'auto', padding: 8 }}>
-              {events.length === 0 && (
-                <div style={{ color: '#444', textAlign: 'center', marginTop: 20 }}>No events yet. Send a message.</div>
-              )}
-              {events.map((ev, i) => (
-                <div key={i} style={{ marginBottom: 4, borderLeft: `2px solid ${ev.type === 'done' ? '#00ff88' : ev.type === 'error' ? '#ff4444' : ev.type === 'info' ? '#4488ff' : '#444'}`, paddingLeft: 8 }}>
-                  <span style={{ color: '#555' }}>{ev.time} </span>
-                  <span style={{ color: ev.type === 'done' ? '#00ff88' : ev.type === 'error' ? '#ff4444' : ev.type === 'info' ? '#4488ff' : '#888' }}>
-                    [{ev.type.toUpperCase()}]
-                  </span>
-                  {' '}
-                  <span style={{ color: '#ccc', wordBreak: 'break-all' }}>
-                    {ev.type === 'chunk' ? ev.data.slice(0, 80) + (ev.data.length > 80 ? '...' : '') : ev.data}
-                  </span>
-                </div>
-              ))}
-              <div ref={bottomRef} />
-            </div>
-
-            <div data-panel="1" style={{ height: '100%', overflowY: 'auto', padding: 8, display: 'none' }}>
-              <pre style={{ color: '#ccc', whiteSpace: 'pre-wrap', wordBreak: 'break-all', margin: 0, fontSize: 10 }}>
-                {rawStream || <span style={{ color: '#444' }}>Raw stream appears here during generation...</span>}
-              </pre>
-            </div>
+        )}
+        {tab === 'raw' && (
+          <div className="debug-scroll">
+            <pre className="debug-raw">{rawStream || 'Raw stream appears here during generation…'}</pre>
           </div>
+        )}
+      </div>
 
-          <div style={{ padding: '4px 8px', borderTop: '1px solid #222', color: '#444', fontSize: 10 }}>
-            {events.length} events • {events.filter(e => e.type === 'chunk').length} chunks • {events.filter(e => e.type === 'done').length} done signals
-          </div>
-        </div>
-      )}
-    </>
+      <div className="debug-footer">
+        {events.length} events · {events.filter(e => e.type === 'chunk').length} chunks · {events.filter(e => e.type === 'done').length} done
+      </div>
+    </div>
   );
 }
