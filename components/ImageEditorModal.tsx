@@ -18,7 +18,7 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [brushSize, setBrushSize] = useState(24);
-  const [isSourceLoading, setIsSourceLoading] = useState(false);
+  const [isSourceLoading, setIsSourceLoading] = useState(true);
 
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -52,7 +52,6 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
   useEffect(() => {
     setResultUrl(null);
     setError(null);
-    strokeHistory.current = [];
     clearCanvas();
   }, [currentSourceUrl, mode, clearCanvas]);
 
