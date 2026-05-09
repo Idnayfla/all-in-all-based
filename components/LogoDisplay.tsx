@@ -37,7 +37,8 @@ function CircleIcon({ color }: { color: string }) {
 const ICONS = { bolt: BoltIcon, diamond: DiamondIcon, hex: HexIcon, circle: CircleIcon };
 
 export default function LogoDisplay({ config }: { config: LogoConfig }) {
-  const IconComp = ICONS[config.iconShape];
+  const isTerminal = config.iconShape === 'terminal';
+  const IconComp = isTerminal ? null : ICONS[config.iconShape as keyof typeof ICONS] ?? null;
   const totalDuration = config.speed + 1.2;
   const movePct = Math.round((config.speed / totalDuration) * 100);
 
@@ -52,10 +53,32 @@ export default function LogoDisplay({ config }: { config: LogoConfig }) {
         '--shimmer-move-pct': `${movePct}%`,
       } as React.CSSProperties}
     >
-      <div className="logo-icon-svg" style={{ background: config.iconBg }}>
-        <IconComp color={config.shimmerColor} />
-      </div>
-      <span className="animated-logo-text">{config.text}</span>
+      {isTerminal ? (
+        <div
+          className="logo-icon-svg"
+          style={{
+            background: 'linear-gradient(135deg, var(--accent), var(--accent3))',
+            border: 'none',
+            fontFamily: 'var(--font-mono)',
+            fontWeight: 700,
+            fontSize: '11px',
+            color: 'var(--bg)',
+            letterSpacing: 0,
+          }}
+        >
+          B&gt;
+        </div>
+      ) : (
+        <div className="logo-icon-svg" style={{ background: config.iconBg }}>
+          {IconComp && <IconComp color={config.shimmerColor} />}
+        </div>
+      )}
+      <span
+        className="animated-logo-text"
+        style={isTerminal ? { fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '13px', letterSpacing: '2px' } : undefined}
+      >
+        {config.text}
+      </span>
       <div
         className="logo-shimmer"
         style={{
