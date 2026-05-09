@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from 'redis';
+import { getUserId, supabaseAdmin } from '../../_auth';
 
 export async function POST(req: NextRequest) {
-  const redis = createClient({ url: process.env.REDIS_URL });
   try {
+    const userId = await getUserId(req);
     const { memory } = await req.json();
-    await redis.connect();
-    await redis.set('based_memory', memory);
-    await redis.disconnect();
+    const { error } = await supabaseAdmin
+      .from('user_settings')
+      .upsert(
+        { user_id: userId, global_memory: memory ?? '' },
+        { onConflict: 'user_id' }
+      );
+    if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    try { await redis.disconnect(); } catch {}
+    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
