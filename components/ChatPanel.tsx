@@ -8,6 +8,7 @@ import ImageEditorModal from './ImageEditorModal';
 import ModeDropdown, { GenerationMode } from './ModeDropdown';
 import GeneratedVideoCard from './GeneratedVideoCard';
 import GeneratingCard from './GeneratingCard';
+import { supabase } from '@/lib/supabase';
 
 const SUGGESTION_POOL = [
   'Build a todo app with drag & drop',
@@ -397,9 +398,13 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               ? m.content.filter((b: { type: string }) => b.type === 'text')
               : m.content,
           }));
+          const { data: { session } } = await supabase.auth.getSession();
           const memRes = await fetch('/api/memory', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token ?? ''}`,
+            },
             body: JSON.stringify({ messages: memMessages }),
           });
           const memData = await memRes.json();
