@@ -21,12 +21,12 @@ export async function POST(req: NextRequest) {
       const blob = new Blob([buffer], { type: mediaType ?? 'image/png' });
       const imageUrl = await fal.storage.upload(blob);
       const result = await fal.subscribe('bytedance/seedance-2.0/image-to-video', {
-        input: { image_url: imageUrl, prompt },
+        input: { image_url: imageUrl, prompt, resolution: '720p', duration: '5' },
       });
       url = (result.data as any).video?.url ?? (result.data as any).videos?.[0]?.url;
     } else {
       const result = await fal.subscribe('bytedance/seedance-2.0/text-to-video', {
-        input: { prompt },
+        input: { prompt, resolution: '720p', duration: '5', aspect_ratio: '16:9' },
       });
       url = (result.data as any).video?.url ?? (result.data as any).videos?.[0]?.url;
     }
