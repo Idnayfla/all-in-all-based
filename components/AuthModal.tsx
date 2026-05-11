@@ -64,15 +64,22 @@ export default function AuthModal() {
 
   const handleForgotPassword = async () => {
     if (!email) { setError('Enter your email address first'); return; }
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback`,
-    });
-    if (error) setError(
-      error.message.toLowerCase().includes('rate limit')
-        ? 'Too many emails sent recently — please wait a few minutes and try again.'
-        : error.message
-    );
-    else setMessage('Password reset email sent.');
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/send-recovery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      if (!res.ok) setError(data.error ?? 'Failed to send reset email');
+      else setMessage('Password reset email sent. Check your inbox.');
+    } catch {
+      setError('Failed to send reset email');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

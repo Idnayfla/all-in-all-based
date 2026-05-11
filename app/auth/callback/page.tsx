@@ -17,10 +17,14 @@ export default function AuthCallback() {
       }
     });
 
+    const hashType = new URLSearchParams(window.location.hash.slice(1)).get('type');
+
     if (code) {
       supabase.auth.exchangeCodeForSession(code).catch(() => {
         router.replace('/');
       });
+    } else if (hashType === 'recovery') {
+      // let onAuthStateChange fire PASSWORD_RECOVERY and handle the redirect
     } else {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) router.replace('/');
