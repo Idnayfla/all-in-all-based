@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ClientOnly from '@/components/ClientOnly';
+import Script from 'next/script';
 
 export const metadata: Metadata = {
   title: 'All in All Based',
@@ -12,6 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <Script src="/no-docwrite.js" strategy="beforeInteractive" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="theme-color" content="#7c6af7" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
