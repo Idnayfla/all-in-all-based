@@ -18,23 +18,28 @@ export default function AuthCallback() {
     let done = false;
     const go = (path: string) => { if (!done) { done = true; router.replace(path); } };
 
+    if (code) {
+      let exchangeStarted = false;
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+        if (!exchangeStarted) return;
+        if (event === 'PASSWORD_RECOVERY') go('/auth/reset-password');
+        else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') go('/');
+      });
+
+      exchangeStarted = true;
+      supabase.auth.exchangeCodeForSession(code).catch(() => go('/'));
+
+      return () => subscription.unsubscribe();
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        go('/auth/reset-password');
-      } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && !code) {
-        go('/');
-      }
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') go('/');
     });
 
-    if (code) {
-      supabase.auth.exchangeCodeForSession(code)
-        .then(({ error }) => { if (error) go('/'); else go('/'); })
-        .catch(() => go('/'));
-    } else {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) go('/');
-      });
-    }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) go('/');
+    });
 
     return () => subscription.unsubscribe();
   }, [router]);
