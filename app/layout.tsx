@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import ClientOnly from '@/components/ClientOnly';
 
 export const metadata: Metadata = {
   title: 'All in All Based',
@@ -19,7 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
-      <body suppressHydrationWarning><ErrorBoundary>{children}</ErrorBoundary></body>
+      <body suppressHydrationWarning><ClientOnly><ErrorBoundary>{children}</ErrorBoundary></ClientOnly></body>
     </html>
   );
 }
