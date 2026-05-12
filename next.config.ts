@@ -75,6 +75,10 @@ const nextConfig: NextConfig = {
       "framer-motion": "framer-motion/dist/cjs/index.js",
     },
   },
+  webpack: (config) => {
+    config.resolve.alias['framer-motion'] = require.resolve('framer-motion/dist/cjs/index.js');
+    return config;
+  },
 };
 
 export default nextConfig;
