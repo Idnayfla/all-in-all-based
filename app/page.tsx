@@ -10,6 +10,7 @@ import DebugPanel from '@/components/DebugPanel';
 import LogoDisplay from '@/components/LogoDisplay';
 import ProjectNameModal from '@/components/ProjectNameModal';
 import AuthModal from '@/components/AuthModal';
+import SplashScreen from '@/components/SplashScreen';
 import { supabase } from '@/lib/supabase';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
 
@@ -66,6 +67,7 @@ export default function Home() {
   const [projectModal, setProjectModal] = useState(false);
   const [user, setUser]               = useState<any>(null);
   const [authReady, setAuthReady]     = useState(false);
+  const [showSplash, setShowSplash]   = useState(true);
 
   // ── Auth headers helper ──────────────────────────────────────────────────
   const getHeaders = useCallback(async (): Promise<HeadersInit> => {
@@ -268,6 +270,7 @@ export default function Home() {
 
   return (
     <div className="app-root">
+      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
       <header className="app-header">
         <div className="logo">
           <LogoDisplay config={LOGO_DEFAULTS} />

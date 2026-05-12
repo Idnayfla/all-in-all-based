@@ -284,7 +284,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       let assistantMsg = '';
       let buffer = '';
 
-      setMessages(prev => [...prev, { role: 'assistant', content: '⏳ Working...' }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: '... Working' }]);
 
       while (true) {
         const { done, value } = await reader.read();
