@@ -69,7 +69,21 @@
       "Bash(sed -n '78,92p' /workspaces/all-in-all-based/app/globals.css)",
       "Bash(sed -n '305,325p' /workspaces/all-in-all-based/app/globals.css)",
       "Bash(sed -n '76,82p' /workspaces/all-in-all-based/app/globals.css)",
-      "Bash(sed -n '305,320p' /workspaces/all-in-all-based/app/globals.css)"
+      "Bash(sed -n '305,320p' /workspaces/all-in-all-based/app/globals.css)",
+      "Bash(~/.claude/plugins/cache/superpowers-marketplace/superpowers/5.0.7/skills/brainstorming/scripts/start-server.sh *)",
+      "Bash(xargs ls)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "WebSearch",
+      "Bash(scripts/start-server.sh *)",
+      "Bash(/home/node/.claude/plugins/cache/superpowers-marketplace/superpowers/5.0.7/skills/brainstorming/scripts/start-server.sh *)",
+      "Bash(npm ls *)",
+      "Bash(awk ' *)",
+      "WebFetch(domain:fal.ai)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm list *)",
+      "Bash(xargs cat)",
+      "Bash(pkill -f \"next dev\")"
     ]
   }
 }

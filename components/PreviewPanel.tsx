@@ -91,14 +91,14 @@ export default function PreviewPanel({ files, projectType }: {
         <span>⬡ Preview — Live</span>
         <div className="preview-actions">
           <button className="run-btn" onClick={publishApp} disabled={isPublishing}>
-            {isPublishing ? '⏳ Publishing...' : '🌐 Publish'}
+            {isPublishing ? '... Publishing' : '◆ Publish'}
           </button>
         </div>
       </div>
       {publishUrl && (
         <div className="publish-url-bar">
           <a href={publishUrl} target="_blank" rel="noreferrer" className="publish-link">
-            🔗 {publishUrl}
+            ▸ {publishUrl}
           </a>
         </div>
       )}

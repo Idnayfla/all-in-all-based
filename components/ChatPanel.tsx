@@ -72,7 +72,7 @@ function ProgressBar({ progress }: { progress: GenerationProgress }) {
   return (
     <div className="generation-progress">
       <div className="gen-progress-header">
-        <span className="gen-progress-file">{progress.file ? `⚙ ${progress.file}` : '⏳ Preparing...'}</span>
+        <span className="gen-progress-file">{progress.file ? `◈ ${progress.file}` : '... Preparing'}</span>
         <span className="gen-progress-count">{progress.completed}/{progress.total}</span>
       </div>
       <div className="gen-progress-bar-track">
@@ -89,7 +89,7 @@ function ProgressBar({ progress }: { progress: GenerationProgress }) {
           const active = i === progress.completed;
           return (
             <span key={f} className={`gen-file-chip ${done ? 'done' : active ? 'active' : ''}`}>
-              {done ? '✓ ' : active ? '⚙ ' : ''}{f}
+              {done ? '✓ ' : active ? '◈ ' : ''}{f}
             </span>
           );
         })}
@@ -200,7 +200,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     } catch (err: any) {
       setMessages(prev => [
         ...prev.slice(0, -1),
-        { role: 'assistant', content: `❌ Image generation failed: ${err.message}` },
+        { role: 'assistant', content: `✕ Image generation failed: ${err.message}` },
       ]);
     } finally {
       setIsGeneratingMedia(false);
@@ -239,7 +239,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     } catch (err: any) {
       setMessages(prev => [
         ...prev.slice(0, -1),
-        { role: 'assistant', content: `❌ Video generation failed: ${err.message}` },
+        { role: 'assistant', content: `✕ Video generation failed: ${err.message}` },
       ]);
     } finally {
       setIsGeneratingMedia(false);
@@ -349,7 +349,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               setGenProgress(null);
               setMessages(prev => [
                 ...prev.slice(0, -1),
-                { role: 'assistant', content: `❌ Generation failed: ${data.error}` },
+                { role: 'assistant', content: `✕ Generation failed: ${data.error}` },
               ]);
             }
 
@@ -362,7 +362,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               setGenProgress(null);
               setMessages(prev => [
                 ...prev.slice(0, -1),
-                { role: 'assistant', content: data.reply || '✅ Done — check the editor.' }
+                { role: 'assistant', content: data.reply || '✓ Done — check the editor.' }
               ]);
               if (resolvedFiles.length) {
                 onFilesUpdate(resolvedFiles, data.projectType);
@@ -383,7 +383,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         setMessages(prev => {
           const last = prev[prev.length - 1];
           if (last?.content === '⏳ Working...') {
-            return [...prev.slice(0, -1), { role: 'assistant', content: '⚠️ Response cut off. Try again.' }];
+            return [...prev.slice(0, -1), { role: 'assistant', content: '! Response cut off. Try again.' }];
           }
           return prev;
         });
@@ -543,7 +543,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             onClick={() => fileInputRef.current?.click()}
             disabled={isGenerating || generationMode === 'chat'}
             title="Attach image"
-          >📎</button>
+          >◆</button>
           <ModeDropdown
             mode={generationMode}
             onChange={setGenerationMode}
@@ -563,7 +563,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                 whileTap={{ scale: 0.92 }}
                 disabled={isGenerating || isGeneratingMedia}
               >
-                {generateAudio ? '🔊' : '🔇'}
+                {generateAudio ? '♪' : '◌'}
               </motion.button>
             )}
           </AnimatePresence>

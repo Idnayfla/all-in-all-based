@@ -278,15 +278,15 @@ export default function Home() {
             <button className={`tab-btn ${activePanel === 'chat' ? 'active' : ''}`} onClick={() => setActivePanel('chat')}>Chat</button>
             <button className={`tab-btn ${activePanel === 'editor' ? 'active' : ''}`} onClick={() => setActivePanel('editor')}>Editor</button>
             <button className={`tab-btn ${activePanel === 'preview' ? 'active' : ''}`} onClick={() => setActivePanel('preview')}>Preview</button>
-            <button className={`tab-btn tab-btn-debug ${activePanel === 'debug' ? 'active' : ''}`} onClick={() => setActivePanel('debug')} title="Debug stream">⚡</button>
+            <button className={`tab-btn tab-btn-debug ${activePanel === 'debug' ? 'active' : ''}`} onClick={() => setActivePanel('debug')} title="Debug stream">◈</button>
           </div>
           <div className="header-controls">
             <button
               className={`icon-btn ${incognito ? 'incognito-active' : ''}`}
               onClick={() => { setIncognito(s => !s); setIncognitoMessages([]); setActivePanel('chat'); }}
               title="Temp chat — no memory saved"
-            >🕵️</button>
-            <button className={`icon-btn ${showSettings ? 'active' : ''}`} onClick={() => setShowSettings(s => !s)} title="Settings" aria-label="Toggle settings">⚙</button>
+            >◉</button>
+            <button className={`icon-btn ${showSettings ? 'active' : ''}`} onClick={() => setShowSettings(s => !s)} title="Settings" aria-label="Toggle settings">◈</button>
             {user && (
               <button
                 className="user-avatar-btn"
@@ -395,7 +395,7 @@ export default function Home() {
 
           {incognito ? (
             <div className="panel panel-active">
-              <div className="incognito-banner">🕵️ Incognito Mode — chat will be wiped when you exit</div>
+              <div className="incognito-banner">◉ Incognito Mode — chat will be wiped when you exit</div>
               <ChatPanel
                 messages={incognitoMessages}
                 setMessages={setIncognitoMessages}

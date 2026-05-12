@@ -235,7 +235,7 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
               <button className="image-editor-chain-btn" onClick={handleChain}>↺ Edit this</button>
             </div>
           )}
-          {error && <div className="image-editor-error">❌ {error}</div>}
+          {error && <div className="image-editor-error">✕ {error}</div>}
         </div>
       </div>
 

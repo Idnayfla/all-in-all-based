@@ -8,7 +8,7 @@ interface GeneratingCardProps {
 const DOTS = [0, 1, 2];
 
 export default function GeneratingCard({ type }: GeneratingCardProps) {
-  const icon = type === 'image' ? '🎨' : '🎬';
+  const icon = type === 'image' ? '◈' : '▸';
   const label = type === 'image' ? 'Generating image' : 'Generating video';
 
   return (
