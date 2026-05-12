@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   transpilePackages: [
@@ -76,7 +77,7 @@ const nextConfig: NextConfig = {
     },
   },
   webpack: (config) => {
-    config.resolve.alias['framer-motion'] = require.resolve('framer-motion/dist/cjs/index.js');
+    config.resolve.alias['framer-motion'] = path.resolve('./node_modules/framer-motion/dist/cjs/index.js');
     return config;
   },
 };
