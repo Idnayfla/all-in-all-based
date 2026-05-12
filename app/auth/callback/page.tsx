@@ -8,26 +8,31 @@ export default function AuthCallback() {
 
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get('code');
+    const hashType = new URLSearchParams(window.location.hash.slice(1)).get('type');
+
+    if (hashType === 'recovery') {
+      router.replace('/auth/reset-password');
+      return;
+    }
+
+    let done = false;
+    const go = (path: string) => { if (!done) { done = true; router.replace(path); } };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event === 'PASSWORD_RECOVERY') {
-        router.replace('/auth/reset-password');
-      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        router.replace('/');
+        go('/auth/reset-password');
+      } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && !code) {
+        go('/');
       }
     });
 
-    const hashType = new URLSearchParams(window.location.hash.slice(1)).get('type');
-
     if (code) {
-      supabase.auth.exchangeCodeForSession(code).catch(() => {
-        router.replace('/');
-      });
-    } else if (hashType === 'recovery') {
-      // let onAuthStateChange fire PASSWORD_RECOVERY and handle the redirect
+      supabase.auth.exchangeCodeForSession(code)
+        .then(({ error }) => { if (error) go('/'); else go('/'); })
+        .catch(() => go('/'));
     } else {
       supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) router.replace('/');
+        if (session) go('/');
       });
     }
 

@@ -14,6 +14,9 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: email.trim(),
+      options: {
+        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      },
     });
 
     if (error || !data?.properties?.action_link) {
