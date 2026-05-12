@@ -11,12 +11,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Email required' }, { status: 400 });
     }
 
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
     const { data, error } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: email.trim(),
-      options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
-      },
+      ...(siteUrl && { options: { redirectTo: `${siteUrl}/auth/callback` } }),
     });
 
     if (error || !data?.properties?.action_link) {
