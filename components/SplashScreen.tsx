@@ -97,7 +97,7 @@ export default function SplashScreen({ onDone }: Props) {
     const audioCtx = new AudioContext();
     audioCtxRef.current = audioCtx;
     if (audioCtx.state === 'suspended') {
-      setShowMute(true);
+      queueMicrotask(() => setShowMute(true));
       return;
     }
     masterGainRef.current = startAudio(audioCtx);
