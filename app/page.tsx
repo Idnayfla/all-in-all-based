@@ -11,6 +11,7 @@ import LogoDisplay from '@/components/LogoDisplay';
 import ProjectNameModal from '@/components/ProjectNameModal';
 import AuthModal from '@/components/AuthModal';
 import SplashScreen from '@/components/SplashScreen';
+import PersonalityPanel from '@/components/PersonalityPanel';
 import { supabase } from '@/lib/supabase';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
 
@@ -328,22 +329,17 @@ export default function Home() {
               <div className="settings-header">⬡ Settings</div>
               <div className="settings-section">
                 <label className="settings-label">AI Personality</label>
-                <textarea
-                  className="settings-textarea"
-                  value={personality}
-                  onChange={async e => {
-                    setPersonality(e.target.value);
+                <PersonalityPanel
+                  onPersonalityChange={async (modifier) => {
+                    setPersonality(modifier);
                     const headers = await getHeaders();
                     fetch('/api/settings', {
                       method: 'PUT',
                       headers,
-                      body: JSON.stringify({ personality: e.target.value }),
+                      body: JSON.stringify({ personality: modifier }),
                     }).catch(() => {});
                   }}
-                  rows={6}
-                  placeholder="Describe how Based should behave..."
                 />
-                <div className="settings-hint">This shapes how Based talks and thinks. Changes apply immediately.</div>
               </div>
               <div className="settings-section">
                 <label className="settings-label">Global Memory</label>
