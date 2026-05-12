@@ -465,10 +465,42 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   .tab-btn { padding: 5px 10px; font-size: 10px; }
 }
 
-/* IOS HEADER FIX — consolidated into canonical .app-header above */
-
 @media (max-width: 768px) {
   .header-status { display: none; }
+}
+
+/* ── Two-row header on phones ──────────────────────────────── */
+@media (max-width: 600px) {
+  .app-header {
+    flex-wrap: wrap;
+    height: auto;
+    gap: 0;
+    padding: env(safe-area-inset-top) 0 0;
+  }
+  /* Dissolve header-nav so its children become direct flex items of app-header */
+  .header-nav { display: contents; }
+
+  /* Row 1: logo on left */
+  .logo {
+    height: 52px; padding-left: 12px;
+    flex-shrink: 0; display: flex; align-items: center;
+  }
+  /* Row 1: controls on right */
+  .header-controls {
+    height: 52px; margin-left: auto; padding-right: 8px;
+    display: flex; align-items: center; gap: 4px;
+  }
+  /* Row 2: tab switcher spans full width */
+  .tab-switcher {
+    order: 3; width: 100%;
+    border-radius: 0; border: none;
+    border-top: 1px solid var(--border-subtle);
+    background: var(--bg2);
+    padding: 4px 8px 6px; gap: 1px;
+  }
+  .tab-btn { flex: 1; padding: 5px 2px; font-size: 10px; letter-spacing: 0.5px; }
+  /* Debug tab not useful on mobile */
+  .tab-btn-debug { display: none; }
 }
 
 /* ===== ANIMATIONS & POLISH ===== */
@@ -1182,27 +1214,36 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   color: var(--text);
   text-align: center;
 }
-.auth-oauth-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+.auth-oauth-stack {
+  display: flex; flex-direction: column; gap: 8px;
 }
+/* Google — prominent white button */
+.auth-google-btn {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 11px 16px;
+  background: #fff; border: 1px solid #dadce0; border-radius: 8px;
+  color: #3c4043; font-size: 14px; font-weight: 500;
+  cursor: pointer; transition: background 0.15s, box-shadow 0.15s;
+  font-family: var(--font-sans);
+}
+.auth-google-btn:hover { background: #f8f9fa; box-shadow: 0 1px 4px rgba(0,0,0,0.18); }
+.auth-google-icon {
+  font-size: 15px; font-weight: 800; line-height: 1;
+  background: linear-gradient(135deg, #4285f4 25%, #ea4335 50%, #fbbc04 75%, #34a853);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+/* GitHub — secondary small button */
 .auth-oauth-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 9px 12px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  font-size: 13px;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 12px; width: 100%;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text2); font-size: 12px;
+  cursor: pointer; transition: border-color 0.15s, color 0.15s;
+  font-family: var(--font-mono);
 }
-.auth-oauth-btn:hover { border-color: var(--accent); background: var(--surface); }
-.auth-oauth-icon { font-size: 15px; font-weight: 700; }
+.auth-oauth-btn:hover { border-color: var(--border); color: var(--text); }
+.auth-oauth-icon { font-size: 13px; font-weight: 700; }
 .auth-divider {
   display: flex;
   align-items: center;

@@ -5,13 +5,6 @@ import { supabase } from '@/lib/supabase';
 
 type Tab = 'signin' | 'signup';
 
-const OAUTH_PROVIDERS = [
-  { id: 'google'  as const, label: 'Google',    icon: 'G'  },
-  { id: 'github'  as const, label: 'GitHub',    icon: '⌥' },
-  { id: 'azure'   as const, label: 'Microsoft', icon: 'M'  },
-  { id: 'apple'   as const, label: 'Apple',     icon: '' },
-];
-
 export default function AuthModal() {
   const [tab, setTab]         = useState<Tab>('signin');
   const [email, setEmail]     = useState('');
@@ -26,7 +19,7 @@ export default function AuthModal() {
     setError(''); setMessage('');
   };
 
-  const handleOAuth = async (provider: typeof OAUTH_PROVIDERS[number]['id']) => {
+  const handleOAuth = async (provider: 'google' | 'github') => {
     setError('');
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
@@ -100,17 +93,15 @@ export default function AuthModal() {
         <div className="auth-logo">B&gt;</div>
         <div className="auth-title">Welcome to Based</div>
 
-        <div className="auth-oauth-grid">
-          {OAUTH_PROVIDERS.map(p => (
-            <button
-              key={p.id}
-              className="auth-oauth-btn"
-              onClick={() => handleOAuth(p.id)}
-            >
-              <span className="auth-oauth-icon">{p.icon}</span>
-              {p.label}
-            </button>
-          ))}
+        <div className="auth-oauth-stack">
+          <button className="auth-google-btn" onClick={() => handleOAuth('google')}>
+            <span className="auth-google-icon">G</span>
+            Continue with Google
+          </button>
+          <button className="auth-oauth-btn" onClick={() => handleOAuth('github')}>
+            <span className="auth-oauth-icon">GH</span>
+            Continue with GitHub
+          </button>
         </div>
 
         <div className="auth-divider"><span>or</span></div>
