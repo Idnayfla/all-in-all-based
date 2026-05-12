@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (error || !data?.properties?.action_link) {
-      return NextResponse.json({ error: 'Could not generate reset link' }, { status: 500 });
+      return NextResponse.json({ error: error?.message ?? 'No action link returned' }, { status: 500 });
     }
 
     const { error: sendError } = await resend.emails.send({
