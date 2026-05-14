@@ -12,6 +12,7 @@ import ProjectNameModal from '@/components/ProjectNameModal';
 import AuthModal from '@/components/AuthModal';
 import SplashScreen from '@/components/SplashScreen';
 import PersonalityPanel from '@/components/PersonalityPanel';
+import MemoryManager from '@/components/MemoryManager';
 import { supabase } from '@/lib/supabase';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
 
@@ -343,22 +344,19 @@ export default function Home() {
               </div>
               <div className="settings-section">
                 <label className="settings-label">Global Memory</label>
-                <textarea
-                  className="settings-textarea"
-                  value={globalMemory}
-                  onChange={e => setGlobalMemory(e.target.value)}
-                  rows={8}
-                  placeholder="Based will learn about you as you chat..."
+                <div className="settings-hint" style={{ marginBottom: 8 }}>Auto-updated after each conversation. Based remembers this across all projects.</div>
+                <MemoryManager
+                  memory={globalMemory}
+                  onSave={async (mem) => {
+                    setGlobalMemory(mem);
+                    const headers = await getHeaders();
+                    fetch('/api/memory/save', {
+                      method: 'POST',
+                      headers,
+                      body: JSON.stringify({ memory: mem }),
+                    }).catch(() => {});
+                  }}
                 />
-                <div className="settings-hint">Auto-updated after each conversation. Based remembers this across all projects.</div>
-                <button className="run-btn" style={{ marginTop: 8 }} onClick={async () => {
-                  const headers = await getHeaders();
-                  await fetch('/api/memory/save', {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({ memory: globalMemory }),
-                  });
-                }}>Save Memory</button>
               </div>
               {currentProject && (
                 <div className="settings-section">

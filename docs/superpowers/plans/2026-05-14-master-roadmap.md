@@ -26,7 +26,7 @@ Last updated: 2026-05-14
 |---------|--------|-------|
 | Fix publish button hidden behind header (mobile) | ✅ Done | Removed sticky + z-index from app-header |
 | Fix phone zoom issue | ✅ Done | `font-size: 16px` on inputs + `touch-action: manipulation` on buttons |
-| Shared memories across chats | ⬜ Todo | Global memory already exists, needs UI polish |
+| Shared memories across chats | ✅ Done | Individual memory chips with add/edit/delete modal |
 | Custom Text & UI | ⬜ Todo | Font/theme/color customization per user |
 | Document export — PDF | ⬜ Todo | |
 | Document export — Docx | ⬜ Todo | |
