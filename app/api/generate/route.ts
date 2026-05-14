@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { generateWithGemini, canUseGemini } from '@/lib/gemini';
 
 export const maxDuration = 300;
 
@@ -338,9 +339,70 @@ function isCodeRequest(message: string): boolean {
   return codeKeywords.some(k => lower.includes(k));
 }
 
+interface GenerationResult {
+  text: string;
+  usedFallback: boolean;
+}
+
+async function callModelWithFallback(
+  prompt: any,
+  systemPrompt: any,
+  modelType: 'planner' | 'generator' | 'summary'
+): Promise<GenerationResult> {
+  try {
+    // Try Claude first
+    const response = await client.messages.create({
+      model:
+        modelType === 'planner'
+          ? 'claude-haiku-4-5-20251001'
+          : modelType === 'generator'
+            ? 'claude-opus-4-7-20250219'
+            : 'claude-haiku-4-5-20251001',
+      max_tokens: modelType === 'generator' ? 16000 : 8000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const content = response.content[0];
+    const text = content.type === 'text' ? content.text : '';
+    return { text, usedFallback: false };
+  } catch (claudeError) {
+    // If Claude fails and Gemini is available, try Gemini
+    if (canUseGemini()) {
+      try {
+        // Convert system to string for Gemini
+        let systemStr = typeof systemPrompt === 'string'
+          ? systemPrompt
+          : (Array.isArray(systemPrompt) ? systemPrompt.map((b: any) => b.text).join('\n') : '');
+
+        // Convert prompt to string for Gemini
+        let promptStr = typeof prompt === 'string'
+          ? prompt
+          : (Array.isArray(prompt)
+              ? prompt.map((p: any) => typeof p === 'string' ? p : (p.type === 'text' ? p.text : '')).join('\n')
+              : '');
+
+        const geminiText = await generateWithGemini(
+          promptStr,
+          systemStr,
+          modelType
+        );
+        return { text: geminiText, usedFallback: true };
+      } catch (geminiError) {
+        throw new Error(
+          `Both Claude and Gemini failed. Claude: ${(claudeError as any).message}. Gemini: ${(geminiError as any).message}`
+        );
+      }
+    }
+    throw claudeError;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { messages, existingFiles, personality, memory } = await req.json();
+
+    const fallbackNotifications: string[] = [];
 
     let globalMemory = '';
     try {
@@ -416,21 +478,23 @@ export async function POST(req: NextRequest) {
           }
 
           // Step 1: Plan files silently
-          const plannerResponse = await client.messages.create({
-            model: 'claude-haiku-4-5',
-            max_tokens: 1024,
-            system: PLANNER_SYSTEM_BLOCKS,
-            messages: [{
-              role: 'user',
-              content: imageBlocks.length > 0
-                ? [...imageBlocks, { type: 'text' as const, text: lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '') }]
-                : lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : ''),
-            }],
-          });
+          const plannerPromptContent = imageBlocks.length > 0
+            ? [...imageBlocks, { type: 'text' as const, text: lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '') }]
+            : lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '');
+
+          const plannerResult = await callModelWithFallback(
+            plannerPromptContent,
+            PLANNER_SYSTEM_BLOCKS,
+            'planner'
+          );
+
+          if (plannerResult.usedFallback) {
+            fallbackNotifications.push('[Based] Switched to Gemini (Claude unavailable)');
+          }
 
           let filePlan: { name: string; language: string; description: string }[] = [];
           try {
-            const planText = plannerResponse.content[0].type === 'text' ? plannerResponse.content[0].text : '[]';
+            const planText = plannerResult.text;
             // Extract JSON array even when the model wraps it in a markdown code fence
             const jsonMatch = planText.match(/\[[\s\S]*\]/);
             filePlan = JSON.parse(jsonMatch ? jsonMatch[0] : planText.trim());
@@ -491,22 +555,49 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
             // Announce which file is starting (updates label, does not advance bar)
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`));
 
-            const fileStream = client.messages.stream({
-              model: 'claude-opus-4-7',
-              max_tokens: 16000,
-              system: FILE_GENERATOR_SYSTEM_BLOCKS,
-              messages: [{ role: 'user', content: imageBlocks.length > 0 ? [...imageBlocks, { type: 'text' as const, text: filePrompt }] : filePrompt }],
-            });
-
             let fileText = '';
-            for await (const chunk of fileStream) {
-              if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-                fileText += chunk.delta.text;
-                // Forward chunks to keep the connection alive (client ignores forge_file content visually)
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+            let usedGeneratorFallback = false;
+            let fileResult: any = null;
+
+            try {
+              const fileStream = client.messages.stream({
+                model: 'claude-opus-4-7',
+                max_tokens: 16000,
+                system: FILE_GENERATOR_SYSTEM_BLOCKS,
+                messages: [{ role: 'user', content: imageBlocks.length > 0 ? [...imageBlocks, { type: 'text' as const, text: filePrompt }] : filePrompt }],
+              });
+
+              for await (const chunk of fileStream) {
+                if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+                  fileText += chunk.delta.text;
+                  // Forward chunks to keep the connection alive (client ignores forge_file content visually)
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+                }
+              }
+              fileResult = await fileStream.finalMessage();
+            } catch (claudeStreamError) {
+              // If Claude stream fails and Gemini is available, fall back
+              if (canUseGemini()) {
+                try {
+                  const generatorResult = await callModelWithFallback(
+                    imageBlocks.length > 0 ? [...imageBlocks, { type: 'text' as const, text: filePrompt }] : filePrompt,
+                    FILE_GENERATOR_SYSTEM_BLOCKS,
+                    'generator'
+                  );
+                  fileText = generatorResult.text;
+                  usedGeneratorFallback = true;
+                  fallbackNotifications.push(`[Based] File "${fileSpec.name}" generated via Gemini (Claude unavailable)`);
+                } catch (geminiError) {
+                  throw new Error(
+                    `File generation failed. Claude: ${(claudeStreamError as any).message}. Gemini: ${(geminiError as any).message}`
+                  );
+                }
+              } else {
+                throw claudeStreamError;
               }
             }
-            const fileResult = await fileStream.finalMessage();
+
+            fileResult = fileResult || { stop_reason: '' };
 
             // If the model was cut off before closing the forge_file tag, continue from where it stopped
             if (fileResult.stop_reason === 'max_tokens' && !fileText.includes('</forge_file>')) {
@@ -554,20 +645,28 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
           }
 
           // Step 3: Brief summary
-          const summaryResponse = await client.messages.create({
-            model: 'claude-haiku-4-5',
-            max_tokens: 200,
-            system: systemBlocks,
-            messages: [
-              { role: 'user', content: lastUserMessage },
-              { role: 'assistant', content: `Generated ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}` },
-              { role: 'user', content: 'Give a 1-2 sentence summary of what was built.' }
-            ],
-          });
+          const summaryPrompt = [
+            { role: 'user', content: lastUserMessage },
+            { role: 'assistant', content: `Generated ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}` },
+            { role: 'user', content: 'Give a 1-2 sentence summary of what was built.' }
+          ] as any[];
 
-          const reply = summaryResponse.content[0].type === 'text'
-            ? summaryResponse.content[0].text
-            : `Built ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}`;
+          const summaryResult = await callModelWithFallback(
+            summaryPrompt[summaryPrompt.length - 1].content,
+            systemBlocks,
+            'summary'
+          );
+
+          if (summaryResult.usedFallback) {
+            fallbackNotifications.push('[Based] Summary generated via Gemini (Claude unavailable)');
+          }
+
+          const reply = summaryResult.text || `Built ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}`;
+
+          // Stream fallback notifications first
+          for (const notification of fallbackNotifications) {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: notification + '\n' })}\n\n`));
+          }
 
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, reply, files: generatedFiles, projectType })}\n\n`));
 
