@@ -10,7 +10,10 @@ export default function EditorPanel({ activeFile, onFileUpdate }: {
 }) {
   if (!activeFile) return (
     <div className="editor-panel">
-      <div className="editor-empty">Select a file from the sidebar or generate code via chat.</div>
+      <div className="editor-empty">
+        <div className="editor-empty-icon">{'{ }'}</div>
+        <div className="editor-empty-text">Select a file from the sidebar or generate code via chat.</div>
+      </div>
     </div>
   );
 

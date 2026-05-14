@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import ChatPanel from '@/components/ChatPanel';
 import EditorPanel from '@/components/EditorPanel';
 import PreviewPanel from '@/components/PreviewPanel';
@@ -13,6 +13,7 @@ import AuthModal from '@/components/AuthModal';
 import SplashScreen from '@/components/SplashScreen';
 import PersonalityPanel from '@/components/PersonalityPanel';
 import MemoryManager from '@/components/MemoryManager';
+import ThemeCustomizer, { AppTheme, DEFAULT_THEME, applyTheme, loadTheme, saveThemeLocally } from '@/components/ThemeCustomizer';
 import { supabase } from '@/lib/supabase';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
 
@@ -70,6 +71,14 @@ export default function Home() {
   const [user, setUser]               = useState<any>(null);
   const [authReady, setAuthReady]     = useState(false);
   const [showSplash, setShowSplash]   = useState(true);
+  const [theme, setTheme]             = useState<AppTheme>(DEFAULT_THEME);
+
+  // ── Apply theme on mount from localStorage ──────────────────────────────
+  useEffect(() => {
+    const saved = loadTheme();
+    setTheme(saved);
+    applyTheme(saved);
+  }, []);
 
   // ── Auth headers helper ──────────────────────────────────────────────────
   const getHeaders = useCallback(async (): Promise<HeadersInit> => {
@@ -92,9 +101,15 @@ export default function Home() {
       setProjects(projects ?? []);
     }
     if (settingsRes.ok) {
-      const { personality: p, globalMemory: m } = await settingsRes.json();
+      const { personality: p, globalMemory: m, theme: t } = await settingsRes.json();
       if (p) setPersonality(p);
       if (m) setGlobalMemory(m);
+      if (t && Object.keys(t).length > 0) {
+        const merged = { ...DEFAULT_THEME, ...t };
+        setTheme(merged);
+        applyTheme(merged);
+        saveThemeLocally(merged);
+      }
     }
   }, [getHeaders]);
 
@@ -268,8 +283,6 @@ export default function Home() {
   const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
   const avatarInitial = (user?.email as string | undefined)?.[0]?.toUpperCase() ?? '?';
 
-  if (!authReady) return null; // Prevent flash before session check
-
   return (
     <div className="app-root">
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
@@ -325,9 +338,33 @@ export default function Home() {
         />
 
         <main className="main-content">
+          <AnimatePresence>
           {showSettings && (
-            <div className="settings-panel">
+            <motion.div
+              className="settings-panel"
+              initial={{ x: 24, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 24, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 350, damping: 32 }}
+            >
               <div className="settings-header">⬡ Settings</div>
+              <div className="settings-section">
+                <label className="settings-label">Appearance</label>
+                <ThemeCustomizer
+                  theme={theme}
+                  onChange={async (next) => {
+                    setTheme(next);
+                    applyTheme(next);
+                    saveThemeLocally(next);
+                    const headers = await getHeaders();
+                    fetch('/api/settings', {
+                      method: 'PUT',
+                      headers,
+                      body: JSON.stringify({ theme: next }),
+                    }).catch(() => {});
+                  }}
+                />
+              </div>
               <div className="settings-section">
                 <label className="settings-label">AI Personality</label>
                 <PersonalityPanel
@@ -387,8 +424,9 @@ export default function Home() {
                   <button className="auth-signout-btn" onClick={signOut}>Sign Out</button>
                 </div>
               )}
-            </div>
+            </motion.div>
           )}
+          </AnimatePresence>
 
           {incognito ? (
             <div className="panel panel-active">
@@ -459,7 +497,7 @@ export default function Home() {
             onCancel={() => setProjectModal(false)}
           />
         )}
-        {authReady && !user && (
+        {authReady && !user && !showSplash && (
           <AuthModal key="auth-modal" />
         )}
       </AnimatePresence>

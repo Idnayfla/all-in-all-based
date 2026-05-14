@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function parseMemories(raw: string): string[] {
@@ -87,49 +88,48 @@ export default function MemoryManager({ memory, onSave }: Props) {
 
       <button className="memory-add-btn" onClick={openAdd}>+ Add memory</button>
 
-      <AnimatePresence>
-        {modalOpen && (
-          <>
-            <motion.div
-              className="memory-modal-overlay"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              onClick={closeModal}
+      {modalOpen && createPortal(
+        <AnimatePresence>
+          <motion.div
+            className="memory-modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={closeModal}
+          />
+          <motion.div
+            className="memory-modal"
+            initial={{ opacity: 0, scale: 0.92, y: -8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.92, y: -8 }}
+            transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+          >
+            <div className="memory-modal-title">
+              {editIndex === null ? 'Add Memory' : 'Edit Memory'}
+            </div>
+            <textarea
+              className="memory-modal-input"
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              placeholder="e.g. User prefers dark mode interfaces"
+              rows={3}
+              autoFocus
+              onKeyDown={e => {
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSave();
+                if (e.key === 'Escape') closeModal();
+              }}
             />
-            <motion.div
-              className="memory-modal"
-              initial={{ opacity: 0, scale: 0.92, y: -8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: -8 }}
-              transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-            >
-              <div className="memory-modal-title">
-                {editIndex === null ? 'Add Memory' : 'Edit Memory'}
-              </div>
-              <textarea
-                className="memory-modal-input"
-                value={draft}
-                onChange={e => setDraft(e.target.value)}
-                placeholder="e.g. User prefers dark mode interfaces"
-                rows={3}
-                autoFocus
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSave();
-                  if (e.key === 'Escape') closeModal();
-                }}
-              />
-              <div className="memory-modal-actions">
-                <button className="memory-modal-cancel" onClick={closeModal}>Cancel</button>
-                <button className="memory-modal-save" onClick={handleSave} disabled={!draft.trim()}>
-                  {editIndex === null ? 'Add' : 'Save'}
-                </button>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+            <div className="memory-modal-actions">
+              <button className="memory-modal-cancel" onClick={closeModal}>Cancel</button>
+              <button className="memory-modal-save" onClick={handleSave} disabled={!draft.trim()}>
+                {editIndex === null ? 'Add' : 'Save'}
+              </button>
+            </div>
+          </motion.div>
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

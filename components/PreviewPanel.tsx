@@ -81,7 +81,10 @@ export default function PreviewPanel({ files, projectType }: {
   if (!previewHtml) return (
     <div className="preview-panel">
       <div className="preview-header">⬡ Preview</div>
-      <div className="preview-empty">Generate an HTML project to see a preview here.</div>
+      <div className="preview-empty">
+        <div className="preview-empty-icon">⬡</div>
+        <div className="preview-empty-text">Generate an HTML project to see a preview here.</div>
+      </div>
     </div>
   );
 
