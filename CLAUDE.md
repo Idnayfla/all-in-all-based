@@ -13,7 +13,10 @@ If starting a new terminal session, activate it with:
 ```powershell
 . $PROFILE
 ```
-To switch to Gemini free tier as a fallback: run `use-gemini`. To return to subscription: run `use-subscription`.
+Provider options:
+- `use-subscription` — Claude.ai Pro/Max (default)
+- `use-gemini` — Gemini 2.0 Flash (free tier)
+- `use-anthropic` — Anthropic API (pay as you go)
 
 ## Key Files
 
