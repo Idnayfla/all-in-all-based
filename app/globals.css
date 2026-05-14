@@ -1895,6 +1895,60 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   -webkit-overflow-scrolling: touch;
 }
 
+/* ── Install Prompt ── */
+.install-prompt {
+  position: fixed;
+  bottom: calc(var(--safe-bottom) + 64px);
+  left: var(--sp-3);
+  right: var(--sp-3);
+  z-index: 9000;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.install-prompt__body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.install-prompt__text {
+  font-size: var(--fs-sm);
+  color: var(--text2);
+  margin: 0;
+  flex: 1;
+}
+
+.install-prompt__install {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--r-md);
+  padding: var(--sp-1) var(--sp-3);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.install-prompt__dismiss {
+  background: none;
+  border: none;
+  color: var(--text3);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 var(--sp-1);
+  line-height: 1;
+  flex-shrink: 0;
+}
+
 .memory-compiled-line {
   font-size: 11px;
   color: var(--text2);
