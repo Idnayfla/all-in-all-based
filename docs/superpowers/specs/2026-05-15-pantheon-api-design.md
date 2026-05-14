@@ -114,6 +114,36 @@ Authorization: Bearer pk_live_...
 
 Response format mirrors OpenAI's `ChatCompletionChunk` for streaming and `ChatCompletion` for non-streaming. Drop-in compatible.
 
+#### Layer 1b — Anthropic-compatible (Claude Code drop-in)
+
+Claude Code uses the Anthropic Messages API format (`/v1/messages`), not OpenAI's. Pantheon implements this format so any developer using Claude Code in VSCode can point it at Pantheon with a single environment variable:
+
+```bash
+# In terminal or VSCode settings / .env
+ANTHROPIC_BASE_URL=https://api.pantheon.ai
+ANTHROPIC_API_KEY=pk_live_...
+```
+
+From that point, their Claude Code session routes through Pantheon's brain — their hard bugs go to Opus, their math to DeepSeek, their large file analysis to Gemini. They pay in Pantheon credits.
+
+```http
+POST /v1/messages
+Authorization: Bearer pk_live_...
+
+{
+  "model": "claude-sonnet-4-6",   // or "pantheon-auto"
+  "max_tokens": 4096,
+  "messages": [{"role": "user", "content": "..."}],
+  "stream": true
+}
+```
+
+Response mirrors Anthropic's `MessageStreamEvent` format exactly. All Claude model names map transparently:
+- `claude-opus-*` → Pantheon routes as `task_type: code`
+- `claude-sonnet-*` → Pantheon routes as `task_type: chat`
+- `claude-haiku-*` → Pantheon routes as `task_type: chat` (fast/cheap path)
+- `pantheon-auto` → full classifier runs
+
 #### Layer 2 — Native Pantheon (generative media + research)
 
 ```http
@@ -174,6 +204,61 @@ POST /v1/credits/topup   // redirects to Stripe checkout
 
 ---
 
+## VSCode Extension — Pantheon for VSCode
+
+A first-party VSCode extension that embeds Pantheon's full routing intelligence directly in the editor. Separate from the Claude Code compatibility layer — this is the premium native experience.
+
+### Capabilities
+
+| Feature | Description |
+|---------|-------------|
+| Chat panel | Sidebar WebView — chat with Pantheon, context-aware of open files |
+| Inline completions | Ghost text suggestions as you type (like Copilot). Routes to Opus for complex code, Sonnet for simple completions |
+| Selection actions | Select code → right-click → "Explain", "Refactor", "Add tests", "Fix bug" |
+| File context | Automatically includes active file + relevant imports in every request |
+| Math mode | Detects math/algorithm problems → routes to DeepSeek R1 automatically |
+| Research panel | Run a Pantheon `/v1/research` query from inside the editor |
+| Multi-file awareness | Reads workspace symbol index for large codebase questions |
+
+### Extension architecture
+
+```
+VSCode Extension (TypeScript)
+├── src/
+│   ├── extension.ts         — activation, command registration
+│   ├── PantheonClient.ts    — calls api.pantheon.ai, manages API key
+│   ├── ChatPanel.ts         — WebView sidebar chat UI
+│   ├── InlineProvider.ts    — InlineCompletionItemProvider
+│   ├── ContextBuilder.ts    — assembles file context for requests
+│   └── commands/
+│       ├── explain.ts
+│       ├── refactor.ts
+│       ├── addTests.ts
+│       └── fixBug.ts
+└── package.json             — VSCode extension manifest
+```
+
+### Auth flow
+
+On first use, the extension prompts for a Pantheon API key. Key stored in VSCode's `SecretStorage` (OS keychain). Users without a key are offered a link to sign up at `pantheon.ai` (100 free credits on signup).
+
+### Routing inside the extension
+
+The extension passes `task_type` hints directly — no classifier overhead needed since editor context makes intent clear:
+
+- Inline completion → `task_type: code` (fast path, Sonnet)
+- "Fix bug" command → `task_type: code` (Opus — quality matters here)
+- "Explain" command → `task_type: chat` (Sonnet — speed matters)
+- Research panel → `task_type: research` (Gemini + Tavily)
+- Math/algorithm file detected → `task_type: math` (DeepSeek R1)
+
+### Published to VS Code Marketplace
+
+Extension ID: `pantheon-ai.pantheon-vscode`  
+Requires: Pantheon API key (`pk_live_` or `pk_test_`)
+
+---
+
 ## Credit System
 
 **Pricing:** $10 = 1,000 credits. Credits never expire.
@@ -208,6 +293,7 @@ Pantheon is a standalone Next.js App Router project, deployed separately from Ba
 | Streaming | Server-Sent Events (SSE) — unified across all providers |
 | Hosting | Vercel |
 | Docs | `docs.pantheon.ai` — static site |
+| VSCode Extension | TypeScript, VS Code Extension API, WebView |
 
 ---
 
@@ -235,12 +321,16 @@ After:  Based → Pantheon API → best model per task
 - Owner key wired into Based
 - Minimal developer dashboard: key management, balance, usage graph
 
-### Phase 2 — Full God Roster (weeks 7–12)
+### Phase 2 — Full God Roster + VSCode (weeks 7–16)
 - Add Suno, Perplexity, OpenAI GPT-4o adapters
 - `/v1/research` endpoint (multi-step web search + synthesis)
+- Anthropic-compatible `/v1/messages` endpoint (Claude Code drop-in)
 - Unified streaming improvements
 - Memory layer: session context stored per API key in Redis
 - Public docs site
+- **Pantheon VSCode Extension v1**: chat panel, selection actions (explain/refactor/fix/test), API key auth
+- **VSCode Extension v2**: inline completions, file context, math mode routing
+- Publish to VS Code Marketplace
 - Public launch (Product Hunt, dev communities)
 
 ### Phase 3 — Pantheon Model (months 6–18)
@@ -264,6 +354,8 @@ After:  Based → Pantheon API → best model per task
 **Phase 2 done when:**
 - All 8 task types route correctly
 - `/v1/research` returns cited multi-source answers
+- Claude Code users can point `ANTHROPIC_BASE_URL` at Pantheon and it works
+- VSCode extension is published on the Marketplace and installs cleanly
 - Public docs are live
 - First 10 external developers using the API
 
