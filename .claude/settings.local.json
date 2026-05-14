@@ -16,7 +16,21 @@
       "Bash(npm install *)",
       "Bash(git fetch *)",
       "Bash(git pull *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(git checkout *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(taskkill /PID 28936 /F)",
+      "Bash(taskkill /IM node.exe /F)",
+      "Bash(del \"C:\\\\Users\\\\Obsidian\\\\ai-dev-tool\\\\.next\\\\dev\\\\lock\")",
+      "PowerShell(Stop-Process *)",
+      "Skill(frontend-design:frontend-design)",
+      "Bash(node *)",
+      "Skill(context-save)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000)",
+      "Skill(context-restore)",
+      "WebSearch",
+      "PowerShell(echo $PROFILE)"
     ]
   }
 }

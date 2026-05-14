@@ -5,6 +5,16 @@ Personal AI dev studio. Users chat with "Based" (Claude-powered) and get generat
 **Creator:** Mohamad Hus Alfyandi Bin Mohamed Tahir  
 **Stack:** Next.js 16 App Router, TypeScript, Anthropic SDK, Redis (memory)
 
+## Environment Setup
+
+Claude Code is configured to use **Gemini 2.0 Flash (free tier)** instead of Anthropic API tokens.
+
+If starting a new terminal session, activate it with:
+```powershell
+. $PROFILE
+```
+To switch back to Anthropic: run `use-anthropic` and set your API key in the profile.
+
 ## Key Files
 
 | File | Purpose |
