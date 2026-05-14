@@ -28,11 +28,13 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const userId = await getUserId(req);
-    const { name } = await req.json();
+    const { name, id } = await req.json();
     if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 });
+    const row: Record<string, unknown> = { user_id: userId, name: name.trim(), files: [], messages: [], memory: '' };
+    if (id) row.id = id;
     const { data, error } = await supabaseAdmin
       .from('projects')
-      .insert({ user_id: userId, name: name.trim(), files: [], messages: [], memory: '' })
+      .insert(row)
       .select('id, name, files, messages, memory, updated_at')
       .single();
     if (error) throw error;
@@ -48,6 +50,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: any) {
     if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    console.error('[POST /api/projects]', err.message, err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

@@ -21,6 +21,7 @@ export default function SplashScreen({ onDone }: Props) {
   const exitedRef     = useRef(false);
   const [logoIn,    setLogoIn]    = useState(false);
   const [taglineIn, setTaglineIn] = useState(false);
+  const [subIn,     setSubIn]     = useState(false);
   const [ringPulse, setRingPulse] = useState(false);
   const [exiting,   setExiting]   = useState(false);
   const [showMute,  setShowMute]  = useState(false);
@@ -88,8 +89,9 @@ export default function SplashScreen({ onDone }: Props) {
   useEffect(() => {
     const t1 = setTimeout(() => { setLogoIn(true); setRingPulse(true); }, 1200);
     const t2 = setTimeout(() => setTaglineIn(true), 1800);
-    const t3 = setTimeout(exit, 3200);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    const t3 = setTimeout(() => setSubIn(true), 2200);
+    const t4 = setTimeout(exit, 3800);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
   }, [exit]);
 
   /* ── Audio ── */
@@ -122,6 +124,9 @@ export default function SplashScreen({ onDone }: Props) {
         </div>
         <div className={`splash-tagline${taglineIn ? ' visible' : ''}`}>
           All in All Based
+        </div>
+        <div className={`splash-sub${subIn ? ' visible' : ''}`}>
+          Describe it. Based builds it. Ships in seconds.
         </div>
       </div>
       <div className="splash-grain" />

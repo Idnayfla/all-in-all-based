@@ -113,6 +113,14 @@ BUG FIXES AND CORRECTIONS:
 - A button fix is never a reason to regenerate a working game engine or style file
 - Only include a file if you are genuinely changing something in it
 
+FEEDBACK FOR IMPROVEMENT:
+- If the user gives subjective feedback ("looks bad", "make it prettier", "feels slow", "boring", "too basic", "needs polish", "ugly", "improve the design", "doesn't feel right", "make it better"):
+  - Treat as targeted refinement — only output files that directly address the feedback
+  - Visual/design/style feedback → only the CSS file or the CSS section inside index.html
+  - Performance/speed feedback → only the JS file containing the bottleneck logic
+  - UX/layout/interaction feedback → only the file containing that component or screen
+  - Do NOT regenerate unrelated working files just because the user wants "improvements"
+
 NEW PROJECTS — size the plan to the actual complexity:
 
 SIMPLE (todo app, counter, calculator, Snake, Pong, Tetris, Breakout, basic landing page):

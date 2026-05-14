@@ -12,7 +12,7 @@ import ProjectNameModal from '@/components/ProjectNameModal';
 import AuthModal from '@/components/AuthModal';
 import SplashScreen from '@/components/SplashScreen';
 import PersonalityPanel from '@/components/PersonalityPanel';
-import MemoryManager from '@/components/MemoryManager';
+import MemoryManager, { parseMemories } from '@/components/MemoryManager';
 import ThemeCustomizer, { AppTheme, DEFAULT_THEME, applyTheme, loadTheme, saveThemeLocally } from '@/components/ThemeCustomizer';
 import { supabase } from '@/lib/supabase';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
@@ -72,6 +72,20 @@ export default function Home() {
   const [authReady, setAuthReady]     = useState(false);
   const [showSplash, setShowSplash]   = useState(true);
   const [theme, setTheme]             = useState<AppTheme>(DEFAULT_THEME);
+  const [showMemoryManager, setShowMemoryManager] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  // ── Project cache helpers (localStorage) ────────────────────────────────
+  const PROJECTS_CACHE_KEY = 'based_projects_cache';
+  const saveProjectsCache = (list: Project[]) => {
+    try { localStorage.setItem(PROJECTS_CACHE_KEY, JSON.stringify(list)); } catch {}
+  };
+  const loadProjectsCache = (): Project[] => {
+    try {
+      const raw = localStorage.getItem(PROJECTS_CACHE_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch { return []; }
+  };
 
   // ── Apply theme on mount from localStorage ──────────────────────────────
   useEffect(() => {
@@ -91,6 +105,10 @@ export default function Home() {
 
   // ── Load user data from cloud ────────────────────────────────────────────
   const loadCloudData = useCallback(async () => {
+    // Show cached projects immediately so the UI isn't blank on refresh
+    const cached = loadProjectsCache();
+    if (cached.length > 0) setProjects(cached);
+
     const headers = await getHeaders();
     const [projectsRes, settingsRes] = await Promise.all([
       fetch('/api/projects', { headers }),
@@ -98,7 +116,11 @@ export default function Home() {
     ]);
     if (projectsRes.ok) {
       const { projects } = await projectsRes.json();
-      setProjects(projects ?? []);
+      const list = projects ?? [];
+      setProjects(list);
+      saveProjectsCache(list);
+    } else {
+      console.error('[Based] GET /api/projects failed:', projectsRes.status, await projectsRes.text().catch(() => ''));
     }
     if (settingsRes.ok) {
       const { personality: p, globalMemory: m, theme: t } = await settingsRes.json();
@@ -209,7 +231,11 @@ export default function Home() {
     }));
     const updated: Project = { ...currentProject, files, messages: strippedMessages, updatedAt: Date.now() };
     setCurrentProject(updated);
-    setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
+    setProjects(prev => {
+      const next = prev.map(p => p.id === updated.id ? updated : p);
+      saveProjectsCache(next);
+      return next;
+    });
     getHeaders().then(headers => {
       fetch(`/api/projects/${currentProject.id}`, {
         method: 'PUT',
@@ -224,17 +250,43 @@ export default function Home() {
 
   const createProject = async (name: string) => {
     setProjectModal(false);
-    const headers = await getHeaders();
-    const res = await fetch('/api/projects', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ name: name.trim() }),
-    });
-    if (!res.ok) return;
-    const { project } = await res.json();
-    setProjects(prev => [project, ...prev]);
-    setCurrentProject(project);
+
+    // Generate ID on client so local and cloud share the same ID from the start
+    const id = crypto.randomUUID();
+    const newProject: Project = {
+      id,
+      name: name.trim(),
+      files: [],
+      messages: [],
+      updatedAt: Date.now(),
+      memory: '',
+    };
+
+    // Save to localStorage immediately — survives refresh regardless of Supabase
+    const cached = loadProjectsCache();
+    saveProjectsCache([newProject, ...cached]);
+
+    // Update UI immediately
+    setProjects(prev => [newProject, ...prev]);
+    setCurrentProject(newProject);
     setFiles([]); setMessages([]); setActiveFile(null); setActivePanel('chat');
+
+    // Sync to Supabase in background — log errors so we can debug
+    getHeaders().then(async (headers) => {
+      try {
+        const res = await fetch('/api/projects', {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ name: name.trim(), id }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          console.error('[Based] Project cloud sync failed:', res.status, body.error);
+        }
+      } catch (e) {
+        console.error('[Based] Project cloud sync network error:', e);
+      }
+    }).catch(e => console.error('[Based] getHeaders error:', e));
   };
 
   const loadProject = (project: Project) => {
@@ -248,7 +300,11 @@ export default function Home() {
   const deleteProject = async (id: string) => {
     const headers = await getHeaders();
     fetch(`/api/projects/${id}`, { method: 'DELETE', headers }).catch(() => {});
-    setProjects(prev => prev.filter(p => p.id !== id));
+    setProjects(prev => {
+      const next = prev.filter(p => p.id !== id);
+      saveProjectsCache(next);
+      return next;
+    });
     if (currentProject?.id === id) {
       setCurrentProject(null); setFiles([]); setMessages([]); setActiveFile(null);
     }
@@ -382,18 +438,17 @@ export default function Home() {
               <div className="settings-section">
                 <label className="settings-label">Global Memory</label>
                 <div className="settings-hint" style={{ marginBottom: 8 }}>Auto-updated after each conversation. Based remembers this across all projects.</div>
-                <MemoryManager
-                  memory={globalMemory}
-                  onSave={async (mem) => {
-                    setGlobalMemory(mem);
-                    const headers = await getHeaders();
-                    fetch('/api/memory/save', {
-                      method: 'POST',
-                      headers,
-                      body: JSON.stringify({ memory: mem }),
-                    }).catch(() => {});
-                  }}
-                />
+                <div className="memory-compiled-preview">
+                  {parseMemories(globalMemory).length > 0
+                    ? parseMemories(globalMemory).map((line, i) => (
+                        <div key={i} className="memory-compiled-line">{i + 1}) {line}</div>
+                      ))
+                    : <div className="memory-compiled-line" style={{ color: 'var(--text3)' }}>No memories yet.</div>
+                  }
+                </div>
+                <button className="memory-manage-btn" onClick={() => setShowMemoryManager(true)}>
+                  ⬡ Manage Memories
+                </button>
               </div>
               {currentProject && (
                 <div className="settings-section">
@@ -447,8 +502,12 @@ export default function Home() {
             <div className="no-project">
               <div className="chat-empty-logo" aria-hidden="true">B&gt;</div>
               <div className="no-project-title">BASED</div>
-              <div className="no-project-sub">Open a project or start a new one.</div>
+              <div className="no-project-sub">You describe it. Based builds it.</div>
+              <div className="no-project-features">
+                HTML &nbsp;·&nbsp; Canvas games &nbsp;·&nbsp; Web apps &nbsp;·&nbsp; Tools &nbsp;·&nbsp; Dashboards
+              </div>
               <button className="new-project-btn-large" onClick={newProject}>+ New Project</button>
+              <div className="no-project-hint">No login needed to start · Remembers you across sessions</div>
             </div>
           ) : (
             <>
@@ -499,6 +558,36 @@ export default function Home() {
         )}
         {authReady && !user && !showSplash && (
           <AuthModal key="auth-modal" />
+        )}
+      </AnimatePresence>
+
+      {showMemoryManager && (
+        <MemoryManager
+          memory={globalMemory}
+          onSave={async (mem) => {
+            setGlobalMemory(mem);
+            const headers = await getHeaders();
+            fetch('/api/memory/save', {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ memory: mem }),
+            }).catch(() => {});
+          }}
+          onClose={() => setShowMemoryManager(false)}
+        />
+      )}
+
+      <AnimatePresence>
+        {createError && (
+          <motion.div
+            className="create-error-toast"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            transition={{ duration: 0.2 }}
+          >
+            {createError}
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

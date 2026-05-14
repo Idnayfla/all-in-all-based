@@ -116,14 +116,6 @@ export default function PersonalityPanel({ onPersonalityChange }: PersonalityPan
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div className="personality-locked">
-        <span style={{ fontSize: 14, color: 'var(--accent)' }}>&#9670;</span>
-        <div>
-          <div className="personality-locked-label">Core identity &#8212; [FIXED]</div>
-          <div className="personality-locked-sub">Based knows who it is. You shape the style.</div>
-        </div>
-      </div>
-
       <div className="settings-label">Tone</div>
       <Slider value={settings.tone} onChange={v => update({ tone: v })} leftLabel="Casual" rightLabel="Formal" />
 

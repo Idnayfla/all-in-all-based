@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
       max_tokens: 500,
       messages: [{
         role: 'user',
-        content: `You are a memory extractor. Based on this conversation, extract key facts about the user (preferences, skills, projects, goals, personal details) and merge with existing memory.
+        content: `You are a memory extractor. Based on this conversation, extract key facts about the person (preferences, skills, projects, goals, personal details) and merge with existing memory.
 
 EXISTING MEMORY:
 ${existing || 'None yet'}
@@ -59,15 +59,15 @@ NEW CONVERSATION:
 ${conversation}
 
 Return ONLY a plain numbered list. Max 20 items. Format exactly like:
-1) Fact about the user
-2) Another fact
-3) Another fact
+1) Prefers dark mode interfaces
+2) Works primarily in TypeScript
+3) Building a SaaS product
 
 STRICT RULES:
-- No headers
-- No bold text, no asterisks, no markdown whatsoever
+- Never start a fact with "User" — write the fact directly as a statement or preference
+- No headers, no bold text, no asterisks, no markdown whatsoever
 - No categories or labels
-- Just plain sentences
+- Just plain sentences in first-person-implied style
 - If nothing new to add, return existing memory unchanged.`,
       }],
     });

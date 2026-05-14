@@ -17,119 +17,137 @@ function stringifyMemories(items: string[]): string {
 interface Props {
   memory: string;
   onSave: (memory: string) => void;
+  onClose: () => void;
 }
 
-export default function MemoryManager({ memory, onSave }: Props) {
+export default function MemoryManager({ memory, onSave, onClose }: Props) {
   const items = parseMemories(memory);
-  const [editIndex, setEditIndex] = useState<number | null>(null); // null = adding new
-  const [modalOpen, setModalOpen] = useState(false);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [draft, setDraft] = useState('');
 
-  const openAdd = () => {
-    setDraft('');
-    setEditIndex(null);
-    setModalOpen(true);
-  };
-
-  const openEdit = (i: number) => {
-    setDraft(items[i]);
-    setEditIndex(i);
-    setModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setModalOpen(false);
-    setDraft('');
-  };
+  const openAdd = () => { setDraft(''); setEditIndex(null); setEditOpen(true); };
+  const openEdit = (i: number) => { setDraft(items[i]); setEditIndex(i); setEditOpen(true); };
+  const closeEdit = () => { setEditOpen(false); setDraft(''); };
 
   const handleSave = () => {
     const text = draft.trim();
     if (!text) return;
-    let next: string[];
-    if (editIndex === null) {
-      next = [...items, text];
-    } else {
-      next = items.map((item, i) => (i === editIndex ? text : item));
-    }
+    const next = editIndex === null
+      ? [...items, text]
+      : items.map((item, i) => (i === editIndex ? text : item));
     onSave(stringifyMemories(next));
-    closeModal();
+    closeEdit();
   };
 
   const handleDelete = (i: number) => {
-    const next = items.filter((_, idx) => idx !== i);
-    onSave(stringifyMemories(next));
+    onSave(stringifyMemories(items.filter((_, idx) => idx !== i)));
   };
 
-  return (
-    <div className="memory-manager">
-      {items.length === 0 && (
-        <div className="memory-empty">No memories yet — Based will learn about you as you chat.</div>
-      )}
+  return createPortal(
+    <>
+      {/* Backdrop — closes window */}
+      <motion.div
+        className="memwin-backdrop"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.18 }}
+        onClick={onClose}
+      />
 
-      <div className="memory-list">
-        {items.map((item, i) => (
-          <motion.div
-            key={i}
-            className="memory-chip"
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.15, delay: i * 0.03 }}
-            layout
-          >
-            <span className="memory-chip-text">{item}</span>
-            <div className="memory-chip-actions">
-              <button className="memory-chip-btn" onClick={() => openEdit(i)} title="Edit">✎</button>
-              <button className="memory-chip-btn memory-chip-delete" onClick={() => handleDelete(i)} title="Delete">×</button>
+      {/* Centered window — x/y must carry the -50% centering because
+          Framer Motion's inline transform replaces any CSS transform */}
+      <motion.div
+        className="memwin"
+        initial={{ opacity: 0, scale: 0.94, x: '-50%', y: 'calc(-50% - 14px)' }}
+        animate={{ opacity: 1, scale: 1, x: '-50%', y: '-50%' }}
+        transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+      >
+        <div className="memwin-header">
+          <span className="memwin-title">⬡ Global Memory</span>
+          <button className="memwin-close" onClick={onClose} aria-label="Close">×</button>
+        </div>
+
+        <div className="memwin-body">
+          {items.length === 0 ? (
+            <div className="memwin-empty">No memories yet — Based will learn about you as you chat.</div>
+          ) : (
+            <div className="memwin-list">
+              {items.map((item, i) => (
+                <motion.div
+                  key={i}
+                  className="memory-chip"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{ duration: 0.14, delay: i * 0.025 }}
+                  layout
+                >
+                  <span className="memory-chip-num">{i + 1}</span>
+                  <span className="memory-chip-text">{item}</span>
+                  <div className="memory-chip-actions">
+                    <button className="memory-chip-btn" onClick={() => openEdit(i)} title="Edit">✎</button>
+                    <button className="memory-chip-btn memory-chip-delete" onClick={() => handleDelete(i)} title="Delete">×</button>
+                  </div>
+                </motion.div>
+              ))}
             </div>
-          </motion.div>
-        ))}
-      </div>
+          )}
+        </div>
 
-      <button className="memory-add-btn" onClick={openAdd}>+ Add memory</button>
+        <div className="memwin-footer">
+          <span className="memwin-count">{items.length} {items.length === 1 ? 'memory' : 'memories'}</span>
+          <button className="memwin-add-btn" onClick={openAdd}>+ Add memory</button>
+        </div>
+      </motion.div>
 
-      {modalOpen && createPortal(
-        <AnimatePresence>
-          <motion.div
-            className="memory-modal-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            onClick={closeModal}
-          />
-          <motion.div
-            className="memory-modal"
-            initial={{ opacity: 0, scale: 0.92, y: -8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.92, y: -8 }}
-            transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-          >
-            <div className="memory-modal-title">
-              {editIndex === null ? 'Add Memory' : 'Edit Memory'}
-            </div>
-            <textarea
-              className="memory-modal-input"
-              value={draft}
-              onChange={e => setDraft(e.target.value)}
-              placeholder="e.g. User prefers dark mode interfaces"
-              rows={3}
-              autoFocus
-              onKeyDown={e => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSave();
-                if (e.key === 'Escape') closeModal();
-              }}
+      {/* Edit / Add sub-modal — sibling of window so it escapes its stacking context */}
+      <AnimatePresence>
+        {editOpen && (
+          <>
+            <motion.div
+              className="memory-modal-overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              onClick={closeEdit}
             />
-            <div className="memory-modal-actions">
-              <button className="memory-modal-cancel" onClick={closeModal}>Cancel</button>
-              <button className="memory-modal-save" onClick={handleSave} disabled={!draft.trim()}>
-                {editIndex === null ? 'Add' : 'Save'}
-              </button>
-            </div>
-          </motion.div>
-        </AnimatePresence>,
-        document.body
-      )}
-    </div>
+            <motion.div
+              className="memory-modal"
+              initial={{ opacity: 0, scale: 0.92, x: '-50%', y: 'calc(-50% - 8px)' }}
+              animate={{ opacity: 1, scale: 1, x: '-50%', y: '-50%' }}
+              exit={{ opacity: 0, scale: 0.92, x: '-50%', y: 'calc(-50% - 8px)' }}
+              transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+            >
+              <div className="memory-modal-title">
+                {editIndex === null ? 'Add Memory' : 'Edit Memory'}
+              </div>
+              <textarea
+                className="memory-modal-input"
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                placeholder="e.g. prefers dark mode interfaces"
+                rows={3}
+                autoFocus
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSave();
+                  if (e.key === 'Escape') closeEdit();
+                }}
+              />
+              <div className="memory-modal-actions">
+                <button className="memory-modal-cancel" onClick={closeEdit}>Cancel</button>
+                <button className="memory-modal-save" onClick={handleSave} disabled={!draft.trim()}>
+                  {editIndex === null ? 'Add' : 'Save'}
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </>,
+    document.body
   );
 }
+
+export { parseMemories };
