@@ -3,6 +3,7 @@ import './globals.css';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ClientOnly from '@/components/ClientOnly';
 import ServiceWorkerInit from '@/components/ServiceWorkerInit';
+import LaunchSplash from '@/components/LaunchSplash';
 import Script from 'next/script';
 
 export const metadata: Metadata = {
@@ -26,7 +27,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
       </head>
-      <body suppressHydrationWarning><ServiceWorkerInit /><ClientOnly><ErrorBoundary>{children}</ErrorBoundary></ClientOnly></body>
+      <body suppressHydrationWarning><LaunchSplash /><ServiceWorkerInit /><ClientOnly><ErrorBoundary>{children}</ErrorBoundary></ClientOnly></body>
     </html>
   );
 }
