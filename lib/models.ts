@@ -1,18 +1,18 @@
 export function mapClaudeToGeminiModel(claudeModel: string): string {
   // Extract model family (opus, sonnet, haiku)
   const match = claudeModel.match(/(opus|sonnet|haiku)/i);
-  if (!match) return 'gemini-2.0-flash'; // Default fallback
+  if (!match) return 'gemini-2.5-flash'; // Default fallback
 
   const family = match[1].toLowerCase();
   switch (family) {
     case 'opus':
-      return 'gemini-2.0-flash'; // Gemini's most capable model
+      return 'gemini-2.5-flash'; // Gemini's most capable model
     case 'sonnet':
-      return 'gemini-1.5-flash';
+      return 'gemini-2.5-flash-lite';
     case 'haiku':
-      return 'gemini-1.5-flash'; // Use flash for speed on smaller tasks
+      return 'gemini-2.5-flash-lite'; // Use flash for speed on smaller tasks
     default:
-      return 'gemini-2.0-flash';
+      return 'gemini-2.5-flash';
   }
 }
 

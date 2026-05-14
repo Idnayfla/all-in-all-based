@@ -303,6 +303,31 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .audio-toggle-btn--on { background: rgba(124,106,247,0.12); border-color: var(--accent); }
 .audio-toggle-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+/* ── Provider Toggle ── */
+.provider-toggle-btn {
+  flex-shrink: 0;
+  height: 38px;
+  width: 38px;
+  padding: 0;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  border-radius: var(--r-lg);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.provider-toggle-btn:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); }
+.provider-toggle-btn.provider-gemini {
+  background: rgba(66, 133, 244, 0.14);
+  border-color: rgba(66, 133, 244, 0.55);
+  color: rgb(120, 165, 250);
+}
+.provider-toggle-btn.provider-gemini:hover { background: rgba(66, 133, 244, 0.22); border-color: rgb(120, 165, 250); }
+.provider-toggle-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
 /* ── Mode Dropdown ── */
 .mode-dropdown { position: relative; flex-shrink: 0; }
 

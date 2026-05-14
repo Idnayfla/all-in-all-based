@@ -339,68 +339,93 @@ function isCodeRequest(message: string): boolean {
   return codeKeywords.some(k => lower.includes(k));
 }
 
+type Provider = 'claude' | 'gemini';
+
 interface GenerationResult {
   text: string;
   usedFallback: boolean;
+  usedProvider: Provider;
+}
+
+async function callClaudeOnce(
+  prompt: any,
+  systemPrompt: any,
+  modelType: 'planner' | 'generator' | 'summary'
+): Promise<string> {
+  const response = await client.messages.create({
+    model:
+      modelType === 'planner'
+        ? 'claude-haiku-4-5-20251001'
+        : modelType === 'generator'
+          ? 'claude-opus-4-7-20250219'
+          : 'claude-haiku-4-5-20251001',
+    max_tokens: modelType === 'generator' ? 16000 : 8000,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: prompt }],
+  });
+  const content = response.content[0];
+  return content.type === 'text' ? content.text : '';
+}
+
+async function callGeminiOnce(
+  prompt: any,
+  systemPrompt: any,
+  modelType: 'planner' | 'generator' | 'summary'
+): Promise<string> {
+  const systemStr = typeof systemPrompt === 'string'
+    ? systemPrompt
+    : Array.isArray(systemPrompt)
+      ? systemPrompt.map((b: any) => b.text).join('\n')
+      : '';
+  const promptStr = typeof prompt === 'string'
+    ? prompt
+    : Array.isArray(prompt)
+      ? prompt.map((p: any) => (typeof p === 'string' ? p : p.type === 'text' ? p.text : '')).join('\n')
+      : '';
+  return await generateWithGemini(promptStr, systemStr, modelType);
 }
 
 async function callModelWithFallback(
   prompt: any,
   systemPrompt: any,
-  modelType: 'planner' | 'generator' | 'summary'
+  modelType: 'planner' | 'generator' | 'summary',
+  primaryProvider: Provider = 'claude'
 ): Promise<GenerationResult> {
+  const callProvider = (p: Provider) =>
+    p === 'gemini'
+      ? callGeminiOnce(prompt, systemPrompt, modelType)
+      : callClaudeOnce(prompt, systemPrompt, modelType);
+
+  const fallbackProvider: Provider = primaryProvider === 'claude' ? 'gemini' : 'claude';
+  const fallbackAvailable = fallbackProvider === 'gemini' ? canUseGemini() : true;
+
   try {
-    // Try Claude first
-    const response = await client.messages.create({
-      model:
-        modelType === 'planner'
-          ? 'claude-haiku-4-5-20251001'
-          : modelType === 'generator'
-            ? 'claude-opus-4-7-20250219'
-            : 'claude-haiku-4-5-20251001',
-      max_tokens: modelType === 'generator' ? 16000 : 8000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    const content = response.content[0];
-    const text = content.type === 'text' ? content.text : '';
-    return { text, usedFallback: false };
-  } catch (claudeError) {
-    // If Claude fails and Gemini is available, try Gemini
-    if (canUseGemini()) {
-      try {
-        // Convert system to string for Gemini
-        let systemStr = typeof systemPrompt === 'string'
-          ? systemPrompt
-          : (Array.isArray(systemPrompt) ? systemPrompt.map((b: any) => b.text).join('\n') : '');
-
-        // Convert prompt to string for Gemini
-        let promptStr = typeof prompt === 'string'
-          ? prompt
-          : (Array.isArray(prompt)
-              ? prompt.map((p: any) => typeof p === 'string' ? p : (p.type === 'text' ? p.text : '')).join('\n')
-              : '');
-
-        const geminiText = await generateWithGemini(
-          promptStr,
-          systemStr,
-          modelType
-        );
-        return { text: geminiText, usedFallback: true };
-      } catch (geminiError) {
-        throw new Error(
-          `Both Claude and Gemini failed. Claude: ${(claudeError as any).message}. Gemini: ${(geminiError as any).message}`
-        );
-      }
+    const text = await callProvider(primaryProvider);
+    return { text, usedFallback: false, usedProvider: primaryProvider };
+  } catch (primaryErr: any) {
+    if (!fallbackAvailable) throw primaryErr;
+    try {
+      const text = await callProvider(fallbackProvider);
+      return { text, usedFallback: true, usedProvider: fallbackProvider };
+    } catch (fallbackErr: any) {
+      throw new Error(
+        `Both ${primaryProvider} and ${fallbackProvider} failed. ${primaryProvider}: ${primaryErr.message}. ${fallbackProvider}: ${fallbackErr.message}`
+      );
     }
-    throw claudeError;
   }
+}
+
+function providerLabel(p: Provider): string {
+  return p === 'gemini' ? 'Gemini' : 'Claude';
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, existingFiles, personality, memory } = await req.json();
+    const { messages, existingFiles, personality, memory, provider } = await req.json();
+
+    const requestedProvider = String(provider || process.env.PRIMARY_PROVIDER || 'claude').toLowerCase();
+    const primaryProvider: Provider = requestedProvider === 'gemini' ? 'gemini' : 'claude';
+    const fallbackProvider: Provider = primaryProvider === 'claude' ? 'gemini' : 'claude';
 
     const fallbackNotifications: string[] = [];
 
@@ -457,19 +482,72 @@ export async function POST(req: NextRequest) {
         try {
           // Check if this is a code generation request
           if (!isCodeRequest(lastUserMessage)) {
-            const stream = await client.messages.stream({
-              model: 'claude-sonnet-4-6',
-              max_tokens: 4096,
-              system: systemBlocks,
-              messages: anthropicMessages,
-            });
+            const runClaudeChat = async (): Promise<string> => {
+              const stream = await client.messages.stream({
+                model: 'claude-sonnet-4-6',
+                max_tokens: 4096,
+                system: systemBlocks,
+                messages: anthropicMessages,
+              });
+              let text = '';
+              for await (const chunk of stream) {
+                if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+                  text += chunk.delta.text;
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+                }
+              }
+              return text;
+            };
+
+            const runGeminiChat = async (): Promise<string> => {
+              const sysStr = systemBlocks.map((b: any) => b.text).join('\n');
+              const promptStr = anthropicMessages
+                .map((m: any) => {
+                  const c = m.content;
+                  const t = typeof c === 'string'
+                    ? c
+                    : Array.isArray(c)
+                      ? c.map((b: any) => (b.type === 'text' ? b.text : '')).join('')
+                      : '';
+                  return `${m.role}: ${t}`;
+                })
+                .join('\n\n');
+              const text = await generateWithGemini(promptStr, sysStr, 'summary');
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: text })}\n\n`));
+              return text;
+            };
+
+            const runProvider = (p: Provider) =>
+              p === 'gemini' ? runGeminiChat() : runClaudeChat();
+
+            const chatFallbackAvailable =
+              fallbackProvider === 'gemini' ? canUseGemini() : true;
+
             let fullText = '';
-            for await (const chunk of stream) {
-              if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-                fullText += chunk.delta.text;
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+            try {
+              if (primaryProvider === 'gemini' && !canUseGemini()) {
+                fullText = await runClaudeChat();
+              } else {
+                fullText = await runProvider(primaryProvider);
+              }
+            } catch (primaryErr: any) {
+              if (!chatFallbackAvailable) throw primaryErr;
+              try {
+                fullText = await runProvider(fallbackProvider);
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      chunk: `\n\n[Based] Switched to ${providerLabel(fallbackProvider)} (${providerLabel(primaryProvider)} unavailable)\n`,
+                    })}\n\n`
+                  )
+                );
+              } catch (fbErr: any) {
+                throw new Error(
+                  `Both ${primaryProvider} and ${fallbackProvider} failed. ${primaryProvider}: ${primaryErr.message}. ${fallbackProvider}: ${fbErr.message}`
+                );
               }
             }
+
             const files = parseFiles(fullText);
             const projectType = parseType(fullText);
             const reply = stripTags(fullText);
@@ -485,11 +563,14 @@ export async function POST(req: NextRequest) {
           const plannerResult = await callModelWithFallback(
             plannerPromptContent,
             PLANNER_SYSTEM_BLOCKS,
-            'planner'
+            'planner',
+            primaryProvider
           );
 
           if (plannerResult.usedFallback) {
-            fallbackNotifications.push('[Based] Switched to Gemini (Claude unavailable)');
+            fallbackNotifications.push(
+              `[Based] Switched to ${providerLabel(plannerResult.usedProvider)} (${providerLabel(primaryProvider)} unavailable)`
+            );
           }
 
           let filePlan: { name: string; language: string; description: string }[] = [];
@@ -559,41 +640,65 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
             let usedGeneratorFallback = false;
             let fileResult: any = null;
 
-            try {
-              const fileStream = client.messages.stream({
-                model: 'claude-opus-4-7',
-                max_tokens: 16000,
-                system: FILE_GENERATOR_SYSTEM_BLOCKS,
-                messages: [{ role: 'user', content: imageBlocks.length > 0 ? [...imageBlocks, { type: 'text' as const, text: filePrompt }] : filePrompt }],
-              });
+            const filePromptContent = imageBlocks.length > 0
+              ? [...imageBlocks, { type: 'text' as const, text: filePrompt }]
+              : filePrompt;
 
-              for await (const chunk of fileStream) {
-                if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-                  fileText += chunk.delta.text;
-                  // Forward chunks to keep the connection alive (client ignores forge_file content visually)
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
-                }
+            if (primaryProvider === 'gemini') {
+              // Skip streaming; go straight to provider-aware fallback (Gemini first).
+              const generatorResult = await callModelWithFallback(
+                filePromptContent,
+                FILE_GENERATOR_SYSTEM_BLOCKS,
+                'generator',
+                'gemini'
+              );
+              fileText = generatorResult.text;
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: fileText })}\n\n`));
+              if (generatorResult.usedFallback) {
+                fallbackNotifications.push(
+                  `[Based] File "${fileSpec.name}" generated via ${providerLabel(generatorResult.usedProvider)} (Gemini unavailable)`
+                );
               }
-              fileResult = await fileStream.finalMessage();
-            } catch (claudeStreamError) {
-              // If Claude stream fails and Gemini is available, fall back
-              if (canUseGemini()) {
-                try {
-                  const generatorResult = await callModelWithFallback(
-                    imageBlocks.length > 0 ? [...imageBlocks, { type: 'text' as const, text: filePrompt }] : filePrompt,
-                    FILE_GENERATOR_SYSTEM_BLOCKS,
-                    'generator'
-                  );
-                  fileText = generatorResult.text;
-                  usedGeneratorFallback = true;
-                  fallbackNotifications.push(`[Based] File "${fileSpec.name}" generated via Gemini (Claude unavailable)`);
-                } catch (geminiError) {
-                  throw new Error(
-                    `File generation failed. Claude: ${(claudeStreamError as any).message}. Gemini: ${(geminiError as any).message}`
-                  );
+            } else {
+              try {
+                const fileStream = client.messages.stream({
+                  model: 'claude-opus-4-7',
+                  max_tokens: 16000,
+                  system: FILE_GENERATOR_SYSTEM_BLOCKS,
+                  messages: [{ role: 'user', content: filePromptContent }],
+                });
+
+                for await (const chunk of fileStream) {
+                  if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+                    fileText += chunk.delta.text;
+                    // Forward chunks to keep the connection alive (client ignores forge_file content visually)
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+                  }
                 }
-              } else {
-                throw claudeStreamError;
+                fileResult = await fileStream.finalMessage();
+              } catch (claudeStreamError) {
+                // Claude already failed; go straight to Gemini (don't retry Claude via callModelWithFallback).
+                if (canUseGemini()) {
+                  try {
+                    const geminiText = await callGeminiOnce(
+                      filePromptContent,
+                      FILE_GENERATOR_SYSTEM_BLOCKS,
+                      'generator'
+                    );
+                    fileText = geminiText;
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: fileText })}\n\n`));
+                    usedGeneratorFallback = true;
+                    fallbackNotifications.push(
+                      `[Based] File "${fileSpec.name}" generated via Gemini (Claude unavailable)`
+                    );
+                  } catch (geminiError) {
+                    throw new Error(
+                      `File generation failed. Claude: ${(claudeStreamError as any).message}. Gemini: ${(geminiError as any).message}`
+                    );
+                  }
+                } else {
+                  throw claudeStreamError;
+                }
               }
             }
 
@@ -654,11 +759,14 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
           const summaryResult = await callModelWithFallback(
             summaryPrompt[summaryPrompt.length - 1].content,
             systemBlocks,
-            'summary'
+            'summary',
+            primaryProvider
           );
 
           if (summaryResult.usedFallback) {
-            fallbackNotifications.push('[Based] Summary generated via Gemini (Claude unavailable)');
+            fallbackNotifications.push(
+              `[Based] Summary generated via ${providerLabel(summaryResult.usedProvider)} (${providerLabel(primaryProvider)} unavailable)`
+            );
           }
 
           const reply = summaryResult.text || `Built ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}`;

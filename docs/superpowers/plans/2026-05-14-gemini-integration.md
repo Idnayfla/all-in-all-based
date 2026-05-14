@@ -389,7 +389,7 @@ git commit -m "feat: add fallback logic to generate route with Gemini support"
 Add this line to `.env.local`:
 
 ```
-GEMINI_API_KEY=AIzaSyDvoIA_J1TuNuN-z6vLhuicAHddbr7iXO0
+GEMINI_API_KEY=<your-key-here>
 ```
 
 (Use your actual Gemini API key from Google AI Studio if different)

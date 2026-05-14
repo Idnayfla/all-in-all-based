@@ -14,12 +14,16 @@ If starting a new terminal session, activate it with:
 . $PROFILE
 ```
 
-Provider options:
-- `use-subscription` — Claude.ai Pro/Max (default, no fallback)
-- `use-anthropic` — Anthropic API (pay as you go, no fallback)
-- `use-gemini` — Gemini (primary with Claude fallback for reliability)
+Claude Code provider options (this terminal, not the webapp):
+- **LiteLLM is currently active in this session (ANTHROPIC_BASE_URL is set to http://localhost:4000).**
+- `use-subscription` — Claude.ai Pro/Max (default)
+- `use-anthropic` — Anthropic API (pay as you go)
+- `use-litellm` — route Claude Code through a local LiteLLM proxy that translates Anthropic API calls to Gemini. Useful when Pro/Max is rate-limited. Caveats: no prompt caching, no extended thinking, tool use may be rough. Start the proxy first (auto-started by `use-litellm`) with `start-litellm`; stop with `stop-litellm`.
+- `set-gemini-key` — exports `$GEMINI_API_KEY` into the shell for external tools (Claude Code itself is Anthropic-only)
 
-**Gemini Setup:** Gemini requires a free API key from [Google AI Studio](https://aistudio.google.com). Get your key and add it to your PowerShell profile as `$GEMINI_API_KEY`.
+**Based webapp provider switching** is independent of Claude Code. The webapp reads `GEMINI_API_KEY` from `.env.local` and auto-falls-back to Gemini when the Anthropic API errors. Users can also force Gemini-primary via the C/G toggle in the chat input, or by setting `PRIMARY_PROVIDER=gemini` in `.env.local`.
+
+**Gemini Setup:** get a free API key from [Google AI Studio](https://aistudio.google.com) and put it in (a) `.env.local` for the webapp and (b) `$GEMINI_API_KEY` in your PowerShell profile for external CLI tools.
 
 ## Key Files
 
@@ -66,8 +70,8 @@ When Gemini fallback is used, Claude models map to Gemini equivalents:
 
 | Claude | Gemini |
 |--------|--------|
-| claude-opus-4-7 (generator) | gemini-2.0-flash |
-| claude-sonnet-4-6 | gemini-1.5-flash |
-| claude-haiku-4-5 (planner/summary) | gemini-1.5-flash |
+| claude-opus-4-7 (generator) | gemini-2.5-flash |
+| claude-sonnet-4-6 | gemini-2.5-flash-lite |
+| claude-haiku-4-5 (planner/summary) | gemini-2.5-flash-lite |
 
 Fallback is transparent — user sees a message in chat when Gemini is used.

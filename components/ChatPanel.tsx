@@ -114,6 +114,14 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   const [generationMode, setGenerationMode] = useState<GenerationMode>('chat');
   const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
   const [generateAudio, setGenerateAudio] = useState(false);
+  const [provider, setProvider] = useState<'claude' | 'gemini'>(() => {
+    if (typeof window === 'undefined') return 'claude';
+    return localStorage.getItem('based-provider') === 'gemini' ? 'gemini' : 'claude';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') localStorage.setItem('based-provider', provider);
+  }, [provider]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -273,7 +281,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages, existingFiles: files, personality, memory }),
+        body: JSON.stringify({ messages: newMessages, existingFiles: files, personality, memory, provider }),
       });
 
       if (!res.ok) throw new Error('API error');
@@ -549,6 +557,19 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             onChange={setGenerationMode}
             disabled={isGenerating || isGeneratingMedia}
           />
+          <button
+            type="button"
+            className={`provider-toggle-btn provider-${provider}`}
+            onClick={() => setProvider(p => (p === 'claude' ? 'gemini' : 'claude'))}
+            disabled={isGenerating || isGeneratingMedia}
+            title={
+              provider === 'claude'
+                ? 'Provider: Claude (Gemini fallback). Click to switch.'
+                : 'Provider: Gemini (Claude fallback). Click to switch.'
+            }
+          >
+            {provider === 'claude' ? 'C' : 'G'}
+          </button>
           <AnimatePresence>
             {generationMode === 'seedance' && (
               <motion.button
