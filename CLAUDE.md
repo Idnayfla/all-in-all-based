@@ -7,13 +7,13 @@ Personal AI dev studio. Users chat with "Based" (Claude-powered) and get generat
 
 ## Environment Setup
 
-Claude Code is configured to use **Gemini 2.0 Flash (free tier)** instead of Anthropic API tokens.
+Claude Code defaults to your **Claude.ai Pro/Max subscription** (no API credits consumed).
 
 If starting a new terminal session, activate it with:
 ```powershell
 . $PROFILE
 ```
-To switch back to Anthropic: run `use-anthropic` and set your API key in the profile.
+To switch to Gemini free tier as a fallback: run `use-gemini`. To return to subscription: run `use-subscription`.
 
 ## Key Files
 
