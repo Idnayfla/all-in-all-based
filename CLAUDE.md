@@ -13,10 +13,13 @@ If starting a new terminal session, activate it with:
 ```powershell
 . $PROFILE
 ```
+
 Provider options:
-- `use-subscription` — Claude.ai Pro/Max (default)
-- `use-gemini` — Gemini 2.0 Flash (free tier)
-- `use-anthropic` — Anthropic API (pay as you go)
+- `use-subscription` — Claude.ai Pro/Max (default, no fallback)
+- `use-anthropic` — Anthropic API (pay as you go, no fallback)
+- `use-gemini` — Gemini (primary with Claude fallback for reliability)
+
+**Gemini Setup:** Gemini requires a free API key from [Google AI Studio](https://aistudio.google.com). Get your key and add it to your PowerShell profile as `$GEMINI_API_KEY`.
 
 ## Key Files
 
@@ -56,3 +59,15 @@ Non-code chat uses `sonnet`. `sanitizeHTML()` post-processes all HTML before sen
 | Complex multi-file changes | opus |
 | Hard bug you've been stuck on | opus |
 | Changes to `generate/route.ts` logic | opus |
+
+## Model Equivalents (Gemini Fallback)
+
+When Gemini fallback is used, Claude models map to Gemini equivalents:
+
+| Claude | Gemini |
+|--------|--------|
+| claude-opus-4-7 (generator) | gemini-2.0-flash |
+| claude-sonnet-4-6 | gemini-1.5-flash |
+| claude-haiku-4-5 (planner/summary) | gemini-1.5-flash |
+
+Fallback is transparent — user sees a message in chat when Gemini is used.
