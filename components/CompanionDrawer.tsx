@@ -37,6 +37,7 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
   const screenCaptureSupported = isScreenCaptureSupported();
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const mobileImageRef = useRef<HTMLInputElement>(null);
   const sessionId = useRef(String(Date.now()).slice(-4));
 
   useEffect(() => {
@@ -48,6 +49,18 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
   }, []);
 
   const flashError = (msg: string) => { setCaptureError(msg); setTimeout(() => setCaptureError(null), 2500); };
+
+  const handleMobileImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const dataUrl = ev.target?.result as string;
+      setPendingCapture({ label: 'Screenshot attached', source: dataUrl, isScreenshot: true, thumb: dataUrl });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   const handleCapturePreview = () => {
     const cap = capturePreview(files);
@@ -187,12 +200,29 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
             disabled={isGenerating}
             title="Send project source code to Based"
           >📄 Code</button>
-          <button
-            className={`companion-capture-btn${pendingCapture?.isScreenshot ? ' active' : ''}`}
-            onClick={handleCaptureScreen}
-            disabled={isGenerating || !screenCaptureSupported}
-            title={!screenCaptureSupported ? 'Screen sharing is not available on mobile' : undefined}
-          >🖥 Screen</button>
+          {isMobile ? (
+            <>
+              <input
+                ref={mobileImageRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleMobileImagePick}
+              />
+              <button
+                className={`companion-capture-btn${pendingCapture?.isScreenshot ? ' active' : ''}`}
+                onClick={() => mobileImageRef.current?.click()}
+                disabled={isGenerating}
+                title="Attach a screenshot from your photos"
+              >📷 Photo</button>
+            </>
+          ) : (
+            <button
+              className={`companion-capture-btn${pendingCapture?.isScreenshot ? ' active' : ''}`}
+              onClick={handleCaptureScreen}
+              disabled={isGenerating || !screenCaptureSupported}
+            >🖥 Screen</button>
+          )}
           {captureError && <span className="companion-capture-error">{captureError}</span>}
         </div>
 
