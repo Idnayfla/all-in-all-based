@@ -9,6 +9,7 @@ import ModeDropdown, { GenerationMode } from './ModeDropdown';
 import GeneratedVideoCard from './GeneratedVideoCard';
 import GeneratingCard from './GeneratingCard';
 import { supabase } from '@/lib/supabase';
+import { useVoiceActivation } from '@/hooks/useVoiceActivation';
 
 const SUGGESTION_POOL = [
   'Build a todo app with drag & drop',
@@ -132,6 +133,11 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   } | null>(null);
   const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
   const [suggestions] = useState(getRandomSuggestions);
+
+  const { state: voiceState, transcript: voiceTranscript, toggle: toggleVoice } =
+    useVoiceActivation((command) => {
+      if (!isGenerating) send(command);
+    });
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
@@ -570,6 +576,20 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           >
             {provider === 'claude' ? 'C' : 'G'}
           </button>
+          <button
+            type="button"
+            className={`voice-btn voice-btn--${voiceState}`}
+            onClick={toggleVoice}
+            title={
+              voiceState === 'idle' ? 'Enable voice — say "Based, ..." to send' :
+              voiceState === 'listening' ? 'Listening for "Based, ..." — click to stop' :
+              voiceState === 'activated' ? `Got it: "${voiceTranscript}"` :
+              'Voice not supported in this browser'
+            }
+            disabled={voiceState === 'unsupported' || isGenerating || isGeneratingMedia}
+          >
+            {voiceState === 'activated' ? '◉' : '⬡'}
+          </button>
           <AnimatePresence>
             {generationMode === 'seedance' && (
               <motion.button
@@ -595,6 +615,8 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             onChange={e => { setInput(e.target.value); autoResize(); }}
             onKeyDown={handleKey}
             placeholder={
+              voiceState === 'listening' ? 'Listening… say "Based, build me a game"' :
+              voiceState === 'activated' ? `"${voiceTranscript}"` :
               generationMode === 'seedance' ? 'Describe a video to generate...' :
               generationMode !== 'chat' ? 'Describe an image to generate...' :
               'Ask Based anything...'
