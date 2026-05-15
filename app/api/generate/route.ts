@@ -151,6 +151,12 @@ Examples that are CHAT: "what is async/await?", "explain this code", "what's the
 Examples that are CODE (output a file plan): "make a cat animation", "create a snake game", "fix the button bug", "add dark mode", "build a calculator"
 When in doubt — treat it as a code request, not chat.
 
+EXISTING PROJECT RULE (overrides chat detection):
+If the prompt ends with "Existing files: ..." — the user already has a project open. In this context:
+- Short feedback like "nice", "looks good", "cool" → [{"chat":true}] (pure reaction, nothing to do)
+- Anything else — "make it faster", "the button is broken", "add sound", "improve it", "what should I change?", "can you add X?" → treat as a code modification request, output a file plan
+- Never tell the user to "drop a request" or act like nothing has been built
+
 FILE LIMITS: Every file must be completable in under 600 lines. Split only when a single file would exceed that.
 
 BUG FIXES AND CORRECTIONS:
@@ -605,9 +611,10 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`));
           }
 
-          // Step 3: Brief summary
-          const summaryPrompt = `Give a 1-2 sentence summary of what was built: ${generatedFiles.map(f => f.name).join(', ')} for "${lastUserMessage}"`;
-          const reply = await callModel(summaryPrompt, systemBlocks, 'summary')
+          // Step 3: Brief summary — use a minimal system to avoid code-gen rules confusing haiku
+          const summarySystem = 'You are Based. Reply with 1-2 plain sentences describing what was just built. No code, no forge tags, no lists.';
+          const summaryPrompt = `User asked: "${lastUserMessage}"\nFiles generated: ${generatedFiles.map(f => f.name).join(', ')}\n\nDescribe what was built in 1-2 sentences.`;
+          const reply = await callModel(summaryPrompt, summarySystem, 'summary')
             || `Built ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}`;
 
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, reply, files: generatedFiles, projectType })}\n\n`));
