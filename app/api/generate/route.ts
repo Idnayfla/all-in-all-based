@@ -87,11 +87,16 @@ BUG FIXING RULES:
 - Before fixing: state the root cause and which file(s) you are changing
 - After fixing: state exactly what changed and why
 
-MOBILE & TOUCH:
+MOBILE & RESPONSIVE — EVERY PROJECT MUST WORK ON PHONE, TABLET, AND DESKTOP:
+- Every HTML file must include in <head>: <meta name="viewport" content="width=device-width, initial-scale=1.0">
 - Every CSS file must include: * { touch-action: manipulation; box-sizing: border-box; }
-- Every button/link: -webkit-tap-highlight-color: transparent; cursor: pointer;
-- Canvas games: always add both mouse AND touch event listeners
-- Never use hover-only interactions
+- Every button/link: -webkit-tap-highlight-color: transparent; cursor: pointer; min-height: 44px; min-width: 44px;
+- Layout: use flexbox or CSS grid with flex-wrap, never fixed pixel widths for containers — use %, vw, min(), max(), clamp()
+- Font sizes: use clamp() or rem — e.g. font-size: clamp(14px, 2.5vw, 18px) — never hard-code px sizes that break on small screens
+- Images: always width: 100%; max-width: 100%; height: auto;
+- Buttons and controls: stack vertically on small screens using flex-wrap or a @media (max-width: 480px) block
+- Canvas games: always add both mouse AND touch event listeners; resize canvas on window resize
+- Never use hover-only interactions — every hover state must also work on touch/tap
 
 ARCHITECTURE PATTERNS:
 - Games: game state object, requestAnimationFrame loop, separate input/update/render phases

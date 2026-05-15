@@ -33,15 +33,11 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
     label: string; source: string; isScreenshot: boolean; thumb?: string;
   } | null>(null);
   const [captureError, setCaptureError] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 600);
   const screenCaptureSupported = isScreenCaptureSupported();
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sessionId = useRef(String(Date.now()).slice(-4));
-
-  useEffect(() => {
-    setIsMobile(window.innerWidth <= 600);
-  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -140,9 +136,9 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
   return (
     <motion.div
       className="companion-drawer"
-      initial={isMobile ? { y: '100%', opacity: 0 } : { x: 320, opacity: 0 }}
+      initial={isMobile ? { y: '-100%', opacity: 0 } : { x: 320, opacity: 0 }}
       animate={isMobile ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
-      exit={isMobile ? { y: '100%', opacity: 0 } : { x: 320, opacity: 0 }}
+      exit={isMobile ? { y: '-100%', opacity: 0 } : { x: 320, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 380, damping: 34 }}
     >
       <div className="companion-header">
