@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import ChatPanel from '@/components/ChatPanel';
 import EditorPanel from '@/components/EditorPanel';
@@ -70,6 +70,7 @@ export default function Home() {
   const [projectModal, setProjectModal] = useState(false);
   const [user, setUser]               = useState<any>(null);
   const [authReady, setAuthReady]     = useState(false);
+  const isExplicitSignOut             = useRef(false);
   const [showSplash, setShowSplash]   = useState(true);
   const [theme, setTheme]             = useState<AppTheme>(DEFAULT_THEME);
   const [showMemoryManager, setShowMemoryManager] = useState(false);
@@ -201,9 +202,15 @@ export default function Home() {
         await loadCloudData();
       }
       if (event === 'SIGNED_OUT') {
-        setProjects([]); setCurrentProject(null);
-        setFiles([]); setMessages([]); setActiveFile(null);
-        setGlobalMemory(''); setPersonality(DEFAULT_PERSONALITY);
+        if (isExplicitSignOut.current) {
+          // User clicked Sign Out — clear everything
+          isExplicitSignOut.current = false;
+          setProjects([]); setCurrentProject(null);
+          setFiles([]); setMessages([]); setActiveFile(null);
+          setGlobalMemory(''); setPersonality(DEFAULT_PERSONALITY);
+        }
+        // Token expiry SIGNED_OUT: don't wipe projects — auth modal appears
+        // and user can re-login to re-sync. Projects stay visible from cache.
       }
     });
 
@@ -337,6 +344,7 @@ export default function Home() {
   };
 
   const signOut = async () => {
+    isExplicitSignOut.current = true;
     await supabase.auth.signOut();
     setShowSettings(false);
   };

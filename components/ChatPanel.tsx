@@ -136,7 +136,12 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
 
   const { state: voiceState, transcript: voiceTranscript, toggle: toggleVoice } =
     useVoiceActivation((command) => {
-      if (!isGenerating) send(command);
+      // Show the recognized text in the textarea so the user can see it was heard,
+      // then auto-send after a brief pause
+      setInput(command);
+      setTimeout(() => {
+        if (!isGenerating) send(command);
+      }, 400);
     });
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
