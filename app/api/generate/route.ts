@@ -4,11 +4,9 @@ import { generateWithGemini, canUseGemini } from '@/lib/gemini';
 
 export const maxDuration = 300;
 
-const apiKey = process.env.ANTHROPIC_API_KEY || process.env.APP_ANTHROPIC_API_KEY;
-const baseURL = process.env.ANTHROPIC_BASE_URL || undefined;
-const clientOptions: any = { apiKey };
-if (baseURL) clientOptions.baseURL = baseURL;
-const client = new Anthropic(clientOptions);
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY || process.env.APP_ANTHROPIC_API_KEY,
+});
 
 const SYSTEM = `You are Based, the AI inside All in All Based — an elite coding assistant and personal dev studio. You build production-quality applications, games, and tools.
 
