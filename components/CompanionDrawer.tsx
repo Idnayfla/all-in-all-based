@@ -3,7 +3,6 @@ import { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { capturePreview, captureScreen } from '@/hooks/useScreenCapture';
 import { FileNode } from '@/app/page';
-import { supabase } from '@/lib/supabase';
 
 interface CMsg {
   role: 'user' | 'assistant';
@@ -75,13 +74,9 @@ export default function CompanionDrawer({ personality, memory, files, onClose, o
     onGeneratingChange(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch('/api/companion', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token ?? ''}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: history.map(m => ({ role: m.role, content: m.content })),
           personality,
