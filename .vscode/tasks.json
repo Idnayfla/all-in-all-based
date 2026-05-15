@@ -2,16 +2,17 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Install Dependencies",
+      "label": "Auto Setup (Node + deps + Claude CLI)",
       "type": "shell",
-      "command": "npm install",
+      "command": "powershell",
+      "args": ["-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\setup-claude.ps1"],
       "runOptions": {
         "runOn": "folderOpen"
       },
       "presentation": {
-        "reveal": "silent",
+        "reveal": "always",
         "panel": "shared",
-        "close": true
+        "focus": false
       },
       "problemMatcher": []
     }
