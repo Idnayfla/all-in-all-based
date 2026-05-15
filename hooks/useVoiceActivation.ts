@@ -12,6 +12,8 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
   onCommandRef.current = onCommand;
   const activeRef = useRef<any>(null);
   const lastCommandRef = useRef('');
+  // Once granted we skip getUserMedia on subsequent starts to avoid device contention
+  const permissionGranted = useRef(false);
 
   const updateState = (s: VoiceState) => { stateRef.current = s; setState(s); };
 
@@ -72,7 +74,7 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
     rec.onerror = (e: any) => {
       console.warn('[voice] error:', e.error);
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        setError('Mic denied — click the lock icon in your browser address bar and allow microphone');
+        setError('Mic denied — click the 🔒 lock icon in the address bar → allow Microphone');
         updateState('idle');
       } else if (e.error === 'network') {
         setError('Network error — Chrome voice requires internet access');
@@ -90,9 +92,10 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
       }
     };
 
+    console.log('[voice] calling rec.start()');
     try { rec.start(); } catch (err: any) {
       console.warn('[voice] start threw:', err.message);
-      setError(`Could not start: ${err.message}`);
+      setError(`Could not start mic: ${err.message}`);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [triggerWord]);
@@ -103,30 +106,36 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
       : null;
     if (!SR) {
       updateState('unsupported');
-      setError('Speech recognition not supported in this browser (use Chrome or Edge)');
-      return;
-    }
-
-    // Explicitly request mic permission before touching SpeechRecognition.
-    // rec.start() silently drops when permission is blocked — getUserMedia gives us a real error.
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      stream.getTracks().forEach(t => t.stop()); // release immediately — SR uses its own stream
-      console.log('[voice] mic permission granted ✓');
-    } catch (err: any) {
-      console.warn('[voice] getUserMedia failed:', err.name, err.message);
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        setError('Mic blocked — click the 🔒 lock icon in the address bar → allow Microphone');
-      } else if (err.name === 'NotFoundError') {
-        setError('No microphone found — plug in a mic and try again');
-      } else {
-        setError(`Mic error: ${err.message}`);
-      }
-      updateState('idle');
+      setError('Speech recognition not supported — use Chrome or Edge');
       return;
     }
 
     setError(null);
+
+    if (!permissionGranted.current) {
+      // First run: probe permission via getUserMedia then release immediately.
+      // We don't skip this even if Permissions API says granted — some browsers lie.
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(t => t.stop());
+        permissionGranted.current = true;
+        console.log('[voice] mic permission confirmed ✓ — waiting for device to release');
+        // Give the audio hardware 300ms to fully release before SR grabs it
+        await new Promise(r => setTimeout(r, 300));
+      } catch (err: any) {
+        console.warn('[voice] getUserMedia failed:', err.name, err.message);
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          setError('Mic blocked — click the 🔒 lock icon in the address bar → allow Microphone');
+        } else if (err.name === 'NotFoundError') {
+          setError('No microphone found — plug in a mic and try again');
+        } else {
+          setError(`Mic error: ${err.message}`);
+        }
+        updateState('idle');
+        return;
+      }
+    }
+
     updateState('listening');
     startRec();
   }, [startRec]);
