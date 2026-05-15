@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import { generateWithGemini, canUseGemini } from '@/lib/gemini';
 
 export const maxDuration = 300;
 
@@ -360,7 +359,7 @@ function toClaudeContent(
       : {
           type: 'image',
           source: {
-            type: 'base64',
+            type: 'base64' as const,
             media_type: block.mediaType as ImageMediaType,
             data: block.data,
           },
@@ -370,29 +369,7 @@ function toClaudeContent(
   return blocks;
 }
 
-function isCodeRequest(message: string): boolean {
-  const codeKeywords = [
-    'make', 'build', 'create', 'generate', 'code', 'write', 'develop',
-    'fix', 'update', 'add', 'implement', 'modify', 'change', 'edit',
-    'correct', 'repair', 'patch', 'solve', 'resolve', 'debug',
-    'broken', 'not work', "doesn't work", 'button', 'issue', 'problem', 'bug', 'error',
-    'design', 'logo', '3d', 'three.js', 'text effect', 'typography', 'lettering',
-    'manipulate', 'filter', 'render', 'draw', 'sketch', 'visual', 'animate', 'animation',
-    'image', 'photo', 'picture', 'scene', 'object', 'model', 'app', 'game', 'tool', 'website',
-  ];
-  const lower = message.toLowerCase();
-  return codeKeywords.some(k => lower.includes(k));
-}
-
-type Provider = 'claude' | 'gemini';
-
-interface GenerationResult {
-  text: string;
-  usedFallback: boolean;
-  usedProvider: Provider;
-}
-
-async function callClaudeOnce(
+async function callModel(
   prompt: any,
   systemPrompt: any,
   modelType: 'planner' | 'generator' | 'summary'
@@ -412,67 +389,9 @@ async function callClaudeOnce(
   return content.type === 'text' ? content.text : '';
 }
 
-async function callGeminiOnce(
-  prompt: any,
-  systemPrompt: any,
-  modelType: 'planner' | 'generator' | 'summary'
-): Promise<string> {
-  const systemStr = typeof systemPrompt === 'string'
-    ? systemPrompt
-    : Array.isArray(systemPrompt)
-      ? systemPrompt.map((b: any) => b.text).join('\n')
-      : '';
-  const promptStr = typeof prompt === 'string'
-    ? prompt
-    : Array.isArray(prompt)
-      ? prompt.map((p: any) => (typeof p === 'string' ? p : p.type === 'text' ? p.text : '')).join('\n')
-      : '';
-  return await generateWithGemini(promptStr, systemStr, modelType);
-}
-
-async function callModelWithFallback(
-  prompt: any,
-  systemPrompt: any,
-  modelType: 'planner' | 'generator' | 'summary',
-  primaryProvider: Provider = 'claude'
-): Promise<GenerationResult> {
-  const callProvider = (p: Provider) =>
-    p === 'gemini'
-      ? callGeminiOnce(prompt, systemPrompt, modelType)
-      : callClaudeOnce(prompt, systemPrompt, modelType);
-
-  const fallbackProvider: Provider = primaryProvider === 'claude' ? 'gemini' : 'claude';
-  const fallbackAvailable = fallbackProvider === 'gemini' ? canUseGemini() : true;
-
-  try {
-    const text = await callProvider(primaryProvider);
-    return { text, usedFallback: false, usedProvider: primaryProvider };
-  } catch (primaryErr: any) {
-    if (!fallbackAvailable) throw primaryErr;
-    try {
-      const text = await callProvider(fallbackProvider);
-      return { text, usedFallback: true, usedProvider: fallbackProvider };
-    } catch (fallbackErr: any) {
-      throw new Error(
-        `Both ${primaryProvider} and ${fallbackProvider} failed. ${primaryProvider}: ${primaryErr.message}. ${fallbackProvider}: ${fallbackErr.message}`
-      );
-    }
-  }
-}
-
-function providerLabel(p: Provider): string {
-  return p === 'gemini' ? 'Gemini' : 'Claude';
-}
-
 export async function POST(req: NextRequest) {
   try {
-    const { messages, existingFiles, personality, memory, provider } = await req.json();
-
-    const requestedProvider = String(provider || process.env.PRIMARY_PROVIDER || 'claude').toLowerCase();
-    const primaryProvider: Provider = requestedProvider === 'gemini' ? 'gemini' : 'claude';
-    const fallbackProvider: Provider = primaryProvider === 'claude' ? 'gemini' : 'claude';
-
-    const fallbackNotifications: string[] = [];
+    const { messages, existingFiles, personality, memory } = await req.json();
 
     let globalMemory = '';
     try {
@@ -526,29 +445,17 @@ export async function POST(req: NextRequest) {
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          // Always run the planner first — it classifies intent AND plans files
+          // Step 1: Planner classifies intent and plans files
           const plannerPromptContent = imageBlocks.length > 0
             ? [...imageBlocks, { type: 'text' as const, text: lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '') }]
             : lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '');
 
-          const plannerResult = await callModelWithFallback(
-            plannerPromptContent,
-            PLANNER_SYSTEM_BLOCKS,
-            'planner',
-            primaryProvider
-          );
-
-          if (plannerResult.usedFallback) {
-            fallbackNotifications.push(
-              `[Based] Switched to ${providerLabel(plannerResult.usedProvider)} (${providerLabel(primaryProvider)} unavailable)`
-            );
-          }
+          const planText = await callModel(plannerPromptContent, PLANNER_SYSTEM_BLOCKS, 'planner');
 
           let filePlan: { name: string; language: string; description: string }[] = [];
           let routeToChat = false;
 
           try {
-            const planText = plannerResult.text;
             const jsonMatch = planText.match(/\[[\s\S]*\]/);
             const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : planText.trim());
             if (Array.isArray(parsed) && parsed.length === 1 && (parsed[0] as any).chat === true) {
@@ -561,7 +468,7 @@ export async function POST(req: NextRequest) {
             }
           } catch (e) {
             if (!routeToChat) {
-              // Fallback to single request — SYSTEM only, no personality
+              // Planner parse failed — fall back to single streaming request
               const stream = await client.messages.stream({
                 model: 'claude-opus-4-7',
                 max_tokens: 16000,
@@ -584,59 +491,19 @@ export async function POST(req: NextRequest) {
           }
 
           if (routeToChat) {
-            const runClaudeChat = async (): Promise<string> => {
-              const stream = await client.messages.stream({
-                model: 'claude-sonnet-4-6',
-                max_tokens: 4096,
-                system: systemBlocks,
-                messages: anthropicMessages,
-              });
-              let text = '';
-              for await (const chunk of stream) {
-                if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-                  text += chunk.delta.text;
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
-                }
-              }
-              return text;
-            };
-
-            const runGeminiChat = async (): Promise<string> => {
-              const sysStr = systemBlocks.map((b: any) => b.text).join('\n');
-              const promptStr = anthropicMessages
-                .map((m: any) => {
-                  const c = m.content;
-                  const t = typeof c === 'string'
-                    ? c
-                    : Array.isArray(c)
-                      ? c.map((b: any) => (b.type === 'text' ? b.text : '')).join('')
-                      : '';
-                  return `${m.role}: ${t}`;
-                })
-                .join('\n\n');
-              const text = await generateWithGemini(promptStr, sysStr, 'summary');
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: text })}\n\n`));
-              return text;
-            };
-
-            const runProvider = (p: Provider) => p === 'gemini' ? runGeminiChat() : runClaudeChat();
-            const chatFallbackAvailable = fallbackProvider === 'gemini' ? canUseGemini() : true;
-
+            const stream = await client.messages.stream({
+              model: 'claude-sonnet-4-6',
+              max_tokens: 4096,
+              system: systemBlocks,
+              messages: anthropicMessages,
+            });
             let fullText = '';
-            try {
-              fullText = primaryProvider === 'gemini' && !canUseGemini()
-                ? await runClaudeChat()
-                : await runProvider(primaryProvider);
-            } catch (primaryErr: any) {
-              if (!chatFallbackAvailable) throw primaryErr;
-              try {
-                fullText = await runProvider(fallbackProvider);
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: `\n\n[Based] Switched to ${providerLabel(fallbackProvider)} (${providerLabel(primaryProvider)} unavailable)\n` })}\n\n`));
-              } catch (fbErr: any) {
-                throw new Error(`Both providers failed. ${primaryProvider}: ${primaryErr.message}. ${fallbackProvider}: ${(fbErr as any).message}`);
+            for await (const chunk of stream) {
+              if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+                fullText += chunk.delta.text;
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
               }
             }
-
             const files = parseFiles(fullText);
             const projectType = parseType(fullText);
             const reply = stripTags(fullText);
@@ -674,76 +541,27 @@ ${generatedContext}${existingContext}${imagePlaceholderNote}
 
 Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
 
-            // Announce which file is starting (updates label, does not advance bar)
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`));
-
-            let fileText = '';
-            let usedGeneratorFallback = false;
-            let fileResult: any = null;
 
             const filePromptContent = imageBlocks.length > 0
               ? [...imageBlocks, { type: 'text' as const, text: filePrompt }]
               : filePrompt;
 
-            if (primaryProvider === 'gemini') {
-              // Skip streaming; go straight to provider-aware fallback (Gemini first).
-              const generatorResult = await callModelWithFallback(
-                filePromptContent,
-                FILE_GENERATOR_SYSTEM_BLOCKS,
-                'generator',
-                'gemini'
-              );
-              fileText = generatorResult.text;
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: fileText })}\n\n`));
-              if (generatorResult.usedFallback) {
-                fallbackNotifications.push(
-                  `[Based] File "${fileSpec.name}" generated via ${providerLabel(generatorResult.usedProvider)} (Gemini unavailable)`
-                );
-              }
-            } else {
-              try {
-                const fileStream = client.messages.stream({
-                  model: 'claude-opus-4-7',
-                  max_tokens: 16000,
-                  system: FILE_GENERATOR_SYSTEM_BLOCKS,
-                  messages: [{ role: 'user', content: filePromptContent }],
-                });
+            let fileText = '';
+            const fileStream = client.messages.stream({
+              model: 'claude-opus-4-7',
+              max_tokens: 16000,
+              system: FILE_GENERATOR_SYSTEM_BLOCKS,
+              messages: [{ role: 'user', content: filePromptContent }],
+            });
 
-                for await (const chunk of fileStream) {
-                  if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-                    fileText += chunk.delta.text;
-                    // Forward chunks to keep the connection alive (client ignores forge_file content visually)
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
-                  }
-                }
-                fileResult = await fileStream.finalMessage();
-              } catch (claudeStreamError) {
-                // Claude already failed; go straight to Gemini (don't retry Claude via callModelWithFallback).
-                if (canUseGemini()) {
-                  try {
-                    const geminiText = await callGeminiOnce(
-                      filePromptContent,
-                      FILE_GENERATOR_SYSTEM_BLOCKS,
-                      'generator'
-                    );
-                    fileText = geminiText;
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: fileText })}\n\n`));
-                    usedGeneratorFallback = true;
-                    fallbackNotifications.push(
-                      `[Based] File "${fileSpec.name}" generated via Gemini (Claude unavailable)`
-                    );
-                  } catch (geminiError) {
-                    throw new Error(
-                      `File generation failed. Claude: ${(claudeStreamError as any).message}. Gemini: ${(geminiError as any).message}`
-                    );
-                  }
-                } else {
-                  throw claudeStreamError;
-                }
+            for await (const chunk of fileStream) {
+              if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+                fileText += chunk.delta.text;
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
               }
             }
-
-            fileResult = fileResult || { stop_reason: '' };
+            const fileResult = await fileStream.finalMessage();
 
             // If the model was cut off before closing the forge_file tag, continue from where it stopped
             if (fileResult.stop_reason === 'max_tokens' && !fileText.includes('</forge_file>')) {
@@ -771,12 +589,10 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
               content: fileText.replace(/^<forge_file[^>]*>\n?/, '').trim() || fileText.trim(),
             }];
 
-            // Build the image data URL once for placeholder replacement
             const imageDataUrl = imageBlocks.length > 0
               ? `data:${imageBlocks[0].source.media_type};base64,${imageBlocks[0].source.data}`
               : null;
 
-            // Post-process HTML files to guarantee button wiring and script loading order
             for (const f of filesToAdd) {
               let content = imageDataUrl
                 ? f.content.replaceAll(IMAGE_SRC_PLACEHOLDER, imageDataUrl)
@@ -786,36 +602,13 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
               );
             }
 
-            // File complete — advance the progress bar
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`));
           }
 
           // Step 3: Brief summary
-          const summaryPrompt = [
-            { role: 'user', content: lastUserMessage },
-            { role: 'assistant', content: `Generated ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}` },
-            { role: 'user', content: 'Give a 1-2 sentence summary of what was built.' }
-          ] as any[];
-
-          const summaryResult = await callModelWithFallback(
-            summaryPrompt[summaryPrompt.length - 1].content,
-            systemBlocks,
-            'summary',
-            primaryProvider
-          );
-
-          if (summaryResult.usedFallback) {
-            fallbackNotifications.push(
-              `[Based] Summary generated via ${providerLabel(summaryResult.usedProvider)} (${providerLabel(primaryProvider)} unavailable)`
-            );
-          }
-
-          const reply = summaryResult.text || `Built ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}`;
-
-          // Stream fallback notifications first
-          for (const notification of fallbackNotifications) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: notification + '\n' })}\n\n`));
-          }
+          const summaryPrompt = `Give a 1-2 sentence summary of what was built: ${generatedFiles.map(f => f.name).join(', ')} for "${lastUserMessage}"`;
+          const reply = await callModel(summaryPrompt, systemBlocks, 'summary')
+            || `Built ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}`;
 
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, reply, files: generatedFiles, projectType })}\n\n`));
 

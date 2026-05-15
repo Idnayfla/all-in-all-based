@@ -17,11 +17,6 @@ If starting a new terminal session, activate it with:
 Claude Code provider options (this terminal, not the webapp):
 - `use-subscription` — Claude.ai Pro/Max (default)
 - `use-anthropic` — Anthropic API (pay as you go)
-- `set-gemini-key` — exports `$GEMINI_API_KEY` into the shell for external tools (Claude Code itself is Anthropic-only)
-
-**Based webapp provider switching** is independent of Claude Code. The webapp reads `GEMINI_API_KEY` from `.env.local` and auto-falls-back to Gemini when the Anthropic API errors. Users can also force Gemini-primary via the C/G toggle in the chat input, or by setting `PRIMARY_PROVIDER=gemini` in `.env.local`.
-
-**Gemini Setup:** get a free API key from [Google AI Studio](https://aistudio.google.com) and put it in (a) `.env.local` for the webapp and (b) `$GEMINI_API_KEY` in your PowerShell profile for external CLI tools.
 
 ## Key Files
 
@@ -62,14 +57,3 @@ Non-code chat uses `sonnet`. `sanitizeHTML()` post-processes all HTML before sen
 | Hard bug you've been stuck on | opus |
 | Changes to `generate/route.ts` logic | opus |
 
-## Model Equivalents (Gemini Fallback)
-
-When Gemini fallback is used, Claude models map to Gemini equivalents:
-
-| Claude | Gemini |
-|--------|--------|
-| claude-opus-4-7 (generator) | gemini-2.5-flash |
-| claude-sonnet-4-6 | gemini-2.5-flash-lite |
-| claude-haiku-4-5 (planner/summary) | gemini-2.5-flash-lite |
-
-Fallback is transparent — user sees a message in chat when Gemini is used.

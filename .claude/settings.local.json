@@ -40,7 +40,6 @@
       "PowerShell($PROFILE)",
       "Bash(git restore *)",
       "PowerShell(. $PROFILE)",
-      "PowerShell(use-gemini *)",
       "PowerShell(use-subscription *)",
       "Bash(Get-ChildItem -Name)",
       "PowerShell(Get-Process *)",
@@ -62,7 +61,14 @@
       "Bash(git check-ignore *)",
       "Bash(npm uninstall *)",
       "Bash(npm test *)",
-      "Bash(Select-String \"dev|vite-tsconfig\")"
+      "Bash(Select-String \"dev|vite-tsconfig\")",
+      "Skill(update-config)",
+      "Bash(Test-Path C:UsersObsidianai-dev-toollib *)",
+      "Bash(Get-Content \"C:\\\\Users\\\\Obsidian\\\\ai-dev-tool\\\\app\\\\globals.css\")",
+      "Bash(Measure-Object -Line)",
+      "Bash(Select-Object -Last 60)",
+      "PowerShell($lines = \\(Get-Content \"C:\\\\Users\\\\Obsidian\\\\ai-dev-tool\\\\app\\\\globals.css\" | Measure-Object -Line\\).Lines; Write-Output \"Total lines: $lines\")",
+      "PowerShell(Get-Content \"C:\\\\Users\\\\Obsidian\\\\ai-dev-tool\\\\app\\\\layout.tsx\" | ForEach-Object { $_ } | Select-Object -First 10 | ForEach-Object { [System.Text.Encoding]::UTF8.GetBytes\\($_\\) | ForEach-Object { $_.ToString\\(\"X2\"\\) } | Join-String -Separator \" \" })"
     ]
   }
 }
