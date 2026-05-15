@@ -16,7 +16,7 @@
     "cap:sync": "npx cap sync",
     "cap:open:android": "npx cap open android",
     "cap:open:ios": "npx cap open ios",
-    "electron:dev": "NODE_ENV=development electron electron/main.js",
+    "electron:start": "electron electron/main.js",
     "electron:build": "electron-builder build --config electron-builder.config.js"
   },
   "main": "electron/main.js",

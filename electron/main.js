@@ -1,10 +1,7 @@
 const { app, BrowserWindow, shell, Menu } = require('electron');
 const path = require('path');
 
-const PROD_URL = 'https://getbased.dev';
-const DEV_URL = 'http://localhost:3000';
-
-const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+const APP_URL = 'https://getbased.dev';
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -31,10 +28,8 @@ function createWindow() {
     return { action: 'deny' };
   });
 
-  win.loadURL(isDev ? DEV_URL : PROD_URL);
-
-  // Remove default menu in production
-  if (!isDev) Menu.setApplicationMenu(null);
+  win.loadURL(APP_URL);
+  Menu.setApplicationMenu(null);
 }
 
 app.whenReady().then(() => {
