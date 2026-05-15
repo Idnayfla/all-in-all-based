@@ -2510,6 +2510,9 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
   font-family: var(--font-sans);
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .suggestion-chip:hover {
   border-color: var(--accent);
