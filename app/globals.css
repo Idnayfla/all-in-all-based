@@ -2304,8 +2304,20 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   margin-left: 2px;
   font-family: 'JetBrains Mono', monospace;
 }
-.companion-close {
+.companion-clear {
   margin-left: auto;
+  background: none;
+  border: none;
+  color: #4a4a6a;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.companion-clear:hover { color: #e8e8f0; }
+.companion-clear:disabled { opacity: 0.3; cursor: default; }
+.companion-close {
   background: none;
   border: none;
   color: #4a4a6a;

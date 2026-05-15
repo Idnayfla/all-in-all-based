@@ -143,6 +143,7 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
         <span className="companion-logo">⬡</span>
         <span className="companion-title">BASED</span>
         <span className="companion-session">#{sessionId.current}</span>
+        <button className="companion-clear" onClick={() => setMessages([])} disabled={isGenerating} title="Clear history">↺</button>
         <button className="companion-close" onClick={onClose} title="Close">✕</button>
       </div>
 
