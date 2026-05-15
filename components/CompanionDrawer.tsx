@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { capturePreview, captureScreen } from '@/hooks/useScreenCapture';
+import { capturePreview, captureScreen, isScreenCaptureSupported } from '@/hooks/useScreenCapture';
 import { FileNode } from '@/app/page';
 
 export interface CMsg {
@@ -33,9 +33,15 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
     label: string; source: string; isScreenshot: boolean; thumb?: string;
   } | null>(null);
   const [captureError, setCaptureError] = useState<string | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const screenCaptureSupported = isScreenCaptureSupported();
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sessionId = useRef(String(Date.now()).slice(-4));
+
+  useEffect(() => {
+    setIsMobile(window.innerWidth <= 600);
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -134,9 +140,9 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
   return (
     <motion.div
       className="companion-drawer"
-      initial={{ x: 320, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: 320, opacity: 0 }}
+      initial={isMobile ? { y: '100%', opacity: 0 } : { x: 320, opacity: 0 }}
+      animate={isMobile ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
+      exit={isMobile ? { y: '100%', opacity: 0 } : { x: 320, opacity: 0 }}
       transition={{ type: 'spring', stiffness: 380, damping: 34 }}
     >
       <div className="companion-header">
@@ -188,7 +194,8 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
           <button
             className={`companion-capture-btn${pendingCapture?.isScreenshot ? ' active' : ''}`}
             onClick={handleCaptureScreen}
-            disabled={isGenerating}
+            disabled={isGenerating || !screenCaptureSupported}
+            title={!screenCaptureSupported ? 'Screen sharing is not available on mobile' : undefined}
           >🖥 Screen</button>
           {captureError && <span className="companion-capture-error">{captureError}</span>}
         </div>

@@ -397,16 +397,18 @@ async function callModel(
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, existingFiles, personality, memory } = await req.json();
+    const { messages, existingFiles, personality, memory, globalMemory: clientGlobalMemory } = await req.json();
 
-    let globalMemory = '';
-    try {
-      const { createClient } = await import('redis');
-      const redis = createClient({ url: process.env.REDIS_URL });
-      await redis.connect();
-      globalMemory = await redis.get('based_memory') ?? '';
-      await redis.disconnect();
-    } catch (e) {}
+    let globalMemory = clientGlobalMemory || '';
+    if (!globalMemory) {
+      try {
+        const { createClient } = await import('redis');
+        const redis = createClient({ url: process.env.REDIS_URL });
+        await redis.connect();
+        globalMemory = await redis.get('based_memory') ?? '';
+        await redis.disconnect();
+      } catch (e) {}
+    }
 
     const recentMessages = messages.slice(-10);
     const lastUserMsg = recentMessages.filter((m: any) => m.role === 'user').pop();
@@ -617,7 +619,18 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
           const reply = await callModel(summaryPrompt, summarySystem, 'summary')
             || `Built ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}`;
 
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, reply, files: generatedFiles, projectType })}\n\n`));
+          let suggestions: string[] = [];
+          try {
+            const suggestText = await callModel(
+              `The user just built: "${lastUserMessage}"\nFiles: ${generatedFiles.map(f => f.name).join(', ')}\n\nOutput exactly 3 short follow-up action suggestions as a JSON array. Max 5 words each. Be specific to what was built.\nExamples: ["Add dark mode", "Make it mobile-friendly", "Add sound effects"]\nJSON only, no explanation.`,
+              'Output only a valid JSON array of exactly 3 short strings. No markdown.',
+              'planner'
+            );
+            const match = suggestText.match(/\[[\s\S]*?\]/);
+            if (match) suggestions = (JSON.parse(match[0]) as unknown[]).filter((s): s is string => typeof s === 'string').slice(0, 3);
+          } catch {}
+
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, reply, files: generatedFiles, projectType, suggestions })}\n\n`));
 
         } catch (e: any) {
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: e.message })}\n\n`));

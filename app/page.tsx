@@ -92,6 +92,12 @@ export default function Home() {
     } catch { return []; }
   };
 
+  // Load cached projects immediately on mount so they show before auth resolves
+  useEffect(() => {
+    const cached = loadProjectsCache();
+    if (cached.length > 0) setProjects(cached);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Apply theme on mount from localStorage ──────────────────────────────
   useEffect(() => {
     const saved = loadTheme();
@@ -515,6 +521,7 @@ export default function Home() {
                 setIsGenerating={setIsGenerating}
                 personality={personality}
                 memory=""
+                globalMemory={globalMemory}
                 incognito={true}
               />
             </div>
@@ -552,6 +559,7 @@ export default function Home() {
                   setIsGenerating={setIsGenerating}
                   personality={personality}
                   memory={currentProject?.memory ?? ''}
+                  globalMemory={globalMemory}
                   incognito={incognito}
                 />
               </div>

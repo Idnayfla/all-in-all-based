@@ -2238,6 +2238,9 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   0%, 100% { transform: scale(1); opacity: 0.5; }
   50% { transform: scale(1.1); opacity: 0.85; }
 }
+@media (max-width: 600px) {
+  .companion-trigger { bottom: 90px; right: 16px; width: 42px; height: 42px; }
+}
 @keyframes companion-pulse-ring {
   0%, 100% { transform: scale(1); opacity: 0.4; }
   50% { transform: scale(1.18); opacity: 1; }
@@ -2257,6 +2260,19 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   flex-direction: column;
   z-index: 300;
   overflow: hidden;
+}
+@media (max-width: 600px) {
+  .companion-drawer {
+    width: 100%;
+    height: 72vh;
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    border-left: none;
+    border-top: 1px solid rgba(124,58,237,0.3);
+    border-radius: 20px 20px 0 0;
+  }
 }
 .companion-header {
   display: flex;
@@ -2339,6 +2355,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   color: #c0c0d8;
   align-self: flex-start;
   border-bottom-left-radius: 3px;
+  white-space: pre-wrap;
 }
 .companion-cursor {
   display: inline-block;
@@ -2479,3 +2496,22 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 .companion-send:hover:not(:disabled) { background: rgba(124,58,237,0.4); }
 .companion-send:disabled { opacity: 0.4; cursor: default; }
+
+/* ── Suggestion chips ─────────────────────────────────────────────── */
+.suggestion-chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0 8px; }
+.suggestion-chip {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  font-family: var(--font-sans);
+}
+.suggestion-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(124,106,247,0.08);
+}

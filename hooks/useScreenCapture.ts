@@ -1,5 +1,10 @@
 import { FileNode } from '@/app/page';
 
+export function isScreenCaptureSupported(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return typeof navigator.mediaDevices?.getDisplayMedia === 'function';
+}
+
 export interface PreviewCapture {
   source: string;
   label: string;

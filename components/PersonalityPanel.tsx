@@ -29,23 +29,23 @@ function save(s: PersonalitySettings) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch {}
 }
 
-function label(value: number, low: string, high: string): string {
-  if (value <= 20) return low;
-  if (value <= 40) return `${low}-leaning`;
-  if (value <= 60) return 'balanced';
-  if (value <= 80) return `${high}-leaning`;
+function blend(value: number, low: string, high: string): string {
+  if (value <= 15) return low;
+  if (value <= 35) return `mostly ${low}`;
+  if (value <= 65) return `a balance of ${low} and ${high}`;
+  if (value <= 85) return `mostly ${high}`;
   return high;
 }
 
 export function buildPersonalityModifier(s: PersonalitySettings): string {
-  const parts = [
-    `tone=${label(s.tone, 'casual', 'formal')}`,
-    `length=${label(s.length, 'concise', 'detailed')}`,
-    `humour=${label(s.humour, 'dry', 'playful')}`,
-    `technicality=${label(s.technicality, 'simplified', 'expert')}`,
+  const instructions = [
+    `Tone: ${blend(s.tone, 'casual and informal — use contractions, be relaxed', 'professional and formal — be precise, avoid contractions')}`,
+    `Response length: ${blend(s.length, 'ultra-concise — 1-3 sentences max, no elaboration', 'thorough and detailed — explain fully, cover edge cases')}`,
+    `Humour: ${blend(s.humour, 'completely dry and deadpan — zero jokes, zero warmth', 'actively playful and witty — use jokes, puns, and light-hearted language freely')}`,
+    `Technicality: ${blend(s.technicality, 'explain everything simply — no jargon, assume beginner', 'go full expert mode — use precise technical terms, skip basics')}`,
   ];
   const notes = s.notes.trim();
-  return `Personality modifiers: ${parts.join(', ')}.${notes ? ` ${notes}` : ''}`;
+  return instructions.join('\n') + (notes ? `\nExtra: ${notes}` : '');
 }
 
 interface SliderProps {

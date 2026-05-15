@@ -99,7 +99,7 @@ function ProgressBar({ progress }: { progress: GenerationProgress }) {
   );
 }
 
-export default function ChatPanel({ messages, setMessages, files, onFilesUpdate, isGenerating, setIsGenerating, personality, memory, incognito }: {
+export default function ChatPanel({ messages, setMessages, files, onFilesUpdate, isGenerating, setIsGenerating, personality, memory, globalMemory, incognito }: {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   files: FileNode[];
@@ -108,6 +108,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   setIsGenerating: (v: boolean) => void;
   personality: string;
   memory: string;
+  globalMemory?: string;
   incognito: boolean;
 }) {
   const [input, setInput] = useState('');
@@ -115,6 +116,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   const [generationMode, setGenerationMode] = useState<GenerationMode>('chat');
   const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
   const [generateAudio, setGenerateAudio] = useState(false);
+  const [lastSuggestions, setLastSuggestions] = useState<string[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -272,6 +274,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     setInput('');
     setPendingImage(null);
     setGenProgress(null);
+    setLastSuggestions([]);
 
     const userMsg: Message = { role: 'user', content: messageContent };
     const newMessages = [...messages, userMsg];
@@ -284,7 +287,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: newMessages, existingFiles: files, personality, memory }),
+        body: JSON.stringify({ messages: newMessages, existingFiles: files, personality, memory, globalMemory }),
       });
 
       if (!res.ok) throw new Error('API error');
@@ -378,6 +381,8 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               if (resolvedFiles.length) {
                 onFilesUpdate(resolvedFiles, data.projectType);
               }
+              if (data.suggestions?.length) setLastSuggestions(data.suggestions);
+              else setLastSuggestions([]);
             }
           } catch (e) {
             window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'parse-error', data: String(e) } }));
@@ -523,6 +528,19 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               </motion.div>
             ))}
           </AnimatePresence>
+        )}
+        {lastSuggestions.length > 0 && !isGenerating && (
+          <div className="suggestion-chips">
+            {lastSuggestions.map((s, i) => (
+              <button
+                key={i}
+                className="suggestion-chip"
+                onClick={() => { setLastSuggestions([]); send(s); }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
         )}
         <div ref={bottomRef} />
       </div>
