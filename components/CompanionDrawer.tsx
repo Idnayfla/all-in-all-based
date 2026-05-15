@@ -4,25 +4,28 @@ import { motion } from 'framer-motion';
 import { capturePreview, captureScreen } from '@/hooks/useScreenCapture';
 import { FileNode } from '@/app/page';
 
-interface CMsg {
+export interface CMsg {
   role: 'user' | 'assistant';
   content: string;
   captureLabel?: string;
   isScreenshot?: boolean;
-  captureThumb?: string; // data URL for screenshot thumbnail
+  captureThumb?: string;
 }
 
 interface Props {
-  personality: string;
   memory: string;
   files: FileNode[];
   projectName?: string;
+  messages: CMsg[];
+  onMessagesChange: (msgs: CMsg[]) => void;
   onClose: () => void;
   onGeneratingChange: (v: boolean) => void;
 }
 
-export default function CompanionDrawer({ personality, memory, files, projectName, onClose, onGeneratingChange }: Props) {
-  const [messages, setMessages] = useState<CMsg[]>([]);
+export default function CompanionDrawer({ memory, files, projectName, messages, onMessagesChange, onClose, onGeneratingChange }: Props) {
+  const setMessages = (updater: CMsg[] | ((prev: CMsg[]) => CMsg[])) => {
+    onMessagesChange(typeof updater === 'function' ? updater(messages) : updater);
+  };
   const [input, setInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [pendingCapture, setPendingCapture] = useState<{
@@ -80,7 +83,6 @@ export default function CompanionDrawer({ personality, memory, files, projectNam
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: history.map(m => ({ role: m.role, content: m.content })),
-          personality,
           memory,
           projectName,
           fileNames: files.map(f => f.name),

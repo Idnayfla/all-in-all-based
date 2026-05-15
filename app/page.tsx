@@ -16,7 +16,7 @@ import MemoryManager, { parseMemories } from '@/components/MemoryManager';
 import ThemeCustomizer, { AppTheme, DEFAULT_THEME, applyTheme, loadTheme, saveThemeLocally } from '@/components/ThemeCustomizer';
 import { supabase } from '@/lib/supabase';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
-import CompanionDrawer from '@/components/CompanionDrawer';
+import CompanionDrawer, { CMsg } from '@/components/CompanionDrawer';
 
 export interface FileNode {
   name: string;
@@ -78,6 +78,7 @@ export default function Home() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [showCompanion, setShowCompanion] = useState(false);
   const [isCompanionGenerating, setIsCompanionGenerating] = useState(false);
+  const [companionMessages, setCompanionMessages] = useState<CMsg[]>([]);
 
   // ── Project cache helpers (localStorage) ────────────────────────────────
   const PROJECTS_CACHE_KEY = 'based_projects_cache';
@@ -622,10 +623,11 @@ export default function Home() {
       <AnimatePresence>
         {showCompanion && (
           <CompanionDrawer
-            personality={personality}
             memory={globalMemory}
             files={files}
             projectName={currentProject?.name}
+            messages={companionMessages}
+            onMessagesChange={setCompanionMessages}
             onClose={() => setShowCompanion(false)}
             onGeneratingChange={setIsCompanionGenerating}
           />

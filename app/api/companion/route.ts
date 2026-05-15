@@ -9,29 +9,23 @@ const client = new Anthropic({
 
 export async function POST(req: NextRequest) {
 
-  const { messages, personality, memory, screenshot, previewSource, projectName, fileNames } = await req.json();
+  const { messages, memory, screenshot, previewSource, projectName, fileNames } = await req.json();
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: 'messages required' }, { status: 400 });
   }
-  if (typeof personality !== 'string' || !personality.trim()) {
-    return NextResponse.json({ error: 'personality required' }, { status: 400 });
-  }
 
-  const companionRole = [
-    'You are the ambient AI companion sidebar in All in All Based — a personal AI dev studio.',
+  const system = [
+    'You are Based, the ambient AI companion sidebar in All in All Based — a personal AI dev studio.',
     'Your role is to help the user think through, review, and improve their current project.',
-    'You are NOT the main code generator (that is the main chat panel). Do not offer to build projects from scratch or generate full apps.',
-    'Help with questions, feedback, analysis, debugging ideas, and creative suggestions about the existing project.',
+    'You are NOT the main code generator. Do not offer to build apps from scratch or generate full projects.',
+    'Be concise, direct, and helpful. Help with questions, analysis, debugging ideas, and feedback on existing work.',
     projectName ? `Current project: "${projectName}"` : 'No project is currently loaded.',
     Array.isArray(fileNames) && fileNames.length > 0
       ? `Project files: ${fileNames.join(', ')}`
       : 'No files in project yet.',
-  ].join('\n');
-
-  const systemParts = [companionRole, personality];
-  if (memory) systemParts.push(`User memory:\n${memory}`);
-  const system = systemParts.join('\n\n');
+    memory ? `\nUser memory:\n${memory}` : '',
+  ].filter(Boolean).join('\n');
 
   const apiMessages = (messages as Array<{ role: string; content: string }>).map((m, i) => {
     if (i !== messages.length - 1 || m.role !== 'user') return m;
