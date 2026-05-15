@@ -96,8 +96,9 @@ export default function CompanionDrawer({ personality, memory, files, onClose, o
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buf = '';
+      let streamDone = false;
 
-      while (true) {
+      while (!streamDone) {
         const { done, value } = await reader.read();
         if (done) break;
         buf += decoder.decode(value, { stream: true });
@@ -106,7 +107,7 @@ export default function CompanionDrawer({ personality, memory, files, onClose, o
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
           const raw = line.slice(6);
-          if (raw === '[DONE]') break;
+          if (raw === '[DONE]') { streamDone = true; break; }
           try {
             const { text: chunk } = JSON.parse(raw);
             if (chunk) setMessages(prev => {

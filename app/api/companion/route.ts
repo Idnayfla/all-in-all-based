@@ -4,7 +4,11 @@ import { getUserId } from '@/app/api/_auth';
 
 export const maxDuration = 60;
 
-const client = new Anthropic({ apiKey: process.env.APP_ANTHROPIC_API_KEY });
+const apiKey = process.env.ANTHROPIC_API_KEY || process.env.APP_ANTHROPIC_API_KEY;
+const baseURL = process.env.ANTHROPIC_BASE_URL || undefined;
+const clientOptions: ConstructorParameters<typeof Anthropic>[0] = { apiKey };
+if (baseURL) clientOptions.baseURL = baseURL;
+const client = new Anthropic(clientOptions);
 
 export async function POST(req: NextRequest) {
   try {
