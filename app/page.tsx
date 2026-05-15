@@ -16,6 +16,7 @@ import MemoryManager, { parseMemories } from '@/components/MemoryManager';
 import ThemeCustomizer, { AppTheme, DEFAULT_THEME, applyTheme, loadTheme, saveThemeLocally } from '@/components/ThemeCustomizer';
 import { supabase } from '@/lib/supabase';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
+import CompanionDrawer from '@/components/CompanionDrawer';
 
 export interface FileNode {
   name: string;
@@ -75,6 +76,8 @@ export default function Home() {
   const [theme, setTheme]             = useState<AppTheme>(DEFAULT_THEME);
   const [showMemoryManager, setShowMemoryManager] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [showCompanion, setShowCompanion] = useState(false);
+  const [isCompanionGenerating, setIsCompanionGenerating] = useState(false);
 
   // ── Project cache helpers (localStorage) ────────────────────────────────
   const PROJECTS_CACHE_KEY = 'based_projects_cache';
@@ -602,6 +605,27 @@ export default function Home() {
           >
             {createError}
           </motion.div>
+        )}
+      </AnimatePresence>
+      <button
+        className={`companion-trigger${showCompanion ? ' companion-trigger--open' : ''}${isCompanionGenerating ? ' companion-trigger--responding' : ''}`}
+        onClick={() => setShowCompanion(s => !s)}
+        aria-label="Open AI Companion"
+      >
+        <span className="companion-trigger-label">B</span>
+        <span className="companion-trigger-ring companion-trigger-ring--1" />
+        <span className="companion-trigger-ring companion-trigger-ring--2" />
+      </button>
+
+      <AnimatePresence>
+        {showCompanion && (
+          <CompanionDrawer
+            personality={personality}
+            memory={globalMemory}
+            files={files}
+            onClose={() => setShowCompanion(false)}
+            onGeneratingChange={setIsCompanionGenerating}
+          />
         )}
       </AnimatePresence>
     </div>
