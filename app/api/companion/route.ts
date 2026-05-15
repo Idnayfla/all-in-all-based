@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     'Your role is to help the user think through, review, and improve their current project.',
     'You are NOT the main code generator. Do not offer to build apps from scratch or generate full projects.',
     'If asked to create something, remind the user to use the main chat panel for code generation.',
-    'Keep responses concise — 1 to 3 sentences unless the user explicitly asks for more detail.',
+    'Format responses clearly — use bullet points or short paragraphs. Avoid walls of plain text.',
     projectName ? `Current project: "${projectName}"` : 'No project is currently loaded.',
     Array.isArray(fileNames) && fileNames.length > 0
       ? `Project files: ${fileNames.join(', ')}`
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
       try {
         const stream = await client.messages.stream({
           model: 'claude-sonnet-4-6',
-          max_tokens: 400,
+          max_tokens: 1024,
           system,
           messages: apiMessages as Parameters<typeof client.messages.stream>[0]['messages'],
         });

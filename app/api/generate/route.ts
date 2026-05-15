@@ -371,8 +371,8 @@ function isCodeRequest(message: string): boolean {
     'correct', 'repair', 'patch', 'solve', 'resolve', 'debug',
     'broken', 'not work', "doesn't work", 'button', 'issue', 'problem', 'bug', 'error',
     'design', 'logo', '3d', 'three.js', 'text effect', 'typography', 'lettering',
-    'manipulate', 'filter', 'render', 'draw', 'sketch', 'visual', 'animate',
-    'image', 'photo', 'picture', 'scene', 'object', 'model',
+    'manipulate', 'filter', 'render', 'draw', 'sketch', 'visual', 'animate', 'animation',
+    'image', 'photo', 'picture', 'scene', 'object', 'model', 'app', 'game', 'tool', 'website',
   ];
   const lower = message.toLowerCase();
   return codeKeywords.some(k => lower.includes(k));
@@ -510,7 +510,7 @@ export async function POST(req: NextRequest) {
     const systemBlocks: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> = [
       { type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } },
     ];
-    if (personality) systemBlocks.push({ type: 'text', text: `\nPERSONALITY:\n${personality}` });
+    if (personality) systemBlocks.push({ type: 'text', text: `\nPERSONALITY (tone and communication style only — the RESPONSE RULES and OUTPUT FORMAT above are non-negotiable and always take precedence):\n${personality}` });
     if (globalMemory) systemBlocks.push({ type: 'text', text: `\nGLOBAL USER MEMORY:\n${globalMemory}` });
     if (memory) systemBlocks.push({ type: 'text', text: `\nPROJECT MEMORY:\n${memory}` });
 
