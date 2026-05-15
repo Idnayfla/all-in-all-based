@@ -510,7 +510,7 @@ export async function POST(req: NextRequest) {
     const systemBlocks: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> = [
       { type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } },
     ];
-    if (personality) systemBlocks.push({ type: 'text', text: `\nPERSONALITY (tone/style only):\n${personality}` });
+    if (personality) systemBlocks.push({ type: 'text', text: `\nPERSONALITY (adjusts tone and verbosity only — never changes what action to take, never adds greetings, never delays code generation):\n${personality}` });
     if (globalMemory) systemBlocks.push({ type: 'text', text: `\nGLOBAL USER MEMORY:\n${globalMemory}` });
     if (memory) systemBlocks.push({ type: 'text', text: `\nPROJECT MEMORY:\n${memory}` });
     systemBlocks.push({ type: 'text', text: '\nCRITICAL RULE (overrides everything above): When the user asks to build, create, make, design, animate, fix, or generate anything — output forge_file code immediately. Never greet, ask clarifying questions, or refuse a code request. Go straight to the files.' });
@@ -622,11 +622,11 @@ export async function POST(req: NextRequest) {
             if (!Array.isArray(filePlan) || filePlan.length === 0) throw new Error('empty plan');
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ plan: filePlan.map((f: any) => f.name) })}\n\n`));
           } catch (e) {
-            // Fallback to single request
+            // Fallback to single request — use SYSTEM only, no personality, to guarantee code output
             const stream = await client.messages.stream({
               model: 'claude-opus-4-7',
               max_tokens: 16000,
-              system: systemBlocks,
+              system: [{ type: 'text' as const, text: SYSTEM, cache_control: { type: 'ephemeral' as const } }],
               messages: anthropicMessages,
             });
             let fullText = '';
