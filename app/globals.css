@@ -2250,8 +2250,9 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   inset: -16px;
   animation: companion-breathe 3s ease-in-out infinite 0.5s;
 }
-.companion-trigger--open .companion-trigger-ring { display: none; }
+.companion-trigger--open:not(.companion-trigger--responding) .companion-trigger-ring { display: none; }
 .companion-trigger--responding .companion-trigger-ring--1 {
+  display: block;
   animation: companion-pulse-ring 1s ease-in-out infinite;
   border-color: rgba(124,58,237,0.9);
 }

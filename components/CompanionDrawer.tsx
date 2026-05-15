@@ -30,11 +30,16 @@ export default function CompanionDrawer({ personality, memory, files, onClose, o
   } | null>(null);
   const [captureError, setCaptureError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sessionId = useRef(String(Date.now()).slice(-4));
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
 
   const flashError = (msg: string) => { setCaptureError(msg); setTimeout(() => setCaptureError(null), 2500); };
 
@@ -175,7 +180,8 @@ export default function CompanionDrawer({ personality, memory, files, onClose, o
             className={`companion-capture-btn${pendingCapture && !pendingCapture.isScreenshot ? ' active' : ''}`}
             onClick={handleCapturePreview}
             disabled={isGenerating}
-          >📷 Preview</button>
+            title="Send project source code to Based"
+          >📄 Code</button>
           <button
             className={`companion-capture-btn${pendingCapture?.isScreenshot ? ' active' : ''}`}
             onClick={handleCaptureScreen}
@@ -193,6 +199,7 @@ export default function CompanionDrawer({ personality, memory, files, onClose, o
 
         <div className="companion-input-row">
           <textarea
+            ref={textareaRef}
             className="companion-textarea"
             value={input}
             onChange={e => setInput(e.target.value)}
