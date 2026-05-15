@@ -146,6 +146,12 @@ CUSTOM LOGO:
 
 const PLANNER_SYSTEM = `You are a software architect. Output ONLY a JSON array. No explanation. No markdown. Raw JSON only.
 
+CHAT DETECTION — check this first:
+If the user's message is a pure question, explanation request, or general conversation with NO request to build, create, fix, design, animate, or generate anything — output exactly: [{"chat":true}]
+Examples that are CHAT: "what is async/await?", "explain this code", "what's the difference between X and Y?", "how does Z work?"
+Examples that are CODE (output a file plan): "make a cat animation", "create a snake game", "fix the button bug", "add dark mode", "build a calculator"
+When in doubt — treat it as a code request, not chat.
+
 FILE LIMITS: Every file must be completable in under 600 lines. Split only when a single file would exceed that.
 
 BUG FIXES AND CORRECTIONS:
@@ -520,8 +526,64 @@ export async function POST(req: NextRequest) {
     const readable = new ReadableStream({
       async start(controller) {
         try {
-          // Check if this is a code generation request
-          if (!isCodeRequest(lastUserMessage)) {
+          // Always run the planner first — it classifies intent AND plans files
+          const plannerPromptContent = imageBlocks.length > 0
+            ? [...imageBlocks, { type: 'text' as const, text: lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '') }]
+            : lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '');
+
+          const plannerResult = await callModelWithFallback(
+            plannerPromptContent,
+            PLANNER_SYSTEM_BLOCKS,
+            'planner',
+            primaryProvider
+          );
+
+          if (plannerResult.usedFallback) {
+            fallbackNotifications.push(
+              `[Based] Switched to ${providerLabel(plannerResult.usedProvider)} (${providerLabel(primaryProvider)} unavailable)`
+            );
+          }
+
+          let filePlan: { name: string; language: string; description: string }[] = [];
+          let routeToChat = false;
+
+          try {
+            const planText = plannerResult.text;
+            const jsonMatch = planText.match(/\[[\s\S]*\]/);
+            const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : planText.trim());
+            if (Array.isArray(parsed) && parsed.length === 1 && (parsed[0] as any).chat === true) {
+              routeToChat = true;
+            } else if (Array.isArray(parsed) && parsed.length > 0) {
+              filePlan = parsed;
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ plan: filePlan.map((f: any) => f.name) })}\n\n`));
+            } else {
+              throw new Error('empty plan');
+            }
+          } catch (e) {
+            if (!routeToChat) {
+              // Fallback to single request — SYSTEM only, no personality
+              const stream = await client.messages.stream({
+                model: 'claude-opus-4-7',
+                max_tokens: 16000,
+                system: [{ type: 'text' as const, text: SYSTEM, cache_control: { type: 'ephemeral' as const } }],
+                messages: anthropicMessages,
+              });
+              let fullText = '';
+              for await (const chunk of stream) {
+                if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+                  fullText += chunk.delta.text;
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+                }
+              }
+              const files = parseFiles(fullText);
+              const projectType = parseType(fullText);
+              const reply = stripTags(fullText);
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, reply, files, projectType })}\n\n`));
+              return;
+            }
+          }
+
+          if (routeToChat) {
             const runClaudeChat = async (): Promise<string> => {
               const stream = await client.messages.stream({
                 model: 'claude-sonnet-4-6',
@@ -557,85 +619,24 @@ export async function POST(req: NextRequest) {
               return text;
             };
 
-            const runProvider = (p: Provider) =>
-              p === 'gemini' ? runGeminiChat() : runClaudeChat();
-
-            const chatFallbackAvailable =
-              fallbackProvider === 'gemini' ? canUseGemini() : true;
+            const runProvider = (p: Provider) => p === 'gemini' ? runGeminiChat() : runClaudeChat();
+            const chatFallbackAvailable = fallbackProvider === 'gemini' ? canUseGemini() : true;
 
             let fullText = '';
             try {
-              if (primaryProvider === 'gemini' && !canUseGemini()) {
-                fullText = await runClaudeChat();
-              } else {
-                fullText = await runProvider(primaryProvider);
-              }
+              fullText = primaryProvider === 'gemini' && !canUseGemini()
+                ? await runClaudeChat()
+                : await runProvider(primaryProvider);
             } catch (primaryErr: any) {
               if (!chatFallbackAvailable) throw primaryErr;
               try {
                 fullText = await runProvider(fallbackProvider);
-                controller.enqueue(
-                  encoder.encode(
-                    `data: ${JSON.stringify({
-                      chunk: `\n\n[Based] Switched to ${providerLabel(fallbackProvider)} (${providerLabel(primaryProvider)} unavailable)\n`,
-                    })}\n\n`
-                  )
-                );
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: `\n\n[Based] Switched to ${providerLabel(fallbackProvider)} (${providerLabel(primaryProvider)} unavailable)\n` })}\n\n`));
               } catch (fbErr: any) {
-                throw new Error(
-                  `Both ${primaryProvider} and ${fallbackProvider} failed. ${primaryProvider}: ${primaryErr.message}. ${fallbackProvider}: ${fbErr.message}`
-                );
+                throw new Error(`Both providers failed. ${primaryProvider}: ${primaryErr.message}. ${fallbackProvider}: ${(fbErr as any).message}`);
               }
             }
 
-            const files = parseFiles(fullText);
-            const projectType = parseType(fullText);
-            const reply = stripTags(fullText);
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, reply, files, projectType })}\n\n`));
-            return;
-          }
-
-          // Step 1: Plan files silently
-          const plannerPromptContent = imageBlocks.length > 0
-            ? [...imageBlocks, { type: 'text' as const, text: lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '') }]
-            : lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '');
-
-          const plannerResult = await callModelWithFallback(
-            plannerPromptContent,
-            PLANNER_SYSTEM_BLOCKS,
-            'planner',
-            primaryProvider
-          );
-
-          if (plannerResult.usedFallback) {
-            fallbackNotifications.push(
-              `[Based] Switched to ${providerLabel(plannerResult.usedProvider)} (${providerLabel(primaryProvider)} unavailable)`
-            );
-          }
-
-          let filePlan: { name: string; language: string; description: string }[] = [];
-          try {
-            const planText = plannerResult.text;
-            // Extract JSON array even when the model wraps it in a markdown code fence
-            const jsonMatch = planText.match(/\[[\s\S]*\]/);
-            filePlan = JSON.parse(jsonMatch ? jsonMatch[0] : planText.trim());
-            if (!Array.isArray(filePlan) || filePlan.length === 0) throw new Error('empty plan');
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ plan: filePlan.map((f: any) => f.name) })}\n\n`));
-          } catch (e) {
-            // Fallback to single request — use SYSTEM only, no personality, to guarantee code output
-            const stream = await client.messages.stream({
-              model: 'claude-opus-4-7',
-              max_tokens: 16000,
-              system: [{ type: 'text' as const, text: SYSTEM, cache_control: { type: 'ephemeral' as const } }],
-              messages: anthropicMessages,
-            });
-            let fullText = '';
-            for await (const chunk of stream) {
-              if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-                fullText += chunk.delta.text;
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
-              }
-            }
             const files = parseFiles(fullText);
             const projectType = parseType(fullText);
             const reply = stripTags(fullText);
