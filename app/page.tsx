@@ -160,7 +160,13 @@ export default function Home() {
 
   // ── Auth state listener ──────────────────────────────────────────────────
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      if (error) {
+        // Stale or invalid refresh token — clear it so the auth modal shows cleanly
+        await supabase.auth.signOut();
+        setAuthReady(true);
+        return;
+      }
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       setAuthReady(true);
