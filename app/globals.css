@@ -15,10 +15,10 @@ body { overscroll-behavior: none; }
   --accent: #7c6af7;
   --danger: #ff6b6b;
   --accent3: #6af7c8;
-  --text: #e8e8f0;
-  --text2: #8888aa;
-  --text3: #4a4a6a;
-  --text-chat: #c0c0d8;
+  --text: #f0f0f8;
+  --text2: #a8a8c8;
+  --text3: #6e6e90;
+  --text-chat: #d4d4e8;
   /* ── Semantic aliases (previously undefined — bug fix) ── */
   --surface: var(--bg2);
   --muted: var(--text3);
@@ -2068,10 +2068,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   --bg3: #101010;
   --border: #1e1e1e;
   --border-subtle: #141414;
-  --text: #e8e8f0;
-  --text2: #8888aa;
-  --text3: #4a4a6a;
-  --text-chat: #c0c0d8;
+  --text: #f0f0f8;
+  --text2: #a8a8c8;
+  --text3: #6e6e90;
+  --text-chat: #d4d4e8;
   --surface: #080808;
   --muted: #4a4a6a;
 }
