@@ -239,6 +239,8 @@ export default function Home() {
   useEffect(() => {
     if (!currentProject || !user) return;
     if (files.length === 0 && messages.length === 0) return;
+    // Never overwrite persisted files with an empty array — guards against timing edge cases
+    if (files.length === 0 && (currentProject.files?.length ?? 0) > 0) return;
     const strippedMessages = messages.map(m => ({
       ...m,
       content: Array.isArray(m.content)
