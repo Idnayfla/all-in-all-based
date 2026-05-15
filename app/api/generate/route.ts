@@ -106,7 +106,45 @@ IMAGE MANIPULATION:
 - Reference the user's image with the exact source string __BASED_IMAGE_SRC__ — the real base64 data URL will be injected at build time
 - Never use a placeholder URL like "image.jpg" or "your-image.png" — only __BASED_IMAGE_SRC__ for user-provided images
 - Load the image onto a canvas, apply the requested filter/transform, display the result immediately on page load
-- Always include a Download button that saves the canvas output as a PNG via canvas.toDataURL()`;
+- Always include a Download button that saves the canvas output as a PNG via canvas.toDataURL()
+- Supported operations: brightness/contrast/saturation via ctx.filter, hue rotation, grayscale, sepia, blur, crop, flip, rotate, composite overlay, text watermark, color pop, vignette
+
+3D DESIGN:
+- For any 3D scene, object, product mockup, or animation: use Three.js via CDN — import from https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js
+- Standard setup every time: Scene → PerspectiveCamera(75, w/h, 0.1, 1000) → WebGLRenderer({ antialias: true }) → renderer.setPixelRatio(devicePixelRatio) → mount to document.body
+- Always add: AmbientLight(0xffffff, 0.4) + DirectionalLight(0xffffff, 1.0) positioned at (5,10,7)
+- Always add OrbitControls from https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/OrbitControls.js so the user can rotate and zoom
+- Make canvas responsive: window.addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); })
+- Build shapes from primitives: BoxGeometry, SphereGeometry, CylinderGeometry, TorusGeometry, TorusKnotGeometry, PlaneGeometry
+- Materials: MeshStandardMaterial for PBR shading, MeshPhongMaterial for shine, MeshBasicMaterial for flat color
+- Animations: use requestAnimationFrame loop — rotate mesh.rotation.x/y each frame for spinning, lerp for smooth transitions
+- For 3D text labels: use CSS2DRenderer overlay or floating <div> positioned via Three.js project() — never TextGeometry (requires font loader)
+- If user asks for a 3D logo, product, or object: make it visually impressive with reflective materials, subtle rotation animation, and a gradient or dark background
+
+CUSTOM TEXT EFFECTS:
+- For text art, typography, lettering, or text-based visuals: use Canvas 2D API as primary approach
+- Canvas text pattern: const canvas = document.getElementById('c'); const ctx = canvas.getContext('2d'); canvas.width = 800; canvas.height = 400;
+- Font loading: const f = new FontFace('Name', 'url(https://fonts.gstatic.com/...)'); await f.load(); document.fonts.add(f); then draw
+- Text fills: use ctx.createLinearGradient / ctx.createRadialGradient as fillStyle for gradient text
+- Glow effect: ctx.shadowColor = '#color'; ctx.shadowBlur = 20; draw text; reset shadow after
+- Outline text: ctx.strokeStyle, ctx.lineWidth, ctx.strokeText() — draw stroke before fill for clean edges
+- Neon effect: draw text multiple times with increasing shadowBlur and decreasing alpha
+- Curved/path text: use SVG <textPath> with a <path> element for text that follows a curve
+- 3D text illusion: draw text offset multiple times in darker shade (depth layers), then bright on top
+- Always include Download PNG button: canvas.toBlob(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'text.png'; a.click(); })
+
+CUSTOM LOGO:
+- Build logos as inline SVG — always vector, never raster
+- Coordinate system: viewBox="0 0 400 400" for square, "0 0 600 200" for wide/banner logos
+- Always use <defs> for reusable gradients, patterns, and filters
+- Gradient fills: <linearGradient id="g1"><stop offset="0%" stop-color="#color1"/><stop offset="100%" stop-color="#color2"/></linearGradient> then fill="url(#g1)"
+- Shapes: combine <circle>, <rect>, <path>, <polygon>, <ellipse> — never use a single shape for a real logo
+- SVG text: <text font-family="system-ui, sans-serif" font-weight="700" font-size="48" letter-spacing="4">BRAND</text>
+- Drop shadow on SVG: <filter id="shadow"><feDropShadow dx="2" dy="4" stdDeviation="4" flood-opacity="0.3"/></filter>
+- Always provide two download buttons:
+  1. "Download SVG" — Blob from outerHTML, type image/svg+xml, URL.createObjectURL
+  2. "Download PNG" — draw SVG onto canvas via Image src = 'data:image/svg+xml,...', then canvas.toDataURL()
+- Make logos look professional: use 2-3 colors max, clean geometry, deliberate negative space`;
 
 const PLANNER_SYSTEM = `You are a software architect. Output ONLY a JSON array. No explanation. No markdown. Raw JSON only.
 
@@ -334,6 +372,9 @@ function isCodeRequest(message: string): boolean {
     'fix', 'update', 'add', 'implement', 'modify', 'change', 'edit',
     'correct', 'repair', 'patch', 'solve', 'resolve', 'debug',
     'broken', 'not work', "doesn't work", 'button', 'issue', 'problem', 'bug', 'error',
+    'design', 'logo', '3d', 'three.js', 'text effect', 'typography', 'lettering',
+    'manipulate', 'filter', 'render', 'draw', 'sketch', 'visual', 'animate',
+    'image', 'photo', 'picture', 'scene', 'object', 'model',
   ];
   const lower = message.toLowerCase();
   return codeKeywords.some(k => lower.includes(k));
