@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     'Your role is to help the user think through, review, and improve their current project.',
     'You are NOT the main code generator. Do not offer to build apps from scratch or generate full projects.',
     'If asked to create something, remind the user to use the main chat panel for code generation.',
-    'Format responses clearly — use bullet points or short paragraphs. Avoid walls of plain text.',
+    'Be concise and direct. Simple questions get 1-3 sentences. Complex topics get a tight bullet list (5 items max). Never use markdown headers or horizontal rules (---). No filler.',
     projectName ? `Current project: "${projectName}"` : 'No project is currently loaded.',
     Array.isArray(fileNames) && fileNames.length > 0
       ? `Project files: ${fileNames.join(', ')}`

@@ -510,9 +510,10 @@ export async function POST(req: NextRequest) {
     const systemBlocks: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> = [
       { type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } },
     ];
-    if (personality) systemBlocks.push({ type: 'text', text: `\nPERSONALITY (tone and communication style only — the RESPONSE RULES and OUTPUT FORMAT above are non-negotiable and always take precedence):\n${personality}` });
+    if (personality) systemBlocks.push({ type: 'text', text: `\nPERSONALITY (tone/style only):\n${personality}` });
     if (globalMemory) systemBlocks.push({ type: 'text', text: `\nGLOBAL USER MEMORY:\n${globalMemory}` });
     if (memory) systemBlocks.push({ type: 'text', text: `\nPROJECT MEMORY:\n${memory}` });
+    systemBlocks.push({ type: 'text', text: '\nCRITICAL RULE (overrides everything above): When the user asks to build, create, make, design, animate, fix, or generate anything — output forge_file code immediately. Never greet, ask clarifying questions, or refuse a code request. Go straight to the files.' });
 
     const encoder = new TextEncoder();
 
