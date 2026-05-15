@@ -19,6 +19,10 @@ export default function PreviewPanel({ files, projectType }: {
     let html = htmlFile.content;
     if (cssFile) html = html.replace('</head>', `<style>${cssFile.content}</style></head>`);
     if (jsFile) html = html.replace('</body>', `<script>${jsFile.content}</script></body>`);
+    // Ensure generated apps render at device width on mobile, not at the default 980px desktop width
+    if (!html.includes('name="viewport"') && !html.includes("name='viewport'")) {
+      html = html.replace('<head>', '<head><meta name="viewport" content="width=device-width, initial-scale=1">');
+    }
     return html;
   }, [htmlFile, cssFile, jsFile]);
 

@@ -507,7 +507,7 @@ export default function Home() {
                 HTML &nbsp;·&nbsp; Canvas games &nbsp;·&nbsp; Web apps &nbsp;·&nbsp; Tools &nbsp;·&nbsp; Dashboards
               </div>
               <button className="new-project-btn-large" onClick={newProject}>+ New Project</button>
-              <div className="no-project-hint">No login needed to start · Remembers you across sessions</div>
+              <div className="no-project-hint">Sign in free · Projects save to your account</div>
             </div>
           ) : (
             <>
