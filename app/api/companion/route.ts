@@ -56,22 +56,26 @@ export async function POST(req: NextRequest) {
     return m;
   });
 
-  const stream = await client.messages.stream({
+  const response = await client.messages.create({
     model: 'claude-sonnet-4-6',
     max_tokens: 1024,
     system,
-    messages: apiMessages as Parameters<typeof client.messages.stream>[0]['messages'],
+    messages: apiMessages as any,
+    stream: true,
   });
 
   const encoder = new TextEncoder();
   const readable = new ReadableStream({
     async start(controller) {
       try {
-        for await (const chunk of stream) {
-          if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk.delta.text })}\n\n`));
+        for await (const event of response) {
+          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`));
           }
+          if (event.type === 'message_stop') break;
         }
+      } catch {
+        // stream error — fall through to finally
       } finally {
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();

@@ -74,10 +74,10 @@ export default function CompanionDrawer({ personality, memory, files, onClose, o
     setIsGenerating(true);
     onGeneratingChange(true);
 
+    const abort = new AbortController();
+    const timeout = setTimeout(() => abort.abort(), 60000);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const abort = new AbortController();
-      const timeout = setTimeout(() => abort.abort(), 60000);
       const res = await fetch('/api/companion', {
         method: 'POST',
         signal: abort.signal,
@@ -94,7 +94,6 @@ export default function CompanionDrawer({ personality, memory, files, onClose, o
         }),
       });
 
-      clearTimeout(timeout);
       if (!res.ok || !res.body) throw new Error('Stream failed');
 
       const reader = res.body.getReader();
@@ -129,6 +128,7 @@ export default function CompanionDrawer({ personality, memory, files, onClose, o
         return next;
       });
     } finally {
+      clearTimeout(timeout);
       setIsGenerating(false);
       onGeneratingChange(false);
     }
