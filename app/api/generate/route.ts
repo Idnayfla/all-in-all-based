@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { supabaseAdmin } from '../_auth';
 
 export const maxDuration = 300;
 
@@ -403,6 +404,39 @@ async function callModel(
 export async function POST(req: NextRequest) {
   try {
     const { messages, existingFiles, personality, memory, globalMemory: clientGlobalMemory } = await req.json();
+
+    // Free tier generation gate — fail open so DB issues never block users
+    const authToken = req.headers.get('Authorization')?.replace('Bearer ', '');
+    if (authToken) {
+      try {
+        const { data: { user } } = await supabaseAdmin.auth.getUser(authToken);
+        if (user) {
+          const { data: s } = await supabaseAdmin
+            .from('user_settings')
+            .select('subscription_tier, generations_used, generations_reset_at')
+            .eq('user_id', user.id)
+            .single();
+
+          if ((s?.subscription_tier ?? 'free') === 'free') {
+            const now = new Date();
+            const needsReset = !s?.generations_reset_at ||
+              new Date(s.generations_reset_at).getMonth() !== now.getMonth() ||
+              new Date(s.generations_reset_at).getFullYear() !== now.getFullYear();
+            const used = needsReset ? 0 : (s?.generations_used ?? 0);
+
+            if (used >= 10) {
+              return NextResponse.json({ error: 'generation_limit_reached' }, { status: 402 });
+            }
+
+            void (async () => { try { await supabaseAdmin.from('user_settings').upsert({
+              user_id: user.id,
+              generations_used: used + 1,
+              generations_reset_at: needsReset ? now.toISOString() : s.generations_reset_at,
+            }, { onConflict: 'user_id' }); } catch {} })();
+          }
+        }
+      } catch { /* fail open */ }
+    }
 
     let globalMemory = clientGlobalMemory || '';
     if (!globalMemory) {

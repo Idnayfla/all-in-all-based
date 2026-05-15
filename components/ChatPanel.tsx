@@ -291,13 +291,21 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     abortRef.current = abort;
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch('/api/generate', {
         method: 'POST',
         signal: abort.signal,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ messages: newMessages, existingFiles: files, personality, memory, globalMemory }),
       });
 
+      if (res.status === 402) {
+        window.dispatchEvent(new CustomEvent('generation-limit-reached'));
+        throw new Error('limit');
+      }
       if (!res.ok) throw new Error('API error');
       if (!res.body) throw new Error('No stream');
 

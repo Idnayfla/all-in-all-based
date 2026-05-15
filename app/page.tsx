@@ -17,6 +17,7 @@ import ThemeCustomizer, { AppTheme, DEFAULT_THEME, applyTheme, loadTheme, saveTh
 import { supabase } from '@/lib/supabase';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
 import CompanionDrawer, { CMsg } from '@/components/CompanionDrawer';
+import PricingModal from '@/components/PricingModal';
 
 export interface FileNode {
   name: string;
@@ -80,6 +81,9 @@ export default function Home() {
   const [showCompanion, setShowCompanion] = useState(false);
   const [isCompanionGenerating, setIsCompanionGenerating] = useState(false);
   const [companionMessages, setCompanionMessages] = useState<CMsg[]>([]);
+  const [subscription, setSubscription] = useState<{ tier: 'free' | 'pro'; status: string; generationsUsed: number }>({ tier: 'free', status: 'active', generationsUsed: 0 });
+  const [showPricing, setShowPricing] = useState(false);
+  const [pricingReason, setPricingReason] = useState<'generations' | 'projects' | 'companion' | 'upgrade'>('upgrade');
 
   // ── Project cache helpers (localStorage) ────────────────────────────────
   const PROJECTS_CACHE_KEY = 'based_projects_cache';
@@ -104,6 +108,16 @@ export default function Home() {
     const saved = loadTheme();
     setTheme(saved);
     applyTheme(saved);
+  }, []);
+
+  // ── Handle return from Stripe checkout ──────────────────────────────────
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('upgraded') === 'true') {
+      window.history.replaceState({}, '', window.location.pathname);
+      setSubscription(s => ({ ...s, tier: 'pro' }));
+    }
   }, []);
 
   // ── Auth headers helper ──────────────────────────────────────────────────
@@ -135,7 +149,8 @@ export default function Home() {
       console.error('[Based] GET /api/projects failed:', projectsRes.status, await projectsRes.text().catch(() => ''));
     }
     if (settingsRes.ok) {
-      const { personality: p, globalMemory: m, theme: t } = await settingsRes.json();
+      const { personality: p, globalMemory: m, theme: t, subscriptionTier, subscriptionStatus, generationsUsed } = await settingsRes.json();
+      setSubscription({ tier: subscriptionTier ?? 'free', status: subscriptionStatus ?? 'active', generationsUsed: generationsUsed ?? 0 });
       if (p) {
         try {
           const parsed = JSON.parse(p);
@@ -246,6 +261,13 @@ export default function Home() {
     return () => window.removeEventListener('focus', onFocus);
   }, [user, loadCloudData]);
 
+  // ── Generation limit event ───────────────────────────────────────────────
+  useEffect(() => {
+    const handler = () => { setPricingReason('generations'); setShowPricing(true); };
+    window.addEventListener('generation-limit-reached', handler);
+    return () => window.removeEventListener('generation-limit-reached', handler);
+  }, []);
+
   // ── Memory updated event ─────────────────────────────────────────────────
   useEffect(() => {
     const handler = async () => {
@@ -290,7 +312,14 @@ export default function Home() {
   }, [files, messages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Project CRUD ─────────────────────────────────────────────────────────
-  const newProject = () => setProjectModal(true);
+  const newProject = () => {
+    if (subscription.tier === 'free' && projects.length >= 3) {
+      setPricingReason('projects');
+      setShowPricing(true);
+      return;
+    }
+    setProjectModal(true);
+  };
 
   const createProject = async (name: string) => {
     setProjectModal(false);
@@ -522,6 +551,33 @@ export default function Home() {
               )}
               {user && (
                 <div className="settings-section">
+                  <label className="settings-label">Plan</label>
+                  <div className="plan-badge-row">
+                    <span className={`plan-badge plan-badge--${subscription.tier}`}>
+                      {subscription.tier === 'pro' ? '⬡ Pro' : 'Free'}
+                    </span>
+                    {subscription.tier === 'free' && (
+                      <span className="plan-usage">{subscription.generationsUsed}/10 generations this month</span>
+                    )}
+                  </div>
+                  {subscription.tier === 'free' ? (
+                    <button className="plan-upgrade-btn" onClick={() => { setPricingReason('upgrade'); setShowPricing(true); }}>
+                      Upgrade to Pro — $12/mo
+                    </button>
+                  ) : (
+                    <button className="plan-portal-btn" onClick={async () => {
+                      const headers = await getHeaders();
+                      const res = await fetch('/api/stripe/portal', { method: 'POST', headers });
+                      const { url } = await res.json();
+                      if (url) window.location.href = url;
+                    }}>
+                      Manage billing
+                    </button>
+                  )}
+                </div>
+              )}
+              {user && (
+                <div className="settings-section">
                   <div className="settings-hint" style={{ marginBottom: 4 }}>Signed in as {user.email}</div>
                   <button className="auth-signout-btn" onClick={signOut}>Sign Out</button>
                 </div>
@@ -641,13 +697,32 @@ export default function Home() {
       </AnimatePresence>
       <button
         className={`companion-trigger${showCompanion ? ' companion-trigger--open' : ''}${isCompanionGenerating ? ' companion-trigger--responding' : ''}`}
-        onClick={() => setShowCompanion(s => !s)}
+        onClick={() => {
+          if (!showCompanion && subscription.tier === 'free') {
+            setPricingReason('companion');
+            setShowPricing(true);
+            return;
+          }
+          setShowCompanion(s => !s);
+        }}
         aria-label="Open AI Companion"
       >
         <span className="companion-trigger-label">B</span>
         <span className="companion-trigger-ring companion-trigger-ring--1" />
         <span className="companion-trigger-ring companion-trigger-ring--2" />
       </button>
+
+      <AnimatePresence>
+        {showPricing && (
+          <PricingModal
+            reason={pricingReason}
+            generationsUsed={subscription.generationsUsed}
+            projectCount={projects.length}
+            onClose={() => setShowPricing(false)}
+            getHeaders={getHeaders}
+          />
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showCompanion && (

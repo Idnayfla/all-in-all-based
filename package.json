@@ -42,7 +42,8 @@
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",
     "redis": "^5.11.0",
-    "resend": "^6.12.3"
+    "resend": "^6.12.3",
+    "stripe": "^22.1.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
