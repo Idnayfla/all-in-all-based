@@ -512,9 +512,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .project-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-actions { display: flex; gap: 4px; opacity: 0; transition: opacity 0.15s; }
 .project-item:hover .project-actions { opacity: 1; }
+@media (hover: none) {
+  .project-actions { opacity: 1; }
+}
 .action-btn {
   background: transparent; border: none; color: var(--text3); cursor: pointer;
   font-size: 11px; padding: 2px 4px; border-radius: 3px; transition: all 0.15s;
+  touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }
 .action-btn:hover { color: var(--text); background: var(--bg); }
 .action-btn.danger:hover { color: var(--danger); }
@@ -2513,6 +2517,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .suggestion-chip:hover {
   border-color: var(--accent);
