@@ -2212,7 +2212,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .companion-trigger {
   position: fixed;
   bottom: 24px;
-  left: 24px;
+  right: 24px;
   width: 48px;
   height: 48px;
   border-radius: 50%;
