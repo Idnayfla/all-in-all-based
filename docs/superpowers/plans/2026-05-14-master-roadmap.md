@@ -80,9 +80,9 @@ Last updated: 2026-05-14
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| Android + iOS compatibility | ⬜ Todo | PWA first, then Capacitor/Expo wrapper |
-| Voice activation (Siri-like) | ⬜ Todo | Web Speech API or Whisper — trigger "Based" by voice |
-| Ambient personal AI companion | ⬜ Todo | Always-accessible conversational interface (like Siri/Assistant) — floating button, voice + text, quick-access from any screen |
+| Android + iOS compatibility | 🔄 In Progress | PWA complete; Capacitor installed + configured — run `npm run cap:add:android` / `cap:add:ios` then open in Android Studio / Xcode |
+| Voice activation (Siri-like) | ✅ Done | useVoiceActivation hook — say "Based, ..." to trigger |
+| Ambient personal AI companion | ✅ Done | CompanionDrawer — floating trigger, voice + text, screen capture |
 | Desktop app (Electron / Tauri) | ⬜ Todo | Runs outside browser as native self-contained app |
 
 ---
