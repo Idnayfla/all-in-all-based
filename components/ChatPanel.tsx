@@ -120,6 +120,11 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const discardGeneration = () => {
+    abortRef.current?.abort();
+  };
   const [pendingImage, setPendingImage] = useState<{
     data: string;
     mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
@@ -282,10 +287,13 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     setIsGenerating(true);
 
     let doneHandled = false;
+    const abort = new AbortController();
+    abortRef.current = abort;
 
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
+        signal: abort.signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: newMessages, existingFiles: files, personality, memory, globalMemory }),
       });
@@ -390,9 +398,18 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         }
       }
 
-    } catch (e) {
+    } catch (e: any) {
       setGenProgress(null);
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Error: Could not reach the API.' }]);
+      if (e?.name === 'AbortError') {
+        doneHandled = true;
+        setMessages(prev => {
+          const last = prev[prev.length - 1];
+          if (last?.role === 'assistant') return [...prev.slice(0, -1)];
+          return prev;
+        });
+      } else {
+        setMessages(prev => [...prev, { role: 'assistant', content: 'Error: Could not reach the API.' }]);
+      }
     } finally {
       if (!doneHandled) {
         setGenProgress(null);
@@ -545,6 +562,20 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         <div ref={bottomRef} />
       </div>
       <div className="chat-input-area">
+        <AnimatePresence>
+          {isGenerating && (
+            <motion.button
+              className="discard-btn"
+              onClick={discardGeneration}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            >
+              ✕ Discard
+            </motion.button>
+          )}
+        </AnimatePresence>
         <AnimatePresence>
           {pendingImage && (
             <motion.div

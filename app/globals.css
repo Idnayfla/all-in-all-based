@@ -277,6 +277,23 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 .send-btn:hover { background: var(--accent-hover); }
 .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.discard-btn {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid var(--danger, #ff4d4d);
+  color: var(--danger, #ff4d4d);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+  padding: 4px 12px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  margin-bottom: 6px;
+  transition: background 0.15s, color 0.15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.discard-btn:hover { background: rgba(255,77,77,0.12); }
 
 .chat-input-row {
   display: flex; gap: 12px; align-items: flex-end;

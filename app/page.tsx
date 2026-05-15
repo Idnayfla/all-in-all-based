@@ -322,9 +322,7 @@ export default function Home() {
     setActivePanel('chat');
   };
 
-  const deleteProject = async (id: string) => {
-    const headers = await getHeaders();
-    fetch(`/api/projects/${id}`, { method: 'DELETE', headers }).catch(() => {});
+  const deleteProject = (id: string) => {
     setProjects(prev => {
       const next = prev.filter(p => p.id !== id);
       saveProjectsCache(next);
@@ -333,6 +331,9 @@ export default function Home() {
     if (currentProject?.id === id) {
       setCurrentProject(null); setFiles([]); setMessages([]); setActiveFile(null);
     }
+    getHeaders().then(headers => {
+      fetch(`/api/projects/${id}`, { method: 'DELETE', headers }).catch(() => {});
+    }).catch(() => {});
   };
 
   const renameProject = async (id: string, name: string) => {
