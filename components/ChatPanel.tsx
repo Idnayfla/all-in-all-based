@@ -134,7 +134,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
   const [suggestions] = useState(getRandomSuggestions);
 
-  const { state: voiceState, transcript: voiceTranscript, toggle: toggleVoice } =
+  const { state: voiceState, transcript: voiceTranscript, error: voiceError, toggle: toggleVoice } =
     useVoiceActivation((command) => {
       // Show the recognized text in the textarea so the user can see it was heard,
       // then auto-send after a brief pause
@@ -642,6 +642,12 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             {isGeneratingMedia ? '⏳' : generationMode !== 'chat' ? 'Generate' : 'Send'}
           </motion.button>
         </div>
+        {voiceError && (
+          <div className="voice-error">{voiceError}</div>
+        )}
+        {voiceState === 'listening' && !voiceError && (
+          <div className="voice-hint">Say "Based, build me a calculator" — listening…</div>
+        )}
       </div>
       {editingImageUrl && (
         <ImageEditorModal

@@ -6,32 +6,43 @@ export type VoiceState = 'idle' | 'listening' | 'activated' | 'unsupported';
 export function useVoiceActivation(onCommand: (text: string) => void, triggerWord = 'based') {
   const [state, setState] = useState<VoiceState>('idle');
   const [transcript, setTranscript] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const stateRef = useRef<VoiceState>('idle');
   const onCommandRef = useRef(onCommand);
   onCommandRef.current = onCommand;
-  // Keep a ref to the active recognition instance so stop() can abort it
   const activeRef = useRef<any>(null);
 
   const updateState = (s: VoiceState) => { stateRef.current = s; setState(s); };
 
-  // Creates and starts one recognition utterance. When it ends, schedules itself again.
   const startOnce = useCallback(() => {
     const SR = typeof window !== 'undefined'
       ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
       : null;
-    if (!SR) { updateState('unsupported'); return; }
+
+    if (!SR) {
+      updateState('unsupported');
+      setError('Speech recognition not supported in this browser');
+      return;
+    }
 
     const rec = new SR();
     rec.lang = 'en-US';
-    rec.continuous = false;      // one utterance per instance — most reliable cross-browser
-    rec.interimResults = false;  // final results only — cleaner trigger matching
+    rec.continuous = false;
+    rec.interimResults = false;
     rec.maxAlternatives = 1;
     activeRef.current = rec;
 
+    rec.onstart = () => {
+      console.log('[voice] recognition started');
+      setError(null);
+    };
+
     rec.onresult = (e: any) => {
       const text: string = e.results[0][0].transcript.trim();
+      console.log('[voice] heard:', text);
       if (text.toLowerCase().startsWith(triggerWord)) {
         const command = text.replace(new RegExp(`^${triggerWord}[,!.?\\s]*`, 'i'), '').trim();
+        console.log('[voice] command:', command);
         if (command) {
           updateState('activated');
           setTranscript(command);
@@ -44,26 +55,36 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
       }
     };
 
-    // Silently swallow no-speech; warn on anything else
     rec.onerror = (e: any) => {
+      console.warn('[voice] error:', e.error);
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        updateState('idle'); // mic permission denied — stop trying
+        setError('Microphone access denied — allow mic in browser settings');
+        updateState('idle');
+      } else if (e.error === 'network') {
+        setError('Network error — voice needs internet connection');
       } else if (e.error !== 'no-speech' && e.error !== 'aborted') {
-        console.warn('[voice]', e.error);
+        setError(`Voice error: ${e.error}`);
       }
     };
 
-    // Fresh instance next time — 150ms gap prevents "already started" errors
     rec.onend = () => {
+      console.log('[voice] recognition ended, state:', stateRef.current);
       if (stateRef.current === 'listening' || stateRef.current === 'activated') {
         setTimeout(startOnce, 150);
       }
     };
 
-    try { rec.start(); } catch (err) { console.warn('[voice] start failed', err); }
+    try {
+      rec.start();
+      console.log('[voice] rec.start() called');
+    } catch (err: any) {
+      console.warn('[voice] start threw:', err.message);
+      setError(`Could not start mic: ${err.message}`);
+    }
   }, [triggerWord]);
 
   const start = useCallback(() => {
+    setError(null);
     updateState('listening');
     startOnce();
   }, [startOnce]);
@@ -73,6 +94,7 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
     activeRef.current = null;
     updateState('idle');
     setTranscript('');
+    setError(null);
   }, []);
 
   const toggle = useCallback(() => {
@@ -81,5 +103,5 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
 
   useEffect(() => () => { try { activeRef.current?.abort(); } catch {} }, []);
 
-  return { state, transcript, toggle };
+  return { state, transcript, error, toggle };
 }
