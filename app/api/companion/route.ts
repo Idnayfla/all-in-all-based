@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getUserId } from '@/app/api/_auth';
 
@@ -12,82 +12,63 @@ export async function POST(req: NextRequest) {
   try {
     await getUserId(req);
   } catch {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { messages, personality, memory, screenshot, previewSource } = await req.json();
+  try {
+    const { messages, personality, memory, screenshot, previewSource } = await req.json();
 
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return new Response(JSON.stringify({ error: 'messages required' }), { status: 400 });
-  }
-  if (typeof personality !== 'string' || !personality.trim()) {
-    return new Response(JSON.stringify({ error: 'personality required' }), { status: 400 });
-  }
-
-  const systemParts = [personality];
-  if (memory) systemParts.push(`User memory:\n${memory}`);
-  const system = systemParts.join('\n\n');
-
-  // Inject screenshot or previewSource into the last user message
-  const apiMessages = (messages as Array<{ role: string; content: string }>).map((m, i) => {
-    if (i !== messages.length - 1 || m.role !== 'user') return m;
-
-    if (screenshot) {
-      const match = screenshot.match(/^data:(image\/(?:jpeg|png|webp|gif));base64,/);
-      // Cast is required because the Anthropic SDK uses a discriminated union of literal media_type strings
-      const media_type = (match?.[1] ?? 'image/png') as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
-      const base64 = screenshot.replace(/^data:image\/\w+;base64,/, '');
-      return {
-        role: 'user' as const,
-        content: [
-          { type: 'image' as const, source: { type: 'base64' as const, media_type, data: base64 } },
-          { type: 'text' as const, text: m.content },
-        ],
-      };
+    if (!Array.isArray(messages) || messages.length === 0) {
+      return NextResponse.json({ error: 'messages required' }, { status: 400 });
+    }
+    if (typeof personality !== 'string' || !personality.trim()) {
+      return NextResponse.json({ error: 'personality required' }, { status: 400 });
     }
 
-    if (previewSource) {
-      const safeSrc = previewSource.length > 40000
-        ? previewSource.slice(0, 40000) + '\n\n[truncated]'
-        : previewSource;
-      return { role: 'user' as const, content: `Here is the current preview source:\n\n${safeSrc}\n\n${m.content}` };
-    }
+    const systemParts = [personality];
+    if (memory) systemParts.push(`User memory:\n${memory}`);
+    const system = systemParts.join('\n\n');
 
-    return m;
-  });
+    const apiMessages = (messages as Array<{ role: string; content: string }>).map((m, i) => {
+      if (i !== messages.length - 1 || m.role !== 'user') return m;
 
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
-    system,
-    messages: apiMessages as any,
-    stream: true,
-  });
-
-  const encoder = new TextEncoder();
-  const readable = new ReadableStream({
-    async start(controller) {
-      try {
-        for await (const event of response) {
-          if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`));
-          }
-          if (event.type === 'message_stop') break;
-        }
-      } catch {
-        // stream error — fall through to finally
-      } finally {
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
-        controller.close();
+      if (screenshot) {
+        const match = screenshot.match(/^data:(image\/(?:jpeg|png|webp|gif));base64,/);
+        const media_type = (match?.[1] ?? 'image/png') as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+        const base64 = screenshot.replace(/^data:image\/\w+;base64,/, '');
+        return {
+          role: 'user' as const,
+          content: [
+            { type: 'image' as const, source: { type: 'base64' as const, media_type, data: base64 } },
+            { type: 'text' as const, text: m.content },
+          ],
+        };
       }
-    },
-  });
 
-  return new Response(readable, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    },
-  });
+      if (previewSource) {
+        const safeSrc = previewSource.length > 40000
+          ? previewSource.slice(0, 40000) + '\n\n[truncated]'
+          : previewSource;
+        return { role: 'user' as const, content: `Here is the current preview source:\n\n${safeSrc}\n\n${m.content}` };
+      }
+
+      return m;
+    });
+
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system,
+      messages: apiMessages as any,
+    });
+
+    const text = response.content
+      .filter(b => b.type === 'text')
+      .map(b => (b as { type: 'text'; text: string }).text)
+      .join('');
+
+    return NextResponse.json({ text });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message ?? 'Internal error' }, { status: 500 });
+  }
 }

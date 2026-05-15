@@ -74,13 +74,10 @@ export default function CompanionDrawer({ personality, memory, files, onClose, o
     setIsGenerating(true);
     onGeneratingChange(true);
 
-    const abort = new AbortController();
-    const timeout = setTimeout(() => abort.abort(), 60000);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch('/api/companion', {
         method: 'POST',
-        signal: abort.signal,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token ?? ''}`,
@@ -94,33 +91,25 @@ export default function CompanionDrawer({ personality, memory, files, onClose, o
         }),
       });
 
-      if (!res.ok || !res.body) throw new Error('Stream failed');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Request failed');
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = '';
-      let streamDone = false;
-
-      while (!streamDone) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        const lines = buf.split('\n');
-        buf = lines.pop() ?? '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const raw = line.slice(6);
-          if (raw.trim() === '[DONE]') { streamDone = true; break; }
-          try {
-            const { text: chunk } = JSON.parse(raw);
-            if (chunk) setMessages(prev => {
-              const next = [...prev];
-              next[next.length - 1] = { ...next[next.length - 1], content: next[next.length - 1].content + chunk };
-              return next;
-            });
-          } catch {}
-        }
-      }
+      const fullText: string = data.text ?? '';
+      // Typewriter animation
+      let i = 0;
+      await new Promise<void>(resolve => {
+        const tick = () => {
+          i++;
+          setMessages(prev => {
+            const next = [...prev];
+            next[next.length - 1] = { ...next[next.length - 1], content: fullText.slice(0, i) };
+            return next;
+          });
+          if (i < fullText.length) requestAnimationFrame(tick);
+          else resolve();
+        };
+        requestAnimationFrame(tick);
+      });
     } catch {
       setMessages(prev => {
         const next = [...prev];
@@ -128,7 +117,6 @@ export default function CompanionDrawer({ personality, memory, files, onClose, o
         return next;
       });
     } finally {
-      clearTimeout(timeout);
       setIsGenerating(false);
       onGeneratingChange(false);
     }
