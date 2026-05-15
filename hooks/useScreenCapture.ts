@@ -6,16 +6,16 @@ export interface PreviewCapture {
 }
 
 export function capturePreview(files: FileNode[]): PreviewCapture | null {
-  const htmlFile = files.find(f => f.language === 'html');
-  const cssFile = files.find(f => f.language === 'css');
-  const jsFile = files.find(f => f.language === 'javascript' || f.language === 'js');
+  if (!files.length) return null;
 
-  if (!htmlFile && !cssFile && !jsFile) return null;
+  const order = ['html', 'css', 'javascript', 'js', 'typescript', 'ts', 'python', 'json'];
+  const sorted = [...files].sort((a, b) => {
+    const ai = order.indexOf(a.language);
+    const bi = order.indexOf(b.language);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+  });
 
-  const parts: string[] = [];
-  if (htmlFile) parts.push(`\`\`\`html\n${htmlFile.content}\n\`\`\``);
-  if (cssFile) parts.push(`\`\`\`css\n${cssFile.content}\n\`\`\``);
-  if (jsFile) parts.push(`\`\`\`js\n${jsFile.content}\n\`\`\``);
+  const parts = sorted.map(f => `\`\`\`${f.language}\n${f.content}\n\`\`\``);
 
   return {
     source: parts.join('\n\n'),
