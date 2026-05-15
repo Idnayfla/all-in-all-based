@@ -16,16 +16,17 @@ interface Props {
   memory: string;
   files: FileNode[];
   projectName?: string;
-  messages: CMsg[];
+  initialMessages: CMsg[];
   onMessagesChange: (msgs: CMsg[]) => void;
   onClose: () => void;
   onGeneratingChange: (v: boolean) => void;
 }
 
-export default function CompanionDrawer({ memory, files, projectName, messages, onMessagesChange, onClose, onGeneratingChange }: Props) {
-  const setMessages = (updater: CMsg[] | ((prev: CMsg[]) => CMsg[])) => {
-    onMessagesChange(typeof updater === 'function' ? updater(messages) : updater);
-  };
+export default function CompanionDrawer({ memory, files, projectName, initialMessages, onMessagesChange, onClose, onGeneratingChange }: Props) {
+  const [messages, setMessages] = useState<CMsg[]>(initialMessages);
+  const syncRef = useRef(onMessagesChange);
+  useEffect(() => { syncRef.current = onMessagesChange; });
+  useEffect(() => { syncRef.current(messages); }, [messages]);
   const [input, setInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [pendingCapture, setPendingCapture] = useState<{

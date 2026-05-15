@@ -626,7 +626,7 @@ export default function Home() {
             memory={globalMemory}
             files={files}
             projectName={currentProject?.name}
-            messages={companionMessages}
+            initialMessages={companionMessages}
             onMessagesChange={setCompanionMessages}
             onClose={() => setShowCompanion(false)}
             onGeneratingChange={setIsCompanionGenerating}
