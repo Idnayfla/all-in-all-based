@@ -173,3 +173,4 @@ Last updated: 2026-05-14
 | Video generation | ✅ Done |
 | Personal AI API for developers | ⬜ Todo | Expose Based as an API — devs can call it to get AI-generated apps/code |
 | Codespace → VS Code direct workflow | ⬜ Todo | Open Codespace directly in VS Code Desktop (not browser) |
+| **Cross-project referencing** | ⬜ Todo | When chatting in Project A, mention "like in Project B" — Claude pulls that project's files/context and uses it as reference (e.g. "same auth flow as my TodoApp"). UI: `@ProjectName` mention in chat; backend: load target project's files into context alongside current chat. |
