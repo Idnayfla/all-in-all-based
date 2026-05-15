@@ -2,7 +2,11 @@
   "name": "ai-dev-tool",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
+    "predev": "node -e \"var v=parseInt(process.versions.node);if(v<20){console.error('\\n❌ Node '+process.versions.node+' detected. Node 20+ required.\\nRun: .\\\\setup-claude.ps1\\n');process.exit(1)}\"",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
