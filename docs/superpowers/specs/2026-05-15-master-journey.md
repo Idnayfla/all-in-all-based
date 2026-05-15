@@ -10,11 +10,13 @@
 
 | Layer | Status |
 |-------|--------|
-| Based web app | Live — Phase 2 complete |
+| Based web app | Live — Phase 3 in progress |
 | Auth + cloud storage | ✅ Done (Phase 1) |
 | Design system | ✅ Done (Phase 2) |
 | Gemini fallback + C/G toggle | ✅ Done |
-| PWA foundation | ✅ Partial (manifest, SW, icons — gaps remain) |
+| PWA — full native launch experience | ✅ Done (Phase 3 PWA sprint complete) |
+| 3D design / custom text / logo / image manipulation | ✅ Done (system prompt + isCodeRequest) |
+| Voice activation + ambient companion | ⬜ Next (Phase 3 remaining) |
 | Pantheon API | 🔄 Bootstrap only (Task 1 of 18) |
 
 ---
@@ -61,15 +63,15 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | PWA manifest + service worker | ✅ Done | manifest.json, sw.js, ServiceWorkerInit |
-| Safe area insets (notch/Dynamic Island) | ⬜ Todo | `env(safe-area-inset-*)` CSS |
-| Install prompt UI | ⬜ Todo | In-app "Add to Home Screen" banner |
-| iOS splash screens | ⬜ Todo | `apple-touch-startup-image` per device |
-| SW update notification | ⬜ Todo | "New version available" toast |
-| Maskable icon (Android adaptive) | ⬜ Todo | Regenerate with safe-zone padding |
-| Welcome audio on launch | ⬜ Todo | Dramatic jingle on app open |
-| Voice activation ("Based, …") | ⬜ Todo | Web Speech API trigger |
-| Ambient AI companion | ⬜ Todo | Floating button, always-accessible |
-| Desktop app | ⬜ Todo | Electron / Tauri wrapper |
+| Safe area insets (notch/Dynamic Island) | ✅ Done | `env(safe-area-inset-*)` CSS vars in globals.css |
+| Install prompt UI | ✅ Done | InstallPrompt component — Android + iOS |
+| iOS splash screens | ✅ Done | 7 device sizes via System.Drawing generator |
+| SW update notification | ✅ Done | Toast with auto-dismiss in ServiceWorkerInit |
+| Maskable icon (Android adaptive) | ✅ Done | Regenerated with safe-zone padding |
+| Welcome audio on launch | ✅ Done | Web Audio API synth jingle on tap-to-enter |
+| Voice activation ("Based, …") | ⬜ Next | Web Speech API continuous listen + trigger word |
+| Ambient AI companion | ⬜ Next | Floating button, always-accessible, voice + text |
+| Desktop app | ⬜ Later | Electron / Tauri wrapper |
 
 ---
 
@@ -149,11 +151,14 @@
 
 ---
 
-### Phase 11 — Advanced Game & Web Engine ⬜ TODO
+### Phase 11 — Advanced Game & Web Engine 🔄 PARTIAL
 
 | Feature | Status | Notes |
 |---------|--------|-------|
-| 3D game generation (Three.js / Babylon.js) | ⬜ Todo | |
+| 3D design generation (Three.js) | ✅ Done | System prompt — scene, OrbitControls, materials, animation |
+| Custom text effects (Canvas 2D) | ✅ Done | Gradient/glow/neon/outline, FontFace API, PNG download |
+| Logo generation (SVG) | ✅ Done | Inline SVG, defs/gradients/filters, SVG+PNG export |
+| Image manipulation with reference image | ✅ Done | `__BASED_IMAGE_SRC__` pipeline — filters, overlay, crop |
 | Physics engine (Cannon.js / Rapier) | ⬜ Todo | |
 | Multi-section landing pages + GSAP | ⬜ Todo | |
 | Game architecture planner (Haiku) | ⬜ Todo | |
