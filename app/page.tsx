@@ -625,6 +625,7 @@ export default function Home() {
             personality={personality}
             memory={globalMemory}
             files={files}
+            projectName={currentProject?.name}
             onClose={() => setShowCompanion(false)}
             onGeneratingChange={setIsCompanionGenerating}
           />

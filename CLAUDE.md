@@ -15,10 +15,8 @@ If starting a new terminal session, activate it with:
 ```
 
 Claude Code provider options (this terminal, not the webapp):
-- **LiteLLM is currently active in this session (ANTHROPIC_BASE_URL is set to http://localhost:4000).**
 - `use-subscription` — Claude.ai Pro/Max (default)
 - `use-anthropic` — Anthropic API (pay as you go)
-- `use-litellm` — route Claude Code through a local LiteLLM proxy that translates Anthropic API calls to Gemini. Useful when Pro/Max is rate-limited. Caveats: no prompt caching, no extended thinking, tool use may be rough. Start the proxy first (auto-started by `use-litellm`) with `start-litellm`; stop with `stop-litellm`.
 - `set-gemini-key` — exports `$GEMINI_API_KEY` into the shell for external tools (Claude Code itself is Anthropic-only)
 
 **Based webapp provider switching** is independent of Claude Code. The webapp reads `GEMINI_API_KEY` from `.env.local` and auto-falls-back to Gemini when the Anthropic API errors. Users can also force Gemini-primary via the C/G toggle in the chat input, or by setting `PRIMARY_PROVIDER=gemini` in `.env.local`.

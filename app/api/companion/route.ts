@@ -9,7 +9,7 @@ const client = new Anthropic({
 
 export async function POST(req: NextRequest) {
 
-  const { messages, personality, memory, screenshot, previewSource } = await req.json();
+  const { messages, personality, memory, screenshot, previewSource, projectName, fileNames } = await req.json();
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: 'messages required' }, { status: 400 });
@@ -18,7 +18,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'personality required' }, { status: 400 });
   }
 
-  const systemParts = [personality];
+  const companionRole = [
+    'You are the ambient AI companion sidebar in All in All Based — a personal AI dev studio.',
+    'Your role is to help the user think through, review, and improve their current project.',
+    'You are NOT the main code generator (that is the main chat panel). Do not offer to build projects from scratch or generate full apps.',
+    'Help with questions, feedback, analysis, debugging ideas, and creative suggestions about the existing project.',
+    projectName ? `Current project: "${projectName}"` : 'No project is currently loaded.',
+    Array.isArray(fileNames) && fileNames.length > 0
+      ? `Project files: ${fileNames.join(', ')}`
+      : 'No files in project yet.',
+  ].join('\n');
+
+  const systemParts = [companionRole, personality];
   if (memory) systemParts.push(`User memory:\n${memory}`);
   const system = systemParts.join('\n\n');
 

@@ -16,11 +16,12 @@ interface Props {
   personality: string;
   memory: string;
   files: FileNode[];
+  projectName?: string;
   onClose: () => void;
   onGeneratingChange: (v: boolean) => void;
 }
 
-export default function CompanionDrawer({ personality, memory, files, onClose, onGeneratingChange }: Props) {
+export default function CompanionDrawer({ personality, memory, files, projectName, onClose, onGeneratingChange }: Props) {
   const [messages, setMessages] = useState<CMsg[]>([]);
   const [input, setInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -81,6 +82,8 @@ export default function CompanionDrawer({ personality, memory, files, onClose, o
           messages: history.map(m => ({ role: m.role, content: m.content })),
           personality,
           memory,
+          projectName,
+          fileNames: files.map(f => f.name),
           ...(cap?.isScreenshot ? { screenshot: cap.source } : {}),
           ...(!cap?.isScreenshot && cap ? { previewSource: cap.source } : {}),
         }),
