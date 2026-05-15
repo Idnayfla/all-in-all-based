@@ -174,3 +174,4 @@ Last updated: 2026-05-14
 | Personal AI API for developers | ⬜ Todo | Expose Based as an API — devs can call it to get AI-generated apps/code |
 | Codespace → VS Code direct workflow | ⬜ Todo | Open Codespace directly in VS Code Desktop (not browser) |
 | **Cross-project referencing** | ⬜ Todo | When chatting in Project A, mention "like in Project B" — Claude pulls that project's files/context and uses it as reference (e.g. "same auth flow as my TodoApp"). UI: `@ProjectName` mention in chat; backend: load target project's files into context alongside current chat. |
+| **Student discount** | ⬜ Post-launch | $5/mo tier (vs $12 Pro). Verify via `.edu` email check or SheerID. Implement as Stripe coupon applied at checkout. Add after Free/Pro launch is stable. |
