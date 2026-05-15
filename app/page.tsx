@@ -61,6 +61,7 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [projectType, setProjectType] = useState('html');
   const [personality, setPersonality] = useState(DEFAULT_PERSONALITY);
+  const [personalitySettings, setPersonalitySettings] = useState<import('@/components/PersonalityPanel').PersonalitySettings | undefined>(undefined);
   const [showSettings, setShowSettings] = useState(false);
   const [globalMemory, setGlobalMemory] = useState('');
   const [incognito, setIncognito]     = useState(false);
@@ -135,7 +136,18 @@ export default function Home() {
     }
     if (settingsRes.ok) {
       const { personality: p, globalMemory: m, theme: t } = await settingsRes.json();
-      if (p) setPersonality(p);
+      if (p) {
+        try {
+          const parsed = JSON.parse(p);
+          if (parsed && typeof parsed === 'object' && 'tone' in parsed) {
+            setPersonalitySettings(parsed);
+          } else {
+            setPersonality(p);
+          }
+        } catch {
+          setPersonality(p);
+        }
+      }
       if (m) setGlobalMemory(m);
       if (t && Object.keys(t).length > 0) {
         const merged = { ...DEFAULT_THEME, ...t };
@@ -226,6 +238,13 @@ export default function Home() {
 
     return () => subscription.unsubscribe();
   }, [getHeaders, loadCloudData, runMigration]);
+
+  // ── Refresh cloud data when window regains focus ─────────────────────────
+  useEffect(() => {
+    const onFocus = () => { if (user) loadCloudData(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [user, loadCloudData]);
 
   // ── Memory updated event ─────────────────────────────────────────────────
   useEffect(() => {
@@ -451,13 +470,14 @@ export default function Home() {
               <div className="settings-section">
                 <label className="settings-label">AI Personality</label>
                 <PersonalityPanel
-                  onPersonalityChange={async (modifier) => {
+                  initialSettings={personalitySettings}
+                  onPersonalityChange={async (modifier, settings) => {
                     setPersonality(modifier);
                     const headers = await getHeaders();
                     fetch('/api/settings', {
                       method: 'PUT',
                       headers,
-                      body: JSON.stringify({ personality: modifier }),
+                      body: JSON.stringify({ personality: JSON.stringify(settings) }),
                     }).catch(() => {});
                   }}
                 />

@@ -261,6 +261,10 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   padding: 16px 24px; border-top: 1px solid var(--border-subtle); background: var(--bg2);
   display: flex; flex-direction: column; gap: 8px;
   padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  padding-right: 72px;
+}
+@media (max-width: 600px) {
+  .chat-input-area { padding-right: 24px; }
 }
 .chat-textarea {
   flex: 1; background: var(--bg2); border: 1px solid var(--border);

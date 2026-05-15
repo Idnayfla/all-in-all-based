@@ -94,24 +94,26 @@ function Slider({ value, onChange, leftLabel, rightLabel }: SliderProps) {
 }
 
 interface PersonalityPanelProps {
-  onPersonalityChange: (modifier: string) => void;
+  onPersonalityChange: (modifier: string, settings: PersonalitySettings) => void;
+  initialSettings?: PersonalitySettings;
 }
 
-export default function PersonalityPanel({ onPersonalityChange }: PersonalityPanelProps) {
+export default function PersonalityPanel({ onPersonalityChange, initialSettings }: PersonalityPanelProps) {
   const [settings, setSettings] = useState<PersonalitySettings>(DEFAULTS);
 
   useEffect(() => {
-    const s = load();
+    const s = initialSettings ?? load();
     setSettings(s);
-    onPersonalityChange(buildPersonalityModifier(s));
+    save(s);
+    onPersonalityChange(buildPersonalityModifier(s), s);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [initialSettings]);
 
   const update = (partial: Partial<PersonalitySettings>) => {
     const next = { ...settings, ...partial };
     setSettings(next);
     save(next);
-    onPersonalityChange(buildPersonalityModifier(next));
+    onPersonalityChange(buildPersonalityModifier(next), next);
   };
 
   return (
