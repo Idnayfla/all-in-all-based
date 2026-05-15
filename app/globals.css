@@ -2168,16 +2168,18 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 
 .launch-splash__tagline {
   font-size: var(--fs-sm);
-  color: var(--text3);
+  color: var(--text2);
   margin: 0;
+  letter-spacing: 0.04em;
 }
 
 .launch-splash__hint {
   position: absolute;
   bottom: calc(var(--safe-bottom) + var(--sp-6));
   font-size: var(--fs-xs);
-  color: var(--text3);
+  color: var(--text2);
   margin: 0;
+  letter-spacing: 0.06em;
 }
 .theme-font-select:focus { outline: none; border-color: var(--accent); }
 
