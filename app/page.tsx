@@ -375,6 +375,11 @@ export default function Home() {
             <button className={`tab-btn tab-btn-debug ${activePanel === 'debug' ? 'active' : ''}`} onClick={() => setActivePanel('debug')} title="Debug stream">◈</button>
           </div>
           <div className="header-controls">
+            <button
+              className={`icon-btn ${incognito ? 'incognito-active' : ''}`}
+              onClick={() => { setIncognito(s => !s); setIncognitoMessages([]); setActivePanel('chat'); }}
+              title="Temp chat — no memory saved"
+            >◉</button>
             <button className={`icon-btn ${showSettings ? 'active' : ''}`} onClick={() => setShowSettings(s => !s)} title="Settings" aria-label="Toggle settings">◈</button>
             {user && (
               <button
