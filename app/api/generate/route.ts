@@ -181,7 +181,7 @@ PHASER SCENE STRUCTURE — copy this exact pattern:
     create() {
       const { score } = this.scene.settings.data || { score: 0 };
       this.add.text(400, 260, 'GAME OVER', { fontSize: '48px', color: '#f87171', fontFamily: 'monospace' }).setOrigin(0.5);
-      this.add.text(400, 330, `Score: ${score}`, { fontSize: '24px', color: '#fff', fontFamily: 'monospace' }).setOrigin(0.5);
+      this.add.text(400, 330, 'Score: ' + score, { fontSize: '24px', color: '#fff', fontFamily: 'monospace' }).setOrigin(0.5);
       this.add.text(400, 400, 'Click to Restart', { fontSize: '18px', color: '#aaa', fontFamily: 'monospace' }).setOrigin(0.5);
       this.input.once('pointerdown', () => this.scene.start('GameScene'));
     }
