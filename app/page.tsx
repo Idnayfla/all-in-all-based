@@ -414,7 +414,7 @@ export default function Home() {
 
   const signOut = async () => {
     try { await supabase.auth.signOut(); } catch {}
-    try { localStorage.removeItem(PROJECTS_CACHE_KEY); } catch {}
+    try { localStorage.clear(); } catch {}
     window.location.href = '/';
   };
 
