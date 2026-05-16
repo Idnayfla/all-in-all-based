@@ -407,7 +407,8 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                 setMessages(prev => {
                   const updated = [...prev];
                   const last = updated[updated.length - 1];
-                  if (last?.content && last.content !== '⏳ Working...') {
+                  const c = typeof last?.content === 'string' ? last.content : '';
+                  if (c && !c.startsWith('⟳') && !c.startsWith('🌐') && c !== '⏳ Working...') {
                     updated[updated.length - 1] = { role: 'assistant', content: '⏳ Working...' };
                   }
                   return updated;
