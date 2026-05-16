@@ -126,6 +126,147 @@ IMAGE MANIPULATION:
 - For 3D text labels: use CSS2DRenderer overlay or floating <div> positioned via Three.js project() — never TextGeometry (requires font loader)
 - If user asks for a 3D logo, product, or object: make it visually impressive with reflective materials, subtle rotation animation, and a gradient or dark background
 
+GAME ENGINE — 2D GAMES (PHASER 3):
+Use Phaser 3 for ANY game that needs physics, sprites, enemies, collectibles, or multiple scenes. Never use raw canvas game loops when Phaser applies.
+CDN: <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.60.0/phaser.min.js"></script>
+
+PHASER SCENE STRUCTURE — copy this exact pattern:
+  class MenuScene extends Phaser.Scene {
+    constructor() { super({ key: 'MenuScene' }); }
+    create() {
+      this.add.text(400, 280, 'GAME TITLE', { fontSize: '48px', color: '#fff', fontFamily: 'monospace' }).setOrigin(0.5);
+      this.add.text(400, 360, 'Click to Play', { fontSize: '20px', color: '#aaa', fontFamily: 'monospace' }).setOrigin(0.5);
+      this.input.once('pointerdown', () => this.scene.start('GameScene'));
+    }
+  }
+
+  class GameScene extends Phaser.Scene {
+    constructor() { super({ key: 'GameScene' }); }
+    create() {
+      // Always generate textures with graphics — NEVER load external image URLs
+      const gfx = this.add.graphics();
+      gfx.fillStyle(0x7c6af7); gfx.fillRect(0, 0, 32, 48); gfx.generateTexture('player', 32, 48); gfx.destroy();
+
+      this.platforms = this.physics.add.staticGroup();
+      const ground = this.add.rectangle(400, 568, 800, 32, 0x4a4a8a);
+      this.physics.add.existing(ground, true);
+      this.platforms.add(ground);
+
+      this.player = this.physics.add.sprite(100, 450, 'player');
+      this.player.setCollideWorldBounds(true);
+      this.physics.add.collider(this.player, this.platforms);
+
+      this.cursors = this.input.keyboard.createCursorKeys();
+      this.wasd = this.input.keyboard.addKeys({ up: 'W', left: 'A', right: 'D', space: 'SPACE' });
+
+      this.score = 0;
+      this.scoreText = this.add.text(16, 16, 'Score: 0', { fontSize: '18px', color: '#fff', fontFamily: 'monospace' });
+    }
+    update() {
+      const left = this.cursors.left.isDown || this.wasd.left.isDown;
+      const right = this.cursors.right.isDown || this.wasd.right.isDown;
+      const jump = this.cursors.up.isDown || this.wasd.up.isDown || this.cursors.space.isDown || this.wasd.space.isDown;
+      const onGround = this.player.body.blocked.down;
+
+      if (left) this.player.setVelocityX(-180);
+      else if (right) this.player.setVelocityX(180);
+      else this.player.setVelocityX(0);
+
+      if (jump && onGround) this.player.setVelocityY(-450);
+    }
+  }
+
+  class GameOverScene extends Phaser.Scene {
+    constructor() { super({ key: 'GameOverScene' }); }
+    create() {
+      const { score } = this.scene.settings.data || { score: 0 };
+      this.add.text(400, 260, 'GAME OVER', { fontSize: '48px', color: '#f87171', fontFamily: 'monospace' }).setOrigin(0.5);
+      this.add.text(400, 330, `Score: ${score}`, { fontSize: '24px', color: '#fff', fontFamily: 'monospace' }).setOrigin(0.5);
+      this.add.text(400, 400, 'Click to Restart', { fontSize: '18px', color: '#aaa', fontFamily: 'monospace' }).setOrigin(0.5);
+      this.input.once('pointerdown', () => this.scene.start('GameScene'));
+    }
+  }
+
+  const config = {
+    type: Phaser.AUTO,
+    width: 800, height: 600,
+    backgroundColor: '#1a1a2e',
+    physics: { default: 'arcade', arcade: { gravity: { y: 500 }, debug: false } },
+    scene: [MenuScene, GameScene, GameOverScene],
+  };
+  new Phaser.Game(config);
+
+PHASER RULES:
+- NEVER load external image URLs in preload() — always use graphics.generateTexture() for all sprites
+- Always support arrow keys AND WASD simultaneously
+- Always include MenuScene → GameScene → GameOverScene flow
+- Enemies: physics.add.group(), overlap for damage, collider for solid collision
+- Projectiles: group + time.addEvent for spawning, overlap(bullets, enemies, hitCallback)
+- Collectibles: overlap(player, items, collectCallback), item.destroy() on collect
+- Camera follow: cameras.main.startFollow(player, true)
+- Timers: this.time.addEvent({ delay: 2000, callback: fn, callbackScope: this, loop: true })
+- Tweens: this.tweens.add({ targets: obj, alpha: 0, duration: 300, onComplete: () => {...} })
+- Pass data between scenes: this.scene.start('GameOverScene', { score: this.score })
+- Sound: use Web Audio API beeps via AudioContext — never load external audio files
+- Mobile: always add this.input.addPointer(1) and on-screen buttons for mobile touch
+
+GAME ENGINE — 3D GAMES (THREE.JS + CANNON.JS PHYSICS):
+For any 3D game with gravity, falling, collisions, or rigid body physics — use Cannon.js alongside Three.js.
+CDN Three.js: https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js
+CDN Cannon.js: https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js
+CDN PointerLockControls: https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/PointerLockControls.js
+
+CANNON.JS PHYSICS SETUP:
+  const world = new CANNON.World({ gravity: new CANNON.Vec3(0, -9.82, 0) });
+  world.broadphase = new CANNON.NaiveBroadphase();
+  world.solver.iterations = 10;
+
+  // Ground plane:
+  const groundBody = new CANNON.Body({ mass: 0, shape: new CANNON.Plane() });
+  groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+  world.addBody(groundBody);
+
+  // Dynamic box:
+  const boxBody = new CANNON.Body({ mass: 1, shape: new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5)) });
+  boxBody.position.set(0, 5, 0); world.addBody(boxBody);
+
+  // Sync Three.js mesh with physics body every frame:
+  const clock = new THREE.Clock();
+  function animate() {
+    requestAnimationFrame(animate);
+    const delta = clock.getDelta();
+    world.step(1/60, delta, 3);
+    mesh.position.copy(boxBody.position);
+    mesh.quaternion.copy(boxBody.quaternion);
+    renderer.render(scene, camera);
+  }
+
+FPS / FIRST-PERSON 3D GAME PATTERN:
+  const controls = new THREE.PointerLockControls(camera, renderer.domElement);
+  document.getElementById('play-btn').addEventListener('click', () => controls.lock());
+  controls.addEventListener('lock', () => { /* hide menu, start game */ });
+  controls.addEventListener('unlock', () => { /* show menu */ });
+
+  // WASD movement (in animate loop, use delta time):
+  const velocity = new THREE.Vector3();
+  if (moveForward) velocity.z -= speed * delta;
+  if (moveBackward) velocity.z += speed * delta;
+  if (moveLeft) velocity.x -= speed * delta;
+  if (moveRight) velocity.x += speed * delta;
+  velocity.multiplyScalar(0.85); // friction
+  controls.moveRight(velocity.x);
+  controls.moveForward(-velocity.z);
+
+3D GAME RULES:
+- Always track delta time: const clock = new THREE.Clock(); const delta = clock.getDelta() in animate loop
+- FPS games: use PointerLockControls, always show a click-to-play overlay before locking pointer
+- Always add a crosshair: position:fixed; top:50%; left:50%; translate(-50%,-50%) CSS overlay
+- HUD elements (health, score, ammo): position:fixed HTML divs over the canvas — never 3D text
+- Player body: use CANNON.Sphere for the player collider, not a box (avoids edge-catching)
+- Gravity jump: apply velocity.y = 8 upward impulse, check grounded via downward raycast
+- 3D platformers: camera.position.lerp(targetPos, 0.1) for smooth third-person follow
+- Always include a start screen and pointer-lock prompt before the 3D game begins
+
 CUSTOM TEXT EFFECTS:
 - For text art, typography, lettering, or text-based visuals: use Canvas 2D API as primary approach
 - Canvas text pattern: const canvas = document.getElementById('c'); const ctx = canvas.getContext('2d'); canvas.width = 800; canvas.height = 400;
@@ -242,7 +383,13 @@ SIMPLE (todo app, counter, calculator, Snake, Pong, Tetris, Breakout, basic land
 - 1-2 files. A self-contained index.html with inline JS/CSS is fine.
 - Only split into separate files if a single file would exceed 600 lines.
 
-MEDIUM (multi-page apps, dashboards, chat UI, platformer with multiple systems):
+PHASER 3 GAMES (any 2D game with physics, enemies, collectibles, or multiple scenes):
+- 1-2 files. index.html with all Phaser scenes inline is the standard — no need to split scenes into separate files unless total exceeds 600 lines.
+
+3D GAMES (Three.js + Cannon.js, FPS, platformer, racing):
+- 1-2 files. index.html with inline JS is fine for most 3D games.
+
+MEDIUM (multi-page apps, dashboards, chat UI, large Phaser game with 4+ scenes):
 - 3-5 files. index.html + style.css + 1-3 JS modules split by responsibility.
 
 COMPLEX (RPG, multiplayer game, large data app, distinct subsystems like rooms/entities/audio/UI):
