@@ -98,7 +98,7 @@ function ProgressBar({ progress }: { progress: GenerationProgress }) {
   );
 }
 
-export default function ChatPanel({ messages, setMessages, files, onFilesUpdate, isGenerating, setIsGenerating, personality, memory, globalMemory, incognito, authToken }: {
+export default function ChatPanel({ messages, setMessages, files, onFilesUpdate, isGenerating, setIsGenerating, personality, memory, globalMemory, incognito, authToken, subscriptionTier, generationsUsed }: {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   files: FileNode[];
@@ -110,6 +110,8 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   globalMemory?: string;
   incognito: boolean;
   authToken?: string;
+  subscriptionTier?: 'free' | 'pro';
+  generationsUsed?: number;
 }) {
   const [input, setInput] = useState('');
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
@@ -269,6 +271,12 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     if (!trimmed && !pendingImage) return;
     if (isGenerating) return;
 
+    // Client-side pre-check so limit modal shows even if server count is stale
+    if (subscriptionTier === 'free' && (generationsUsed ?? 0) >= 10) {
+      window.dispatchEvent(new CustomEvent('generation-limit-reached'));
+      return;
+    }
+
     const messageContent: Message['content'] = pendingImage
       ? [
           { type: 'image', mediaType: pendingImage.mediaType, data: pendingImage.data },
@@ -335,6 +343,12 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             if (data.plan) {
               flushSync(() => {
                 setGenProgress({ files: data.plan, completed: 0, total: data.plan.length, file: '', chunks: 0 });
+              });
+              const fileNames = (data.plan as { name: string }[]).map(f => f.name).join(', ');
+              setMessages(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = { role: 'assistant', content: `⟳ Building ${fileNames}…` };
+                return updated;
               });
             }
 
@@ -408,7 +422,8 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
 
     } catch (e: any) {
       setGenProgress(null);
-      if (e?.name === 'AbortError') {
+      if (e?.name === 'AbortError' || e?.message === 'limit') {
+        // AbortError = user clicked Discard; limit = pricing modal already shown — just clean up
         doneHandled = true;
         setMessages(prev => {
           const last = prev[prev.length - 1];
@@ -416,7 +431,10 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           return prev;
         });
       } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: 'Error: Could not reach the API.' }]);
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: "Hmm, something went wrong on my end — give it another shot. If it keeps happening, try refreshing the page.",
+        }]);
       }
     } finally {
       if (!doneHandled) {

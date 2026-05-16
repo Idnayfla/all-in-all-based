@@ -630,6 +630,8 @@ export default function Home() {
                   setMessages={setMessages}
                   files={files}
                   authToken={authToken}
+                  subscriptionTier={subscription.tier}
+                  generationsUsed={subscription.generationsUsed}
                   onFilesUpdate={(newFiles, type) => {
                     setFiles(prev => {
                       const merged = [...prev];
