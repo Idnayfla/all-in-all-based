@@ -291,13 +291,21 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     abortRef.current = abort;
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      let accessToken: string | undefined;
+      try {
+        const result = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 2000)),
+        ]);
+        accessToken = result.data.session?.access_token;
+      } catch {}
+
       const res = await fetch('/api/generate', {
         method: 'POST',
         signal: abort.signal,
         headers: {
           'Content-Type': 'application/json',
-          ...(session?.access_token ? { 'Authorization': `Bearer ${session.access_token}` } : {}),
+          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
         },
         body: JSON.stringify({ messages: newMessages, existingFiles: files, personality, memory, globalMemory }),
       });
