@@ -412,8 +412,9 @@ export default function Home() {
     setActiveFile(updated);
   };
 
-  const signOut = async () => {
-    try { await supabase.auth.signOut(); } catch {}
+  const signOut = () => {
+    isExplicitSignOut.current = true;
+    void supabase.auth.signOut().catch(() => {});
     try { localStorage.clear(); } catch {}
     window.location.href = '/';
   };
