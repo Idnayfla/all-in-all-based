@@ -82,12 +82,7 @@ function ProgressBar({ progress }: { progress: GenerationProgress }) {
       </div>
       <div className="gen-progress-bar-track">
         {isIndeterminate ? (
-          <motion.div
-            className="gen-progress-bar-fill"
-            style={{ width: '40%' }}
-            animate={{ x: ['-100%', '300%'] }}
-            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-          />
+          <div className="gen-progress-bar-fill gen-progress-bar-scanning" />
         ) : (
           <motion.div
             className="gen-progress-bar-fill"
