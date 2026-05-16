@@ -487,6 +487,12 @@ export default function Home() {
               transition={{ type: 'spring', stiffness: 350, damping: 32 }}
             >
               <div className="settings-header">⬡ Settings</div>
+              {user && (
+                <div className="settings-section settings-account-row">
+                  <span className="settings-hint" style={{ margin: 0 }}>{user.email}</span>
+                  <button className="auth-signout-btn" onClick={signOut}>Sign Out</button>
+                </div>
+              )}
               <div className="settings-section">
                 <label className="settings-label">Appearance</label>
                 <ThemeCustomizer
@@ -582,12 +588,6 @@ export default function Home() {
                       Manage billing
                     </button>
                   )}
-                </div>
-              )}
-              {user && (
-                <div className="settings-section">
-                  <div className="settings-hint" style={{ marginBottom: 4 }}>Signed in as {user.email}</div>
-                  <button className="auth-signout-btn" onClick={signOut}>Sign Out</button>
                 </div>
               )}
             </motion.div>

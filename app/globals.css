@@ -602,6 +602,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 }
 .settings-header { font-family: var(--font-display); font-size: 16px; font-weight: 700; color: var(--text); }
 .settings-section { display: flex; flex-direction: column; gap: 8px; }
+.settings-account-row { flex-direction: row; align-items: center; justify-content: space-between; }
 .settings-label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--text3); }
 .settings-textarea {
   background: var(--bg3); border: 1px solid var(--border); color: var(--text);
