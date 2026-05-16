@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     const enhanced = await enhancePrompt(prompt);
 
-    const res = await fetch('https://fal.run/fal-ai/musicgen', {
+    const res = await fetch('https://fal.run/fal-ai/stable-audio', {
       method: 'POST',
       headers: {
         'Authorization': `Key ${key}`,
@@ -40,27 +40,15 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         prompt: enhanced,
-        duration: Math.min(duration ?? 30, 30),
-        model_version: 'stereo-large',
+        seconds_total: Math.min(duration ?? 30, 45),
+        steps: 100,
       }),
     });
 
-    if (!res.ok) {
-      // Fall back to stable-audio if musicgen fails
-      const fallback = await fetch('https://fal.run/fal-ai/stable-audio', {
-        method: 'POST',
-        headers: { 'Authorization': `Key ${key}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: enhanced, seconds_total: Math.min(duration ?? 30, 45), steps: 100 }),
-      });
-      if (!fallback.ok) return NextResponse.json({ error: 'Music generation failed' }, { status: 500 });
-      const fd = await fallback.json();
-      const url = fd.audio_file?.url ?? '';
-      if (!url) return NextResponse.json({ error: 'No audio URL returned' }, { status: 500 });
-      return NextResponse.json({ url, enhanced });
-    }
+    if (!res.ok) return NextResponse.json({ error: 'Music generation failed' }, { status: 500 });
 
     const data = await res.json();
-    const url = data.audio?.url ?? data.audio_file?.url ?? '';
+    const url = data.audio_file?.url ?? '';
     if (!url) return NextResponse.json({ error: 'No audio URL returned' }, { status: 500 });
 
     return NextResponse.json({ url, enhanced });
