@@ -63,42 +63,53 @@ interface GenerationProgress {
 }
 
 function ProgressBar({ progress }: { progress: GenerationProgress }) {
-  // Asymptotic curve: fills quickly then tapers — no fixed chunk estimate needed
   const withinFile = progress.file
     ? Math.min(1 - Math.exp(-progress.chunks / 50), 0.92)
     : 0;
   const pct = progress.total === 0 ? 0
     : Math.round((progress.completed + withinFile) / progress.total * 100);
+  const isIndeterminate = progress.total === 0;
 
   return (
     <div className="generation-progress">
       <div className="gen-progress-header">
         <span className="gen-progress-file">
-          {progress.total === 0
+          {isIndeterminate
             ? (progress.file || '... Preparing')
             : (progress.file ? `◈ ${progress.file}` : '... Preparing')}
         </span>
-        <span className="gen-progress-count">{progress.completed}/{progress.total}</span>
+        {!isIndeterminate && <span className="gen-progress-count">{progress.completed}/{progress.total}</span>}
       </div>
       <div className="gen-progress-bar-track">
-        <motion.div
-          className="gen-progress-bar-fill"
-          animate={{ width: `${pct}%` }}
-          transition={{ type: 'spring', stiffness: 120, damping: 20 }}
-        />
+        {isIndeterminate ? (
+          <motion.div
+            className="gen-progress-bar-fill"
+            style={{ width: '40%' }}
+            animate={{ x: ['-100%', '300%'] }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        ) : (
+          <motion.div
+            className="gen-progress-bar-fill"
+            animate={{ width: `${pct}%` }}
+            transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+          />
+        )}
       </div>
-      <div className="gen-progress-pct">{pct}%</div>
-      <div className="gen-progress-files">
-        {progress.files.map((f, i) => {
-          const done = i < progress.completed;
-          const active = i === progress.completed;
-          return (
-            <span key={f} className={`gen-file-chip ${done ? 'done' : active ? 'active' : ''}`}>
-              {done ? '✓ ' : active ? '◈ ' : ''}{f}
-            </span>
-          );
-        })}
-      </div>
+      {!isIndeterminate && <div className="gen-progress-pct">{pct}%</div>}
+      {!isIndeterminate && (
+        <div className="gen-progress-files">
+          {progress.files.map((f, i) => {
+            const done = i < progress.completed;
+            const active = i === progress.completed;
+            return (
+              <span key={f} className={`gen-file-chip ${done ? 'done' : active ? 'active' : ''}`}>
+                {done ? '✓ ' : active ? '◈ ' : ''}{f}
+              </span>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
