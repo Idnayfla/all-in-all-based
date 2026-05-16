@@ -72,7 +72,11 @@ function ProgressBar({ progress }: { progress: GenerationProgress }) {
   return (
     <div className="generation-progress">
       <div className="gen-progress-header">
-        <span className="gen-progress-file">{progress.file ? `◈ ${progress.file}` : '... Preparing'}</span>
+        <span className="gen-progress-file">
+          {progress.total === 0
+            ? (progress.file || '... Preparing')
+            : (progress.file ? `◈ ${progress.file}` : '... Preparing')}
+        </span>
         <span className="gen-progress-count">{progress.completed}/{progress.total}</span>
       </div>
       <div className="gen-progress-bar-track">
@@ -591,8 +595,8 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               >
                 <div className="message-role">{m.role === 'user' ? 'YOU' : 'BASED'}</div>
                 <div className="message-content">
-                  {m.role === 'assistant' && genProgress && i === messages.length - 1
-                    ? <ProgressBar progress={genProgress} />
+                  {m.role === 'assistant' && isGenerating && i === messages.length - 1
+                    ? <ProgressBar progress={genProgress ?? { files: [], completed: 0, total: 0, file: typeof m.content === 'string' && m.content !== '... Working' ? m.content : '', chunks: 0 }} />
                     : renderContent(m.content)
                   }
                 </div>
