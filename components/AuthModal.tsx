@@ -5,8 +5,13 @@ import { supabase } from '@/lib/supabase';
 
 type Tab = 'signin' | 'signup';
 
-export default function AuthModal() {
-  const [tab, setTab]         = useState<Tab>('signin');
+interface Props {
+  defaultTab?: Tab;
+  onClose?: () => void;
+}
+
+export default function AuthModal({ defaultTab = 'signin', onClose }: Props) {
+  const [tab, setTab]         = useState<Tab>(defaultTab);
   const [email, setEmail]     = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -90,6 +95,9 @@ export default function AuthModal() {
         exit={{ opacity: 0, scale: 0.94, y: -12 }}
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       >
+        {onClose && (
+          <button className="auth-close-btn" onClick={onClose} aria-label="Close">✕</button>
+        )}
         <div className="auth-logo">B&gt;</div>
         <div className="auth-title">Welcome to Based</div>
 

@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
 import CompanionDrawer, { CMsg } from '@/components/CompanionDrawer';
 import PricingModal from '@/components/PricingModal';
+import LandingPage from '@/components/LandingPage';
 
 export interface FileNode {
   name: string;
@@ -76,6 +77,8 @@ export default function Home() {
   const [authToken, setAuthToken]     = useState<string>('');
   const isExplicitSignOut             = useRef(false);
   const [showSplash, setShowSplash]   = useState(true);
+  const [showAuth, setShowAuth]       = useState(false);
+  const [authTab, setAuthTab]         = useState<'signin' | 'signup'>('signin');
   const [theme, setTheme]             = useState<AppTheme>(DEFAULT_THEME);
   const [showMemoryManager, setShowMemoryManager] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -423,6 +426,25 @@ export default function Home() {
   const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
   const avatarInitial = (user?.email as string | undefined)?.[0]?.toUpperCase() ?? '?';
 
+  if (!showSplash && authReady && !user) {
+    return (
+      <>
+        <LandingPage
+          onSignIn={(tab) => { setAuthTab(tab ?? 'signin'); setShowAuth(true); }}
+        />
+        <AnimatePresence>
+          {showAuth && (
+            <AuthModal
+              key="auth-modal"
+              defaultTab={authTab}
+              onClose={() => setShowAuth(false)}
+            />
+          )}
+        </AnimatePresence>
+      </>
+    );
+  }
+
   return (
     <div className="app-root">
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
@@ -673,9 +695,6 @@ export default function Home() {
             onConfirm={createProject}
             onCancel={() => setProjectModal(false)}
           />
-        )}
-        {authReady && !user && !showSplash && (
-          <AuthModal key="auth-modal" />
         )}
       </AnimatePresence>
 
