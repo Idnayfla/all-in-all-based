@@ -414,7 +414,13 @@ export default function Home() {
 
   const signOut = async () => {
     isExplicitSignOut.current = true;
-    await supabase.auth.signOut();
+    try { await supabase.auth.signOut(); } catch {}
+    // Force-clear state even if Supabase signOut fails
+    setUser(null);
+    setAuthToken('');
+    setProjects([]); setCurrentProject(null);
+    setFiles([]); setMessages([]); setActiveFile(null);
+    setGlobalMemory(''); setPersonality(DEFAULT_PERSONALITY);
     setShowSettings(false);
   };
 
