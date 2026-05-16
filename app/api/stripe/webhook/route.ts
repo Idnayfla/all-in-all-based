@@ -16,13 +16,38 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });
   }
 
+  // Look up Supabase user by stripe_customer_id.
+  // Falls back to customer email lookup so manually-created subscriptions work too.
   async function getUidByCustomer(customerId: string): Promise<string | null> {
     const { data } = await supabaseAdmin
       .from('user_settings')
       .select('user_id')
       .eq('stripe_customer_id', customerId)
       .single();
-    return data?.user_id ?? null;
+
+    if (data?.user_id) return data.user_id;
+
+    // Fallback: fetch email from Stripe, find matching Supabase user
+    try {
+      const customer = await stripe.customers.retrieve(customerId);
+      if (customer.deleted) return null;
+      const email = (customer as Stripe.Customer).email;
+      if (!email) return null;
+
+      const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+      const user = users.find(u => u.email === email);
+      if (!user) return null;
+
+      // Cache the link for future webhook events
+      await supabaseAdmin.from('user_settings').upsert({
+        user_id: user.id,
+        stripe_customer_id: customerId,
+      }, { onConflict: 'user_id' });
+
+      return user.id;
+    } catch {
+      return null;
+    }
   }
 
   async function setTier(userId: string, tier: 'free' | 'pro', status: string) {
@@ -50,6 +75,7 @@ export async function POST(req: NextRequest) {
         break;
       }
 
+      case 'customer.subscription.created':
       case 'customer.subscription.updated': {
         const sub = event.data.object as Stripe.Subscription;
         const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id;
