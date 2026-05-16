@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '../_auth';
+import { searchWeb } from '@/lib/tavily';
+import { getWeather } from '@/lib/weather';
 
 export const maxDuration = 300;
 
@@ -403,7 +405,7 @@ async function callModel(
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, existingFiles, personality, memory, globalMemory: clientGlobalMemory } = await req.json();
+    const { messages, existingFiles, personality, memory, globalMemory: clientGlobalMemory, location } = await req.json();
 
     // Free tier generation gate — fail open so DB issues never block users
     const authToken = req.headers.get('Authorization')?.replace('Bearer ', '');
@@ -492,6 +494,40 @@ export async function POST(req: NextRequest) {
     const readable = new ReadableStream({
       async start(controller) {
         try {
+          // Step 0: Real-time context gathering
+          let realtimeContext = '';
+          if (process.env.TAVILY_API_KEY || process.env.OPENWEATHER_API_KEY) {
+            try {
+              const needsCheck = await callModel(
+                `User request: "${lastUserMessage}"\n\nDoes this need real-time external data? Reply with JSON only:\n{"needsSearch":boolean,"needsWeather":boolean,"searchQuery":"...","weatherLocation":"..."}`,
+                'Reply with only valid JSON. No markdown.',
+                'planner'
+              );
+              const match = needsCheck.match(/\{[\s\S]*\}/);
+              if (match) {
+                const needs = JSON.parse(match[0]);
+                if (needs.needsSearch && process.env.TAVILY_API_KEY && needs.searchQuery) {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ searching: 'web' })}\n\n`));
+                  const results = await searchWeb(needs.searchQuery);
+                  if (results) realtimeContext += `\nWEB SEARCH for "${needs.searchQuery}":\n${results}`;
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ searching: null })}\n\n`));
+                }
+                if (needs.needsWeather && process.env.OPENWEATHER_API_KEY) {
+                  const loc = needs.weatherLocation
+                    ? needs.weatherLocation
+                    : location ?? null;
+                  if (loc) {
+                    const weather = await getWeather(loc);
+                    if (weather) realtimeContext += `\nCURRENT WEATHER:\n${weather}`;
+                  }
+                }
+              }
+            } catch { /* fail open */ }
+          }
+          if (realtimeContext) {
+            systemBlocks.push({ type: 'text', text: `\nREAL-TIME DATA (use this as actual data in the generated app — do not invent fake values when real data is provided):\n${realtimeContext}` });
+          }
+
           // Step 1: Planner classifies intent and plans files
           const plannerPromptContent = imageBlocks.length > 0
             ? [...imageBlocks, { type: 'text' as const, text: lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '') }]

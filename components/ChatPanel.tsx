@@ -123,6 +123,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const locationRef = useRef<{ lat: number; lon: number } | null>(null);
 
   const discardGeneration = () => {
     abortRef.current?.abort();
@@ -299,6 +300,17 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     abortRef.current = abort;
 
     try {
+      // Lazily fetch location once — silently skip if denied or unavailable
+      if (!locationRef.current && typeof navigator !== 'undefined' && navigator.geolocation) {
+        await new Promise<void>(resolve => {
+          navigator.geolocation.getCurrentPosition(
+            pos => { locationRef.current = { lat: pos.coords.latitude, lon: pos.coords.longitude }; resolve(); },
+            () => resolve(),
+            { timeout: 2000, maximumAge: 600000 }
+          );
+        });
+      }
+
       const res = await fetch('/api/generate', {
         method: 'POST',
         signal: abort.signal,
@@ -306,7 +318,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           'Content-Type': 'application/json',
           ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
         },
-        body: JSON.stringify({ messages: newMessages, existingFiles: files, personality, memory, globalMemory }),
+        body: JSON.stringify({ messages: newMessages, existingFiles: files, personality, memory, globalMemory, location: locationRef.current }),
       });
 
       if (res.status === 402) {
@@ -339,6 +351,22 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
 
           try {
             const data = JSON.parse(line.slice(6));
+
+            if (data.searching === 'web') {
+              setMessages(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = { role: 'assistant', content: '🌐 Searching the web...' };
+                return updated;
+              });
+            }
+
+            if (data.searching === null) {
+              setMessages(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = { role: 'assistant', content: '⏳ Working...' };
+                return updated;
+              });
+            }
 
             if (data.plan) {
               flushSync(() => {
