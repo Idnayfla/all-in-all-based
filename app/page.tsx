@@ -30,7 +30,8 @@ export type ContentBlock =
   | { type: 'text'; text: string }
   | { type: 'image'; mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'; data: string }
   | { type: 'generated-image'; url: string; prompt: string }
-  | { type: 'generated-video'; url: string; prompt: string };
+  | { type: 'generated-video'; url: string; prompt: string }
+  | { type: 'generated-music'; url: string; prompt: string };
 
 export interface Message {
   role: 'user' | 'assistant';

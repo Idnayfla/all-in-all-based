@@ -2,14 +2,14 @@
 import { motion } from 'framer-motion';
 
 interface GeneratingCardProps {
-  type: 'image' | 'video';
+  type: 'image' | 'video' | 'music';
 }
 
 const DOTS = [0, 1, 2];
 
 export default function GeneratingCard({ type }: GeneratingCardProps) {
-  const icon = type === 'image' ? '◈' : '▸';
-  const label = type === 'image' ? 'Generating image' : 'Generating video';
+  const icon = type === 'image' ? '◈' : type === 'music' ? '♪' : '▸';
+  const label = type === 'image' ? 'Generating image' : type === 'music' ? 'Composing music' : 'Generating video';
 
   return (
     <motion.div

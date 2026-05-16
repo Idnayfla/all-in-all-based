@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import ImageEditorModal from './ImageEditorModal';
 import ModeDropdown, { GenerationMode } from './ModeDropdown';
 import GeneratedVideoCard from './GeneratedVideoCard';
+import GeneratedMusicCard from './GeneratedMusicCard';
 import GeneratingCard from './GeneratingCard';
 import { useVoiceActivation } from '@/hooks/useVoiceActivation';
 
@@ -226,6 +227,38 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       setMessages(prev => [
         ...prev.slice(0, -1),
         { role: 'assistant', content: `✕ Image generation failed: ${err.message}` },
+      ]);
+    } finally {
+      setIsGeneratingMedia(false);
+    }
+  };
+
+  const sendMusic = async () => {
+    const prompt = input.trim();
+    if (!prompt || isGenerating || isGeneratingMedia) return;
+    setInput('');
+    setIsGeneratingMedia(true);
+
+    const userMsg: Message = { role: 'user', content: prompt };
+    const loadingMsg: Message = { role: 'assistant', content: [{ type: 'text', text: '__generating-music__' }] };
+    setMessages(prev => [...prev, userMsg, loadingMsg]);
+
+    try {
+      const res = await fetch('/api/music', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setMessages(prev => [
+        ...prev.slice(0, -1),
+        { role: 'assistant', content: [{ type: 'generated-music', url: data.url, prompt }] },
+      ]);
+    } catch (err: any) {
+      setMessages(prev => [
+        ...prev.slice(0, -1),
+        { role: 'assistant', content: `✕ Music generation failed: ${err.message}` },
       ]);
     } finally {
       setIsGeneratingMedia(false);
@@ -511,6 +544,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (generationMode === 'seedance') sendVideo();
+      else if (generationMode === 'music') sendMusic();
       else if (generationMode !== 'chat') sendImage();
       else send();
     }
@@ -545,11 +579,17 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           if (block.type === 'generated-video') {
             return <GeneratedVideoCard key={i} url={block.url} prompt={block.prompt} />;
           }
+          if (block.type === 'generated-music') {
+            return <GeneratedMusicCard key={i} url={block.url} prompt={block.prompt} />;
+          }
           if (block.type === 'text' && block.text === '__generating-image__') {
             return <GeneratingCard key={i} type="image" />;
           }
           if (block.type === 'text' && block.text === '__generating-video__') {
             return <GeneratingCard key={i} type="video" />;
+          }
+          if (block.type === 'text' && block.text === '__generating-music__') {
+            return <GeneratingCard key={i} type="music" />;
           }
           if (block.type === 'text') {
             return <ReactMarkdown key={i}>{block.text}</ReactMarkdown>;
@@ -709,6 +749,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               voiceState === 'listening' ? 'Listening… say "Based, build me a game"' :
               voiceState === 'activated' ? `"${voiceTranscript}"` :
               generationMode === 'seedance' ? 'Describe a video to generate...' :
+              generationMode === 'music' ? 'Describe the music to generate...' :
               generationMode !== 'chat' ? 'Describe an image to generate...' :
               'Ask Based anything...'
             }
@@ -719,6 +760,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             className={`send-btn${generationMode !== 'chat' ? ' send-btn-image' : ''}`}
             onClick={() => {
               if (generationMode === 'seedance') sendVideo();
+              else if (generationMode === 'music') sendMusic();
               else if (generationMode !== 'chat') sendImage();
               else send();
             }}

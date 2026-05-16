@@ -2,13 +2,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-export type GenerationMode = 'chat' | 'flux' | 'nano-banana' | 'seedance';
+export type GenerationMode = 'chat' | 'flux' | 'nano-banana' | 'seedance' | 'music';
 
 const MODES: { value: GenerationMode; icon: string; label: string }[] = [
   { value: 'chat',        icon: 'B>', label: 'Chat' },
   { value: 'flux',        icon: '◈',  label: 'Image · FLUX' },
   { value: 'nano-banana', icon: '◈',  label: 'Image · Nano Banana 2' },
   { value: 'seedance',    icon: '▸',  label: 'Video · Seedance 2.0' },
+  { value: 'music',       icon: '♪',  label: 'Music · Stable Audio' },
 ];
 
 interface ModeDropdownProps {

@@ -454,6 +454,35 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
   box-shadow: 0 4px 20px var(--accent-glow);
 }
 
+.generated-music-wrap {
+  display: flex; flex-direction: column; gap: 8px; max-width: 420px;
+}
+
+.generated-music-player {
+  display: flex; align-items: center; gap: 12px;
+  background: linear-gradient(135deg, #1a1a2e, #16213e);
+  border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; overflow: hidden;
+}
+
+.generated-music-btn {
+  width: 44px; height: 44px; flex-shrink: 0;
+  background: rgba(124,106,247,0.85); border: none; border-radius: 50%;
+  color: #fff; font-size: 16px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  padding-left: 2px;
+  box-shadow: 0 4px 16px var(--accent-glow);
+}
+
+.generated-music-waveform {
+  display: flex; align-items: center; gap: 3px; flex: 1; height: 32px;
+}
+
+.waveform-bar {
+  width: 3px; background: var(--accent); border-radius: 2px;
+  height: 4px; flex-shrink: 0;
+}
+
 .chat-image-preview {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 12px; background: var(--bg3);
