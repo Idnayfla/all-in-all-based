@@ -307,6 +307,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         throw new Error('limit');
       }
       if (!res.ok) throw new Error('API error');
+      window.dispatchEvent(new CustomEvent('generation-used'));
       if (!res.body) throw new Error('No stream');
 
       const reader = res.body.getReader();

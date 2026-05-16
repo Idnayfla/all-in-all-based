@@ -261,11 +261,16 @@ export default function Home() {
     return () => window.removeEventListener('focus', onFocus);
   }, [user, loadCloudData]);
 
-  // ── Generation limit event ───────────────────────────────────────────────
+  // ── Generation events ────────────────────────────────────────────────────
   useEffect(() => {
-    const handler = () => { setPricingReason('generations'); setShowPricing(true); };
-    window.addEventListener('generation-limit-reached', handler);
-    return () => window.removeEventListener('generation-limit-reached', handler);
+    const onLimit = () => { setPricingReason('generations'); setShowPricing(true); };
+    const onUsed  = () => setSubscription(s => ({ ...s, generationsUsed: s.generationsUsed + 1 }));
+    window.addEventListener('generation-limit-reached', onLimit);
+    window.addEventListener('generation-used', onUsed);
+    return () => {
+      window.removeEventListener('generation-limit-reached', onLimit);
+      window.removeEventListener('generation-used', onUsed);
+    };
   }, []);
 
   // ── Memory updated event ─────────────────────────────────────────────────
