@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { FileNode } from '@/app/page';
 
 export default function PreviewPanel({ files, projectType }: { 
@@ -10,6 +10,7 @@ export default function PreviewPanel({ files, projectType }: {
   const [isRunning, setIsRunning] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishUrl, setPublishUrl] = useState('');
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const htmlFile = files.find(f => f.language === 'html');
   const cssFile = files.find(f => f.language === 'css');
   const jsFile = files.find(f => f.language === 'javascript' || f.language === 'js');
@@ -97,6 +98,9 @@ export default function PreviewPanel({ files, projectType }: {
       <div className="preview-header">
         <span>⬡ Preview — Live</span>
         <div className="preview-actions">
+          <button className="run-btn" onClick={() => iframeRef.current?.contentWindow?.print()}>
+            ⬇ PDF
+          </button>
           <button className="run-btn" onClick={publishApp} disabled={isPublishing}>
             {isPublishing ? '... Publishing' : '◆ Publish'}
           </button>
@@ -110,9 +114,10 @@ export default function PreviewPanel({ files, projectType }: {
         </div>
       )}
       <iframe
+        ref={iframeRef}
         className="preview-frame"
         srcDoc={previewHtml}
-        sandbox="allow-scripts allow-same-origin"
+        sandbox="allow-scripts allow-same-origin allow-modals"
         title="Preview"
       />
     </div>

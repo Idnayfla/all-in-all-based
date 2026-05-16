@@ -149,7 +149,62 @@ CUSTOM LOGO:
 - Always provide two download buttons:
   1. "Download SVG" — Blob from outerHTML, type image/svg+xml, URL.createObjectURL
   2. "Download PNG" — draw SVG onto canvas via Image src = 'data:image/svg+xml,...', then canvas.toDataURL()
-- Make logos look professional: use 2-3 colors max, clean geometry, deliberate negative space`;
+- Make logos look professional: use 2-3 colors max, clean geometry, deliberate negative space
+
+DOCUMENT GENERATION — EXPORT PDF / EXCEL / POWERPOINT / WORD:
+When the user asks to export, download, or generate a document (PDF, Excel/spreadsheet, PowerPoint/slides, Word/DOCX):
+- NEVER use server-side libraries or Node.js requires — always use browser CDN libraries only
+- Always add a prominent "Export" button that triggers the download immediately on click
+- Always wire the export button inside DOMContentLoaded with addEventListener
+
+PDF (single page or multi-page reports):
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(18); doc.text('Title', 20, 20);
+  doc.setFontSize(12); doc.text('Body text here', 20, 35);
+  // For tables: doc.autoTable({ head: [['Col1','Col2']], body: [['a','b']], startY: 50 });
+  doc.save('output.pdf');
+
+EXCEL / Spreadsheet:
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([['Name','Score'],['Alice',95],['Bob',87]]);
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  XLSX.writeFile(wb, 'output.xlsx');
+  // From HTML table: const ws = XLSX.utils.table_to_sheet(document.getElementById('table'));
+
+POWERPOINT / Slides:
+  <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+  const pptx = new PptxGenJS();
+  const slide = pptx.addSlide();
+  slide.addText('Slide Title', { x: 0.5, y: 0.5, fontSize: 28, bold: true, color: '363636' });
+  slide.addText('Bullet point', { x: 0.5, y: 1.5, fontSize: 18, color: '666666' });
+  // Image: slide.addImage({ path: 'url', x: 1, y: 1, w: 6, h: 3 });
+  // Shape: slide.addShape(pptx.ShapeType.rect, { x: 0.5, y: 0.5, w: 8, h: 1, fill: { color: '0070C0' } });
+  pptx.writeFile({ fileName: 'output.pptx' });
+
+WORD / DOCX:
+  <script src="https://unpkg.com/docx@8.5.0/build/index.js"></script>
+  // docx runs in browser via Blob + FileSaver pattern:
+  const { Document, Paragraph, TextRun, Packer } = docx;
+  const doc = new Document({ sections: [{ children: [
+    new Paragraph({ children: [new TextRun({ text: 'Hello World', bold: true, size: 32 })] }),
+    new Paragraph({ text: 'Normal paragraph here.' }),
+  ]}]});
+  Packer.toBlob(doc).then(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'output.docx'; a.click();
+    URL.revokeObjectURL(url);
+  });
+
+RULES FOR ALL DOCUMENT EXPORTS:
+- Always show a live preview of the data first (table, card, chart) then the export button below
+- Style the export button prominently: background #2563eb, white text, padding 10px 24px, border-radius 6px
+- After export: briefly show "✓ Downloaded!" feedback on the button for 2 seconds, then reset
+- If the user provides data (a list, table, numbers): use that exact data — never invent placeholder data
+- Combine export types when it makes sense: a data dashboard should offer both PDF and Excel buttons`;
 
 const PLANNER_SYSTEM = `You are a software architect. Output ONLY a JSON array. No explanation. No markdown. Raw JSON only.
 
