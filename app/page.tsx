@@ -73,6 +73,7 @@ export default function Home() {
   const [projectModal, setProjectModal] = useState(false);
   const [user, setUser]               = useState<any>(null);
   const [authReady, setAuthReady]     = useState(false);
+  const [authToken, setAuthToken]     = useState<string>('');
   const isExplicitSignOut             = useRef(false);
   const [showSplash, setShowSplash]   = useState(true);
   const [theme, setTheme]             = useState<AppTheme>(DEFAULT_THEME);
@@ -207,6 +208,7 @@ export default function Home() {
       }
       const currentUser = session?.user ?? null;
       setUser(currentUser);
+      setAuthToken(session?.access_token ?? '');
       setAuthReady(true);
       if (currentUser) {
         const headers = await getHeaders();
@@ -226,6 +228,7 @@ export default function Home() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
+      setAuthToken(session?.access_token ?? '');
       if (event === 'SIGNED_IN' && currentUser) {
         const headers = await getHeaders();
         const res = await fetch('/api/projects', { headers });
@@ -562,7 +565,7 @@ export default function Home() {
                       {subscription.tier === 'pro' ? '⬡ Pro' : 'Free'}
                     </span>
                     {subscription.tier === 'free' && (
-                      <span className="plan-usage">{subscription.generationsUsed}/10 generations this month</span>
+                      <span className="plan-usage">{Math.min(subscription.generationsUsed, 10)}/10 generations this month</span>
                     )}
                   </div>
                   {subscription.tier === 'free' ? (
@@ -605,6 +608,7 @@ export default function Home() {
                 memory=""
                 globalMemory={globalMemory}
                 incognito={true}
+                authToken={authToken}
               />
             </div>
           ) : !currentProject ? (
@@ -625,6 +629,7 @@ export default function Home() {
                   messages={messages}
                   setMessages={setMessages}
                   files={files}
+                  authToken={authToken}
                   onFilesUpdate={(newFiles, type) => {
                     setFiles(prev => {
                       const merged = [...prev];

@@ -8,7 +8,6 @@ import ImageEditorModal from './ImageEditorModal';
 import ModeDropdown, { GenerationMode } from './ModeDropdown';
 import GeneratedVideoCard from './GeneratedVideoCard';
 import GeneratingCard from './GeneratingCard';
-import { supabase } from '@/lib/supabase';
 import { useVoiceActivation } from '@/hooks/useVoiceActivation';
 
 const SUGGESTION_POOL = [
@@ -99,7 +98,7 @@ function ProgressBar({ progress }: { progress: GenerationProgress }) {
   );
 }
 
-export default function ChatPanel({ messages, setMessages, files, onFilesUpdate, isGenerating, setIsGenerating, personality, memory, globalMemory, incognito }: {
+export default function ChatPanel({ messages, setMessages, files, onFilesUpdate, isGenerating, setIsGenerating, personality, memory, globalMemory, incognito, authToken }: {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   files: FileNode[];
@@ -110,6 +109,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   memory: string;
   globalMemory?: string;
   incognito: boolean;
+  authToken?: string;
 }) {
   const [input, setInput] = useState('');
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
@@ -291,21 +291,12 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     abortRef.current = abort;
 
     try {
-      let accessToken: string | undefined;
-      try {
-        const result = await Promise.race([
-          supabase.auth.getSession(),
-          new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 2000)),
-        ]);
-        accessToken = result.data.session?.access_token;
-      } catch {}
-
       const res = await fetch('/api/generate', {
         method: 'POST',
         signal: abort.signal,
         headers: {
           'Content-Type': 'application/json',
-          ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
         },
         body: JSON.stringify({ messages: newMessages, existingFiles: files, personality, memory, globalMemory }),
       });
@@ -448,12 +439,11 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               ? m.content.filter((b: { type: string }) => b.type === 'text')
               : m.content,
           }));
-          const { data: { session } } = await supabase.auth.getSession();
           const memRes = await fetch('/api/memory', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session?.access_token ?? ''}`,
+              ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
             },
             body: JSON.stringify({ messages: memMessages }),
           });
