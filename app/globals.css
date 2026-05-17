@@ -2478,6 +2478,52 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .chat-empty-title { animation: fadeSlideUp 0.5s 0.1s cubic-bezier(0.16,1,0.3,1) both; }
 .chat-empty-sub   { animation: fadeSlideUp 0.5s 0.2s cubic-bezier(0.16,1,0.3,1) both; }
 
+/* ── Wallpaper mode — semi-transparent panels so the photo shows through ── */
+html.has-wallpaper {
+  --bg:  rgba(10, 10, 15, 0.78);
+  --bg2: rgba(17, 17, 24, 0.82);
+  --bg3: rgba(26, 26, 36, 0.86);
+}
+html.has-wallpaper body {
+  background-color: #0a0a0f;
+}
+html.has-wallpaper .app-root,
+html.has-wallpaper .app-header,
+html.has-wallpaper .sidebar,
+html.has-wallpaper .chat-panel,
+html.has-wallpaper .chat-input-area,
+html.has-wallpaper .settings-panel,
+html.has-wallpaper .preview-panel,
+html.has-wallpaper .editor-panel {
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+}
+
+/* ── Wallpaper settings UI ── */
+.wallpaper-section { display: flex; flex-direction: column; gap: 10px; }
+.wallpaper-preview {
+  width: 100%; height: 96px; border-radius: var(--r-lg);
+  background-size: cover; background-position: center;
+  border: 1px solid var(--border);
+}
+.wallpaper-actions { display: flex; gap: 8px; }
+.wallpaper-upload-btn {
+  flex: 1; padding: 10px 16px; background: var(--bg3);
+  border: 1px solid var(--accent); color: var(--accent);
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px;
+  cursor: pointer; border-radius: var(--r-md); text-transform: uppercase;
+  transition: all 0.15s cubic-bezier(0.16,1,0.3,1);
+}
+.wallpaper-upload-btn:hover { background: var(--accent); color: #fff; transform: translateY(-1px); }
+.wallpaper-clear-btn {
+  padding: 10px 14px; background: transparent;
+  border: 1px solid var(--border); color: var(--text3);
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.5px;
+  cursor: pointer; border-radius: var(--r-md);
+  transition: all 0.15s;
+}
+.wallpaper-clear-btn:hover { border-color: var(--danger); color: var(--danger); }
+
 /* ── Light mode ── */
 [data-theme="light"] {
   --bg: #f0f0f5;

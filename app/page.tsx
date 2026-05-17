@@ -92,6 +92,8 @@ export default function Home() {
   const [subscription, setSubscription] = useState<{ tier: 'free' | 'pro'; status: string; generationsUsed: number }>({ tier: 'free', status: 'active', generationsUsed: 0 });
   const [showPricing, setShowPricing] = useState(false);
   const [pricingReason, setPricingReason] = useState<'generations' | 'projects' | 'companion' | 'upgrade'>('upgrade');
+  const [wallpaper, setWallpaper] = useState<string | null>(null);
+  const wallpaperInputRef = useRef<HTMLInputElement>(null);
 
   // ── Project cache helpers (localStorage) ────────────────────────────────
   const PROJECTS_CACHE_KEY = 'based_projects_cache';
@@ -117,6 +119,55 @@ export default function Home() {
     setTheme(saved);
     applyTheme(saved);
   }, []);
+
+  // ── Wallpaper: load from localStorage and apply ──────────────────────────
+  useEffect(() => {
+    const saved = localStorage.getItem('based_wallpaper');
+    if (saved) { setWallpaper(saved); applyWallpaper(saved); }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function applyWallpaper(url: string | null) {
+    if (url) {
+      document.body.style.backgroundImage = `url(${url})`;
+      document.body.style.backgroundSize = 'cover';
+      document.body.style.backgroundPosition = 'center';
+      document.body.style.backgroundAttachment = 'fixed';
+      document.documentElement.classList.add('has-wallpaper');
+    } else {
+      document.body.style.backgroundImage = '';
+      document.documentElement.classList.remove('has-wallpaper');
+    }
+  }
+
+  function handleWallpaperUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      img.onload = () => {
+        const MAX = 1920;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+        setWallpaper(dataUrl);
+        applyWallpaper(dataUrl);
+        try { localStorage.setItem('based_wallpaper', dataUrl); } catch {}
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }
+
+  function handleWallpaperClear() {
+    setWallpaper(null);
+    applyWallpaper(null);
+    localStorage.removeItem('based_wallpaper');
+  }
 
   // ── Handle return from Stripe checkout ──────────────────────────────────
   useEffect(() => {
@@ -567,6 +618,30 @@ export default function Home() {
                   <button className="auth-signout-btn" onClick={signOut}>Sign Out</button>
                 </div>
               )}
+              <div className="settings-section">
+                <label className="settings-label">Wallpaper</label>
+                <div className="wallpaper-section">
+                  {wallpaper && (
+                    <div className="wallpaper-preview" style={{ backgroundImage: `url(${wallpaper})` }} />
+                  )}
+                  <div className="wallpaper-actions">
+                    <button className="wallpaper-upload-btn" onClick={() => wallpaperInputRef.current?.click()}>
+                      {wallpaper ? 'Change Photo' : '+ Set Wallpaper'}
+                    </button>
+                    {wallpaper && (
+                      <button className="wallpaper-clear-btn" onClick={handleWallpaperClear}>Remove</button>
+                    )}
+                  </div>
+                  <div className="settings-hint">Your personal photo shows behind the UI — only visible to you.</div>
+                </div>
+                <input
+                  ref={wallpaperInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleWallpaperUpload}
+                />
+              </div>
               <div className="settings-section">
                 <label className="settings-label">Appearance</label>
                 <ThemeCustomizer
