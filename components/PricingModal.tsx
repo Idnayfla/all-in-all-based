@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface PricingModalProps {
-  reason?: 'generations' | 'projects' | 'companion' | 'upgrade';
+  reason?: 'generations' | 'projects' | 'upgrade';
   generationsUsed?: number;
   projectCount?: number;
   onClose: () => void;
@@ -13,14 +13,12 @@ interface PricingModalProps {
 const REASON_MSG: Record<string, string> = {
   generations: "You've used all 10 free generations this month.",
   projects:    "Free accounts are limited to 3 projects.",
-  companion:   "The AI Companion is a Pro feature.",
   upgrade:     "Unlock everything Based has to offer.",
 };
 
 const PRO_FEATURES = [
   'Unlimited generations — no monthly cap',
   'Unlimited projects',
-  'AI Companion with screen awareness',
   'Voice activation',
   'Priority generation speed',
 ];

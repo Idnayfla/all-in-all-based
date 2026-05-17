@@ -16,7 +16,6 @@ import MemoryManager, { parseMemories } from '@/components/MemoryManager';
 import ThemeCustomizer, { AppTheme, DEFAULT_THEME, applyTheme, loadTheme, saveThemeLocally } from '@/components/ThemeCustomizer';
 import { supabase } from '@/lib/supabase';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
-import CompanionDrawer, { CMsg } from '@/components/CompanionDrawer';
 import { useSwipePanels } from '@/hooks/useSwipePanels';
 import PricingModal from '@/components/PricingModal';
 import LandingPage from '@/components/LandingPage';
@@ -89,12 +88,9 @@ export default function Home() {
   const [theme, setTheme]             = useState<AppTheme>(DEFAULT_THEME);
   const [showMemoryManager, setShowMemoryManager] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [showCompanion, setShowCompanion] = useState(false);
-  const [isCompanionGenerating, setIsCompanionGenerating] = useState(false);
-  const [companionMessages, setCompanionMessages] = useState<CMsg[]>([]);
   const [subscription, setSubscription] = useState<{ tier: 'free' | 'pro'; status: string; generationsUsed: number }>({ tier: 'free', status: 'active', generationsUsed: 0 });
   const [showPricing, setShowPricing] = useState(false);
-  const [pricingReason, setPricingReason] = useState<'generations' | 'projects' | 'companion' | 'upgrade'>('upgrade');
+  const [pricingReason, setPricingReason] = useState<'generations' | 'projects' | 'upgrade'>('upgrade');
   const [wallpaper, setWallpaper] = useState<string | null>(null);
   const wallpaperInputRef = useRef<HTMLInputElement>(null);
 
@@ -781,6 +777,10 @@ export default function Home() {
                 </div>
               </div>
             </motion.div>
+
+
+
+
           )}
           </AnimatePresence>
 
@@ -900,23 +900,6 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
-      <button
-        className={`companion-trigger${showCompanion ? ' companion-trigger--open' : ''}${isCompanionGenerating ? ' companion-trigger--responding' : ''}`}
-        onClick={() => {
-          if (!showCompanion && subscription.tier === 'free') {
-            setPricingReason('companion');
-            setShowPricing(true);
-            return;
-          }
-          setShowCompanion(s => !s);
-        }}
-        aria-label="Open AI Companion"
-      >
-        <span className="companion-trigger-label">B</span>
-        <span className="companion-trigger-ring companion-trigger-ring--1" />
-        <span className="companion-trigger-ring companion-trigger-ring--2" />
-      </button>
-
       <AnimatePresence>
         {showPricing && (
           <PricingModal
@@ -929,19 +912,6 @@ export default function Home() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {showCompanion && (
-          <CompanionDrawer
-            memory={globalMemory}
-            files={files}
-            projectName={currentProject?.name}
-            initialMessages={companionMessages}
-            onMessagesChange={setCompanionMessages}
-            onClose={() => setShowCompanion(false)}
-            onGeneratingChange={setIsCompanionGenerating}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }
