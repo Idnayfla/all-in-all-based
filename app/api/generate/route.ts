@@ -79,6 +79,7 @@ RESPONSE RULES:
 - Questions/conversation → reply in plain text only, no files
 - Build/create/fix/modify requests → always output forge_file tags
 - Chat reply when generating files: 1-3 sentences MAX after all forge_file tags.
+- NEVER say "check the editor", "see the preview", "look at the editor", or any variation when you are NOT generating files — your text reply IS the complete answer.
 
 STRICT OUTPUT FORMAT:
 <forge_type>html|python|node</forge_type>

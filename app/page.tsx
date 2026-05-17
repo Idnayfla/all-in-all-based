@@ -576,10 +576,10 @@ export default function Home() {
         </div>
         <nav className="header-nav">
           <div className="tab-switcher">
-            <button className={`tab-btn ${activePanel === 'chat' ? 'active' : ''}`} onClick={() => setActivePanel('chat')}>Chat</button>
-            <button className={`tab-btn ${activePanel === 'editor' ? 'active' : ''}`} onClick={() => setActivePanel('editor')}>Editor</button>
-            <button className={`tab-btn ${activePanel === 'preview' ? 'active' : ''}`} onClick={() => setActivePanel('preview')}>Preview</button>
-            <button className={`tab-btn tab-btn-debug ${activePanel === 'debug' ? 'active' : ''}`} onClick={() => setActivePanel('debug')} title="Debug stream">◈</button>
+            <button className={`tab-btn ${activePanel === 'chat' ? 'active' : ''}`} onClick={() => { setActivePanel('chat'); setShowSettings(false); }}>Chat</button>
+            <button className={`tab-btn ${activePanel === 'editor' ? 'active' : ''}`} onClick={() => { setActivePanel('editor'); setShowSettings(false); }}>Editor</button>
+            <button className={`tab-btn ${activePanel === 'preview' ? 'active' : ''}`} onClick={() => { setActivePanel('preview'); setShowSettings(false); }}>Preview</button>
+            <button className={`tab-btn tab-btn-debug ${activePanel === 'debug' ? 'active' : ''}`} onClick={() => { setActivePanel('debug'); setShowSettings(false); }} title="Debug stream">◈</button>
           </div>
           <div className="header-controls">
             {currentProject && files.length > 0 && (
