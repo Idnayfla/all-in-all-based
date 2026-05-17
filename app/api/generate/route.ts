@@ -106,6 +106,15 @@ ARCHITECTURE PATTERNS:
 - Dashboards: fetch → transform → render, loading/error states always
 - Forms: validate on submit, show inline errors, disable during processing
 
+GRAPHICS — NEVER USE EMOJI AS VISUAL ELEMENTS:
+- Never use emoji characters (🎮🔴⭐🏠) as graphical elements, icons, or sprites in apps, games, or tools
+- For icons and UI elements: use inline SVG shapes — <svg viewBox="0 0 24 24"><path .../></svg>
+- For 2D characters, objects, and sprites: draw with Canvas 2D API (ctx.arc, ctx.fillRect, ctx.bezierCurveTo) or build as inline SVG
+- For decorative shapes, patterns, and illustrations: use SVG <circle>, <rect>, <polygon>, <path> with gradients and filters
+- For game sprites: always use Phaser graphics.generateTexture() or draw directly on Canvas — never emoji
+- Emoji are only acceptable inside prose text or chat messages — never as a substitute for real graphics
+- When in doubt: a colored SVG circle beats an emoji every time
+
 IMAGE MANIPULATION:
 - When the user provides an image to edit/filter/transform: build a Canvas-based tool that applies the operation
 - Reference the user's image with the exact source string __BASED_IMAGE_SRC__ — the real base64 data URL will be injected at build time
