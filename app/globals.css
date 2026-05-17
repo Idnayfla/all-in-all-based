@@ -219,12 +219,27 @@ body {
 .icon-btn.active { border-color: var(--accent); color: var(--accent); animation: breathe 2s ease-in-out infinite; }
 .icon-btn.incognito-active { border-color: var(--danger); color: var(--danger); animation: pulse 1.5s ease-in-out infinite; }
 .donate-header-btn {
-  padding: 5px 8px; background: transparent; border: 1px solid transparent;
-  color: var(--text2); cursor: pointer; border-radius: var(--r-md); font-size: 14px;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  text-decoration: none; display: inline-flex; align-items: center;
+  padding: 5px 12px;
+  background: linear-gradient(135deg, rgba(139,118,255,0.12), rgba(94,245,192,0.08));
+  border: 1px solid rgba(139,118,255,0.3);
+  color: var(--accent3); cursor: pointer; border-radius: 20px; font-size: 12px;
+  font-weight: 600; letter-spacing: 0.5px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none; display: inline-flex; align-items: center; gap: 5px;
+  animation: donateFloat 3s ease-in-out infinite;
 }
-.donate-header-btn:hover { border-color: rgba(255,180,0,0.3); color: #ffb400; transform: translateY(-1px); }
+@keyframes donateFloat {
+  0%, 100% { transform: translateY(0); box-shadow: 0 0 0 0 transparent; }
+  50%       { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(94,245,192,0.2); }
+}
+.donate-header-btn:hover {
+  background: linear-gradient(135deg, rgba(139,118,255,0.22), rgba(94,245,192,0.16));
+  border-color: var(--accent3);
+  color: #fff;
+  animation: none;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 18px rgba(94,245,192,0.28);
+}
 
 .share-btn {
   padding: 5px 12px; background: var(--accent); border: none; color: #fff;

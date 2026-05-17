@@ -116,6 +116,12 @@ export default function Home() {
     if (cached.length > 0) setProjects(cached);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Restore subscription tier instantly from cache so Pro never flashes away ──
+  useEffect(() => {
+    const cached = localStorage.getItem('based_sub_tier');
+    if (cached === 'pro') setSubscription(s => ({ ...s, tier: 'pro' }));
+  }, []);
+
   // ── Apply theme on mount from localStorage ──────────────────────────────
   useEffect(() => {
     const saved = loadTheme();
@@ -212,7 +218,9 @@ export default function Home() {
     }
     if (settingsRes.ok) {
       const { personality: p, globalMemory: m, theme: t, subscriptionTier, subscriptionStatus, generationsUsed } = await settingsRes.json();
-      setSubscription({ tier: subscriptionTier ?? 'free', status: subscriptionStatus ?? 'active', generationsUsed: generationsUsed ?? 0 });
+      const tier = subscriptionTier ?? 'free';
+      setSubscription({ tier, status: subscriptionStatus ?? 'active', generationsUsed: generationsUsed ?? 0 });
+      localStorage.setItem('based_sub_tier', tier);
       if (p) {
         try {
           const parsed = JSON.parse(p);
@@ -459,16 +467,20 @@ export default function Home() {
   const shareProject = async () => {
     if (!currentProject || !files.length || isSharing) return;
     setIsSharing(true);
+    const abort = new AbortController();
+    const timeout = setTimeout(() => abort.abort(), 15000);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch('/api/share', {
         method: 'POST',
+        signal: abort.signal,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token ?? ''}`,
         },
         body: JSON.stringify({ files, projectName: currentProject.name }),
       });
+      clearTimeout(timeout);
       const data = await res.json();
       if (data.url) {
         const full = `https://getbased.dev${data.url}`;
@@ -485,9 +497,14 @@ export default function Home() {
         alert('Share failed: ' + (data.error ?? 'Unknown error'));
       }
     } catch (e: any) {
-      console.error('[share]', e);
+      clearTimeout(timeout);
       setIsSharing(false);
-      alert('Share failed: ' + e.message);
+      if (e?.name === 'AbortError') {
+        alert('Share timed out — check your connection and try again.');
+      } else {
+        console.error('[share]', e);
+        alert('Share failed: ' + e.message);
+      }
     }
   };
 
@@ -574,7 +591,7 @@ export default function Home() {
               onClick={() => { setIncognito(s => !s); setIncognitoMessages([]); setActivePanel('chat'); }}
               title="Temp chat — no memory saved"
             >◉</button>
-            <a href="https://ko-fi.com/basedfund" target="_blank" rel="noopener noreferrer" className="donate-header-btn" title="Support Based on Ko-fi">◈</a>
+            <a href="https://ko-fi.com/basedfund" target="_blank" rel="noopener noreferrer" className="donate-header-btn" title="Support Based on Ko-fi">◈ Support</a>
             <button className={`icon-btn ${showSettings ? 'active' : ''}`} onClick={() => setShowSettings(s => !s)} title="Settings" aria-label="Toggle settings">◈</button>
             {user && (
               <button
