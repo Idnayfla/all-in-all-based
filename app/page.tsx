@@ -406,10 +406,13 @@ export default function Home() {
     if (!currentProject || !files.length || isSharing) return;
     setIsSharing(true);
     try {
-      const headers = await getHeaders();
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch('/api/share', {
         method: 'POST',
-        headers: { ...headers as any, 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token ?? ''}`,
+        },
         body: JSON.stringify({ files, projectName: currentProject.name }),
       });
       const data = await res.json();
@@ -417,7 +420,13 @@ export default function Home() {
         const full = `https://getbased.dev${data.url}`;
         setShareUrl(full);
         await navigator.clipboard.writeText(full).catch(() => {});
+      } else {
+        console.error('[share]', data.error);
+        alert('Share failed: ' + (data.error ?? 'Unknown error'));
       }
+    } catch (e: any) {
+      console.error('[share]', e);
+      alert('Share failed: ' + e.message);
     } finally {
       setIsSharing(false);
     }
