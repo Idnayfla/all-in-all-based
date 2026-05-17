@@ -172,6 +172,13 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .icon-btn:hover { border-color: var(--border); color: var(--text); }
 .icon-btn.active { border-color: var(--accent); color: var(--accent); }
 .icon-btn.incognito-active { border-color: var(--danger); color: var(--danger); }
+.share-btn {
+  padding: 5px 12px; background: var(--accent); border: none; color: #fff;
+  cursor: pointer; border-radius: var(--r-md); font-size: 12px; font-weight: 600;
+  transition: all 0.15s; font-family: var(--font-mono);
+}
+.share-btn:hover { opacity: 0.85; }
+.share-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .header-status {
   display: flex; align-items: center; gap: 6px;

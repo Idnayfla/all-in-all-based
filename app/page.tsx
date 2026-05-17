@@ -74,6 +74,8 @@ export default function Home() {
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [projectModal, setProjectModal] = useState(false);
   const [pendingPrompt, setPendingPrompt] = useState('');
+  const [shareUrl, setShareUrl] = useState('');
+  const [isSharing, setIsSharing] = useState(false);
   const [user, setUser]               = useState<any>(null);
   const [authReady, setAuthReady]     = useState(false);
   const [authToken, setAuthToken]     = useState<string>('');
@@ -356,6 +358,7 @@ export default function Home() {
     setProjects(prev => [newProject, ...prev]);
     setCurrentProject(newProject);
     setFiles([]); setMessages([]); setActiveFile(null); setActivePanel('chat');
+    setShareUrl('');
     setTimeout(() => setPendingPrompt(''), 100);
 
     // Sync to Supabase in background — log errors so we can debug
@@ -382,6 +385,7 @@ export default function Home() {
     setMessages(project.messages);
     setActiveFile(project.files[0] ?? null);
     setActivePanel('chat');
+    setShareUrl('');
   };
 
   const deleteProject = (id: string) => {
@@ -396,6 +400,27 @@ export default function Home() {
     getHeaders().then(headers => {
       fetch(`/api/projects/${id}`, { method: 'DELETE', headers }).catch(() => {});
     }).catch(() => {});
+  };
+
+  const shareProject = async () => {
+    if (!currentProject || !files.length || isSharing) return;
+    setIsSharing(true);
+    try {
+      const headers = await getHeaders();
+      const res = await fetch('/api/share', {
+        method: 'POST',
+        headers: { ...headers as any, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ files, projectName: currentProject.name }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        const full = `https://getbased.dev${data.url}`;
+        setShareUrl(full);
+        await navigator.clipboard.writeText(full).catch(() => {});
+      }
+    } finally {
+      setIsSharing(false);
+    }
   };
 
   const renameProject = async (id: string, name: string) => {
@@ -464,6 +489,16 @@ export default function Home() {
             <button className={`tab-btn tab-btn-debug ${activePanel === 'debug' ? 'active' : ''}`} onClick={() => setActivePanel('debug')} title="Debug stream">◈</button>
           </div>
           <div className="header-controls">
+            {currentProject && files.length > 0 && (
+              <button
+                className="share-btn"
+                onClick={shareProject}
+                disabled={isSharing}
+                title="Share project"
+              >
+                {isSharing ? '...' : shareUrl ? '✓ Copied!' : '↗ Share'}
+              </button>
+            )}
             <button
               className={`icon-btn ${incognito ? 'incognito-active' : ''}`}
               onClick={() => { setIncognito(s => !s); setIncognitoMessages([]); setActivePanel('chat'); }}
