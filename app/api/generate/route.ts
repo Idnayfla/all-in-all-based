@@ -849,7 +849,7 @@ export async function POST(req: NextRequest) {
                 }
               } else {
                 const sysText = systemBlocks.map(b => b.text).join('\n');
-                const msgs = [{ role: 'system', content: sysText }, ...anthropicMessages.map(m => ({ role: m.role as string, content: typeof m.content === 'string' ? m.content : lastUserMessage }))];
+                const msgs = [{ role: 'system', content: sysText }, ...anthropicMessages.map((m: { role: string; content: unknown }) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : lastUserMessage }))];
                 for await (const text of streamPantheon(msgs, 'chat', 16000)) {
                   fullText += text;
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: text })}\n\n`));
@@ -880,7 +880,7 @@ export async function POST(req: NextRequest) {
               }
             } else {
               const sysText = systemBlocks.map(b => b.text).join('\n');
-              const msgs = [{ role: 'system', content: sysText }, ...anthropicMessages.map(m => ({ role: m.role as string, content: typeof m.content === 'string' ? m.content : lastUserMessage }))];
+              const msgs = [{ role: 'system', content: sysText }, ...anthropicMessages.map((m: { role: string; content: unknown }) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : lastUserMessage }))];
               for await (const text of streamPantheon(msgs, 'chat', 4096)) {
                 fullText += text;
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: text })}\n\n`));
