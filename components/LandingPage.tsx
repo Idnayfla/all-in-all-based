@@ -127,7 +127,8 @@ export default function LandingPage({ onSignIn }: Props) {
               <li>10 generations/month</li>
               <li>3 projects</li>
               <li>Live preview</li>
-              <li>AI memory</li>
+              <li>PNG &amp; Excel export</li>
+              <li>Per-project memory</li>
             </ul>
             <button className="landing-tier-cta" onClick={() => onSignIn('signup')}>Get Started</button>
           </div>
@@ -143,7 +144,8 @@ export default function LandingPage({ onSignIn }: Props) {
               <li>Music generation — Stable Audio</li>
               <li>AI Personality tuning</li>
               <li>Incognito mode</li>
-              <li>Export — JPG, GIF, PDF</li>
+              <li>Global AI memory across projects</li>
+              <li>Export — JPG, GIF, PDF, Word, PowerPoint</li>
             </ul>
             <button className="landing-tier-cta landing-tier-cta--pro" onClick={() => onSignIn('signup')}>Upgrade to Pro</button>
           </div>

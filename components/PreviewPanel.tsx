@@ -145,6 +145,64 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
     setShowExportMenu(false);
   };
 
+  const exportDOCX = async () => {
+    setIsExporting(true);
+    setShowExportMenu(false);
+    try {
+      const iframe = iframeRef.current;
+      if (!iframe?.contentDocument?.body) return;
+
+      const { Document, Paragraph, TextRun, HeadingLevel, Packer } = await import('docx');
+
+      const children: InstanceType<typeof Paragraph>[] = [];
+      const walker = iframe.contentDocument.body.querySelectorAll('h1,h2,h3,h4,h5,h6,p,li,td,th');
+
+      walker.forEach(el => {
+        const text = (el as HTMLElement).innerText?.trim();
+        if (!text) return;
+        const tag = el.tagName.toLowerCase();
+        const headingMap: Record<string, typeof HeadingLevel[keyof typeof HeadingLevel]> = {
+          h1: HeadingLevel.HEADING_1, h2: HeadingLevel.HEADING_2,
+          h3: HeadingLevel.HEADING_3, h4: HeadingLevel.HEADING_4,
+        };
+        children.push(new Paragraph(
+          headingMap[tag]
+            ? { text, heading: headingMap[tag] }
+            : { children: [new TextRun(text)] }
+        ));
+      });
+
+      if (children.length === 0) {
+        const lines = (iframe.contentDocument.body.innerText ?? '').split('\n').filter(Boolean);
+        lines.forEach(l => children.push(new Paragraph({ children: [new TextRun(l.trim())] })));
+      }
+
+      const doc = new Document({ sections: [{ children }] });
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'based-export.docx'; a.click();
+      URL.revokeObjectURL(url);
+    } finally { setIsExporting(false); }
+  };
+
+  const exportPPTX = async () => {
+    setIsExporting(true);
+    setShowExportMenu(false);
+    try {
+      const canvas = await captureCanvas(2);
+      if (!canvas) return;
+      const imgData = canvas.toDataURL('image/png');
+      // @ts-ignore — pptxgenjs types are loose
+      const PptxGenJS = (await import('pptxgenjs')).default;
+      const pptx = new PptxGenJS();
+      pptx.layout = 'LAYOUT_WIDE';
+      const slide = pptx.addSlide();
+      slide.addImage({ data: imgData, x: 0, y: 0, w: '100%', h: '100%' });
+      await pptx.writeFile({ fileName: 'based-export.pptx' });
+    } finally { setIsExporting(false); }
+  };
+
   const exportXLSX = async () => {
     setIsExporting(true);
     setShowExportMenu(false);
@@ -234,6 +292,12 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
               </button>
               <button className="export-menu-item" onClick={exportXLSX}>
                 Excel <span className="export-menu-badge">.xlsx</span>
+              </button>
+              <button className="export-menu-item" onClick={subscriptionTier === 'free' ? onProRequired : exportDOCX}>
+                Word {subscriptionTier === 'free' && <span className="export-menu-badge export-menu-badge--pro">⬡ Pro</span>}
+              </button>
+              <button className="export-menu-item" onClick={subscriptionTier === 'free' ? onProRequired : exportPPTX}>
+                PowerPoint {subscriptionTier === 'free' && <span className="export-menu-badge export-menu-badge--pro">⬡ Pro</span>}
               </button>
             </div>
           )}
