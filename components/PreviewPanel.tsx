@@ -207,7 +207,7 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
         ref={iframeRef}
         className="preview-frame"
         srcDoc={previewHtml}
-        sandbox="allow-scripts allow-same-origin allow-modals"
+        sandbox="allow-scripts allow-same-origin allow-modals allow-downloads"
         title="Preview"
         onClick={() => setShowExportMenu(false)}
       />
