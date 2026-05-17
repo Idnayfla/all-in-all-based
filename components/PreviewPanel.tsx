@@ -2,14 +2,12 @@
 import { useMemo, useRef, useState } from 'react';
 import { FileNode } from '@/app/page';
 
-export default function PreviewPanel({ files, projectType }: { 
+export default function PreviewPanel({ files, projectType }: {
   files: FileNode[];
   projectType: string;
 }) {
   const [output, setOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [publishUrl, setPublishUrl] = useState('');
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const htmlFile = files.find(f => f.language === 'html');
   const cssFile = files.find(f => f.language === 'css');
@@ -20,7 +18,6 @@ export default function PreviewPanel({ files, projectType }: {
     let html = htmlFile.content;
     if (cssFile) html = html.replace('</head>', `<style>${cssFile.content}</style></head>`);
     if (jsFile) html = html.replace('</body>', `<script>${jsFile.content}</script></body>`);
-    // Ensure generated apps render at device width on mobile, not at the default 980px desktop width
     if (!html.includes('name="viewport"') && !html.includes("name='viewport'")) {
       html = html.replace('<head>', '<head><meta name="viewport" content="width=device-width, initial-scale=1">');
     }
@@ -42,24 +39,6 @@ export default function PreviewPanel({ files, projectType }: {
       setOutput('Error: Could not execute code.');
     } finally {
       setIsRunning(false);
-    }
-  };
-
-  const publishApp = async () => {
-    setIsPublishing(true);
-    try {
-      const res = await fetch('/api/publish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ files, projectName: 'based-app' }),
-      });
-      const data = await res.json();
-      if (data.url) setPublishUrl(data.url);
-      else alert('Publish failed: ' + data.error);
-    } catch (e) {
-      alert('Publish failed');
-    } finally {
-      setIsPublishing(false);
     }
   };
 
@@ -101,18 +80,8 @@ export default function PreviewPanel({ files, projectType }: {
           <button className="run-btn" onClick={() => iframeRef.current?.contentWindow?.print()}>
             ⬇ PDF
           </button>
-          <button className="run-btn" onClick={publishApp} disabled={isPublishing}>
-            {isPublishing ? '... Publishing' : '◆ Publish'}
-          </button>
         </div>
       </div>
-      {publishUrl && (
-        <div className="publish-url-bar">
-          <a href={publishUrl} target="_blank" rel="noreferrer" className="publish-link">
-            ▸ {publishUrl}
-          </a>
-        </div>
-      )}
       <iframe
         ref={iframeRef}
         className="preview-frame"
