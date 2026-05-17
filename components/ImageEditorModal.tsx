@@ -216,7 +216,7 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
           <div className="image-editor-pane-label">Result</div>
           <div className="image-editor-image-wrap">
             {isGenerating ? (
-              <div className="image-editor-placeholder">⏳ Generating…</div>
+              <div className="image-editor-placeholder"><span className="spinner" /> Generating…</div>
             ) : resultUrl ? (
               <img src={resultUrl} alt="result" className="image-editor-result" />
             ) : (
@@ -258,7 +258,7 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
           onClick={handleGenerate}
           disabled={isGenerating || isSourceLoading || !prompt.trim()}
         >
-          {isGenerating ? '⏳' : isSourceLoading ? '⏳' : 'Generate'}
+          {isGenerating || isSourceLoading ? <span className="spinner" /> : 'Generate'}
         </button>
         <button
           className="image-editor-confirm-btn"

@@ -48,7 +48,7 @@ export default function PreviewPanel({ files, projectType }: {
         <div className="preview-header">
           <span>⬡ Terminal Output</span>
           <button className="run-btn" onClick={runCode} disabled={isRunning || files.length === 0}>
-            {isRunning ? '⏳ Running...' : '▶ Run'}
+            {isRunning ? '◈ Running...' : '▶ Run'}
           </button>
         </div>
         <div className="terminal-output">

@@ -248,7 +248,7 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
             className="companion-send"
             onClick={send}
             disabled={isGenerating || !input.trim()}
-          >{isGenerating ? '⏳' : '▶'}</button>
+          >{isGenerating ? <span className="spinner" /> : '▶'}</button>
         </div>
       </div>
     </motion.div>

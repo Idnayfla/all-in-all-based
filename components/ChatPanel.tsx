@@ -399,7 +399,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             if (data.searching === 'web') {
               setMessages(prev => {
                 const updated = [...prev];
-                updated[updated.length - 1] = { role: 'assistant', content: '🌐 Searching the web...' };
+                updated[updated.length - 1] = { role: 'assistant', content: '◈ Searching the web...' };
                 return updated;
               });
             }
@@ -407,7 +407,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             if (data.searching === null) {
               setMessages(prev => {
                 const updated = [...prev];
-                updated[updated.length - 1] = { role: 'assistant', content: '⏳ Working...' };
+                updated[updated.length - 1] = { role: 'assistant', content: '◈ Working...' };
                 return updated;
               });
             }
@@ -444,7 +444,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               if (!hasForge) {
                 setMessages(prev => {
                   const updated = [...prev];
-                  updated[updated.length - 1] = { role: 'assistant', content: assistantMsg.trim() || '⏳ Working...' };
+                  updated[updated.length - 1] = { role: 'assistant', content: assistantMsg.trim() || '◈ Working...' };
                   return updated;
                 });
               } else {
@@ -452,8 +452,8 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                   const updated = [...prev];
                   const last = updated[updated.length - 1];
                   const c = typeof last?.content === 'string' ? last.content : '';
-                  if (c && !c.startsWith('⟳') && !c.startsWith('🌐') && c !== '⏳ Working...') {
-                    updated[updated.length - 1] = { role: 'assistant', content: '⏳ Working...' };
+                  if (c && !c.startsWith('⟳') && !c.startsWith('◈ Searching') && c !== '◈ Working...') {
+                    updated[updated.length - 1] = { role: 'assistant', content: '◈ Working...' };
                   }
                   return updated;
                 });
@@ -514,7 +514,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         setGenProgress(null);
         setMessages(prev => {
           const last = prev[prev.length - 1];
-          if (last?.content === '⏳ Working...') {
+          if (last?.content === '◈ Working...') {
             return [...prev.slice(0, -1), { role: 'assistant', content: '! Response cut off. Try again.' }];
           }
           return prev;
@@ -774,7 +774,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             disabled={isGenerating || isGeneratingMedia || (!input.trim() && !pendingImage)}
             whileTap={{ scale: 0.95 }}
           >
-            {isGeneratingMedia ? '⏳' : generationMode !== 'chat' ? 'Generate' : 'Send'}
+            {isGeneratingMedia ? <span className="spinner" /> : generationMode !== 'chat' ? 'Generate' : 'Send'}
           </motion.button>
         </div>
         {voiceError && (

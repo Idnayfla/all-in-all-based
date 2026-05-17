@@ -35,7 +35,7 @@ export default function GeneratedMusicCard({ url, prompt }: GeneratedMusicCardPr
           whileTap={{ scale: 0.92 }}
           aria-label={playing ? 'Pause' : 'Play'}
         >
-          {playing ? '⏸' : '▶'}
+          {playing ? '▐▐' : '▶'}
         </motion.button>
         <div className="generated-music-waveform">
           {BAR_HEIGHTS.map((h, i) => (

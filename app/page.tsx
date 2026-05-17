@@ -695,7 +695,7 @@ export default function Home() {
               </div>
               <button className="new-project-btn-large" onClick={newProject}>+ New Project</button>
               <div className="no-project-examples">
-                {['🎮 Build a snake game', '📊 Sales dashboard with charts', '🧮 Scientific calculator', '🌐 Portfolio website'].map(p => (
+                {['Build a snake game', 'Sales dashboard with charts', 'Scientific calculator', 'Portfolio website'].map(p => (
                   <span key={p} onClick={() => { setPendingPrompt(p); newProject(); }}>{p}</span>
                 ))}
               </div>
