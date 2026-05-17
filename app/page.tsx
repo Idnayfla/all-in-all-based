@@ -419,7 +419,11 @@ export default function Home() {
       if (data.url) {
         const full = `https://getbased.dev${data.url}`;
         setShareUrl(full);
-        await navigator.clipboard.writeText(full).catch(() => {});
+        if (navigator.share) {
+          await navigator.share({ title: currentProject.name, url: full }).catch(() => {});
+        } else {
+          await navigator.clipboard.writeText(full).catch(() => {});
+        }
       } else {
         console.error('[share]', data.error);
         alert('Share failed: ' + (data.error ?? 'Unknown error'));
