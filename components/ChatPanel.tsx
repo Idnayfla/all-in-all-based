@@ -109,7 +109,7 @@ function ProgressBar({ progress }: { progress: GenerationProgress }) {
   );
 }
 
-export default function ChatPanel({ messages, setMessages, files, onFilesUpdate, isGenerating, setIsGenerating, personality, memory, globalMemory, incognito, authToken, subscriptionTier, generationsUsed }: {
+export default function ChatPanel({ messages, setMessages, files, onFilesUpdate, isGenerating, setIsGenerating, personality, memory, globalMemory, incognito, authToken, subscriptionTier, generationsUsed, prefillMessage }: {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   files: FileNode[];
@@ -123,8 +123,9 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   authToken?: string;
   subscriptionTier?: 'free' | 'pro';
   generationsUsed?: number;
+  prefillMessage?: string;
 }) {
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(prefillMessage ?? '');
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
   const [generationMode, setGenerationMode] = useState<GenerationMode>('chat');
   const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);

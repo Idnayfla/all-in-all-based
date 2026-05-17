@@ -73,6 +73,7 @@ export default function Home() {
   const [projects, setProjects]       = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [projectModal, setProjectModal] = useState(false);
+  const [pendingPrompt, setPendingPrompt] = useState('');
   const [user, setUser]               = useState<any>(null);
   const [authReady, setAuthReady]     = useState(false);
   const [authToken, setAuthToken]     = useState<string>('');
@@ -355,6 +356,7 @@ export default function Home() {
     setProjects(prev => [newProject, ...prev]);
     setCurrentProject(newProject);
     setFiles([]); setMessages([]); setActiveFile(null); setActivePanel('chat');
+    setTimeout(() => setPendingPrompt(''), 100);
 
     // Sync to Supabase in background — log errors so we can debug
     getHeaders().then(async (headers) => {
@@ -644,6 +646,11 @@ export default function Home() {
                 HTML &nbsp;·&nbsp; Canvas games &nbsp;·&nbsp; Web apps &nbsp;·&nbsp; Tools &nbsp;·&nbsp; Dashboards
               </div>
               <button className="new-project-btn-large" onClick={newProject}>+ New Project</button>
+              <div className="no-project-examples">
+                {['🎮 Build a snake game', '📊 Sales dashboard with charts', '🧮 Scientific calculator', '🌐 Portfolio website'].map(p => (
+                  <span key={p} onClick={() => { setPendingPrompt(p); newProject(); }}>{p}</span>
+                ))}
+              </div>
               <div className="no-project-hint">Sign in free · Projects save to your account</div>
             </div>
           ) : (
@@ -674,6 +681,7 @@ export default function Home() {
                   memory={currentProject?.memory ?? ''}
                   globalMemory={globalMemory}
                   incognito={incognito}
+                  prefillMessage={pendingPrompt}
                 />
               </div>
               <div className={`panel ${activePanel === 'editor' ? 'panel-active' : ''}`}>
