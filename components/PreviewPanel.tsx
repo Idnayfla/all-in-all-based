@@ -145,6 +145,39 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
     setShowExportMenu(false);
   };
 
+  const exportXLSX = async () => {
+    setIsExporting(true);
+    setShowExportMenu(false);
+    try {
+      const iframe = iframeRef.current;
+      if (!iframe?.contentDocument) return;
+
+      const XLSX = await import('xlsx');
+      const tables = iframe.contentDocument.querySelectorAll('table');
+
+      if (tables.length === 0) {
+        // No table — build a sheet from all visible text content as a fallback
+        const lines = (iframe.contentDocument.body.innerText ?? '')
+          .split('\n')
+          .map(l => l.trim())
+          .filter(Boolean)
+          .map(l => [l]);
+        const ws = XLSX.utils.aoa_to_sheet(lines);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+        XLSX.writeFile(wb, 'based-export.xlsx');
+        return;
+      }
+
+      const wb = XLSX.utils.book_new();
+      tables.forEach((table, i) => {
+        const ws = XLSX.utils.table_to_sheet(table);
+        XLSX.utils.book_append_sheet(wb, ws, `Sheet${i + 1}`);
+      });
+      XLSX.writeFile(wb, 'based-export.xlsx');
+    } finally { setIsExporting(false); }
+  };
+
   if (projectType === 'python' || projectType === 'node') {
     return (
       <div className="preview-panel">
@@ -198,6 +231,9 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
               </button>
               <button className="export-menu-item" onClick={subscriptionTier === 'free' ? onProRequired : exportPDF}>
                 PDF {subscriptionTier === 'free' && <span className="export-menu-badge export-menu-badge--pro">⬡ Pro</span>}
+              </button>
+              <button className="export-menu-item" onClick={exportXLSX}>
+                Excel <span className="export-menu-badge">.xlsx</span>
               </button>
             </div>
           )}
