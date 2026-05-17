@@ -10,6 +10,63 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || process.env.APP_ANTHROPIC_API_KEY,
 });
 
+const PANTHEON_KEY = process.env.PANTHEON_OWNER_KEY ?? 'pk_owner_based_internal';
+const PANTHEON_URL = process.env.PANTHEON_API_URL ?? 'https://pantheon-api.vercel.app';
+
+async function callPantheon(
+  messages: Array<{ role: string; content: string }>,
+  taskType: 'fast_chat' | 'chat',
+  maxTokens = 8000
+): Promise<string> {
+  const res = await fetch(`${PANTHEON_URL}/api/v1/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${PANTHEON_KEY}` },
+    body: JSON.stringify({ messages, task_type: taskType, stream: false, max_tokens: maxTokens }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error((err as any).error ?? `Pantheon ${res.status}`);
+  }
+  const data = await res.json();
+  return data.text ?? '';
+}
+
+async function* streamPantheon(
+  messages: Array<{ role: string; content: string }>,
+  taskType: 'fast_chat' | 'chat',
+  maxTokens = 16000
+): AsyncGenerator<string> {
+  const res = await fetch(`${PANTHEON_URL}/api/v1/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${PANTHEON_KEY}` },
+    body: JSON.stringify({ messages, task_type: taskType, stream: true, max_tokens: maxTokens }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error((err as any).error ?? `Pantheon ${res.status}`);
+  }
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('No response body');
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const payload = line.slice(6).trim();
+      if (payload === '[DONE]') continue;
+      try {
+        const parsed = JSON.parse(payload);
+        if (parsed.type === 'text') yield parsed.text;
+      } catch {}
+    }
+  }
+}
+
 const SYSTEM = `You are Based, the AI inside All in All Based — an elite coding assistant and personal dev studio. You build production-quality applications, games, and tools.
 
 IDENTITY:
@@ -599,13 +656,26 @@ async function callModel(
   systemPrompt: any,
   modelType: 'planner' | 'generator' | 'summary'
 ): Promise<string> {
+  const hasImages = Array.isArray(prompt) && prompt.some((b: any) => b.type === 'image');
+
+  if (!hasImages) {
+    const systemText = Array.isArray(systemPrompt)
+      ? systemPrompt.map((b: any) => b.text ?? '').join('\n')
+      : (systemPrompt as string) ?? '';
+    const userText = Array.isArray(prompt)
+      ? prompt.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n')
+      : (prompt as string);
+    const taskType = modelType === 'generator' ? 'chat' : 'fast_chat';
+    return callPantheon(
+      [{ role: 'system', content: systemText }, { role: 'user', content: userText }],
+      taskType,
+      modelType === 'generator' ? 16000 : 8000
+    );
+  }
+
+  // Image-containing calls stay on Anthropic (vision required)
   const response = await client.messages.create({
-    model:
-      modelType === 'planner'
-        ? 'claude-haiku-4-5-20251001'
-        : modelType === 'generator'
-          ? 'claude-opus-4-7-20250219'
-          : 'claude-haiku-4-5-20251001',
+    model: modelType === 'generator' ? 'claude-opus-4-7-20250219' : 'claude-haiku-4-5-20251001',
     max_tokens: modelType === 'generator' ? 16000 : 8000,
     system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
@@ -762,18 +832,27 @@ export async function POST(req: NextRequest) {
             }
           } catch (e) {
             if (!routeToChat) {
-              // Planner parse failed — fall back to single streaming request
-              const stream = await client.messages.stream({
-                model: 'claude-opus-4-7',
-                max_tokens: 16000,
-                system: [{ type: 'text' as const, text: SYSTEM, cache_control: { type: 'ephemeral' as const } }],
-                messages: anthropicMessages,
-              });
+              // Planner parse failed — stream via Pantheon (Anthropic fallback for images)
               let fullText = '';
-              for await (const chunk of stream) {
-                if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-                  fullText += chunk.delta.text;
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+              if (imageBlocks.length > 0) {
+                const stream = await client.messages.stream({
+                  model: 'claude-opus-4-7',
+                  max_tokens: 16000,
+                  system: [{ type: 'text' as const, text: SYSTEM, cache_control: { type: 'ephemeral' as const } }],
+                  messages: anthropicMessages,
+                });
+                for await (const chunk of stream) {
+                  if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+                    fullText += chunk.delta.text;
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+                  }
+                }
+              } else {
+                const sysText = systemBlocks.map(b => b.text).join('\n');
+                const msgs = [{ role: 'system', content: sysText }, ...anthropicMessages.map(m => ({ role: m.role as string, content: typeof m.content === 'string' ? m.content : lastUserMessage }))];
+                for await (const text of streamPantheon(msgs, 'chat', 16000)) {
+                  fullText += text;
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: text })}\n\n`));
                 }
               }
               const files = parseFiles(fullText);
@@ -785,17 +864,26 @@ export async function POST(req: NextRequest) {
           }
 
           if (routeToChat) {
-            const stream = await client.messages.stream({
-              model: 'claude-sonnet-4-6',
-              max_tokens: 4096,
-              system: systemBlocks,
-              messages: anthropicMessages,
-            });
             let fullText = '';
-            for await (const chunk of stream) {
-              if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-                fullText += chunk.delta.text;
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+            if (imageBlocks.length > 0) {
+              const stream = await client.messages.stream({
+                model: 'claude-sonnet-4-6',
+                max_tokens: 4096,
+                system: systemBlocks,
+                messages: anthropicMessages,
+              });
+              for await (const chunk of stream) {
+                if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+                  fullText += chunk.delta.text;
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+                }
+              }
+            } else {
+              const sysText = systemBlocks.map(b => b.text).join('\n');
+              const msgs = [{ role: 'system', content: sysText }, ...anthropicMessages.map(m => ({ role: m.role as string, content: typeof m.content === 'string' ? m.content : lastUserMessage }))];
+              for await (const text of streamPantheon(msgs, 'chat', 4096)) {
+                fullText += text;
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: text })}\n\n`));
               }
             }
             const files = parseFiles(fullText);
@@ -842,37 +930,47 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
               : filePrompt;
 
             let fileText = '';
-            const fileStream = client.messages.stream({
-              model: 'claude-opus-4-7',
-              max_tokens: 16000,
-              system: FILE_GENERATOR_SYSTEM_BLOCKS,
-              messages: [{ role: 'user', content: filePromptContent }],
-            });
-
-            for await (const chunk of fileStream) {
-              if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-                fileText += chunk.delta.text;
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
-              }
-            }
-            const fileResult = await fileStream.finalMessage();
-
-            // If the model was cut off before closing the forge_file tag, continue from where it stopped
-            if (fileResult.stop_reason === 'max_tokens' && !fileText.includes('</forge_file>')) {
-              const contStream = client.messages.stream({
+            if (imageBlocks.length > 0) {
+              // Image-containing files must use Anthropic (vision required)
+              const fileStream = client.messages.stream({
                 model: 'claude-opus-4-7',
                 max_tokens: 16000,
                 system: FILE_GENERATOR_SYSTEM_BLOCKS,
-                messages: [
-                  { role: 'user', content: imageBlocks.length > 0 ? [...imageBlocks, { type: 'text' as const, text: filePrompt }] : filePrompt },
-                  { role: 'assistant', content: fileText },
-                ],
+                messages: [{ role: 'user', content: filePromptContent }],
               });
-              for await (const chunk of contStream) {
+              for await (const chunk of fileStream) {
                 if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
                   fileText += chunk.delta.text;
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
                 }
+              }
+              const fileResult = await fileStream.finalMessage();
+              if (fileResult.stop_reason === 'max_tokens' && !fileText.includes('</forge_file>')) {
+                const contStream = client.messages.stream({
+                  model: 'claude-opus-4-7',
+                  max_tokens: 16000,
+                  system: FILE_GENERATOR_SYSTEM_BLOCKS,
+                  messages: [
+                    { role: 'user', content: filePromptContent },
+                    { role: 'assistant', content: fileText },
+                  ],
+                });
+                for await (const chunk of contStream) {
+                  if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+                    fileText += chunk.delta.text;
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+                  }
+                }
+              }
+            } else {
+              // Text-only files routed through Pantheon (multi-provider fallback)
+              const msgs = [
+                { role: 'system', content: FILE_GENERATOR_SYSTEM },
+                { role: 'user', content: filePrompt },
+              ];
+              for await (const text of streamPantheon(msgs, 'chat', 16000)) {
+                fileText += text;
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: text })}\n\n`));
               }
             }
 
