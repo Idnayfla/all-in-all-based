@@ -91,6 +91,40 @@ body {
 
 .app-root { display: flex; flex-direction: column; height: 100vh; }
 
+/* ── Pro indicators ── */
+.pro-crown-strip {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent3) 50%, var(--accent) 100%);
+  background-size: 200% 100%;
+  animation: crownShimmer 4s linear infinite;
+  z-index: 9999;
+  pointer-events: none;
+}
+@keyframes crownShimmer {
+  0%   { background-position: 0% 0%; }
+  100% { background-position: 200% 0%; }
+}
+
+.pro-chip {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px;
+  background: linear-gradient(135deg, rgba(139,118,255,0.18), rgba(94,245,192,0.12));
+  border: 1px solid rgba(139,118,255,0.35);
+  border-radius: 20px;
+  font-size: 9px; font-weight: 800;
+  color: var(--accent);
+  letter-spacing: 1.5px;
+  font-family: 'Courier New', monospace;
+  text-transform: uppercase;
+  animation: chipGlow 3s ease-in-out infinite;
+}
+@keyframes chipGlow {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50%       { box-shadow: 0 0 8px 1px rgba(139,118,255,0.3); }
+}
+
 .app-header {
   display: flex; align-items: center; gap: 24px;
   padding: env(safe-area-inset-top) 20px 0; height: calc(56px + env(safe-area-inset-top));

@@ -541,10 +541,12 @@ export default function Home() {
   return (
     <div className="app-root">
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+      {subscription.tier === 'pro' && <div className="pro-crown-strip" />}
       <header className="app-header">
         <div className="logo">
           <LogoDisplay config={LOGO_DEFAULTS} />
           {currentProject && <span className="project-name-display">{currentProject.name}</span>}
+          {subscription.tier === 'pro' && <span className="pro-chip">PRO ✦</span>}
         </div>
         <nav className="header-nav">
           <div className="tab-switcher">
