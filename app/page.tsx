@@ -758,7 +758,7 @@ export default function Home() {
                 <div className="credits-footer">
                   <a href="mailto:husgogogo@gmail.com" className="credits-email">husgogogo@gmail.com</a>
                   <span className="credits-dot">·</span>
-                  <a href="https://ko-fi.com" target="_blank" rel="noopener noreferrer" className="credits-kofi">☕ Support</a>
+                  <a href="https://ko-fi.com/basedfund" target="_blank" rel="noopener noreferrer" className="credits-kofi">☕ Support</a>
                 </div>
               </div>
             </motion.div>
