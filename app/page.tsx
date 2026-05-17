@@ -94,6 +94,7 @@ export default function Home() {
   const [pricingReason, setPricingReason] = useState<'generations' | 'projects' | 'upgrade'>('upgrade');
   const [showFeedback, setShowFeedback] = useState(false);
   const [wallpaper, setWallpaper] = useState<string | null>(null);
+  const [wallpaperBlur, setWallpaperBlur] = useState(0);
   const wallpaperInputRef = useRef<HTMLInputElement>(null);
 
   // ── Project cache helpers (localStorage) ────────────────────────────────
@@ -131,17 +132,15 @@ export default function Home() {
   useEffect(() => {
     const saved = localStorage.getItem('based_wallpaper');
     if (saved) { setWallpaper(saved); applyWallpaper(saved); }
+    const savedBlur = parseInt(localStorage.getItem('based_wallpaper_blur') ?? '0');
+    if (!isNaN(savedBlur)) setWallpaperBlur(savedBlur);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function applyWallpaper(url: string | null) {
+    document.body.style.backgroundImage = '';
     if (url) {
-      document.body.style.backgroundImage = `url(${url})`;
-      document.body.style.backgroundSize = 'cover';
-      document.body.style.backgroundPosition = 'center';
-      document.body.style.backgroundAttachment = 'fixed';
       document.documentElement.classList.add('has-wallpaper');
     } else {
-      document.body.style.backgroundImage = '';
       document.documentElement.classList.remove('has-wallpaper');
     }
   }
@@ -558,6 +557,15 @@ export default function Home() {
 
   return (
     <div className="app-root">
+      {wallpaper && (
+        <div
+          className="wallpaper-bg-layer"
+          style={{
+            backgroundImage: `url(${wallpaper})`,
+            filter: wallpaperBlur > 0 ? `blur(${wallpaperBlur * 2}px)` : undefined,
+          }}
+        />
+      )}
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
       {subscription.tier === 'pro' && <div className="pro-crown-strip" />}
       <header className="app-header">
@@ -659,6 +667,25 @@ export default function Home() {
                       <button className="wallpaper-clear-btn" onClick={handleWallpaperClear}>Remove</button>
                     )}
                   </div>
+                  {wallpaper && (
+                    <div className="wallpaper-blur-row">
+                      <span className="wallpaper-blur-label">Blur</span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={10}
+                        step={1}
+                        value={wallpaperBlur}
+                        className="wallpaper-blur-slider"
+                        onChange={e => {
+                          const v = Number(e.target.value);
+                          setWallpaperBlur(v);
+                          try { localStorage.setItem('based_wallpaper_blur', String(v)); } catch {}
+                        }}
+                      />
+                      <span className="wallpaper-blur-value">{wallpaperBlur === 0 ? 'Off' : `${wallpaperBlur}`}</span>
+                    </div>
+                  )}
                   <div className="settings-hint">Your personal photo shows behind the UI — only visible to you.</div>
                 </div>
                 <input

@@ -2741,6 +2741,19 @@ body {
 .clarify-option-btn:active { transform: scale(0.96); }
 
 /* ── Wallpaper mode — semi-transparent panels so the photo shows through ── */
+.wallpaper-bg-layer {
+  position: fixed;
+  inset: -60px;
+  background-size: cover;
+  background-position: center;
+  z-index: 0;
+  pointer-events: none;
+}
+html.has-wallpaper .app-root {
+  position: relative;
+  z-index: 1;
+}
+
 html.has-wallpaper {
   --bg:  rgba(10, 10, 15, 0.78);
   --bg2: rgba(17, 17, 24, 0.82);
@@ -2763,6 +2776,53 @@ html.has-wallpaper .editor-panel {
 
 /* ── Wallpaper settings UI ── */
 .wallpaper-section { display: flex; flex-direction: column; gap: 10px; }
+.wallpaper-blur-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wallpaper-blur-label {
+  font-size: var(--fs-xs);
+  color: var(--text2);
+  font-family: var(--font-mono);
+  min-width: 28px;
+}
+.wallpaper-blur-value {
+  font-size: var(--fs-xs);
+  color: var(--text2);
+  font-family: var(--font-mono);
+  min-width: 24px;
+  text-align: right;
+}
+.wallpaper-blur-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  outline: none;
+  cursor: pointer;
+}
+.wallpaper-blur-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.wallpaper-blur-slider::-webkit-slider-thumb:hover { transform: scale(1.2); }
+.wallpaper-blur-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: none;
+  cursor: pointer;
+}
 .wallpaper-preview {
   width: 100%; height: 96px; border-radius: var(--r-lg);
   background-size: cover; background-position: center;
