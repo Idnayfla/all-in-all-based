@@ -92,47 +92,44 @@ export default function PreviewPanel({ files, projectType }: {
       if (!iframe?.contentDocument?.body) return;
 
       const { default: html2canvas } = await import('html2canvas');
-      const w = iframe.offsetWidth;
-      const h = iframe.offsetHeight;
-      const frameCount = 12;
-      const delayMs    = 150;
+      // @ts-ignore — gif.js has no types
+      const GIF = (await import('gif.js')).default;
 
-      // Capture frames
-      const frames: string[] = [];
+      const w          = iframe.offsetWidth;
+      const h          = iframe.offsetHeight;
+      const frameCount = 16;
+      const frameDelay = 120; // ms per frame
+
+      const gif = new GIF({
+        workers: 2,
+        quality: 8,
+        width:   w,
+        height:  h,
+        workerScript: '/gif.worker.js',
+      });
+
       for (let i = 0; i < frameCount; i++) {
         const canvas = await html2canvas(iframe.contentDocument.body, {
           useCORS: true, allowTaint: true,
           width: w, height: h, windowWidth: w, windowHeight: h,
         });
-        frames.push(canvas.toDataURL('image/png'));
-        await new Promise(r => setTimeout(r, delayMs));
+        gif.addFrame(canvas, { delay: frameDelay, copy: true });
+        await new Promise(r => setTimeout(r, frameDelay));
       }
 
-      // Build a minimal animated GIF via a Web Worker-free encoder
-      // Fall back: offer frames as a ZIP or just the first frame as PNG
-      // For now, stitch frames into a WebP animation using canvas
-      const outCanvas = document.createElement('canvas');
-      outCanvas.width  = w;
-      outCanvas.height = h * frameCount;
-      const ctx = outCanvas.getContext('2d')!;
-
-      for (let i = 0; i < frames.length; i++) {
-        const img = new Image();
-        await new Promise<void>(resolve => {
-          img.onload = () => {
-            ctx.drawImage(img, 0, h * i);
-            resolve();
-          };
-          img.src = frames[i];
+      await new Promise<void>((resolve, reject) => {
+        gif.on('finished', (blob: Blob) => {
+          const url  = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.download = 'based-export.gif';
+          link.href = url;
+          link.click();
+          URL.revokeObjectURL(url);
+          resolve();
         });
-      }
-
-      // Export as PNG sprite sheet (true GIF encoding needs a library)
-      // We'll label it clearly
-      const link = document.createElement('a');
-      link.download = 'based-export-frames.png';
-      link.href = outCanvas.toDataURL('image/png');
-      link.click();
+        gif.on('error', reject);
+        gif.render();
+      });
     } finally { setIsExporting(false); }
   };
 
@@ -187,7 +184,7 @@ export default function PreviewPanel({ files, projectType }: {
             <div className="export-menu">
               <button className="export-menu-item" onClick={exportPNG}>PNG</button>
               <button className="export-menu-item" onClick={exportJPG}>JPG</button>
-              <button className="export-menu-item" onClick={exportGIF}>GIF&nbsp;<span className="export-menu-badge">frames</span></button>
+              <button className="export-menu-item" onClick={exportGIF}>GIF&nbsp;<span className="export-menu-badge">animated</span></button>
               <button className="export-menu-item" onClick={exportPDF}>PDF</button>
             </div>
           )}

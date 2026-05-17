@@ -473,20 +473,21 @@ export default function Home() {
       if (data.url) {
         const full = `https://getbased.dev${data.url}`;
         setShareUrl(full);
+        setIsSharing(false); // unblock UI before share dialog
         if (navigator.share) {
-          await navigator.share({ title: currentProject.name, url: full }).catch(() => {});
+          navigator.share({ title: currentProject.name, url: full }).catch(() => {});
         } else {
           await navigator.clipboard.writeText(full).catch(() => {});
         }
       } else {
         console.error('[share]', data.error);
+        setIsSharing(false);
         alert('Share failed: ' + (data.error ?? 'Unknown error'));
       }
     } catch (e: any) {
       console.error('[share]', e);
-      alert('Share failed: ' + e.message);
-    } finally {
       setIsSharing(false);
+      alert('Share failed: ' + e.message);
     }
   };
 
@@ -573,6 +574,7 @@ export default function Home() {
               onClick={() => { setIncognito(s => !s); setIncognitoMessages([]); setActivePanel('chat'); }}
               title="Temp chat — no memory saved"
             >◉</button>
+            <a href="https://ko-fi.com/basedfund" target="_blank" rel="noopener noreferrer" className="donate-header-btn" title="Support Based on Ko-fi">☕</a>
             <button className={`icon-btn ${showSettings ? 'active' : ''}`} onClick={() => setShowSettings(s => !s)} title="Settings" aria-label="Toggle settings">◈</button>
             {user && (
               <button

@@ -218,6 +218,14 @@ body {
 .icon-btn:active { transform: scale(0.93); }
 .icon-btn.active { border-color: var(--accent); color: var(--accent); animation: breathe 2s ease-in-out infinite; }
 .icon-btn.incognito-active { border-color: var(--danger); color: var(--danger); animation: pulse 1.5s ease-in-out infinite; }
+.donate-header-btn {
+  padding: 5px 8px; background: transparent; border: 1px solid transparent;
+  color: var(--text2); cursor: pointer; border-radius: var(--r-md); font-size: 14px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  text-decoration: none; display: inline-flex; align-items: center;
+}
+.donate-header-btn:hover { border-color: rgba(255,180,0,0.3); color: #ffb400; transform: translateY(-1px); }
+
 .share-btn {
   padding: 5px 12px; background: var(--accent); border: none; color: #fff;
   cursor: pointer; border-radius: var(--r-md); font-size: 12px; font-weight: 600;
