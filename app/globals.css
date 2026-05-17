@@ -26,12 +26,14 @@ body { overscroll-behavior: none; }
   --accent-hover: #6a58e0;
   --disabled-opacity: 0.4;
   /* ── Accent opacity tokens ── */
-  --accent-muted: var(--accent-muted);
+  --accent-muted: rgba(124,106,247,0.12);
   --accent-subtle: rgba(124,106,247,0.06);
-  --accent-glow: var(--accent-glow);
-  --accent3-muted: var(--accent3-muted);
+  --accent-glow: rgba(124,106,247,0.35);
+  --accent3-muted: rgba(106,247,200,0.12);
   --accent3-subtle: rgba(106,247,200,0.06);
-  --accent3-glow: var(--accent3-glow);
+  --accent3-glow: rgba(106,247,200,0.28);
+  /* ── Surface layers ── */
+  --surface2: rgba(255,255,255,0.05);
   /* ── Typography scale ── */
   --fs-2xs: 9px;
   --fs-xs: 10px;
@@ -102,7 +104,7 @@ html, body { height: 100%; background: var(--bg); color: var(--text); font-famil
 .tab-btn {
   padding: 5px 16px; background: transparent; border: none;
   color: var(--text2); font-family: var(--font-mono); font-size: 11px;
-  letter-spacing: 1px; cursor: pointer; border-radius: 5px;
+  letter-spacing: 1px; cursor: pointer; border-radius: var(--r-md);
   transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .tab-btn:hover:not(.active) { color: var(--text); background: rgba(255,255,255,0.05); transform: translateY(-1px); }
