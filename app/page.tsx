@@ -19,6 +19,7 @@ import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
 import { useSwipePanels } from '@/hooks/useSwipePanels';
 import PricingModal from '@/components/PricingModal';
 import LandingPage from '@/components/LandingPage';
+import FeedbackModal from '@/components/FeedbackModal';
 
 export interface FileNode {
   name: string;
@@ -91,6 +92,7 @@ export default function Home() {
   const [subscription, setSubscription] = useState<{ tier: 'free' | 'pro'; status: string; generationsUsed: number }>({ tier: 'free', status: 'active', generationsUsed: 0 });
   const [showPricing, setShowPricing] = useState(false);
   const [pricingReason, setPricingReason] = useState<'generations' | 'projects' | 'upgrade'>('upgrade');
+  const [showFeedback, setShowFeedback] = useState(false);
   const [wallpaper, setWallpaper] = useState<string | null>(null);
   const wallpaperInputRef = useRef<HTMLInputElement>(null);
 
@@ -590,6 +592,7 @@ export default function Home() {
               }}
               title={subscription.tier === 'free' ? 'Incognito — Pro feature' : 'Temp chat — no memory saved'}
             >◉</button>
+            <button className="feedback-header-btn" onClick={() => setShowFeedback(true)} title="Send feedback">⬡ Feedback</button>
             <a href="https://ko-fi.com/basedfund" target="_blank" rel="noopener noreferrer" className="donate-header-btn" title="Support Based on Ko-fi">◈ Support</a>
             <button className={`icon-btn ${showSettings ? 'active' : ''}`} onClick={() => setShowSettings(s => !s)} title="Settings" aria-label="Toggle settings">◈</button>
             {user && (
@@ -922,6 +925,15 @@ export default function Home() {
             projectCount={projects.length}
             onClose={() => setShowPricing(false)}
             getHeaders={getHeaders}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showFeedback && (
+          <FeedbackModal
+            userEmail={user?.email}
+            onClose={() => setShowFeedback(false)}
           />
         )}
       </AnimatePresence>

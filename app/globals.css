@@ -3434,4 +3434,167 @@ html.has-wallpaper .editor-panel {
   transition: border-color 0.15s, color 0.15s;
   touch-action: manipulation;
 }
+
+/* ── Feedback ──────────────────────────────────────────────────────────────── */
+.feedback-header-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.feedback-header-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.feedback-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 16px;
+}
+.feedback-modal {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px;
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.feedback-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.feedback-title {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text1);
+}
+.feedback-close {
+  background: none;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: color 0.15s;
+}
+.feedback-close:hover { color: var(--text1); }
+
+.feedback-type-row {
+  display: flex;
+  gap: 8px;
+}
+.feedback-type-btn {
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: 6px 8px;
+  border-radius: 7px;
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.feedback-type-btn:hover { border-color: var(--accent); color: var(--accent); }
+.feedback-type-btn.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+.feedback-textarea {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  padding: 10px 12px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s;
+  line-height: 1.55;
+}
+.feedback-textarea:focus { border-color: var(--accent); }
+.feedback-textarea::placeholder { color: var(--text3); }
+
+.feedback-email {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text1);
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.feedback-email:focus { border-color: var(--accent); }
+.feedback-email::placeholder { color: var(--text3); }
+
+.feedback-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.feedback-hint {
+  font-size: 11px;
+  color: var(--text3);
+  font-family: var(--font-mono);
+}
+.feedback-hint a { color: var(--text2); text-decoration: none; }
+.feedback-hint a:hover { color: var(--accent); }
+
+.feedback-submit {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 8px 18px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.feedback-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+.feedback-submit:not(:disabled):hover { opacity: 0.85; }
+
+.feedback-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 0;
+  text-align: center;
+}
+.feedback-done-icon {
+  font-size: 28px;
+  color: var(--accent);
+}
+.feedback-done-text {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text1);
+}
+.feedback-done-sub {
+  font-size: var(--fs-xs);
+  color: var(--text3);
+  font-family: var(--font-mono);
+}
 .plan-portal-btn:hover { border-color: var(--accent); color: var(--accent); }
