@@ -17,6 +17,7 @@ import ThemeCustomizer, { AppTheme, DEFAULT_THEME, applyTheme, loadTheme, saveTh
 import { supabase } from '@/lib/supabase';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
 import CompanionDrawer, { CMsg } from '@/components/CompanionDrawer';
+import { useSwipePanels } from '@/hooks/useSwipePanels';
 import PricingModal from '@/components/PricingModal';
 import LandingPage from '@/components/LandingPage';
 
@@ -71,6 +72,7 @@ export default function Home() {
   const [incognito, setIncognito]     = useState(false);
   const [incognitoMessages, setIncognitoMessages] = useState<Message[]>([]);
   const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview' | 'debug'>('chat');
+  useSwipePanels(activePanel, setActivePanel, !incognito && !!currentProject);
   const [projects, setProjects]       = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [projectModal, setProjectModal] = useState(false);
@@ -742,6 +744,23 @@ export default function Home() {
                   )}
                 </div>
               )}
+
+              <div className="settings-section settings-credits">
+                <label className="settings-label">Credits</label>
+                <div className="credit-row">
+                  <span className="credit-row-name">Mohamad Hus Alfyandi</span>
+                  <span className="credit-row-role">Creator &amp; Lead Developer</span>
+                </div>
+                <div className="credit-row">
+                  <span className="credit-row-name">Claude by Anthropic</span>
+                  <span className="credit-row-role">AI Development Partner</span>
+                </div>
+                <div className="credits-footer">
+                  <a href="mailto:husgogogo@gmail.com" className="credits-email">husgogogo@gmail.com</a>
+                  <span className="credits-dot">·</span>
+                  <a href="https://ko-fi.com" target="_blank" rel="noopener noreferrer" className="credits-kofi">☕ Support</a>
+                </div>
+              </div>
             </motion.div>
           )}
           </AnimatePresence>
