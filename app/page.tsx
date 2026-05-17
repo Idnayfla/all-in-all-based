@@ -549,7 +549,7 @@ export default function Home() {
         <div className="logo">
           <LogoDisplay config={LOGO_DEFAULTS} />
           {currentProject && <span className="project-name-display">{currentProject.name}</span>}
-          {subscription.tier === 'pro' && <span className="pro-chip">PRO ✦</span>}
+          {subscription.tier === 'pro' && <span className="pro-chip">PRO ⬡</span>}
         </div>
         <nav className="header-nav">
           <div className="tab-switcher">
@@ -574,7 +574,7 @@ export default function Home() {
               onClick={() => { setIncognito(s => !s); setIncognitoMessages([]); setActivePanel('chat'); }}
               title="Temp chat — no memory saved"
             >◉</button>
-            <a href="https://ko-fi.com/basedfund" target="_blank" rel="noopener noreferrer" className="donate-header-btn" title="Support Based on Ko-fi">☕</a>
+            <a href="https://ko-fi.com/basedfund" target="_blank" rel="noopener noreferrer" className="donate-header-btn" title="Support Based on Ko-fi">◈</a>
             <button className={`icon-btn ${showSettings ? 'active' : ''}`} onClick={() => setShowSettings(s => !s)} title="Settings" aria-label="Toggle settings">◈</button>
             {user && (
               <button
@@ -760,7 +760,7 @@ export default function Home() {
                 <div className="credits-footer">
                   <a href="mailto:husgogogo@gmail.com" className="credits-email">husgogogo@gmail.com</a>
                   <span className="credits-dot">·</span>
-                  <a href="https://ko-fi.com/basedfund" target="_blank" rel="noopener noreferrer" className="credits-kofi">☕ Support</a>
+                  <a href="https://ko-fi.com/basedfund" target="_blank" rel="noopener noreferrer" className="credits-kofi">◈ Support</a>
                 </div>
               </div>
             </motion.div>
