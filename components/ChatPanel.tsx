@@ -460,6 +460,16 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               }
             }
 
+            if (data.clarify) {
+              doneHandled = true;
+              setGenProgress(null);
+              setIsGenerating(false);
+              setMessages(prev => [
+                ...prev.slice(0, -1),
+                { role: 'assistant', content: [{ type: 'clarify' as const, question: data.question, options: data.options }] },
+              ]);
+            }
+
             if (data.error) {
               window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'error', data: data.error } }));
               doneHandled = true;
@@ -598,6 +608,24 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           if (block.type === 'text' && block.text === '__generating-music__') {
             return <GeneratingCard key={i} type="music" />;
           }
+          if (block.type === 'clarify') {
+            return (
+              <div key={i} className="clarify-card">
+                <div className="clarify-question">{block.question}</div>
+                <div className="clarify-options">
+                  {block.options.map((opt: string) => (
+                    <button
+                      key={opt}
+                      className="clarify-option-btn"
+                      onClick={() => send(opt)}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          }
           if (block.type === 'text') {
             return <ReactMarkdown key={i}>{block.text}</ReactMarkdown>;
           }
@@ -614,7 +642,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           <div className="chat-empty">
             <div className="chat-empty-logo" aria-hidden="true">B&gt;</div>
             <div className="chat-empty-title">BASED</div>
-            <div className="chat-empty-sub">Your AI coding assistant. Describe what you want to build.</div>
+            <div className="chat-empty-sub">Describe what you want to build — Based brings it to life.</div>
             <div className="chat-suggestions">
               {suggestions.map((s, index) => (
                 <motion.button

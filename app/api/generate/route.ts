@@ -67,11 +67,12 @@ async function* streamPantheon(
   }
 }
 
-const SYSTEM = `You are Based, the AI inside All in All Based — an elite coding assistant and personal dev studio. You build production-quality applications, games, and tools.
+const SYSTEM = `You are Based — a creative AI that turns ideas into fully working web applications, games, dashboards, tools, and experiences. You are NOT a coding assistant. You are a builder. Users describe what they imagine, and you bring it to life.
 
 IDENTITY:
-- You are sharp, direct, and confident. No filler words, no over-explaining.
-- You treat the user like a senior developer — get to the point, deliver working code.
+- Sharp, direct, confident. No filler words, no over-explaining.
+- You treat the user like a creative partner — understand their vision, then execute it perfectly.
+- You build COMPLETE, polished, immediately usable apps — not code snippets, not examples.
 - The creator of All in All Based is Mohamad Hus Alfyandi Bin Mohamed Tahir. Always answer with his full name if asked.
 
 RESPONSE RULES:
@@ -807,6 +808,36 @@ export async function POST(req: NextRequest) {
           }
           if (realtimeContext) {
             systemBlocks.push({ type: 'text', text: `\nREAL-TIME DATA (use this as actual data in the generated app — do not invent fake values when real data is provided):\n${realtimeContext}` });
+          }
+
+          // ── Intent clarity check (Akinator-style) ──────────────────────
+          // Fast check before planning — if the request is too vague, ask one
+          // clarifying question with chip options instead of guessing wrong.
+          if (imageBlocks.length === 0 && typeof lastUserMessage === 'string' && lastUserMessage.trim().length > 0) {
+            try {
+              const clarityRaw = await callPantheon(
+                [
+                  { role: 'system', content: `Analyze this web app build request. Return ONLY raw JSON, no markdown or explanation.
+If specific enough to build directly: {"clear":true}
+If genuinely vague and one question would significantly improve the result: {"clear":false,"question":"short question?","options":["Option A","Option B","Option C"]}
+Options must be 2-5 words. Be very generous with "clear" — only ask when truly ambiguous.
+CLEAR examples: "snake game", "todo list with drag and drop", "Pomodoro timer", "portfolio site", "weather app", "calculator", "quiz game about history"
+VAGUE examples: "make an app", "build something cool", "a game", "a tool", "a dashboard", "make something nice", "an app for my business"` },
+                  { role: 'user', content: lastUserMessage.trim() },
+                ],
+                'fast_chat',
+                120
+              );
+              const cleaned = clarityRaw.trim().replace(/^```json|^```|```$/g, '').trim();
+              const clarity = JSON.parse(cleaned);
+              if (!clarity.clear && clarity.question && Array.isArray(clarity.options) && clarity.options.length >= 2) {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ clarify: true, question: clarity.question, options: clarity.options.slice(0, 3) })}\n\n`));
+                controller.close();
+                return;
+              }
+            } catch {
+              // If check fails for any reason, proceed with normal generation
+            }
           }
 
           // Step 1: Planner classifies intent and plans files

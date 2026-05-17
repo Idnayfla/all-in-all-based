@@ -2500,6 +2500,35 @@ body {
 .chat-empty-title { animation: fadeSlideUp 0.5s 0.1s cubic-bezier(0.16,1,0.3,1) both; }
 .chat-empty-sub   { animation: fadeSlideUp 0.5s 0.2s cubic-bezier(0.16,1,0.3,1) both; }
 
+/* ── Clarification card (Akinator-style intent chips) ── */
+.clarify-card {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 4px 0;
+}
+.clarify-question {
+  font-size: 14px; font-family: var(--font-sans); color: var(--text);
+  line-height: 1.6; font-weight: 500;
+}
+.clarify-options {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.clarify-option-btn {
+  padding: 8px 18px;
+  background: var(--accent-subtle);
+  border: 1px solid var(--border);
+  color: var(--text2); font-family: var(--font-sans);
+  font-size: 13px; cursor: pointer;
+  border-radius: var(--r-full);
+  transition: all 0.15s cubic-bezier(0.16,1,0.3,1);
+}
+.clarify-option-btn:hover {
+  background: var(--accent); color: #fff;
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px var(--accent-glow);
+}
+.clarify-option-btn:active { transform: scale(0.96); }
+
 /* ── Wallpaper mode — semi-transparent panels so the photo shows through ── */
 html.has-wallpaper {
   --bg:  rgba(10, 10, 15, 0.78);
