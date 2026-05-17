@@ -44,17 +44,19 @@ export default function PreviewPanel({ files, projectType }: {
     }
   };
 
-  const captureCanvas = async (): Promise<HTMLCanvasElement | null> => {
+  const captureCanvas = async (scale = Math.max(window.devicePixelRatio ?? 1, 2)): Promise<HTMLCanvasElement | null> => {
     const iframe = iframeRef.current;
     if (!iframe?.contentDocument?.body) return null;
     const { default: html2canvas } = await import('html2canvas');
     return html2canvas(iframe.contentDocument.body, {
       useCORS: true,
       allowTaint: true,
-      width:  iframe.offsetWidth,
-      height: iframe.offsetHeight,
+      scale,
+      width:        iframe.offsetWidth,
+      height:       iframe.offsetHeight,
       windowWidth:  iframe.offsetWidth,
       windowHeight: iframe.offsetHeight,
+      logging: false,
     });
   };
 
@@ -100,18 +102,21 @@ export default function PreviewPanel({ files, projectType }: {
       const frameCount = 16;
       const frameDelay = 120; // ms per frame
 
+      const gifScale = 1.5;
       const gif = new GIF({
         workers: 2,
         quality: 8,
-        width:   w,
-        height:  h,
+        width:   Math.round(w * gifScale),
+        height:  Math.round(h * gifScale),
         workerScript: '/gif.worker.js',
       });
 
       for (let i = 0; i < frameCount; i++) {
         const canvas = await html2canvas(iframe.contentDocument.body, {
           useCORS: true, allowTaint: true,
+          scale: 1.5,
           width: w, height: h, windowWidth: w, windowHeight: h,
+          logging: false,
         });
         gif.addFrame(canvas, { delay: frameDelay, copy: true });
         await new Promise(r => setTimeout(r, frameDelay));
