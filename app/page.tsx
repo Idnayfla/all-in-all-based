@@ -584,8 +584,11 @@ export default function Home() {
             )}
             <button
               className={`icon-btn ${incognito ? 'incognito-active' : ''}`}
-              onClick={() => { setIncognito(s => !s); setIncognitoMessages([]); setActivePanel('chat'); }}
-              title="Temp chat — no memory saved"
+              onClick={() => {
+                if (subscription.tier === 'free') { setPricingReason('upgrade'); setShowPricing(true); return; }
+                setIncognito(s => !s); setIncognitoMessages([]); setActivePanel('chat');
+              }}
+              title={subscription.tier === 'free' ? 'Incognito — Pro feature' : 'Temp chat — no memory saved'}
             >◉</button>
             <a href="https://ko-fi.com/basedfund" target="_blank" rel="noopener noreferrer" className="donate-header-btn" title="Support Based on Ko-fi">◈ Support</a>
             <button className={`icon-btn ${showSettings ? 'active' : ''}`} onClick={() => setShowSettings(s => !s)} title="Settings" aria-label="Toggle settings">◈</button>
@@ -640,7 +643,8 @@ export default function Home() {
               )}
               <div className="settings-section">
                 <label className="settings-label">Wallpaper</label>
-                <div className="wallpaper-section">
+                {subscription.tier === 'free' && <div className="pro-gate-overlay" onClick={() => { setPricingReason('upgrade'); setShowPricing(true); setShowSettings(false); }}><span className="pro-gate-badge">⬡ Pro</span></div>}
+                <div className={`wallpaper-section${subscription.tier === 'free' ? ' pro-gate-blurred' : ''}`}>
                   {wallpaper && (
                     <div className="wallpaper-preview" style={{ backgroundImage: `url(${wallpaper})` }} />
                   )}
@@ -662,8 +666,10 @@ export default function Home() {
                   onChange={handleWallpaperUpload}
                 />
               </div>
-              <div className="settings-section">
+              <div className="settings-section" style={{ position: 'relative' }}>
                 <label className="settings-label">Appearance</label>
+                {subscription.tier === 'free' && <div className="pro-gate-overlay" onClick={() => { setPricingReason('upgrade'); setShowPricing(true); setShowSettings(false); }}><span className="pro-gate-badge">⬡ Pro</span></div>}
+                <div className={subscription.tier === 'free' ? 'pro-gate-blurred' : ''}>
                 <ThemeCustomizer
                   theme={theme}
                   onChange={async (next) => {
@@ -678,9 +684,12 @@ export default function Home() {
                     }).catch(() => {});
                   }}
                 />
+                </div>
               </div>
-              <div className="settings-section">
+              <div className="settings-section" style={{ position: 'relative' }}>
                 <label className="settings-label">AI Personality</label>
+                {subscription.tier === 'free' && <div className="pro-gate-overlay" onClick={() => { setPricingReason('upgrade'); setShowPricing(true); setShowSettings(false); }}><span className="pro-gate-badge">⬡ Pro</span></div>}
+                <div className={subscription.tier === 'free' ? 'pro-gate-blurred' : ''}>
                 <PersonalityPanel
                   initialSettings={personalitySettings}
                   onPersonalityChange={async (modifier, settings) => {
@@ -693,9 +702,12 @@ export default function Home() {
                     }).catch(() => {});
                   }}
                 />
+                </div>
               </div>
-              <div className="settings-section">
+              <div className="settings-section" style={{ position: 'relative' }}>
                 <label className="settings-label">Global Memory</label>
+                {subscription.tier === 'free' && <div className="pro-gate-overlay" onClick={() => { setPricingReason('upgrade'); setShowPricing(true); setShowSettings(false); }}><span className="pro-gate-badge">⬡ Pro</span></div>}
+                <div className={subscription.tier === 'free' ? 'pro-gate-blurred' : ''}>
                 <div className="settings-hint" style={{ marginBottom: 8 }}>Auto-updated after each conversation. Based remembers this across all projects.</div>
                 <div className="memory-compiled-preview">
                   {parseMemories(globalMemory).length > 0
@@ -708,6 +720,7 @@ export default function Home() {
                 <button className="memory-manage-btn" onClick={() => setShowMemoryManager(true)}>
                   ⬡ Manage Memories
                 </button>
+                </div>
               </div>
               {currentProject && (
                 <div className="settings-section">
@@ -846,13 +859,14 @@ export default function Home() {
                   globalMemory={globalMemory}
                   incognito={incognito}
                   prefillMessage={pendingPrompt}
+                  onProRequired={() => { setPricingReason('upgrade'); setShowPricing(true); }}
                 />
               </div>
               <div className={`panel ${activePanel === 'editor' ? 'panel-active' : ''}`}>
                 <EditorPanel activeFile={activeFile} onFileUpdate={updateFile} />
               </div>
               <div className={`panel ${activePanel === 'preview' ? 'panel-active' : ''}`}>
-                <PreviewPanel files={files} projectType={projectType} />
+                <PreviewPanel files={files} projectType={projectType} subscriptionTier={subscription.tier} onProRequired={() => { setPricingReason('upgrade'); setShowPricing(true); }} />
               </div>
               <div className={`panel ${activePanel === 'debug' ? 'panel-active' : ''}`}>
                 <DebugPanel />

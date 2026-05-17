@@ -2,9 +2,11 @@
 import { useMemo, useRef, useState } from 'react';
 import { FileNode } from '@/app/page';
 
-export default function PreviewPanel({ files, projectType }: {
+export default function PreviewPanel({ files, projectType, subscriptionTier, onProRequired }: {
   files: FileNode[];
   projectType: string;
+  subscriptionTier?: 'free' | 'pro';
+  onProRequired?: () => void;
 }) {
   const [output, setOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
@@ -188,9 +190,15 @@ export default function PreviewPanel({ files, projectType }: {
           {showExportMenu && (
             <div className="export-menu">
               <button className="export-menu-item" onClick={exportPNG}>PNG</button>
-              <button className="export-menu-item" onClick={exportJPG}>JPG</button>
-              <button className="export-menu-item" onClick={exportGIF}>GIF&nbsp;<span className="export-menu-badge">animated</span></button>
-              <button className="export-menu-item" onClick={exportPDF}>PDF</button>
+              <button className="export-menu-item" onClick={subscriptionTier === 'free' ? onProRequired : exportJPG}>
+                JPG {subscriptionTier === 'free' && <span className="export-menu-badge export-menu-badge--pro">⬡ Pro</span>}
+              </button>
+              <button className="export-menu-item" onClick={subscriptionTier === 'free' ? onProRequired : exportGIF}>
+                GIF&nbsp;<span className="export-menu-badge">{subscriptionTier === 'free' ? '⬡ Pro' : 'animated'}</span>
+              </button>
+              <button className="export-menu-item" onClick={subscriptionTier === 'free' ? onProRequired : exportPDF}>
+                PDF {subscriptionTier === 'free' && <span className="export-menu-badge export-menu-badge--pro">⬡ Pro</span>}
+              </button>
             </div>
           )}
         </div>

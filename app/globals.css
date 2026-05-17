@@ -1078,6 +1078,43 @@ body {
 }
 .export-menu-item:hover { background: var(--bg3); color: var(--text); }
 
+/* ── Pro gate ── */
+.pro-gate-overlay {
+  position: absolute;
+  inset: 0; z-index: 10;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(8,7,15,0.55);
+  backdrop-filter: blur(3px);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.pro-gate-overlay:hover { background: rgba(8,7,15,0.68); }
+.pro-gate-badge {
+  padding: 4px 12px;
+  background: linear-gradient(135deg, var(--accent), var(--accent3));
+  border-radius: 20px;
+  font-size: 11px; font-weight: 800;
+  color: #0d0c1a; letter-spacing: 1.5px;
+  font-family: 'Courier New', monospace;
+  animation: chipGlow 2s ease-in-out infinite;
+}
+.pro-gate-blurred { filter: blur(2px); pointer-events: none; user-select: none; }
+
+/* Mode dropdown pro badge */
+.mode-dropdown-option--locked { opacity: 0.6; }
+.mode-dropdown-option--locked:hover { opacity: 1; background: var(--bg3); }
+.mode-dropdown-pro-badge {
+  margin-left: auto;
+  font-size: 9px; font-weight: 700;
+  color: var(--accent); letter-spacing: 1px;
+  font-family: 'Courier New', monospace;
+  border: 1px solid rgba(139,118,255,0.3);
+  border-radius: 4px; padding: 1px 5px;
+}
+
+.export-menu-badge--pro { color: var(--accent); border-color: rgba(139,118,255,0.3); }
+
 .export-menu-badge {
   font-size: 9px; color: var(--text3);
   border: 1px solid var(--border);
