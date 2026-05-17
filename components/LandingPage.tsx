@@ -52,7 +52,7 @@ export default function LandingPage({ onSignIn }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          <button className="landing-cta-primary" onClick={() => onSignIn('signup')}>Start Building Free</button>
+          <button className="landing-cta-primary" onClick={() => onSignIn('signup')}>Sign Up Free</button>
           <button className="landing-cta-secondary" onClick={() => onSignIn('signin')}>Sign In</button>
         </motion.div>
         <motion.div
