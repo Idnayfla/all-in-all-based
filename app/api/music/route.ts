@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { checkMediaRateLimit } from '../_mediaRateLimit';
 
 export const maxDuration = 120;
 
@@ -23,6 +24,9 @@ async function enhancePrompt(prompt: string): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
+  const limit = await checkMediaRateLimit(req, 'music');
+  if (limit instanceof NextResponse) return limit;
+
   try {
     const { prompt, duration } = await req.json();
     if (!prompt) return NextResponse.json({ error: 'prompt required' }, { status: 400 });

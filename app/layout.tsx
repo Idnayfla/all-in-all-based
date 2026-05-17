@@ -7,6 +7,7 @@ import LaunchSplash from '@/components/LaunchSplash';
 import InstallPrompt from '@/components/InstallPrompt';
 import Script from 'next/script';
 import { Analytics } from '@vercel/analytics/react';
+import BetaBanner from '@/components/BetaBanner';
 
 export const metadata: Metadata = {
   title: 'Based — AI Dev Studio',
@@ -51,7 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-startup-image" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)" href="/splash/splash-1668x2388.png" />
         <link rel="apple-touch-startup-image" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)" href="/splash/splash-2048x2732.png" />
       </head>
-      <body suppressHydrationWarning><LaunchSplash /><InstallPrompt /><ServiceWorkerInit /><ClientOnly><ErrorBoundary>{children}</ErrorBoundary></ClientOnly><Analytics /></body>
+      <body suppressHydrationWarning><BetaBanner /><LaunchSplash /><InstallPrompt /><ServiceWorkerInit /><ClientOnly><ErrorBoundary>{children}</ErrorBoundary></ClientOnly><Analytics /></body>
     </html>
   );
 }

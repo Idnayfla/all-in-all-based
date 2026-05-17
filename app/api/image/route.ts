@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fal } from '@fal-ai/client';
 import { friendlyFalError } from '../_falError';
+import { checkMediaRateLimit } from '../_mediaRateLimit';
 
 if (process.env.FAL_KEY) fal.config({ credentials: process.env.FAL_KEY });
 
 export async function POST(req: NextRequest) {
+  const limit = await checkMediaRateLimit(req, 'image');
+  if (limit instanceof NextResponse) return limit;
+
   if (!process.env.FAL_KEY) {
     return NextResponse.json({ error: 'FAL_KEY not configured' }, { status: 500 });
   }
