@@ -2408,7 +2408,7 @@ body {
 
 .landing-features {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   max-width: 920px;
   margin: 0 auto;
@@ -2498,6 +2498,8 @@ body {
   gap: 10px;
 }
 .landing-footer-sep { color: var(--border); }
+.landing-footer-link { color: var(--text2); text-decoration: none; transition: color 0.15s; }
+.landing-footer-link:hover { color: var(--accent); }
 
 /* Auth modal close button */
 .auth-close-btn {
@@ -2516,6 +2518,9 @@ body {
 .auth-close-btn:hover { color: var(--text); }
 .auth-box { position: relative; }
 
+@media (max-width: 900px) {
+  .landing-features { grid-template-columns: repeat(2, 1fr); }
+}
 @media (max-width: 640px) {
   .landing-features { grid-template-columns: 1fr; }
   .landing-pricing-tiers { grid-template-columns: 1fr; }

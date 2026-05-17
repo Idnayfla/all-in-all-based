@@ -6,9 +6,10 @@ interface Props {
 }
 
 const FEATURES = [
-  { icon: '⟳', title: 'Live Preview', desc: 'See your app render in real time as Based generates each file.' },
-  { icon: '◉', title: 'AI Memory', desc: 'Based learns your style and remembers context across every session.' },
-  { icon: '◈', title: 'Multi-file Apps', desc: 'HTML, CSS, JS, and more — all generated together and kept in sync.' },
+  { icon: '▶', title: 'Live Preview',    desc: 'Your app renders in real time as Based writes each file — no refresh, no copy-paste.' },
+  { icon: '◉', title: 'AI Memory',       desc: 'Based remembers your style, stack preferences, and project context across sessions.' },
+  { icon: '◈', title: 'Image · Video · Music', desc: 'Generate visuals, animated video, and audio tracks alongside your code — all in one place.' },
+  { icon: '⬡', title: 'Any language',    desc: 'HTML/CSS/JS, Python, Node — describe what you need and Based picks the right stack.' },
 ];
 
 export default function LandingPage({ onSignIn }: Props) {
@@ -42,8 +43,8 @@ export default function LandingPage({ onSignIn }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          Generate HTML apps, games, dashboards, and tools from a single message.
-          Live preview. Persistent memory. No setup required.
+          Describe what you want — Based writes the code, generates images, and renders a live preview.
+          No setup. No IDE. Just ship.
         </motion.p>
         <motion.div
           className="landing-ctas"
@@ -113,8 +114,12 @@ export default function LandingPage({ onSignIn }: Props) {
             <ul className="landing-tier-features">
               <li>Unlimited generations</li>
               <li>Unlimited projects</li>
-              <li>AI Companion</li>
-              <li>Priority support</li>
+              <li>Image generation — FLUX &amp; Nano Banana</li>
+              <li>Video generation — Seedance 2.0</li>
+              <li>Music generation — Stable Audio</li>
+              <li>AI Personality tuning</li>
+              <li>Incognito mode</li>
+              <li>Export — JPG, GIF, PDF</li>
             </ul>
             <button className="landing-tier-cta landing-tier-cta--pro" onClick={() => onSignIn('signup')}>Upgrade to Pro</button>
           </div>
@@ -124,7 +129,9 @@ export default function LandingPage({ onSignIn }: Props) {
       <footer className="landing-footer">
         <span>Built by Hus Alfyandi</span>
         <span className="landing-footer-sep">·</span>
-        <span>getbased.dev</span>
+        <a href="https://ko-fi.com/basedfund" target="_blank" rel="noopener noreferrer" className="landing-footer-link">◈ Support</a>
+        <span className="landing-footer-sep">·</span>
+        <a href="mailto:husgogogo@gmail.com" className="landing-footer-link">Contact</a>
       </footer>
     </div>
   );
