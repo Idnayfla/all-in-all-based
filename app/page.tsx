@@ -72,9 +72,9 @@ export default function Home() {
   const [incognito, setIncognito]     = useState(false);
   const [incognitoMessages, setIncognitoMessages] = useState<Message[]>([]);
   const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview' | 'debug'>('chat');
-  useSwipePanels(activePanel, setActivePanel, !incognito && !!currentProject);
   const [projects, setProjects]       = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
+  useSwipePanels(activePanel, setActivePanel, !incognito && !!currentProject);
   const [projectModal, setProjectModal] = useState(false);
   const [pendingPrompt, setPendingPrompt] = useState('');
   const [shareUrl, setShareUrl] = useState('');
