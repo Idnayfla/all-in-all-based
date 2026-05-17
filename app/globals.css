@@ -2406,6 +2406,79 @@ body {
 .landing-cta-secondary:hover { border-color: var(--text2); }
 .landing-hint { font-size: 11px; color: var(--text3); }
 
+/* ── Landing demo window ── */
+.landing-demo {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 24px 72px;
+}
+.landing-demo-window {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.45), 0 0 0 1px rgba(124,106,247,0.12);
+}
+.landing-demo-bar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.landing-demo-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--border);
+}
+.landing-demo-bar-title {
+  margin-left: 10px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text3);
+}
+.landing-demo-placeholder {
+  background: var(--bg2);
+  aspect-ratio: 16/9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.landing-demo-placeholder-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+  padding: 24px;
+}
+.landing-demo-placeholder-icon {
+  font-size: 32px;
+  color: var(--border);
+}
+.landing-demo-placeholder-text {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text3);
+}
+.landing-demo-placeholder-sub {
+  font-size: 11px;
+  color: var(--text3);
+  opacity: 0.6;
+  max-width: 340px;
+  line-height: 1.6;
+}
+.landing-demo-placeholder-sub code {
+  color: var(--accent);
+  font-family: var(--font-mono);
+}
+/* Once you have a real screenshot, use this class on the <img> instead */
+.landing-demo-img {
+  width: 100%;
+  display: block;
+}
+
 .landing-features {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

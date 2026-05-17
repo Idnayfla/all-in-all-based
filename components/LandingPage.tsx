@@ -65,6 +65,30 @@ export default function LandingPage({ onSignIn }: Props) {
         </motion.div>
       </section>
 
+      <section className="landing-demo">
+        <motion.div
+          className="landing-demo-window"
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, type: 'spring', stiffness: 200, damping: 28 }}
+        >
+          <div className="landing-demo-bar">
+            <span className="landing-demo-dot" />
+            <span className="landing-demo-dot" />
+            <span className="landing-demo-dot" />
+            <span className="landing-demo-bar-title">Based — Live Preview</span>
+          </div>
+          {/* Replace src with an actual screenshot — e.g. /demo-screenshot.png */}
+          <div className="landing-demo-placeholder">
+            <div className="landing-demo-placeholder-inner">
+              <div className="landing-demo-placeholder-icon">◈</div>
+              <div className="landing-demo-placeholder-text">Screenshot coming soon</div>
+              <div className="landing-demo-placeholder-sub">Drop a PNG at <code>public/demo-screenshot.png</code> and swap the placeholder div for an &lt;img&gt;</div>
+            </div>
+          </div>
+        </motion.div>
+      </section>
+
       <section className="landing-features">
         {FEATURES.map((f, i) => (
           <motion.div
