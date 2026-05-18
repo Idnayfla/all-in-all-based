@@ -730,7 +730,6 @@ export default function StudioPanel() {
                     <input
                       type="range" min={0} max={1} step={0.01} value={track.volume}
                       className="studio-mixer-vol"
-                      orient="vertical"
                       onChange={e => updateTrack(track.id, { volume: parseFloat(e.target.value) })}
                     />
                   </div>
