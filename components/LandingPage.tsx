@@ -20,6 +20,22 @@ const PILLARS = [
   { icon: '⊙', title: 'Community-Driven', desc: 'Hit a bug? Report it. Love a feature? Support it. Based gets better every time you use it.' },
 ];
 
+const SHIPPED_RECENT = [
+  { icon: '⬡', label: 'Music Studio',   desc: 'Full DAW — piano, drums, voice recording, effects' },
+  { icon: '▸',  label: 'Video Editor',   desc: 'Trim, text overlays, speed control, FFmpeg export' },
+  { icon: '◈', label: 'Music AI',       desc: 'Generate original tracks from a description' },
+  { icon: '◉', label: 'Image Gen',      desc: 'FLUX + Nano Banana — text-to-image and editing' },
+  { icon: '⊙', label: 'Game Engine',    desc: 'Playable games built and rendered in the browser' },
+  { icon: '⬡', label: 'Windows Companion', desc: 'Floating overlay that watches your screen' },
+];
+
+const COMING_NEXT = [
+  { label: 'Image Studio',     desc: 'Canvas, layers, AI-assisted edits' },
+  { label: '3D / Blueprint',   desc: 'Describe a scene — Based renders it' },
+  { label: 'Mobile App',       desc: 'iOS + Android, feels native' },
+  { label: 'Proactive AI',     desc: '"You were working on X — continue?"' },
+];
+
 const COMPARISONS = [
   { them: 'One AI, one job',           us: 'One AI, every job' },
   { them: 'Outputs text',              us: 'Outputs apps, images, video, music' },
@@ -229,6 +245,54 @@ export default function LandingPage({ onSignIn }: Props) {
           </div>
         </section>
       )}
+
+      <section className="landing-roadmap">
+        <motion.div
+          className="landing-roadmap-header"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <div>
+            <div className="landing-roadmap-label">Built in public · Shaped by users</div>
+            <h2 className="landing-roadmap-title">Always shipping.</h2>
+            <p className="landing-roadmap-sub">Based gets better every week. Here&apos;s what&apos;s been built and what&apos;s coming.</p>
+          </div>
+          <a href="/roadmap" className="landing-roadmap-btn">Full roadmap →</a>
+        </motion.div>
+        <motion.div
+          className="landing-roadmap-grid"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+        >
+          <div className="landing-roadmap-col">
+            <div className="landing-roadmap-col-label">◈ Recently shipped</div>
+            {SHIPPED_RECENT.map(item => (
+              <div key={item.label} className="landing-roadmap-item">
+                <span className="landing-roadmap-item-icon">{item.icon}</span>
+                <div>
+                  <div className="landing-roadmap-item-name">{item.label}</div>
+                  <div className="landing-roadmap-item-desc">{item.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="landing-roadmap-col">
+            <div className="landing-roadmap-col-label">⬡ Coming next</div>
+            {COMING_NEXT.map(item => (
+              <div key={item.label} className="landing-roadmap-item landing-roadmap-item--dim">
+                <span className="landing-roadmap-item-icon">⬡</span>
+                <div>
+                  <div className="landing-roadmap-item-name">{item.label}</div>
+                  <div className="landing-roadmap-item-desc">{item.desc}</div>
+                </div>
+              </div>
+            ))}
+            <a href="/roadmap" className="landing-roadmap-see-all">See full roadmap →</a>
+          </div>
+        </motion.div>
+      </section>
 
       <section className="landing-pricing">
         <motion.div
