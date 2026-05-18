@@ -349,6 +349,14 @@ CUSTOM TEXT EFFECTS:
 - 3D text illusion: draw text offset multiple times in darker shade (depth layers), then bright on top
 - Always include Download PNG button: canvas.toBlob(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'text.png'; a.click(); })
 
+ICON TYPE DISAMBIGUATION — read the context before building:
+- "profile icon" / "profile picture" / "avatar icon" → circular or rounded-square SVG avatar — abstract shape, initials, or illustrated face — NOT a favicon or website icon
+- "app icon" / "home screen icon" → square with rounded corners (like iOS/Android), bold graphic, single strong shape, 512×512 viewBox
+- "favicon" / "website icon" / "tab icon" → small 32×32 or 64×64 optimised SVG, simple enough to read tiny
+- "icon" alone with no other context → ask: "What's this icon for — a profile/avatar, an app, a website tab, or a UI element?" — do NOT default to favicon
+- "social media icon" → rounded square 1:1 format, designed for profile photos on platforms
+- Profile icons: use a circle clip-path (<clipPath><circle/></clipPath>) to frame the content; include a Download PNG button
+
 CUSTOM LOGO:
 - Build logos as inline SVG — always vector, never raster
 - Coordinate system: viewBox="0 0 400 400" for square, "0 0 600 200" for wide/banner logos
