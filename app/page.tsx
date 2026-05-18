@@ -231,6 +231,30 @@ export default function Home() {
       const tier = subscriptionTier ?? 'free';
       setSubscription({ tier, status: subscriptionStatus ?? 'active', generationsUsed: generationsUsed ?? 0, periodStart: subscriptionPeriodStart ?? null, periodEnd: subscriptionPeriodEnd ?? null });
       localStorage.setItem('based_sub_tier', tier);
+
+      // If DB shows free, silently re-check Stripe — catches missed webhooks so paying users
+      // never have to manually click Re-sync
+      if (tier === 'free') {
+        void (async () => {
+          try {
+            const h = await getHeaders();
+            const syncRes = await fetch('/api/stripe/sync', { method: 'POST', headers: h });
+            if (syncRes.ok) {
+              const syncData = await syncRes.json();
+              if (syncData.tier === 'pro') {
+                const s2 = await fetch('/api/settings', { headers: h });
+                if (s2.ok) {
+                  const { subscriptionTier: t2, subscriptionStatus: st2, generationsUsed: g2, subscriptionPeriodStart: ps2, subscriptionPeriodEnd: pe2 } = await s2.json();
+                  const tier2 = t2 ?? 'free';
+                  setSubscription({ tier: tier2, status: st2 ?? 'active', generationsUsed: g2 ?? 0, periodStart: ps2 ?? null, periodEnd: pe2 ?? null });
+                  localStorage.setItem('based_sub_tier', tier2);
+                }
+              }
+            }
+          } catch {}
+        })();
+      }
+
       if (p) {
         try {
           const parsed = JSON.parse(p);
