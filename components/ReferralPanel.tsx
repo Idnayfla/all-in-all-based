@@ -39,8 +39,8 @@ export default function ReferralPanel({ getHeaders }: Props) {
     <div className="referral-panel">
       <p className="referral-desc">
         Share Based, earn Pro time for you and a friend.
-        Your friend gets <strong>7 days free Pro</strong> when they sign up.
-        You get <strong>30 days free Pro</strong> when they subscribe.
+        Your friend gets <strong>3 days free Pro</strong> when they sign up.
+        You get <strong>7 days free Pro</strong> when they subscribe.
       </p>
 
       <div className="referral-link-row">

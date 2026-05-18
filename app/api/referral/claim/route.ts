@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserId, supabaseAdmin } from '../../_auth';
 
-const REFERRAL_BONUS_DAYS = 7;
+const REFERRAL_BONUS_DAYS = 3;
 
 export async function POST(req: NextRequest) {
   try {

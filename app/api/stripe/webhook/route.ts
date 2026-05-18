@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
               const base = referrer.pro_bonus_expires_at && new Date(referrer.pro_bonus_expires_at) > now
                 ? new Date(referrer.pro_bonus_expires_at)
                 : now;
-              base.setDate(base.getDate() + 30);
+              base.setDate(base.getDate() + 7);
               await supabaseAdmin.from('user_settings').upsert({
                 user_id: referrer.user_id,
                 pro_bonus_expires_at: base.toISOString(),
