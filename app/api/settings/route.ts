@@ -28,7 +28,8 @@ export async function GET(req: NextRequest) {
     const paidTier = (data?.subscription_tier ?? 'free') as 'free' | 'pro';
     const bonusExpiresAt = data?.pro_bonus_expires_at as string | null;
     const hasBonusPro = !!bonusExpiresAt && new Date(bonusExpiresAt) > new Date();
-    const effectiveTier: 'free' | 'pro' = paidTier === 'pro' || hasBonusPro ? 'pro' : 'free';
+    const isBeta = !!process.env.BETA_ACCESS_CODE; // beta env → everyone gets Pro
+    const effectiveTier: 'free' | 'pro' = isBeta || paidTier === 'pro' || hasBonusPro ? 'pro' : 'free';
     const bonusDaysLeft = hasBonusPro
       ? Math.max(0, Math.ceil((new Date(bonusExpiresAt!).getTime() - Date.now()) / 86400000))
       : 0;
