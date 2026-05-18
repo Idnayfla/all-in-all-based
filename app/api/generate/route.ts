@@ -750,19 +750,26 @@ function toClaudeContent(
   if (typeof content === 'string') {
     return appendText ? content + appendText : content;
   }
-  const blocks: ClaudeContentBlock[] = content.map(block =>
-    block.type === 'text'
-      ? { type: 'text', text: block.text }
-      : {
-          type: 'image',
-          source: {
-            type: 'base64' as const,
-            media_type: block.mediaType as ImageMediaType,
-            data: block.data,
-          },
-        }
-  );
+  const blocks: ClaudeContentBlock[] = [];
+  for (const block of content as any[]) {
+    if (block.type === 'text') {
+      blocks.push({ type: 'text', text: block.text });
+    } else if (block.type === 'image' && block.mediaType && block.data) {
+      blocks.push({ type: 'image', source: { type: 'base64' as const, media_type: block.mediaType as ImageMediaType, data: block.data } });
+    } else if (block.type === 'clarify') {
+      // clarify blocks become a plain-text summary so conversation history stays coherent
+      blocks.push({ type: 'text', text: `[Asked for clarification: "${block.question}"]` });
+    } else if (block.type === 'error') {
+      blocks.push({ type: 'text', text: `[Error: ${block.message}]` });
+    }
+    // generated-image, generated-video, generated-music, etc. — skip, not relevant to generation context
+  }
   if (appendText) blocks.push({ type: 'text', text: appendText });
+  // if all we have is appendText and no real content, return as string
+  if (blocks.length === 0) return appendText ?? '';
+  if (blocks.length === 1 && blocks[0].type === 'text' && !blocks.some(b => b.type === 'image')) {
+    return blocks[0].text;
+  }
   return blocks;
 }
 
