@@ -7,34 +7,61 @@ interface TextOverlay {
   x: number; y: number;
   startTime: number; endTime: number;
   fontSize: number; color: string;
+  fontWeight: 'normal' | 'bold';
 }
 
 const FFMPEG_CORE = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js';
 const FFMPEG_WASM = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm';
 const THUMB_COUNT = 20;
+const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 
 export default function VideoEditorPanel() {
-  const videoRef   = useRef<HTMLVideoElement>(null);
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
-  const timelineRef = useRef<HTMLDivElement>(null);
-  const ffmpegRef  = useRef<any>(null);
+  const videoRef     = useRef<HTMLVideoElement>(null);
+  const canvasRef    = useRef<HTMLCanvasElement>(null);
+  const timelineRef  = useRef<HTMLDivElement>(null);
+  const ffmpegRef    = useRef<any>(null);
 
-  const [videoFile,  setVideoFile]  = useState<File | null>(null);
-  const [videoUrl,   setVideoUrl]   = useState('');
-  const [duration,   setDuration]   = useState(0);
+  const [videoFile,   setVideoFile]   = useState<File | null>(null);
+  const [videoUrl,    setVideoUrl]    = useState('');
+  const [duration,    setDuration]    = useState(0);
   const [currentTime, setCurrentTime] = useState(0);
-  const [playing,    setPlaying]    = useState(false);
-  const [trimStart,  setTrimStart]  = useState(0);
-  const [trimEnd,    setTrimEnd]    = useState(0);
-  const [thumbs,     setThumbs]     = useState<string[]>([]);
-  const [overlays,   setOverlays]   = useState<TextOverlay[]>([]);
-  const [selOverlay, setSelOverlay] = useState<string | null>(null);
-  const [processing, setProcessing] = useState(false);
-  const [procStatus, setProcStatus] = useState('');
-  const [exportUrl,  setExportUrl]  = useState('');
-  const [aiInput,    setAiInput]    = useState('');
-  const [dragging,   setDragging]   = useState<'start'|'end'|'head'|null>(null);
-  const draggingRef = useRef<'start'|'end'|'head'|null>(null);
+  const [playing,     setPlaying]     = useState(false);
+  const [loop,        setLoop]        = useState(false);
+  const [volume,      setVolume]      = useState(1);
+  const [muted,       setMuted]       = useState(false);
+  const [speed,       setSpeed]       = useState(1);
+  const [trimStart,   setTrimStart]   = useState(0);
+  const [trimEnd,     setTrimEnd]     = useState(0);
+  const [thumbs,      setThumbs]      = useState<string[]>([]);
+  const [thumbsReady, setThumbsReady] = useState(false);
+  const [overlays,    setOverlays]    = useState<TextOverlay[]>([]);
+  const [selOverlay,  setSelOverlay]  = useState<string | null>(null);
+  const [processing,  setProcessing]  = useState(false);
+  const [procStatus,  setProcStatus]  = useState('');
+  const [exportUrl,   setExportUrl]   = useState('');
+  const [aiInput,     setAiInput]     = useState('');
+
+  // dragging state stored in refs to avoid stale closures in event listeners
+  const draggingRef     = useRef<'start' | 'end' | 'head' | null>(null);
+  const trimStartRef    = useRef(0);
+  const trimEndRef      = useRef(0);
+  const durationRef     = useRef(0);
+  const canvasDragRef   = useRef<{ id: string; offX: number; offY: number } | null>(null);
+
+  // Undo stack for overlay edits
+  const undoStack = useRef<TextOverlay[][]>([]);
+  const pushUndo = useCallback((snap: TextOverlay[]) => {
+    undoStack.current = [...undoStack.current.slice(-19), snap.map(o => ({ ...o }))];
+  }, []);
+  const undo = useCallback(() => {
+    const prev = undoStack.current.pop();
+    if (prev) setOverlays(prev);
+  }, []);
+
+  // Keep refs in sync with state
+  useEffect(() => { trimStartRef.current = trimStart; }, [trimStart]);
+  useEffect(() => { trimEndRef.current = trimEnd; }, [trimEnd]);
+  useEffect(() => { durationRef.current = duration; }, [duration]);
 
   // ── Load video ────────────────────────────────────────────────────────────
   const loadVideo = (file: File) => {
@@ -44,7 +71,10 @@ export default function VideoEditorPanel() {
     setExportUrl('');
     setOverlays([]);
     setThumbs([]);
+    setThumbsReady(false);
     setCurrentTime(0);
+    setSpeed(1);
+    undoStack.current = [];
   };
 
   const onDrop = (e: React.DragEvent) => {
@@ -63,25 +93,63 @@ export default function VideoEditorPanel() {
   };
 
   const onTimeUpdate = () => setCurrentTime(videoRef.current?.currentTime ?? 0);
-  const onEnded      = () => setPlaying(false);
+
+  const onEnded = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (loop) { v.currentTime = trimStartRef.current; v.play(); }
+    else setPlaying(false);
+  };
+
+  // Seek helper — works without stale closure issues
+  const seekTo = (t: number) => {
+    const v = videoRef.current;
+    if (!v) return;
+    const clamped = Math.max(0, Math.min(durationRef.current || duration, t));
+    v.currentTime = clamped;
+    setCurrentTime(clamped);
+  };
 
   const togglePlay = () => {
     const v = videoRef.current;
     if (!v) return;
-    if (playing) { v.pause(); setPlaying(false); }
-    else {
-      if (v.currentTime < trimStart || v.currentTime >= trimEnd) v.currentTime = trimStart;
-      v.play(); setPlaying(true);
+    if (v.paused) {
+      if (v.currentTime >= trimEndRef.current) v.currentTime = trimStartRef.current;
+      v.play();
+    } else {
+      v.pause();
     }
   };
 
+  const stepFrame = (dir: -1 | 1) => seekTo((videoRef.current?.currentTime ?? 0) + dir / 30);
+
+  // Enforce trim-end during playback
   useEffect(() => {
     const v = videoRef.current;
-    if (!v || !playing) return;
-    const check = () => { if (v.currentTime >= trimEnd) { v.pause(); setPlaying(false); } };
+    if (!v) return;
+    const check = () => {
+      if (v.currentTime >= trimEndRef.current) {
+        v.pause();
+        if (loop) { v.currentTime = trimStartRef.current; v.play(); }
+        else setPlaying(false);
+      }
+    };
     v.addEventListener('timeupdate', check);
     return () => v.removeEventListener('timeupdate', check);
-  }, [playing, trimEnd]);
+  }, [loop]);
+
+  // Sync volume + mute
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    v.volume = volume;
+    v.muted = muted;
+  }, [volume, muted]);
+
+  // Sync speed
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.playbackRate = speed;
+  }, [speed]);
 
   // ── Thumbnails ────────────────────────────────────────────────────────────
   const generateThumbs = async (video: HTMLVideoElement, dur: number) => {
@@ -92,39 +160,59 @@ export default function VideoEditorPanel() {
     for (let i = 0; i < THUMB_COUNT; i++) {
       await new Promise<void>(res => {
         video.currentTime = (i / (THUMB_COUNT - 1)) * dur;
-        video.onseeked = () => { ctx.drawImage(video, 0, 0, 120, 68); results.push(c.toDataURL('image/jpeg', 0.5)); res(); };
+        video.onseeked = () => {
+          ctx.drawImage(video, 0, 0, 120, 68);
+          results.push(c.toDataURL('image/jpeg', 0.5));
+          res();
+        };
       });
     }
     video.currentTime = 0;
+    video.onseeked = null;
     setThumbs(results);
+    setThumbsReady(true);
   };
 
-  // ── Timeline drag ─────────────────────────────────────────────────────────
-  const timelineX = useCallback((clientX: number): number => {
+  // ── Timeline helpers ──────────────────────────────────────────────────────
+  const timelineXToTime = useCallback((clientX: number): number => {
     const r = timelineRef.current?.getBoundingClientRect();
-    if (!r || !duration) return 0;
-    return Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * duration;
-  }, [duration]);
+    if (!r || !durationRef.current) return 0;
+    return Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * durationRef.current;
+  }, []);
 
-  const onTimelineMouseDown = (e: React.MouseEvent, handle: 'start'|'end'|'head') => {
-    e.preventDefault();
-    draggingRef.current = handle;
-    setDragging(handle);
+  const pct = (t: number) => durationRef.current ? `${(t / durationRef.current) * 100}%` : '0%';
+
+  // Click on timeline background → seek (only when not coming off a handle drag)
+  const onTimelineClick = (e: React.MouseEvent) => {
+    if (draggingRef.current) return;
+    seekTo(timelineXToTime(e.clientX));
   };
 
+  const onHandleMouseDown = (e: React.MouseEvent, handle: 'start' | 'end' | 'head') => {
+    e.preventDefault();
+    e.stopPropagation();
+    draggingRef.current = handle;
+  };
+
+  // Global mouse/touch move + up for all dragging
   useEffect(() => {
     const move = (e: MouseEvent | TouchEvent) => {
       if (!draggingRef.current) return;
       const clientX = 'touches' in e ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX;
-      const t = timelineX(clientX);
-      if (draggingRef.current === 'start')  setTrimStart(Math.min(t, trimEnd - 0.5));
-      if (draggingRef.current === 'end')    setTrimEnd(Math.max(t, trimStart + 0.5));
-      if (draggingRef.current === 'head') {
-        setCurrentTime(t);
-        if (videoRef.current) videoRef.current.currentTime = t;
+      const t = timelineXToTime(clientX);
+      if (draggingRef.current === 'start') {
+        const clamped = Math.max(0, Math.min(t, trimEndRef.current - 0.1));
+        trimStartRef.current = clamped;
+        setTrimStart(clamped);
       }
+      if (draggingRef.current === 'end') {
+        const clamped = Math.max(trimStartRef.current + 0.1, Math.min(t, durationRef.current));
+        trimEndRef.current = clamped;
+        setTrimEnd(clamped);
+      }
+      if (draggingRef.current === 'head') seekTo(t);
     };
-    const up = () => { draggingRef.current = null; setDragging(null); };
+    const up = () => { draggingRef.current = null; };
     window.addEventListener('mousemove', move);
     window.addEventListener('mouseup', up);
     window.addEventListener('touchmove', move, { passive: false });
@@ -135,39 +223,130 @@ export default function VideoEditorPanel() {
       window.removeEventListener('touchmove', move);
       window.removeEventListener('touchend', up);
     };
-  }, [timelineX, trimStart, trimEnd]);
+  }, [timelineXToTime]);
 
-  // ── Canvas overlay for text preview ──────────────────────────────────────
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!videoUrl) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      const v = videoRef.current;
+      if (!v) return;
+
+      if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+      if (e.code === 'ArrowLeft') { e.preventDefault(); seekTo(v.currentTime - (e.shiftKey ? 10 : 5)); }
+      if (e.code === 'ArrowRight') { e.preventDefault(); seekTo(v.currentTime + (e.shiftKey ? 10 : 5)); }
+      if (e.key === ',') stepFrame(-1);
+      if (e.key === '.') stepFrame(1);
+      if (e.key === 'm' || e.key === 'M') setMuted(m => !m);
+      if (e.key === 'l' || e.key === 'L') setLoop(l => !l);
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z') { e.preventDefault(); undo(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [videoUrl, undo]);
+
+  // ── Canvas: render text overlays ──────────────────────────────────────────
   useEffect(() => {
     const v = videoRef.current;
     const c = canvasRef.current;
     if (!v || !c) return;
     let raf = 0;
     const draw = () => {
-      c.width  = v.videoWidth  || v.offsetWidth;
-      c.height = v.videoHeight || v.offsetHeight;
+      const vw = v.videoWidth  || v.offsetWidth;
+      const vh = v.videoHeight || v.offsetHeight;
+      if (c.width !== vw || c.height !== vh) { c.width = vw; c.height = vh; }
       const ctx = c.getContext('2d')!;
       ctx.clearRect(0, 0, c.width, c.height);
       const t = v.currentTime;
       overlays.filter(o => t >= o.startTime && t <= o.endTime).forEach(o => {
         ctx.save();
-        ctx.font      = `bold ${o.fontSize}px system-ui, sans-serif`;
+        ctx.font = `${o.fontWeight} ${o.fontSize}px system-ui, sans-serif`;
         ctx.fillStyle = o.color;
-        ctx.shadowColor = 'rgba(0,0,0,0.8)';
-        ctx.shadowBlur  = 4;
+        ctx.shadowColor = 'rgba(0,0,0,0.85)';
+        ctx.shadowBlur = 6;
         ctx.fillText(o.text, o.x * c.width, o.y * c.height);
+        if (selOverlay === o.id) {
+          const w = ctx.measureText(o.text).width;
+          ctx.strokeStyle = 'rgba(96,165,250,0.9)';
+          ctx.lineWidth = 2;
+          ctx.shadowBlur = 0;
+          ctx.strokeRect(o.x * c.width - 6, o.y * c.height - o.fontSize - 4, w + 12, o.fontSize + 14);
+        }
         ctx.restore();
       });
       raf = requestAnimationFrame(draw);
     };
     draw();
     return () => cancelAnimationFrame(raf);
-  }, [overlays]);
+  }, [overlays, selOverlay]);
 
-  // ── Text overlay editing ──────────────────────────────────────────────────
+  // ── Canvas click/drag: select and reposition text overlays ────────────────
+  const onCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const c = canvasRef.current;
+    const v = videoRef.current;
+    if (!c || !v) return;
+    const rect = c.getBoundingClientRect();
+    const scaleX = c.width / rect.width;
+    const scaleY = c.height / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top)  * scaleY;
+    const t = v.currentTime;
+    const ctx = c.getContext('2d')!;
+
+    // Hit-test visible overlays in reverse (topmost first)
+    const visible = overlays.filter(o => t >= o.startTime && t <= o.endTime);
+    for (let i = visible.length - 1; i >= 0; i--) {
+      const o = visible[i];
+      ctx.font = `${o.fontWeight} ${o.fontSize}px system-ui, sans-serif`;
+      const w = ctx.measureText(o.text).width;
+      const ox = o.x * c.width;
+      const oy = o.y * c.height;
+      if (mx >= ox - 6 && mx <= ox + w + 6 && my >= oy - o.fontSize - 4 && my <= oy + 14) {
+        setSelOverlay(o.id);
+        canvasDragRef.current = { id: o.id, offX: mx - ox, offY: my - oy };
+        return;
+      }
+    }
+    setSelOverlay(null);
+  };
+
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+    const onMove = (e: MouseEvent) => {
+      if (!canvasDragRef.current) return;
+      const rect = c.getBoundingClientRect();
+      const nx = ((e.clientX - rect.left) * (c.width / rect.width) - canvasDragRef.current.offX) / c.width;
+      const ny = ((e.clientY - rect.top)  * (c.height / rect.height) - canvasDragRef.current.offY) / c.height;
+      setOverlays(prev => prev.map(o =>
+        o.id === canvasDragRef.current!.id
+          ? { ...o, x: Math.max(0, Math.min(1, nx)), y: Math.max(0.05, Math.min(0.98, ny)) }
+          : o
+      ));
+    };
+    const onUp = () => { canvasDragRef.current = null; };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+
+  // ── Overlay CRUD ──────────────────────────────────────────────────────────
   const addOverlay = () => {
+    pushUndo(overlays);
     const id = Date.now().toString();
-    setOverlays(prev => [...prev, { id, text: 'New Text', x: 0.1, y: 0.2, startTime: trimStart, endTime: Math.min(trimStart + 3, trimEnd), fontSize: 48, color: '#ffffff' }]);
+    const now = videoRef.current?.currentTime ?? trimStart;
+    setOverlays(prev => [...prev, {
+      id, text: 'New Text',
+      x: 0.05, y: 0.15,
+      startTime: now,
+      endTime: Math.min(now + 3, trimEnd),
+      fontSize: 56, color: '#ffffff', fontWeight: 'bold',
+    }]);
     setSelOverlay(id);
   };
 
@@ -175,6 +354,7 @@ export default function VideoEditorPanel() {
     setOverlays(prev => prev.map(o => o.id === id ? { ...o, ...patch } : o));
 
   const deleteOverlay = (id: string) => {
+    pushUndo(overlays);
     setOverlays(prev => prev.filter(o => o.id !== id));
     if (selOverlay === id) setSelOverlay(null);
   };
@@ -182,50 +362,53 @@ export default function VideoEditorPanel() {
   // ── AI command parser ─────────────────────────────────────────────────────
   const applyAI = () => {
     const s = aiInput.trim().toLowerCase();
+    const raw = aiInput.trim();
     let matched = false;
 
-    // "trim from X to Y" / "trim X to Y"
     const trimRange = s.match(/trim.*?(\d+\.?\d*)\s*(?:s|sec)?\s*to\s*(\d+\.?\d*)/);
     if (trimRange) {
       setTrimStart(Math.max(0, parseFloat(trimRange[1])));
       setTrimEnd(Math.min(duration, parseFloat(trimRange[2])));
       matched = true;
     }
-    // "trim to X seconds" / "keep first X"
     const trimTo = s.match(/(?:trim to|keep first|first)\s*(\d+\.?\d*)\s*(?:s|sec)/);
-    if (!matched && trimTo) {
-      setTrimStart(0);
-      setTrimEnd(Math.min(duration, parseFloat(trimTo[1])));
+    if (!matched && trimTo) { setTrimStart(0); setTrimEnd(Math.min(duration, parseFloat(trimTo[1]))); matched = true; }
+
+    const speedM = s.match(/(?:speed|rate|playback)\s*([\d.]+)/);
+    if (!matched && speedM) {
+      const sp = Math.max(0.25, Math.min(4, parseFloat(speedM[1])));
+      setSpeed(sp);
+      if (videoRef.current) videoRef.current.playbackRate = sp;
       matched = true;
     }
-    // "add text 'X' at Y"
-    const addText = s.match(/add text\s+['"]?(.+?)['"]?\s+at\s+(\d+\.?\d*)/);
-    if (!matched && addText) {
+
+    const addTextM = raw.match(/add text\s+['"](.+?)['"]\s+at\s+(\d+\.?\d*)/i)
+                  ?? raw.match(/add text\s+(.+?)\s+at\s+(\d+\.?\d*)/i);
+    if (!matched && addTextM) {
+      pushUndo(overlays);
       const id = Date.now().toString();
-      const start = parseFloat(addText[2]);
-      setOverlays(prev => [...prev, { id, text: addText[1], x: 0.1, y: 0.1, startTime: start, endTime: Math.min(start + 3, duration), fontSize: 48, color: '#ffffff' }]);
+      const start = parseFloat(addTextM[2]);
+      setOverlays(prev => [...prev, { id, text: addTextM[1], x: 0.05, y: 0.15, startTime: start, endTime: Math.min(start + 3, duration), fontSize: 56, color: '#ffffff', fontWeight: 'bold' }]);
       setSelOverlay(id);
       matched = true;
     }
-    // "remove all text"
-    if (!matched && s.includes('remove') && s.includes('text')) { setOverlays([]); matched = true; }
-    // "reset trim"
+    if (!matched && s.includes('remove') && s.includes('text'))  { pushUndo(overlays); setOverlays([]); matched = true; }
     if (!matched && (s.includes('reset') || s.includes('full video'))) { setTrimStart(0); setTrimEnd(duration); matched = true; }
+    if (!matched && s.includes('mute'))   { setMuted(true);  matched = true; }
+    if (!matched && s.includes('unmute')) { setMuted(false); matched = true; }
+    if (!matched && s.includes('loop'))   { setLoop(l => !l); matched = true; }
 
     if (matched) setAiInput('');
-    else alert(`Couldn't understand: "${aiInput}"\n\nTry: "trim from 5 to 30", "trim to 20s", "add text 'Hello' at 5"`);
+    else alert(`Couldn't understand: "${aiInput}"\n\nTry:\n· "trim from 5 to 30"\n· "speed 2x"\n· "add text 'Hello' at 5"\n· "trim to 20s"\n· "mute"`);
   };
 
   // ── FFmpeg export ─────────────────────────────────────────────────────────
   const exportVideo = async () => {
     if (!videoFile) return;
-    setProcessing(true);
-    setExportUrl('');
-
+    setProcessing(true); setExportUrl('');
     try {
       const { FFmpeg } = await import('@ffmpeg/ffmpeg');
       const { fetchFile } = await import('@ffmpeg/util');
-
       if (!ffmpegRef.current) {
         setProcStatus('Loading FFmpeg…');
         const ff = new FFmpeg();
@@ -234,30 +417,32 @@ export default function VideoEditorPanel() {
         ffmpegRef.current = ff;
       }
       const ff = ffmpegRef.current;
-
       setProcStatus('Writing file…');
       await ff.writeFile('input.mp4', await fetchFile(videoFile));
 
       const args: string[] = ['-i', 'input.mp4', '-ss', String(trimStart), '-to', String(trimEnd)];
 
-      if (overlays.length) {
-        const filters = overlays.map(o =>
-          `drawtext=text='${o.text.replace(/'/g, "\\'")}':x=${Math.round(o.x * 1280)}:y=${Math.round(o.y * 720)}:fontsize=${o.fontSize}:fontcolor=${o.color}:enable='between(t\\,${o.startTime}\\,${o.endTime})'`
-        ).join(',');
-        args.push('-vf', filters, '-c:a', 'copy');
+      const textFilters = overlays.map(o =>
+        `drawtext=text='${o.text.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}':x=${Math.round(o.x * 1280)}:y=${Math.round(o.y * 720)}:fontsize=${o.fontSize}:fontcolor=${o.color}:enable='between(t\\,${o.startTime}\\,${o.endTime})'`
+      );
+
+      if (speed !== 1) {
+        const vfParts = [`setpts=${(1 / speed).toFixed(4)}*PTS`, ...textFilters];
+        args.push('-vf', vfParts.join(','), '-af', `atempo=${Math.min(2, Math.max(0.5, speed))}`, '-c:v', 'libx264', '-c:a', 'aac');
+      } else if (overlays.length) {
+        args.push('-vf', textFilters.join(','), '-c:a', 'copy');
       } else {
         args.push('-c', 'copy');
       }
 
+      if (muted) args.push('-an');
       args.push('output.mp4');
 
       setProcStatus('Processing…');
       await ff.exec(args);
-
       setProcStatus('Reading output…');
       const data = await ff.readFile('output.mp4');
-      const blob = new Blob([data], { type: 'video/mp4' });
-      setExportUrl(URL.createObjectURL(blob));
+      setExportUrl(URL.createObjectURL(new Blob([data], { type: 'video/mp4' })));
       setProcStatus('Done');
     } catch (err: any) {
       setProcStatus(`Error: ${err.message}`);
@@ -266,13 +451,13 @@ export default function VideoEditorPanel() {
     }
   };
 
-  // ── Format helpers ────────────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
   const fmt = (s: number) => {
+    if (!isFinite(s)) return '0:00.0';
     const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return `${m}:${sec.toString().padStart(2, '0')}`;
+    const sec = (s % 60).toFixed(1);
+    return `${m}:${parseFloat(sec) < 10 ? '0' : ''}${sec}`;
   };
-  const pct = (t: number) => duration ? `${(t / duration) * 100}%` : '0%';
 
   const sel = overlays.find(o => o.id === selOverlay);
 
@@ -289,13 +474,9 @@ export default function VideoEditorPanel() {
         <div className="ve-upload-icon">▸</div>
         <div className="ve-upload-title">Drop a video here</div>
         <div className="ve-upload-sub">or click to browse · MP4, MOV, WebM</div>
-        <input
-          id="ve-file-input"
-          type="file"
-          accept="video/*"
-          style={{ display: 'none' }}
-          onChange={e => { const f = e.target.files?.[0]; if (f) loadVideo(f); }}
-        />
+        <div className="ve-upload-shortcuts">Space · play/pause &nbsp;·&nbsp; ← → · seek 5s &nbsp;·&nbsp; , . · frame step &nbsp;·&nbsp; M · mute &nbsp;·&nbsp; Ctrl+Z · undo</div>
+        <input id="ve-file-input" type="file" accept="video/*" style={{ display: 'none' }}
+          onChange={e => { const f = e.target.files?.[0]; if (f) loadVideo(f); }} />
       </div>
     </div>
   );
@@ -327,23 +508,36 @@ export default function VideoEditorPanel() {
             onPause={() => setPlaying(false)}
             playsInline
           />
-          <canvas ref={canvasRef} className="ve-canvas-overlay" />
+          <canvas
+            ref={canvasRef}
+            className="ve-canvas-overlay"
+            onMouseDown={onCanvasMouseDown}
+          />
         </div>
 
-        {/* Text overlay panel */}
+        {/* Right panel: text overlays */}
         <div className="ve-side">
           <div className="ve-side-title">
             Text Overlays
-            <button className="ve-btn ve-btn-sm" onClick={addOverlay}>+ Add</button>
+            <div style={{ display: 'flex', gap: 4 }}>
+              {undoStack.current.length > 0 && (
+                <button className="ve-btn ve-btn-sm" onClick={undo} title="Undo (Ctrl+Z)">↩</button>
+              )}
+              <button className="ve-btn ve-btn-sm" onClick={addOverlay}>+ Add</button>
+            </div>
           </div>
+
           <div className="ve-overlay-list">
-            {overlays.length === 0 && <div className="ve-overlay-empty">No overlays yet</div>}
+            {overlays.length === 0 && (
+              <div className="ve-overlay-empty">No overlays yet · click + Add, then drag text on the video to reposition</div>
+            )}
             {overlays.map(o => (
               <div
                 key={o.id}
                 className={`ve-overlay-item${selOverlay === o.id ? ' selected' : ''}`}
-                onClick={() => setSelOverlay(o.id)}
+                onClick={() => { setSelOverlay(o.id); seekTo(o.startTime); }}
               >
+                <span className="ve-overlay-swatch" style={{ background: o.color }} />
                 <span className="ve-overlay-text">{o.text}</span>
                 <span className="ve-overlay-time">{fmt(o.startTime)}–{fmt(o.endTime)}</span>
                 <button className="ve-overlay-del" onClick={e => { e.stopPropagation(); deleteOverlay(o.id); }}>✕</button>
@@ -355,6 +549,7 @@ export default function VideoEditorPanel() {
             <div className="ve-overlay-editor">
               <label className="ve-label">Text</label>
               <input className="ve-input" value={sel.text} onChange={e => updateOverlay(sel.id, { text: e.target.value })} />
+
               <div className="ve-row">
                 <div className="ve-field">
                   <label className="ve-label">Start (s)</label>
@@ -367,17 +562,19 @@ export default function VideoEditorPanel() {
                     onChange={e => updateOverlay(sel.id, { endTime: parseFloat(e.target.value) || 0 })} />
                 </div>
               </div>
+
               <div className="ve-row">
                 <div className="ve-field">
                   <label className="ve-label">Size</label>
-                  <input className="ve-input ve-input-sm" type="number" value={sel.fontSize}
-                    onChange={e => updateOverlay(sel.id, { fontSize: parseInt(e.target.value) || 48 })} />
+                  <input className="ve-input ve-input-sm" type="number" min="8" max="200" value={sel.fontSize}
+                    onChange={e => updateOverlay(sel.id, { fontSize: parseInt(e.target.value) || 56 })} />
                 </div>
                 <div className="ve-field">
                   <label className="ve-label">Color</label>
                   <input type="color" value={sel.color} onChange={e => updateOverlay(sel.id, { color: e.target.value })} className="ve-color" />
                 </div>
               </div>
+
               <div className="ve-row">
                 <div className="ve-field">
                   <label className="ve-label">X (0–1)</label>
@@ -390,49 +587,107 @@ export default function VideoEditorPanel() {
                     onChange={e => updateOverlay(sel.id, { y: parseFloat(e.target.value) || 0 })} />
                 </div>
               </div>
+
+              <label className="ve-label" style={{ marginTop: 2 }}>Style</label>
+              <div className="ve-row">
+                <button className={`ve-btn ve-btn-sm${sel.fontWeight === 'bold' ? ' ve-btn-primary' : ''}`}
+                  style={{ flex: 1 }} onClick={() => updateOverlay(sel.id, { fontWeight: 'bold' })}>Bold</button>
+                <button className={`ve-btn ve-btn-sm${sel.fontWeight === 'normal' ? ' ve-btn-primary' : ''}`}
+                  style={{ flex: 1 }} onClick={() => updateOverlay(sel.id, { fontWeight: 'normal' })}>Normal</button>
+              </div>
+
+              <button className="ve-delete-overlay-btn" onClick={() => deleteOverlay(sel.id)}>Delete overlay</button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Playback controls */}
+      {/* Playback controls — row 1: transport */}
       <div className="ve-controls">
-        <button className="ve-play-btn" onClick={togglePlay}>{playing ? '⏸' : '▶'}</button>
-        <span className="ve-time">{fmt(currentTime)} / {fmt(duration)}</span>
-        <span className="ve-trim-label">Trim: {fmt(trimStart)} → {fmt(trimEnd)}</span>
+        <div className="ve-controls-row">
+          <button className="ve-play-btn" onClick={() => seekTo(trimStart)} title="Go to trim start">⏮</button>
+          <button className="ve-play-btn" onClick={() => stepFrame(-1)} title=", — prev frame">‹</button>
+          <button className="ve-play-btn ve-play-main" onClick={togglePlay} title="Space">{playing ? '⏸' : '▶'}</button>
+          <button className="ve-play-btn" onClick={() => stepFrame(1)} title=". — next frame">›</button>
+          <button className="ve-play-btn" onClick={() => seekTo(trimEnd)} title="Go to trim end">⏭</button>
+          <span className="ve-time">{fmt(currentTime)} / {fmt(duration)}</span>
+          <span className="ve-trim-label">Trim {fmt(trimStart)} → {fmt(trimEnd)} <span className="ve-trim-dur">({fmt(trimEnd - trimStart)})</span></span>
+          <div style={{ flex: 1 }} />
+          <button className={`ve-icon-btn${loop ? ' active' : ''}`} onClick={() => setLoop(l => !l)} title="L — loop trim region">⟳ Loop</button>
+        </div>
+
+        {/* Row 2: speed + volume */}
+        <div className="ve-controls-row ve-controls-row2">
+          <span className="ve-controls-label">Speed</span>
+          <div className="ve-speed-group">
+            {SPEEDS.map(s => (
+              <button key={s} className={`ve-speed-btn${speed === s ? ' active' : ''}`}
+                onClick={() => { setSpeed(s); if (videoRef.current) videoRef.current.playbackRate = s; }}>
+                {s}×
+              </button>
+            ))}
+          </div>
+          <div style={{ flex: 1 }} />
+          <button className="ve-icon-btn" onClick={() => setMuted(m => !m)} title="M — mute/unmute">
+            {muted || volume === 0 ? '🔇' : volume < 0.5 ? '🔉' : '🔊'}
+          </button>
+          <input type="range" min={0} max={1} step={0.02} value={muted ? 0 : volume}
+            className="ve-volume-slider"
+            onChange={e => { setVolume(parseFloat(e.target.value)); setMuted(false); }} />
+        </div>
       </div>
 
       {/* Timeline */}
       <div className="ve-timeline-wrap">
-        <div ref={timelineRef} className="ve-timeline">
+        <div ref={timelineRef} className="ve-timeline" onClick={onTimelineClick}>
           {/* Thumbnails */}
           <div className="ve-thumbs">
-            {thumbs.map((src, i) => <img key={i} src={src} className="ve-thumb" alt="" />)}
+            {thumbsReady
+              ? thumbs.map((src, i) => <img key={i} src={src} className="ve-thumb" alt="" />)
+              : <div className="ve-thumbs-loading">Generating thumbnails…</div>
+            }
           </div>
 
-          {/* Shade outside trim */}
+          {/* Trim shading */}
           <div className="ve-trim-shade ve-trim-shade-l" style={{ width: pct(trimStart) }} />
-          <div className="ve-trim-shade ve-trim-shade-r" style={{ left: pct(trimEnd), width: `calc(100% - ${pct(trimEnd)})` }} />
+          <div className="ve-trim-shade ve-trim-shade-r" style={{ left: pct(trimEnd), right: 0 }} />
+
+          {/* Yellow bracket showing active trim region */}
+          <div className="ve-trim-bracket"
+            style={{ left: pct(trimStart), width: `calc(${pct(trimEnd)} - ${pct(trimStart)})` }} />
 
           {/* Trim handles */}
           <div className="ve-handle ve-handle-start" style={{ left: pct(trimStart) }}
-            onMouseDown={e => onTimelineMouseDown(e, 'start')}
-            onTouchStart={e => { e.preventDefault(); draggingRef.current = 'start'; setDragging('start'); }} />
+            onMouseDown={e => onHandleMouseDown(e, 'start')}
+            onTouchStart={e => { e.preventDefault(); draggingRef.current = 'start'; }} />
           <div className="ve-handle ve-handle-end" style={{ left: pct(trimEnd) }}
-            onMouseDown={e => onTimelineMouseDown(e, 'end')}
-            onTouchStart={e => { e.preventDefault(); draggingRef.current = 'end'; setDragging('end'); }} />
+            onMouseDown={e => onHandleMouseDown(e, 'end')}
+            onTouchStart={e => { e.preventDefault(); draggingRef.current = 'end'; }} />
 
           {/* Playhead */}
           <div className="ve-playhead" style={{ left: pct(currentTime) }}
-            onMouseDown={e => onTimelineMouseDown(e, 'head')}
-            onTouchStart={e => { e.preventDefault(); draggingRef.current = 'head'; setDragging('head'); }} />
+            onMouseDown={e => onHandleMouseDown(e, 'head')}
+            onTouchStart={e => { e.preventDefault(); draggingRef.current = 'head'; }} />
 
           {/* Overlay markers */}
           {overlays.map(o => (
-            <div key={o.id} className={`ve-overlay-marker${selOverlay === o.id ? ' active' : ''}`}
+            <div key={o.id}
+              className={`ve-overlay-marker${selOverlay === o.id ? ' active' : ''}`}
               style={{ left: pct(o.startTime), width: `calc(${pct(o.endTime)} - ${pct(o.startTime)})` }}
-              onClick={() => setSelOverlay(o.id)} />
+              onClick={e => { e.stopPropagation(); setSelOverlay(o.id); seekTo(o.startTime); }} />
           ))}
+        </div>
+
+        {/* Time ruler */}
+        <div className="ve-ruler">
+          {duration > 0 && Array.from({ length: Math.min(10, Math.floor(duration) + 1) }, (_, i) => {
+            const t = (i / Math.min(10, Math.floor(duration))) * duration;
+            return (
+              <span key={i} className="ve-ruler-mark" style={{ left: pct(t) }}>
+                {fmt(t).split('.')[0]}
+              </span>
+            );
+          })}
         </div>
       </div>
 
@@ -441,7 +696,7 @@ export default function VideoEditorPanel() {
         <span className="ve-ai-icon">◈</span>
         <input
           className="ve-ai-input"
-          placeholder={`AI edit: "trim from 5 to 30", "add text 'Hello' at 5", "trim to 20s"`}
+          placeholder={`AI edit: "trim from 5 to 30", "speed 2x", "add text 'Hello' at 5", "mute"`}
           value={aiInput}
           onChange={e => setAiInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && applyAI()}
