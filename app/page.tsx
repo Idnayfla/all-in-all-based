@@ -91,7 +91,7 @@ export default function Home() {
   const [theme, setTheme]             = useState<AppTheme>(DEFAULT_THEME);
   const [showMemoryManager, setShowMemoryManager] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [subscription, setSubscription] = useState<{ tier: 'free' | 'pro'; status: string; generationsUsed: number }>({ tier: 'free', status: 'active', generationsUsed: 0 });
+  const [subscription, setSubscription] = useState<{ tier: 'free' | 'pro'; status: string; generationsUsed: number; periodStart: string | null; periodEnd: string | null }>({ tier: 'free', status: 'active', generationsUsed: 0, periodStart: null, periodEnd: null });
   const [showPricing, setShowPricing] = useState(false);
   const [pricingReason, setPricingReason] = useState<'generations' | 'projects' | 'upgrade'>('upgrade');
   const [showFeedback, setShowFeedback] = useState(false);
@@ -227,9 +227,9 @@ export default function Home() {
       console.error('[Based] GET /api/projects failed:', projectsRes.status, await projectsRes.text().catch(() => ''));
     }
     if (settingsRes.ok) {
-      const { personality: p, globalMemory: m, theme: t, subscriptionTier, subscriptionStatus, generationsUsed } = await settingsRes.json();
+      const { personality: p, globalMemory: m, theme: t, subscriptionTier, subscriptionStatus, generationsUsed, subscriptionPeriodStart, subscriptionPeriodEnd } = await settingsRes.json();
       const tier = subscriptionTier ?? 'free';
-      setSubscription({ tier, status: subscriptionStatus ?? 'active', generationsUsed: generationsUsed ?? 0 });
+      setSubscription({ tier, status: subscriptionStatus ?? 'active', generationsUsed: generationsUsed ?? 0, periodStart: subscriptionPeriodStart ?? null, periodEnd: subscriptionPeriodEnd ?? null });
       localStorage.setItem('based_sub_tier', tier);
       if (p) {
         try {
@@ -808,6 +808,14 @@ export default function Home() {
                       <span className="plan-usage">{Math.min(subscription.generationsUsed, 10)}/10 generations this month</span>
                     )}
                   </div>
+                  {subscription.tier === 'pro' && subscription.periodStart && (
+                    <div className="plan-dates">
+                      <span>Subscribed {new Date(subscription.periodStart).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                      {subscription.periodEnd && (
+                        <span>· Renews {new Date(subscription.periodEnd).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                      )}
+                    </div>
+                  )}
                   {subscription.tier === 'free' ? (
                     <button className="plan-upgrade-btn" onClick={() => { setPricingReason('upgrade'); setShowPricing(true); }}>
                       Upgrade to Pro — $12/mo

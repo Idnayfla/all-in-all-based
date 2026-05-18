@@ -50,12 +50,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  async function setTier(userId: string, tier: 'free' | 'pro', status: string) {
+  async function setTier(userId: string, tier: 'free' | 'pro', status: string, periodStart?: number, periodEnd?: number) {
     await supabaseAdmin.from('user_settings').upsert({
       user_id: userId,
       subscription_tier: tier,
       subscription_status: status,
       ...(tier === 'free' ? { generations_used: 0 } : {}),
+      ...(periodStart ? { subscription_period_start: new Date(periodStart * 1000).toISOString() } : {}),
+      ...(periodEnd   ? { subscription_period_end:   new Date(periodEnd   * 1000).toISOString() } : {}),
     }, { onConflict: 'user_id' });
   }
 
@@ -110,7 +112,8 @@ export async function POST(req: NextRequest) {
         const userId = await getUidByCustomer(customerId);
         if (!userId) break;
         const isActive = sub.status === 'active' || sub.status === 'trialing';
-        await setTier(userId, isActive ? 'pro' : 'free', sub.status);
+        const item = sub.items.data[0];
+        await setTier(userId, isActive ? 'pro' : 'free', sub.status, item?.current_period_start, item?.current_period_end);
         break;
       }
 
