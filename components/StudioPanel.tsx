@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, type ReactElement } from 'react';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Track {
@@ -452,7 +452,7 @@ export default function StudioPanel() {
 
   // ── Piano keyboard renderer ──────────────────────────────────────────────
   const renderPiano = (oct: number) => {
-    const keys: JSX.Element[] = [];
+    const keys: ReactElement[] = [];
     WHITE_NOTES.forEach((note, wi) => {
       const fullNote = `${note}${oct}`;
       keys.push(
