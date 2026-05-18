@@ -150,6 +150,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   } | null>(null);
   const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
   const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
+  const [showSupportNudge, setShowSupportNudge] = useState(false);
   const [suggestions] = useState(getRandomSuggestions);
   const [flaggingIdx, setFlaggingIdx] = useState<number | null>(null);
   const [flaggedSet, setFlaggedSet]   = useState<Set<number>>(new Set());
@@ -532,6 +533,11 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               ]);
               if (resolvedFiles.length) {
                 onFilesUpdate(resolvedFiles, data.projectType);
+                const count = parseInt(localStorage.getItem('based_build_count') || '0', 10) + 1;
+                localStorage.setItem('based_build_count', String(count));
+                if ((count === 1 || count % 5 === 0) && !localStorage.getItem('based_nudge_dismissed')) {
+                  setShowSupportNudge(true);
+                }
               }
               if (data.suggestions?.length) setLastSuggestions(data.suggestions);
               else setLastSuggestions([]);
@@ -789,6 +795,42 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         <div ref={bottomRef} />
       </div>
       <div className="chat-input-area">
+        <AnimatePresence>
+          {showSupportNudge && (
+            <motion.div
+              className="support-nudge"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: 0.2 }}
+            >
+              <div className="support-nudge-text">
+                <span className="support-nudge-icon">◈</span>
+                <span>Based runs on community support — API costs add up fast. If it's been useful, consider backing it.</span>
+              </div>
+              <div className="support-nudge-actions">
+                <a
+                  href="https://ko-fi.com/basedfund"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="support-nudge-btn"
+                  onClick={() => setShowSupportNudge(false)}
+                >
+                  ◈ Support on Ko-fi
+                </a>
+                <button
+                  className="support-nudge-dismiss"
+                  onClick={() => {
+                    setShowSupportNudge(false);
+                    localStorage.setItem('based_nudge_dismissed', '1');
+                  }}
+                >
+                  Not now
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <AnimatePresence>
           {isGenerating && (
             <motion.button
