@@ -505,10 +505,19 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               doneHandled = true;
               setGenProgress(null);
               setIsGenerating(false);
-              setMessages(prev => [
-                ...prev.slice(0, -1),
-                { role: 'assistant', content: [{ type: 'clarify' as const, question: data.question, options: data.options }] },
-              ]);
+              setMessages(prev => {
+                const last = prev[prev.length - 1];
+                const hasText = typeof last?.content === 'string'
+                  && last.content.trim()
+                  && last.content !== '◈ Working...'
+                  && !last.content.startsWith('⟳')
+                  && !last.content.startsWith('◈ Searching')
+                  && !last.content.startsWith('◈ Retrying');
+                const clarifyMsg = { role: 'assistant' as const, content: [{ type: 'clarify' as const, question: data.question, options: data.options }] };
+                return hasText
+                  ? [...prev, clarifyMsg]
+                  : [...prev.slice(0, -1), clarifyMsg];
+              });
             }
 
             if (data.error) {
