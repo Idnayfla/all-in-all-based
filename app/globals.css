@@ -4176,6 +4176,21 @@ body:has(.beta-banner) .app-root { margin-top: 28px; height: calc(100vh - 28px);
 .rm-footer-sep { color: var(--border); }
 .plan-portal-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+.plan-resync-btn {
+  width: 100%;
+  background: none;
+  color: var(--text3);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  cursor: pointer;
+  transition: color 0.15s;
+  text-align: left;
+}
+.plan-resync-btn:hover { color: var(--text2); }
+
 /* ── Referral panel ──────────────────────────────────────────────────────── */
 
 .referral-loading {
