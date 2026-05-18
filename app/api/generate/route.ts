@@ -13,22 +13,80 @@ const client = new Anthropic({
 const PANTHEON_KEY = process.env.PANTHEON_OWNER_KEY ?? 'pk_owner_based_internal';
 const PANTHEON_URL = process.env.PANTHEON_API_URL ?? 'https://pantheon-api.vercel.app';
 
+function friendlyError(e: any): string {
+  const raw: string = e?.message ?? String(e);
+  try {
+    const parsed = JSON.parse(raw);
+    const t = parsed?.error?.type ?? parsed?.type;
+    const m = parsed?.error?.message ?? parsed?.message;
+    if (t === 'overloaded_error') return 'Based is a bit overloaded right now — wait a moment and try again.';
+    if (t === 'rate_limit_error')  return 'Rate limit hit — please wait a few seconds and try again.';
+    if (m) return m;
+  } catch {}
+  if (raw.toLowerCase().includes('overload')) return 'Based is a bit overloaded right now — wait a moment and try again.';
+  if (raw.toLowerCase().includes('rate limit') || raw.toLowerCase().includes('429')) return 'Rate limit hit — please wait a few seconds and try again.';
+  return raw || 'Something went wrong — please try again.';
+}
+
+function isRetryable(e: any): boolean {
+  const msg = friendlyError(e);
+  return msg.includes('overloaded') || msg.includes('Rate limit');
+}
+
+const RETRY_DELAYS = [1500, 3000];
+
 async function callPantheon(
   messages: Array<{ role: string; content: string }>,
   taskType: 'fast_chat' | 'chat',
   maxTokens = 8000
 ): Promise<string> {
-  const res = await fetch(`${PANTHEON_URL}/api/v1/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${PANTHEON_KEY}` },
-    body: JSON.stringify({ messages, task_type: taskType, stream: false, max_tokens: maxTokens }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error((err as any).error ?? `Pantheon ${res.status}`);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch(`${PANTHEON_URL}/api/v1/chat/completions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${PANTHEON_KEY}` },
+        body: JSON.stringify({ messages, task_type: taskType, stream: false, max_tokens: maxTokens }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error((err as any).error ?? `Pantheon ${res.status}`);
+      }
+      const data = await res.json();
+      return data.text ?? '';
+    } catch (e: any) {
+      if (attempt < RETRY_DELAYS.length && isRetryable(e)) {
+        await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
+        continue;
+      }
+      throw e;
+    }
   }
-  const data = await res.json();
-  return data.text ?? '';
+}
+
+async function streamPantheonCollecting(
+  messages: Array<{ role: string; content: string }>,
+  taskType: 'fast_chat' | 'chat',
+  maxTokens: number,
+  onChunk: (text: string) => void,
+  onRetry: () => void
+): Promise<string> {
+  for (let attempt = 0; ; attempt++) {
+    let accumulated = '';
+    try {
+      for await (const text of streamPantheon(messages, taskType, maxTokens)) {
+        accumulated += text;
+        onChunk(text);
+      }
+      return accumulated;
+    } catch (e: any) {
+      if (attempt < RETRY_DELAYS.length && isRetryable(e)) {
+        onRetry();
+        await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
+        continue;
+      }
+      throw e;
+    }
+  }
 }
 
 async function* streamPantheon(
@@ -61,25 +119,21 @@ async function* streamPantheon(
       if (payload === '[DONE]') continue;
       try {
         const parsed = JSON.parse(payload);
-        if (parsed.type === 'text') yield parsed.text;
-      } catch {}
+        // detect forwarded Anthropic error events
+        if (parsed.type === 'error') throw new Error(parsed.error?.message ?? JSON.stringify(parsed));
+        if (parsed.type === 'text') {
+          const txt: string = parsed.text;
+          // detect error JSON forwarded as text content
+          if (txt.trimStart().startsWith('{"type":"error"')) {
+            try { throw new Error(JSON.parse(txt)?.error?.message ?? txt); } catch (inner) { throw inner; }
+          }
+          yield txt;
+        }
+      } catch (e) {
+        if ((e as any).message?.includes('yield') || (e as any).constructor?.name !== 'SyntaxError') throw e;
+      }
     }
   }
-}
-
-function friendlyError(e: any): string {
-  const raw: string = e?.message ?? String(e);
-  try {
-    const parsed = JSON.parse(raw);
-    const t = parsed?.error?.type ?? parsed?.type;
-    const m = parsed?.error?.message ?? parsed?.message;
-    if (t === 'overloaded_error') return 'Based is a bit overloaded right now — wait a moment and try again.';
-    if (t === 'rate_limit_error')  return 'Rate limit hit — please wait a few seconds and try again.';
-    if (m) return m;
-  } catch {}
-  if (raw.toLowerCase().includes('overload')) return 'Based is a bit overloaded right now — wait a moment and try again.';
-  if (raw.toLowerCase().includes('rate limit') || raw.toLowerCase().includes('429')) return 'Rate limit hit — please wait a few seconds and try again.';
-  return raw || 'Something went wrong — please try again.';
 }
 
 const SYSTEM = `You are Based — a sharp, direct AI that can do anything: answer questions, do math, analyse data, write, explain, plan, AND build fully working web apps, games, dashboards, and tools.
@@ -942,10 +996,10 @@ VAGUE examples (only these should ever be false): "make an app", "build somethin
               } else {
                 const sysText = systemBlocks.map(b => b.text).join('\n');
                 const msgs = [{ role: 'system', content: sysText }, ...anthropicMessages.map((m: { role: string; content: unknown }) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : lastUserMessage }))];
-                for await (const text of streamPantheon(msgs, 'chat', 16000)) {
-                  fullText += text;
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: text })}\n\n`));
-                }
+                fullText = await streamPantheonCollecting(msgs, 'chat', 16000,
+                  t => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+                  () => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`))
+                );
               }
               const files = parseFiles(fullText);
               const projectType = parseType(fullText);
@@ -973,10 +1027,10 @@ VAGUE examples (only these should ever be false): "make an app", "build somethin
             } else {
               const sysText = systemBlocks.map(b => b.text).join('\n');
               const msgs = [{ role: 'system', content: sysText }, ...anthropicMessages.map((m: { role: string; content: unknown }) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : lastUserMessage }))];
-              for await (const text of streamPantheon(msgs, 'chat', 4096)) {
-                fullText += text;
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: text })}\n\n`));
-              }
+              fullText = await streamPantheonCollecting(msgs, 'chat', 4096,
+                t => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+                () => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`))
+              );
             }
             const files = parseFiles(fullText);
             const projectType = parseType(fullText);
@@ -1060,10 +1114,10 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
                 { role: 'system', content: FILE_GENERATOR_SYSTEM },
                 { role: 'user', content: filePrompt },
               ];
-              for await (const text of streamPantheon(msgs, 'chat', 16000)) {
-                fileText += text;
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: text })}\n\n`));
-              }
+              fileText = await streamPantheonCollecting(msgs, 'chat', 16000,
+                t => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+                () => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`))
+              );
             }
 
             const parsedFiles = parseFiles(fileText);
