@@ -72,6 +72,34 @@ export async function POST(req: NextRequest) {
           subscription_tier: 'pro',
           subscription_status: 'active',
         }, { onConflict: 'user_id' });
+
+        // Reward the referrer with 30 days free Pro
+        try {
+          const { data: newSub } = await supabaseAdmin
+            .from('user_settings')
+            .select('referred_by')
+            .eq('user_id', userId)
+            .single();
+          if (newSub?.referred_by) {
+            const { data: referrer } = await supabaseAdmin
+              .from('user_settings')
+              .select('user_id, pro_bonus_expires_at, subscription_tier')
+              .eq('referral_code', newSub.referred_by)
+              .single();
+            if (referrer) {
+              const now = new Date();
+              const base = referrer.pro_bonus_expires_at && new Date(referrer.pro_bonus_expires_at) > now
+                ? new Date(referrer.pro_bonus_expires_at)
+                : now;
+              base.setDate(base.getDate() + 30);
+              await supabaseAdmin.from('user_settings').upsert({
+                user_id: referrer.user_id,
+                pro_bonus_expires_at: base.toISOString(),
+                referral_count: ((await supabaseAdmin.from('user_settings').select('referral_count').eq('user_id', referrer.user_id).single()).data?.referral_count ?? 0) + 1,
+              }, { onConflict: 'user_id' });
+            }
+          }
+        } catch {}
         break;
       }
 

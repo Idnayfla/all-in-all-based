@@ -6,7 +6,7 @@ export async function GET(req: NextRequest) {
     const userId = await getUserId(req);
     const { data } = await supabaseAdmin
       .from('user_settings')
-      .select('personality, global_memory, theme, subscription_tier, subscription_status, generations_used, generations_reset_at')
+      .select('personality, global_memory, theme, subscription_tier, subscription_status, generations_used, generations_reset_at, pro_bonus_expires_at')
       .eq('user_id', userId)
       .single();
 
@@ -25,13 +25,22 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const paidTier = (data?.subscription_tier ?? 'free') as 'free' | 'pro';
+    const bonusExpiresAt = data?.pro_bonus_expires_at as string | null;
+    const hasBonusPro = !!bonusExpiresAt && new Date(bonusExpiresAt) > new Date();
+    const effectiveTier: 'free' | 'pro' = paidTier === 'pro' || hasBonusPro ? 'pro' : 'free';
+    const bonusDaysLeft = hasBonusPro
+      ? Math.max(0, Math.ceil((new Date(bonusExpiresAt!).getTime() - Date.now()) / 86400000))
+      : 0;
+
     return NextResponse.json({
       personality:        data?.personality ?? '',
       globalMemory:       data?.global_memory ?? '',
       theme:              data?.theme ?? {},
-      subscriptionTier:   (data?.subscription_tier ?? 'free') as 'free' | 'pro',
+      subscriptionTier:   effectiveTier,
       subscriptionStatus: data?.subscription_status ?? 'active',
       generationsUsed,
+      bonusDaysLeft,
     });
   } catch (err: any) {
     if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

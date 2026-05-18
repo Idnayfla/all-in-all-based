@@ -20,6 +20,7 @@ import { useSwipePanels } from '@/hooks/useSwipePanels';
 import PricingModal from '@/components/PricingModal';
 import LandingPage from '@/components/LandingPage';
 import FeedbackModal from '@/components/FeedbackModal';
+import ReferralPanel from '@/components/ReferralPanel';
 
 export interface FileNode {
   name: string;
@@ -175,6 +176,17 @@ export default function Home() {
     localStorage.removeItem('based_wallpaper');
   }
 
+  // ── Capture ?ref= referral code from URL ─────────────────────────────────
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get('ref');
+    if (ref) {
+      try { localStorage.setItem('based_pending_ref', ref.toUpperCase()); } catch {}
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   // ── Handle return from Stripe checkout ──────────────────────────────────
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -304,6 +316,15 @@ export default function Home() {
           if (cloudProjects.length === 0 && hasLocalProjects) {
             await runMigration(headers);
           }
+        }
+        // Claim pending referral code if present
+        const pendingRef = localStorage.getItem('based_pending_ref');
+        if (pendingRef) {
+          fetch('/api/referral/claim', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ code: pendingRef }),
+          }).then(r => r.ok && localStorage.removeItem('based_pending_ref')).catch(() => {});
         }
         await loadCloudData();
       }
@@ -800,6 +821,13 @@ export default function Home() {
                       Manage billing
                     </button>
                   )}
+                </div>
+              )}
+
+              {user && (
+                <div className="settings-section">
+                  <label className="settings-label">Referral</label>
+                  <ReferralPanel getHeaders={getHeaders} />
                 </div>
               )}
 
