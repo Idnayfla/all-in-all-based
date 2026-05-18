@@ -644,7 +644,11 @@ export default function Home() {
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
       {subscription.tier === 'pro' && <div className="pro-crown-strip" />}
       <header className="app-header">
-        <div className="logo">
+        <div
+          className={`logo${currentProject ? ' logo-home' : ''}`}
+          onClick={() => currentProject && setCurrentProject(null)}
+          title={currentProject ? 'Back to home' : undefined}
+        >
           <LogoDisplay config={LOGO_DEFAULTS} />
           {currentProject && <span className="project-name-display">{currentProject.name}</span>}
           {subscription.tier === 'pro' && <span className="pro-chip">PRO ⬡</span>}

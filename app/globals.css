@@ -135,6 +135,8 @@ body {
 }
 
 .logo { display: flex; align-items: center; gap: 8px; }
+.logo-home { cursor: pointer; transition: opacity 0.15s; }
+.logo-home:hover { opacity: 0.75; }
 
 .header-nav { display: flex; align-items: center; gap: 12px; margin-left: auto; }
 
