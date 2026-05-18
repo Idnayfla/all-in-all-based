@@ -441,7 +441,7 @@ export default function VideoEditorPanel() {
         <span className="ve-ai-icon">◈</span>
         <input
           className="ve-ai-input"
-          placeholder='AI edit: "trim from 5 to 30", "add text \'Hello\' at 5", "trim to 20s"'
+          placeholder={`AI edit: "trim from 5 to 30", "add text 'Hello' at 5", "trim to 20s"`}
           value={aiInput}
           onChange={e => setAiInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && applyAI()}
