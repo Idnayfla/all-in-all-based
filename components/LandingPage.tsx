@@ -20,20 +20,56 @@ const PILLARS = [
   { icon: '⊙', title: 'Community-Driven', desc: 'Hit a bug? Report it. Love a feature? Support it. Based gets better every time you use it.' },
 ];
 
+const MARQUEE_ITEMS = [
+  { icon: '◈', label: 'Build apps' },
+  { icon: '◉', label: 'Generate images' },
+  { icon: '⬡', label: 'Edit video' },
+  { icon: '◈', label: 'Compose music' },
+  { icon: '⊙', label: 'Answer anything' },
+  { icon: '◉', label: 'Remember everything' },
+  { icon: '⬡', label: 'Play instruments' },
+  { icon: '◈', label: 'Build games' },
+  { icon: '⊙', label: 'Export documents' },
+  { icon: '◉', label: 'Record voice' },
+  { icon: '◈', label: 'Real-time data' },
+  { icon: '⬡', label: 'Live preview' },
+];
+
+const BENTO = [
+  {
+    icon: '⊙',
+    title: 'Everywhere',
+    desc: 'Floating on your desktop. On your phone. In your browser. Based shows up wherever you are — and never leaves.',
+    tag: 'Windows · Web · Mobile coming',
+  },
+  {
+    icon: '◈',
+    title: 'Everything',
+    desc: 'Code, images, video, music, data, documents. One companion that does it all — no app switching, no juggling tools.',
+    tag: '12+ capabilities',
+  },
+  {
+    icon: '◉',
+    title: 'Always',
+    desc: 'Remembers your name, your projects, your style. Every session picks up exactly where you left off.',
+    tag: 'Global AI memory',
+  },
+];
+
 const SHIPPED_RECENT = [
-  { icon: '⬡', label: 'Music Studio',   desc: 'Full DAW — piano, drums, voice recording, effects' },
-  { icon: '▸',  label: 'Video Editor',   desc: 'Trim, text overlays, speed control, FFmpeg export' },
-  { icon: '◈', label: 'Music AI',       desc: 'Generate original tracks from a description' },
-  { icon: '◉', label: 'Image Gen',      desc: 'FLUX + Nano Banana — text-to-image and editing' },
-  { icon: '⊙', label: 'Game Engine',    desc: 'Playable games built and rendered in the browser' },
+  { icon: '⬡', label: 'Music Studio',      desc: 'Full DAW — piano, drums, voice recording, effects' },
+  { icon: '▸',  label: 'Video Editor',      desc: 'Trim, text overlays, speed control, FFmpeg export' },
+  { icon: '◈', label: 'Music AI',          desc: 'Generate original tracks from a description' },
+  { icon: '◉', label: 'Image Gen',         desc: 'FLUX + Nano Banana — text-to-image and editing' },
+  { icon: '⊙', label: 'Game Engine',       desc: 'Playable games built and rendered in the browser' },
   { icon: '⬡', label: 'Windows Companion', desc: 'Floating overlay that watches your screen' },
 ];
 
 const COMING_NEXT = [
-  { label: 'Image Studio',     desc: 'Canvas, layers, AI-assisted edits' },
-  { label: '3D / Blueprint',   desc: 'Describe a scene — Based renders it' },
-  { label: 'Mobile App',       desc: 'iOS + Android, feels native' },
-  { label: 'Proactive AI',     desc: '"You were working on X — continue?"' },
+  { label: 'Image Studio',   desc: 'Canvas, layers, AI-assisted edits' },
+  { label: '3D / Blueprint', desc: 'Describe a scene — Based renders it' },
+  { label: 'Mobile App',     desc: 'iOS + Android, feels native' },
+  { label: 'Proactive AI',   desc: '"You were working on X — continue?"' },
 ];
 
 const COMPARISONS = [
@@ -89,6 +125,8 @@ export default function LandingPage({ onSignIn }: Props) {
       .catch(() => {});
   }, []);
 
+  const doubled = [...MARQUEE_ITEMS, ...MARQUEE_ITEMS];
+
   return (
     <div className="landing-root">
       <header className="landing-header">
@@ -100,85 +138,83 @@ export default function LandingPage({ onSignIn }: Props) {
         </nav>
       </header>
 
+      {/* ── Hero ── */}
       <section className="landing-hero">
+        <div className="landing-hero-glow" />
         <motion.div
           className="landing-hero-badge"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          Your Companion AI — All Models · All Tasks · All Generation
+          ◈ Overly Attached Companion AI · Singapore
         </motion.div>
         <motion.h1
           className="landing-headline"
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
+          transition={{ delay: 0.18, type: 'spring', stiffness: 180, damping: 24 }}
         >
-          You describe it.<br />Based builds it.
+          Never leaves<br />your side.
         </motion.h1>
         <motion.p
           className="landing-subheadline"
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
+          transition={{ delay: 0.28 }}
         >
-          Not just code. Not just chat. Based is your overly attached companion AI — it builds apps, generates images, edits video, composes music, answers anything, and remembers everything. One place for all of it.
+          Not a tool. Not just a chatbot. Based is your overly attached companion AI — it builds your apps, edits your video, composes your music, answers anything, and remembers everything about you.
         </motion.p>
         <motion.div
           className="landing-ctas"
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
+          transition={{ delay: 0.38 }}
         >
-          <button className="landing-cta-primary" onClick={() => onSignIn('signup')}>Sign Up Free</button>
+          <button className="landing-cta-primary" onClick={() => onSignIn('signup')}>Start free →</button>
           <button className="landing-cta-secondary" onClick={() => onSignIn('signin')}>Sign In</button>
         </motion.div>
         <motion.div
           className="landing-hint"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
+          transition={{ delay: 0.55 }}
         >
           Free plan · 10 generations/month · No credit card required
         </motion.div>
       </section>
 
-      <section className="landing-demo">
-        <motion.div
-          className="landing-demo-window"
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5, type: 'spring', stiffness: 200, damping: 28 }}
-        >
-          <div className="landing-demo-bar">
-            <span className="landing-demo-dot" />
-            <span className="landing-demo-dot" />
-            <span className="landing-demo-dot" />
-            <span className="landing-demo-bar-title">Based — Live Preview</span>
-          </div>
-          <div className="landing-demo-placeholder">
-            <div className="landing-demo-placeholder-inner">
-              <div className="landing-demo-placeholder-icon">◈</div>
-              <div className="landing-demo-placeholder-text">Screenshot coming soon</div>
-              <div className="landing-demo-placeholder-sub">Drop a PNG at <code>public/demo-screenshot.png</code> and swap the placeholder div for an &lt;img&gt;</div>
-            </div>
-          </div>
-        </motion.div>
+      {/* ── Capability marquee ── */}
+      <div className="landing-marquee">
+        <div className="landing-marquee-track">
+          {doubled.map((item, i) => (
+            <span key={i} className="landing-marquee-item">
+              <span className="landing-marquee-dot">{item.icon}</span>
+              {item.label}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Companion story bento ── */}
+      <section className="landing-bento-section">
+        {BENTO.map((card, i) => (
+          <motion.div
+            key={card.title}
+            className="landing-bento-card"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 + i * 0.1, type: 'spring', stiffness: 200, damping: 26 }}
+          >
+            <span className="landing-bento-icon">{card.icon}</span>
+            <div className="landing-bento-title">{card.title}</div>
+            <div className="landing-bento-desc">{card.desc}</div>
+            <span className="landing-bento-tag">{card.tag}</span>
+          </motion.div>
+        ))}
       </section>
 
-      <section className="landing-manifesto">
-        <motion.p
-          className="landing-manifesto-text"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-        >
-          All model. All task. All generation. There is a problem? Report it, support it, and it becomes better.
-          <br />That is what you call <strong>All-In-All-Based</strong> — your world, overly attached companion AI.
-        </motion.p>
-      </section>
-
+      {/* ── Four pillars ── */}
       <section className="landing-features">
         {PILLARS.map((f, i) => (
           <motion.div
@@ -186,7 +222,7 @@ export default function LandingPage({ onSignIn }: Props) {
             className="landing-feature-card"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 + i * 0.1 }}
+            transition={{ delay: 0.1 + i * 0.1 }}
           >
             <span className="landing-feature-icon">{f.icon}</span>
             <div className="landing-feature-title">{f.title}</div>
@@ -195,12 +231,13 @@ export default function LandingPage({ onSignIn }: Props) {
         ))}
       </section>
 
+      {/* ── Comparison ── */}
       <section className="landing-comparison">
         <motion.div
           className="landing-comparison-title"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.7 }}
+          transition={{ delay: 0.2 }}
         >
           Based vs everything else
         </motion.div>
@@ -208,7 +245,7 @@ export default function LandingPage({ onSignIn }: Props) {
           className="landing-comparison-table"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
+          transition={{ delay: 0.3 }}
         >
           <div className="landing-comparison-col landing-comparison-col--them">
             <div className="landing-comparison-col-header">Others</div>
@@ -225,6 +262,7 @@ export default function LandingPage({ onSignIn }: Props) {
         </motion.div>
       </section>
 
+      {/* ── Community gallery ── */}
       {galleryItems.length > 0 && (
         <section className="landing-gallery">
           <div className="landing-gallery-header">
@@ -246,12 +284,13 @@ export default function LandingPage({ onSignIn }: Props) {
         </section>
       )}
 
+      {/* ── Always shipping strip ── */}
       <section className="landing-roadmap">
         <motion.div
           className="landing-roadmap-header"
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
+          transition={{ delay: 0.2 }}
         >
           <div>
             <div className="landing-roadmap-label">Built in public · Shaped by users</div>
@@ -264,7 +303,7 @@ export default function LandingPage({ onSignIn }: Props) {
           className="landing-roadmap-grid"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
+          transition={{ delay: 0.3 }}
         >
           <div className="landing-roadmap-col">
             <div className="landing-roadmap-col-label">◈ Recently shipped</div>
@@ -294,12 +333,13 @@ export default function LandingPage({ onSignIn }: Props) {
         </motion.div>
       </section>
 
+      {/* ── Pricing ── */}
       <section className="landing-pricing">
         <motion.div
           className="landing-pricing-title"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.7 }}
+          transition={{ delay: 0.2 }}
         >
           Simple pricing
         </motion.div>
@@ -307,7 +347,7 @@ export default function LandingPage({ onSignIn }: Props) {
           className="landing-pricing-tiers"
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
+          transition={{ delay: 0.3 }}
         >
           <div className="landing-tier landing-tier--free">
             <div className="landing-tier-label">Free</div>
@@ -341,8 +381,23 @@ export default function LandingPage({ onSignIn }: Props) {
         </motion.div>
       </section>
 
+      {/* ── Closing CTA ── */}
+      <section className="landing-closer">
+        <motion.div
+          className="landing-closer-inner"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <div className="landing-closer-badge">B&gt;</div>
+          <h2 className="landing-closer-headline">Your companion is waiting.</h2>
+          <p className="landing-closer-sub">Free plan, no credit card. Based is ready when you are.</p>
+          <button className="landing-cta-primary" onClick={() => onSignIn('signup')}>Start free →</button>
+        </motion.div>
+      </section>
+
       <footer className="landing-footer">
-        <span>Built by Hus Alfyandi</span>
+        <span>Built by Hus Alfyandi · Singapore</span>
         <span className="landing-footer-sep">·</span>
         <a href="/roadmap" className="landing-footer-link">Roadmap</a>
         <span className="landing-footer-sep">·</span>
