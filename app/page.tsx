@@ -79,7 +79,11 @@ export default function Home() {
   const [projectModal, setProjectModal] = useState(false);
   const [pendingPrompt, setPendingPrompt] = useState('');
   const [shareUrl, setShareUrl] = useState('');
+  const [shareId, setShareId] = useState('');
   const [isSharing, setIsSharing] = useState(false);
+  const [showGalleryPublish, setShowGalleryPublish] = useState(false);
+  const [galleryAuthorName, setGalleryAuthorName] = useState('');
+  const [galleryPublished, setGalleryPublished] = useState(false);
   const [user, setUser]               = useState<any>(null);
   const [authReady, setAuthReady]     = useState(false);
   const [authToken, setAuthToken]     = useState<string>('');
@@ -186,6 +190,45 @@ export default function Home() {
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
+
+  // ── Capture ?remix= from gallery page ───────────────────────────────────
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const remixId = params.get('remix');
+    if (remixId) {
+      try { localStorage.setItem('based_pending_remix', remixId); } catch {}
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  const handleRemix = useCallback(async (remixShareId: string, headers: HeadersInit) => {
+    try {
+      const res = await fetch(`/api/gallery/remix/${remixShareId}`, { headers });
+      if (!res.ok) return;
+      const { projectName, files: remixFiles } = await res.json();
+      const id = crypto.randomUUID();
+      const project: Project = {
+        id,
+        name: `${projectName} (remix)`,
+        files: remixFiles,
+        messages: [],
+        updatedAt: Date.now(),
+        memory: '',
+      };
+      const cached = loadProjectsCache();
+      saveProjectsCache([project, ...cached]);
+      setProjects(prev => [project, ...prev]);
+      setCurrentProject(project);
+      setFiles(remixFiles);
+      setMessages([]);
+      setActiveFile(remixFiles[0] ?? null);
+      setActivePanel('preview');
+      setShareUrl(''); setShareId(''); setGalleryPublished(false);
+      fetch('/api/projects', { method: 'POST', headers, body: JSON.stringify({ name: project.name, id }) }).catch(() => {});
+      fetch(`/api/projects/${id}`, { method: 'PUT', headers, body: JSON.stringify({ files: remixFiles }) }).catch(() => {});
+    } catch {}
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Handle return from Stripe checkout ──────────────────────────────────
   useEffect(() => {
@@ -327,6 +370,12 @@ export default function Home() {
           }).then(r => r.ok && localStorage.removeItem('based_pending_ref')).catch(() => {});
         }
         await loadCloudData();
+        // Fork a gallery project if remix was pending
+        const pendingRemix = localStorage.getItem('based_pending_remix');
+        if (pendingRemix) {
+          localStorage.removeItem('based_pending_remix');
+          handleRemix(pendingRemix, headers);
+        }
       }
       if (event === 'SIGNED_OUT') {
         if (isExplicitSignOut.current) {
@@ -466,6 +515,8 @@ export default function Home() {
     setActiveFile(project.files[0] ?? null);
     setActivePanel('chat');
     setShareUrl('');
+    setShareId('');
+    setGalleryPublished(false);
   };
 
   const deleteProject = (id: string) => {
@@ -503,6 +554,8 @@ export default function Home() {
       if (data.url) {
         const full = `https://getbased.dev${data.url}`;
         setShareUrl(full);
+        setShareId(data.id ?? '');
+        setGalleryPublished(false);
         setIsSharing(false); // unblock UI before share dialog
         if (navigator.share) {
           navigator.share({ title: currentProject.name, url: full }).catch(() => {});
@@ -604,14 +657,26 @@ export default function Home() {
           </div>
           <div className="header-controls">
             {currentProject && files.length > 0 && (
-              <button
-                className="share-btn"
-                onClick={shareProject}
-                disabled={isSharing}
-                title="Share project"
-              >
-                {isSharing ? '...' : shareUrl ? '✓ Copied!' : '↗ Share'}
-              </button>
+              <>
+                <button
+                  className="share-btn"
+                  onClick={shareProject}
+                  disabled={isSharing}
+                  title="Share project"
+                >
+                  {isSharing ? '...' : shareUrl ? '✓ Copied!' : '↗ Share'}
+                </button>
+                {shareId && (
+                  <button
+                    className={`gallery-publish-btn${galleryPublished ? ' published' : ''}`}
+                    onClick={() => { if (!galleryPublished) setShowGalleryPublish(true); }}
+                    title={galleryPublished ? 'Published to gallery' : 'Add to public gallery'}
+                    disabled={galleryPublished}
+                  >
+                    {galleryPublished ? '✓ In Gallery' : '⬡ Gallery'}
+                  </button>
+                )}
+              </>
             )}
             <button
               className={`icon-btn ${incognito ? 'incognito-active' : ''}`}
@@ -990,6 +1055,57 @@ export default function Home() {
             userEmail={user?.email}
             onClose={() => setShowFeedback(false)}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showGalleryPublish && (
+          <motion.div
+            className="modal-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowGalleryPublish(false)}
+          >
+            <motion.div
+              className="gallery-publish-modal"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="gpm-title">⬡ Publish to Gallery</div>
+              <p className="gpm-desc">Your project will be visible to everyone at <strong>getbased.dev/gallery</strong>. Anyone can remix it.</p>
+              <label className="gpm-label">Your display name (optional)</label>
+              <input
+                className="gpm-input"
+                value={galleryAuthorName}
+                onChange={e => setGalleryAuthorName(e.target.value)}
+                placeholder={user?.email?.split('@')[0] ?? 'Anonymous'}
+                maxLength={40}
+              />
+              <div className="gpm-actions">
+                <button className="gpm-cancel" onClick={() => setShowGalleryPublish(false)}>Cancel</button>
+                <button
+                  className="gpm-confirm"
+                  onClick={async () => {
+                    const headers = await getHeaders();
+                    const res = await fetch('/api/gallery', {
+                      method: 'POST',
+                      headers,
+                      body: JSON.stringify({
+                        shareId,
+                        authorName: galleryAuthorName || user?.email?.split('@')[0] || 'Anonymous',
+                      }),
+                    });
+                    if (res.ok) { setGalleryPublished(true); setShowGalleryPublish(false); }
+                  }}
+                >
+                  Publish →
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
 

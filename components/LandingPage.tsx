@@ -157,6 +157,8 @@ export default function LandingPage({ onSignIn }: Props) {
         <span className="landing-footer-sep">·</span>
         <a href="/roadmap" className="landing-footer-link">Roadmap</a>
         <span className="landing-footer-sep">·</span>
+        <a href="/gallery" className="landing-footer-link">Gallery</a>
+        <span className="landing-footer-sep">·</span>
         <a href="https://ko-fi.com/basedfund" target="_blank" rel="noopener noreferrer" className="landing-footer-link">◈ Support</a>
         <span className="landing-footer-sep">·</span>
         <a href="mailto:husgogogo@gmail.com" className="landing-footer-link">Contact</a>
