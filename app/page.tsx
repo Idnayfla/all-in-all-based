@@ -22,6 +22,7 @@ import LandingPage from '@/components/LandingPage';
 import FeedbackModal from '@/components/FeedbackModal';
 import ReferralPanel from '@/components/ReferralPanel';
 import VideoEditorPanel from '@/components/VideoEditorPanel';
+import StudioPanel from '@/components/StudioPanel';
 
 export interface FileNode {
   name: string;
@@ -74,7 +75,7 @@ export default function Home() {
   const [globalMemory, setGlobalMemory] = useState('');
   const [incognito, setIncognito]     = useState(false);
   const [incognitoMessages, setIncognitoMessages] = useState<Message[]>([]);
-  const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview' | 'debug' | 'video'>('chat');
+  const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview' | 'debug' | 'video' | 'studio'>('chat');
   const [projects, setProjects]       = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   useSwipePanels(activePanel, setActivePanel, !incognito && !!currentProject);
@@ -684,6 +685,7 @@ export default function Home() {
             <button className={`tab-btn ${activePanel === 'editor' ? 'active' : ''}`} onClick={() => { setActivePanel('editor'); setShowSettings(false); }}>Editor</button>
             <button className={`tab-btn ${activePanel === 'preview' ? 'active' : ''}`} onClick={() => { setActivePanel('preview'); setShowSettings(false); }}>Preview</button>
             <button className={`tab-btn ${activePanel === 'video' ? 'active' : ''}`} onClick={() => { setActivePanel('video'); setShowSettings(false); }}>Video</button>
+            <button className={`tab-btn ${activePanel === 'studio' ? 'active' : ''}`} onClick={() => { setActivePanel('studio'); setShowSettings(false); }}>Studio</button>
             <button className={`tab-btn tab-btn-debug ${activePanel === 'debug' ? 'active' : ''}`} onClick={() => { setActivePanel('debug'); setShowSettings(false); }} title="Debug stream">◈</button>
           </div>
           <div className="header-controls">
@@ -1063,6 +1065,9 @@ export default function Home() {
               </div>
               <div className={`panel ${activePanel === 'video' ? 'panel-active' : ''}`}>
                 <VideoEditorPanel />
+              </div>
+              <div className={`panel ${activePanel === 'studio' ? 'panel-active' : ''}`}>
+                <StudioPanel />
               </div>
             </>
           )}

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-type Panel = 'chat' | 'editor' | 'preview' | 'debug' | 'video';
+type Panel = 'chat' | 'editor' | 'preview' | 'debug' | 'video' | 'studio';
 const ORDER: Panel[] = ['chat', 'editor', 'preview'];
 
 export function useSwipePanels(
