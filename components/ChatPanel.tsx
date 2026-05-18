@@ -409,6 +409,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       const decoder = new TextDecoder();
       let assistantMsg = '';
       let buffer = '';
+      let planReceived = false;
 
       setMessages(prev => [...prev, { role: 'assistant', content: '... Working' }]);
 
@@ -454,6 +455,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             }
 
             if (data.plan) {
+              planReceived = true;
               flushSync(() => {
                 setGenProgress({ files: data.plan, completed: 0, total: data.plan.length, file: '', chunks: 0 });
               });
@@ -482,13 +484,13 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               assistantMsg += data.chunk;
               setGenProgress(prev => prev && prev.file ? { ...prev, chunks: prev.chunks + 1 } : prev);
               const hasForge = assistantMsg.includes('<forge_file') || assistantMsg.includes('<forge_type');
-              if (!hasForge) {
+              if (!planReceived && !hasForge) {
                 setMessages(prev => {
                   const updated = [...prev];
                   updated[updated.length - 1] = { role: 'assistant', content: assistantMsg.trim() || '◈ Working...' };
                   return updated;
                 });
-              } else {
+              } else if (hasForge) {
                 setMessages(prev => {
                   const updated = [...prev];
                   const last = updated[updated.length - 1];
