@@ -23,6 +23,7 @@ import FeedbackModal from '@/components/FeedbackModal';
 import ReferralPanel from '@/components/ReferralPanel';
 import VideoEditorPanel from '@/components/VideoEditorPanel';
 import StudioPanel from '@/components/StudioPanel';
+import ProactiveCheckin from '@/components/ProactiveCheckin';
 
 export interface FileNode {
   name: string;
@@ -101,12 +102,14 @@ export default function Home() {
   const [showPricing, setShowPricing] = useState(false);
   const [pricingReason, setPricingReason] = useState<'generations' | 'projects' | 'upgrade'>('upgrade');
   const [showFeedback, setShowFeedback] = useState(false);
+  const [checkin, setCheckin] = useState<{ id: string; name: string } | null>(null);
   const [wallpaper, setWallpaper] = useState<string | null>(null);
   const [wallpaperBlur, setWallpaperBlur] = useState(0);
   const wallpaperInputRef = useRef<HTMLInputElement>(null);
 
   // ── Project cache helpers (localStorage) ────────────────────────────────
   const PROJECTS_CACHE_KEY = 'based_projects_cache';
+  const LAST_PROJECT_KEY   = 'based_last_project';
   const saveProjectsCache = (list: Project[]) => {
     try { localStorage.setItem(PROJECTS_CACHE_KEY, JSON.stringify(list)); } catch {}
   };
@@ -115,6 +118,9 @@ export default function Home() {
       const raw = localStorage.getItem(PROJECTS_CACHE_KEY);
       return raw ? JSON.parse(raw) : [];
     } catch { return []; }
+  };
+  const saveLastProject = (id: string, name: string) => {
+    try { localStorage.setItem(LAST_PROJECT_KEY, JSON.stringify({ id, name, at: Date.now() })); } catch {}
   };
 
   // Load cached projects immediately on mount so they show before auth resolves
@@ -242,6 +248,19 @@ export default function Home() {
       setSubscription(s => ({ ...s, tier: 'pro' }));
     }
   }, []);
+
+  // ── Proactive check-in: offer to resume last project ────────────────────
+  useEffect(() => {
+    if (!user || !authReady || currentProject || projects.length === 0) return;
+    try {
+      const raw = localStorage.getItem(LAST_PROJECT_KEY);
+      if (!raw) return;
+      const { id, name, at } = JSON.parse(raw) as { id: string; name: string; at: number };
+      if (Date.now() - at < 3 * 60 * 1000) return;        // same session — skip
+      if (!projects.find(p => p.id === id)) return;        // project deleted — skip
+      setCheckin({ id, name });
+    } catch {}
+  }, [user, authReady, projects.length, currentProject]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auth headers helper ──────────────────────────────────────────────────
   const getHeaders = useCallback(async (): Promise<HeadersInit> => {
@@ -514,7 +533,9 @@ export default function Home() {
     setProjects(prev => [newProject, ...prev]);
     setCurrentProject(newProject);
     setFiles([]); setMessages([]); setActiveFile(null); setActivePanel('chat');
+    setCheckin(null);
     setShareUrl('');
+    saveLastProject(id, name.trim());
     setTimeout(() => setPendingPrompt(''), 100);
 
     // Sync to Supabase in background — log errors so we can debug
@@ -544,6 +565,8 @@ export default function Home() {
     setShareUrl('');
     setShareId('');
     setGalleryPublished(false);
+    setCheckin(null);
+    saveLastProject(project.id, project.name);
   };
 
   const deleteProject = (id: string) => {
@@ -1013,6 +1036,19 @@ export default function Home() {
               <div className="no-project-features">
                 HTML &nbsp;·&nbsp; Canvas games &nbsp;·&nbsp; Web apps &nbsp;·&nbsp; Tools &nbsp;·&nbsp; Dashboards
               </div>
+              <AnimatePresence>
+                {checkin && (
+                  <ProactiveCheckin
+                    projectName={checkin.name}
+                    onContinue={() => {
+                      const project = projects.find(p => p.id === checkin.id);
+                      if (project) loadProject(project);
+                      else setCheckin(null);
+                    }}
+                    onDismiss={() => setCheckin(null)}
+                  />
+                )}
+              </AnimatePresence>
               <button className="new-project-btn-large" onClick={newProject}>+ New Project</button>
               <div className="no-project-examples">
                 {['Build a snake game', 'Sales dashboard with charts', 'Scientific calculator', 'Portfolio website'].map(p => (

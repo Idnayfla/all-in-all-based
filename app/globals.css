@@ -3021,6 +3021,74 @@ body {
 .landing-tier-cta:hover { transform: translateY(-1px); border-color: var(--text2); }
 .landing-tier-cta--pro:hover { background: var(--accent-hover); transform: translateY(-1px); }
 
+/* ── Proactive check-in card ── */
+.checkin-card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--bg2);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-xl);
+  padding: 20px 20px 0;
+  margin-bottom: 16px;
+  overflow: hidden;
+  box-shadow: 0 0 0 4px rgba(124,106,247,0.08), var(--shadow-md);
+}
+.checkin-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.checkin-icon { color: var(--accent); font-size: 14px; }
+.checkin-label { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; }
+.checkin-body {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+.checkin-project-name { color: var(--text); font-style: normal; }
+.checkin-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.checkin-continue {
+  padding: 8px 20px;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--r-full);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+}
+.checkin-continue:hover { background: var(--accent-hover); transform: translateY(-1px); }
+.checkin-dismiss {
+  padding: 8px 16px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  color: var(--text3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.checkin-dismiss:hover { border-color: var(--text2); color: var(--text2); }
+.checkin-timer-bar { height: 2px; background: var(--bg3); margin: 0 -20px; }
+.checkin-timer-progress {
+  height: 100%;
+  background: var(--accent);
+  animation: checkinTimer 8s linear forwards;
+}
+@keyframes checkinTimer {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
 /* ── Suggestion chips ── */
 .suggestion-btn {
   animation: staggerFade 0.4s cubic-bezier(0.16,1,0.3,1) both;
