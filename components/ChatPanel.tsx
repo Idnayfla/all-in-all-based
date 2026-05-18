@@ -442,6 +442,15 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               });
             }
 
+            if (data.retrying) {
+              assistantMsg = '';
+              setMessages(prev => {
+                const updated = [...prev];
+                updated[updated.length - 1] = { role: 'assistant', content: '◈ Retrying...' };
+                return updated;
+              });
+            }
+
             if (data.plan) {
               flushSync(() => {
                 setGenProgress({ files: data.plan, completed: 0, total: data.plan.length, file: '', chunks: 0 });
