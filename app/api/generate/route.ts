@@ -67,6 +67,21 @@ async function* streamPantheon(
   }
 }
 
+function friendlyError(e: any): string {
+  const raw: string = e?.message ?? String(e);
+  try {
+    const parsed = JSON.parse(raw);
+    const t = parsed?.error?.type ?? parsed?.type;
+    const m = parsed?.error?.message ?? parsed?.message;
+    if (t === 'overloaded_error') return 'Based is a bit overloaded right now — wait a moment and try again.';
+    if (t === 'rate_limit_error')  return 'Rate limit hit — please wait a few seconds and try again.';
+    if (m) return m;
+  } catch {}
+  if (raw.toLowerCase().includes('overload')) return 'Based is a bit overloaded right now — wait a moment and try again.';
+  if (raw.toLowerCase().includes('rate limit') || raw.toLowerCase().includes('429')) return 'Rate limit hit — please wait a few seconds and try again.';
+  return raw || 'Something went wrong — please try again.';
+}
+
 const SYSTEM = `You are Based — a sharp, direct AI that can do anything: answer questions, do math, analyse data, write, explain, plan, AND build fully working web apps, games, dashboards, and tools.
 
 IDENTITY:
@@ -1094,7 +1109,8 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, reply, files: generatedFiles, projectType, suggestions })}\n\n`));
 
         } catch (e: any) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: e.message })}\n\n`));
+          const friendly = friendlyError(e);
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: friendly })}\n\n`));
         } finally {
           controller.close();
         }
