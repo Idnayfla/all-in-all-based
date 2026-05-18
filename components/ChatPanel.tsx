@@ -411,7 +411,9 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       let buffer = '';
       let planReceived = false;
 
-      setMessages(prev => [...prev, { role: 'assistant', content: '... Working' }]);
+      flushSync(() => {
+        setMessages(prev => [...prev, { role: 'assistant', content: '... Working' }]);
+      });
 
       while (true) {
         const { done, value } = await reader.read();
