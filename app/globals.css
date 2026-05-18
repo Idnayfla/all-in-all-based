@@ -4312,3 +4312,203 @@ html.has-wallpaper .editor-panel {
   transition: color 0.15s;
 }
 .gate-peek-btn:hover { color: var(--text1); }
+
+/* __ Gallery page — bigger cards ____________________________________________ */
+
+.gal-grid {
+  grid-template-columns: repeat(auto-fill, minmax(480px, 1fr)) !important;
+  gap: 32px !important;
+}
+
+.gal-card-preview {
+  aspect-ratio: 4/3 !important;
+}
+
+.gal-card-body {
+  padding: 18px 20px !important;
+  gap: 10px !important;
+}
+
+.gal-card-name {
+  font-size: 16px !important;
+}
+
+.gal-card-meta {
+  font-size: 13px !important;
+}
+
+.gal-card-remix-btn {
+  padding: 8px 18px !important;
+  font-size: 13px !important;
+}
+
+/* __ Landing page — header nav ______________________________________________ */
+
+.landing-header-nav {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.landing-nav-link {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text3);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.landing-nav-link:hover { color: var(--text1); }
+
+/* __ Landing page — gallery section _________________________________________ */
+
+.landing-gallery {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 80px 24px;
+}
+
+.landing-gallery-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 36px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.landing-gallery-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.landing-gallery-title {
+  font-size: clamp(24px, 3vw, 36px);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  margin: 0 0 8px;
+  color: var(--text1);
+}
+
+.landing-gallery-sub {
+  font-size: var(--fs-sm);
+  color: var(--text3);
+  margin: 0;
+  font-family: var(--font-mono);
+}
+
+.landing-gallery-browse-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 22px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  border-radius: 8px;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.landing-gallery-browse-btn:hover {
+  background: var(--accent);
+  color: #000;
+}
+
+.landing-gal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .landing-gal-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .landing-gal-grid { grid-template-columns: 1fr; }
+}
+
+.landing-gal-card {
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  text-decoration: none;
+  display: block;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.landing-gal-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  transform: translateY(-3px);
+}
+
+.landing-gal-preview {
+  width: 100%;
+  aspect-ratio: 4/3;
+  overflow: hidden;
+  background: var(--bg0);
+  position: relative;
+}
+.landing-gal-preview iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  pointer-events: none;
+  display: block;
+}
+.landing-gal-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.landing-gal-placeholder span {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+  opacity: 0.2;
+  font-family: var(--font-mono);
+}
+
+.landing-gal-card-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.landing-gal-card-name {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text1);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.landing-gal-card-meta {
+  font-size: 11px;
+  color: var(--text3);
+  font-family: var(--font-mono);
+}
+
+.landing-gallery-cta-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 32px;
+}
+
+.landing-gallery-cta-link {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--accent);
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+.landing-gallery-cta-link:hover { opacity: 0.75; }

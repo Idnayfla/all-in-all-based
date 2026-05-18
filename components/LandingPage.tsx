@@ -1,8 +1,16 @@
 'use client';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 
 interface Props {
   onSignIn: (tab?: 'signin' | 'signup') => void;
+}
+
+interface GalleryItem {
+  id: string;
+  project_name: string;
+  author_name: string | null;
+  remix_count: number;
 }
 
 const FEATURES = [
@@ -12,12 +20,60 @@ const FEATURES = [
   { icon: '⬡', title: 'Any language',    desc: 'HTML/CSS/JS, Python, Node — describe what you need and Based picks the right stack.' },
 ];
 
+function LandingGalleryCard({ item }: { item: GalleryItem }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setVisible(true); },
+      { rootMargin: '200px' }
+    );
+    if (wrapRef.current) observer.observe(wrapRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <a href="/gallery" className="landing-gal-card">
+      <div className="landing-gal-preview" ref={wrapRef}>
+        {visible ? (
+          <iframe
+            src={`/api/share/preview/${item.id}`}
+            title={item.project_name}
+            sandbox="allow-scripts"
+            scrolling="no"
+          />
+        ) : (
+          <div className="landing-gal-placeholder"><span>B&gt;</span></div>
+        )}
+      </div>
+      <div className="landing-gal-card-body">
+        <span className="landing-gal-card-name">{item.project_name}</span>
+        <span className="landing-gal-card-meta">by {item.author_name ?? 'Anonymous'} · ↻ {item.remix_count}</span>
+      </div>
+    </a>
+  );
+}
+
 export default function LandingPage({ onSignIn }: Props) {
+  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
+
+  useEffect(() => {
+    fetch('/api/gallery')
+      .then(r => r.json())
+      .then(d => setGalleryItems((d.items ?? []).slice(0, 3)))
+      .catch(() => {});
+  }, []);
+
   return (
     <div className="landing-root">
       <header className="landing-header">
         <div className="landing-logo">B&gt;</div>
-        <button className="landing-signin-btn" onClick={() => onSignIn('signin')}>Sign In</button>
+        <nav className="landing-header-nav">
+          <a href="/gallery" className="landing-nav-link">Gallery</a>
+          <a href="/roadmap" className="landing-nav-link">Roadmap</a>
+          <button className="landing-signin-btn" onClick={() => onSignIn('signin')}>Sign In</button>
+        </nav>
       </header>
 
       <section className="landing-hero">
@@ -78,7 +134,6 @@ export default function LandingPage({ onSignIn }: Props) {
             <span className="landing-demo-dot" />
             <span className="landing-demo-bar-title">Based — Live Preview</span>
           </div>
-          {/* Replace src with an actual screenshot — e.g. /demo-screenshot.png */}
           <div className="landing-demo-placeholder">
             <div className="landing-demo-placeholder-inner">
               <div className="landing-demo-placeholder-icon">◈</div>
@@ -104,6 +159,27 @@ export default function LandingPage({ onSignIn }: Props) {
           </motion.div>
         ))}
       </section>
+
+      {galleryItems.length > 0 && (
+        <section className="landing-gallery">
+          <div className="landing-gallery-header">
+            <div>
+              <div className="landing-gallery-label">Community Gallery</div>
+              <h2 className="landing-gallery-title">Built with Based.</h2>
+              <p className="landing-gallery-sub">Real projects, built by real people. Browse and remix anything.</p>
+            </div>
+            <a href="/gallery" className="landing-gallery-browse-btn">Browse all →</a>
+          </div>
+          <div className="landing-gal-grid">
+            {galleryItems.map(item => (
+              <LandingGalleryCard key={item.id} item={item} />
+            ))}
+          </div>
+          <div className="landing-gallery-cta-row">
+            <a href="/gallery" className="landing-gallery-cta-link">See everything in the gallery →</a>
+          </div>
+        </section>
+      )}
 
       <section className="landing-pricing">
         <motion.div
