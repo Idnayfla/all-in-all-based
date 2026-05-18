@@ -110,7 +110,7 @@ function ProgressBar({ progress }: { progress: GenerationProgress }) {
   );
 }
 
-export default function ChatPanel({ messages, setMessages, files, onFilesUpdate, isGenerating, setIsGenerating, personality, memory, globalMemory, incognito, authToken, subscriptionTier, generationsUsed, prefillMessage, onProRequired, onReportBug }: {
+export default function ChatPanel({ messages, setMessages, files, onFilesUpdate, isGenerating, setIsGenerating, personality, memory, globalMemory, incognito, authToken, subscriptionTier, generationsUsed, prefillMessage, onProRequired, onReportBug, aiModel }: {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   files: FileNode[];
@@ -127,6 +127,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   prefillMessage?: string;
   onProRequired?: () => void;
   onReportBug?: () => void;
+  aiModel?: 'based' | 'free';
 }) {
   const [input, setInput] = useState(prefillMessage ?? '');
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
@@ -394,7 +395,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           'Content-Type': 'application/json',
           ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
         },
-        body: JSON.stringify({ messages: newMessages, existingFiles: files, personality, memory, globalMemory, location: locationRef.current }),
+        body: JSON.stringify({ messages: newMessages, existingFiles: files, personality, memory, globalMemory, location: locationRef.current, aiModel }),
       });
 
       if (res.status === 402) {

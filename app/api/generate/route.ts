@@ -12,6 +12,8 @@ const client = new Anthropic({
 
 const PANTHEON_KEY = process.env.PANTHEON_OWNER_KEY ?? 'pk_owner_based_internal';
 const PANTHEON_URL = process.env.PANTHEON_API_URL ?? 'https://pantheon-api.vercel.app';
+const GROQ_URL     = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL   = 'llama-3.3-70b-versatile';
 
 function friendlyError(e: any): string {
   const raw: string = e?.message ?? String(e);
@@ -134,6 +136,56 @@ async function* streamPantheon(
       }
     }
   }
+}
+
+async function callGroq(
+  messages: Array<{ role: string; content: string }>,
+  maxTokens = 8000
+): Promise<string> {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+    body: JSON.stringify({ model: GROQ_MODEL, messages, stream: false, max_tokens: maxTokens }),
+  });
+  if (!res.ok) throw new Error(`Groq ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content ?? '';
+}
+
+async function streamGroqCollecting(
+  messages: Array<{ role: string; content: string }>,
+  maxTokens: number,
+  onChunk: (text: string) => void
+): Promise<string> {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+    body: JSON.stringify({ model: GROQ_MODEL, messages, stream: true, max_tokens: maxTokens }),
+  });
+  if (!res.ok) throw new Error(`Groq ${res.status}: ${await res.text()}`);
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('No body');
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let accumulated = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const payload = line.slice(6).trim();
+      if (payload === '[DONE]') continue;
+      try {
+        const parsed = JSON.parse(payload);
+        const text: string = parsed.choices?.[0]?.delta?.content ?? '';
+        if (text) { accumulated += text; onChunk(text); }
+      } catch {}
+    }
+  }
+  return accumulated;
 }
 
 const SYSTEM = `You are Based — a sharp, direct AI that can do anything: answer questions, do math, analyse data, write, explain, plan, AND build fully working web apps, games, dashboards, and tools.
@@ -786,7 +838,8 @@ function toClaudeContent(
 async function callModel(
   prompt: any,
   systemPrompt: any,
-  modelType: 'planner' | 'generator' | 'summary'
+  modelType: 'planner' | 'generator' | 'summary',
+  aiModel?: 'based' | 'free'
 ): Promise<string> {
   const hasImages = Array.isArray(prompt) && prompt.some((b: any) => b.type === 'image');
 
@@ -797,12 +850,10 @@ async function callModel(
     const userText = Array.isArray(prompt)
       ? prompt.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n')
       : (prompt as string);
-    const taskType = modelType === 'generator' ? 'chat' : 'fast_chat';
-    return callPantheon(
-      [{ role: 'system', content: systemText }, { role: 'user', content: userText }],
-      taskType,
-      modelType === 'generator' ? 16000 : 8000
-    );
+    const msgs = [{ role: 'system', content: systemText }, { role: 'user', content: userText }];
+    const maxTokens = modelType === 'generator' ? 16000 : 8000;
+    if (aiModel === 'free' && process.env.GROQ_API_KEY) return callGroq(msgs, maxTokens);
+    return callPantheon(msgs, modelType === 'generator' ? 'chat' : 'fast_chat', maxTokens);
   }
 
   // Image-containing calls stay on Anthropic (vision required)
@@ -816,15 +867,31 @@ async function callModel(
   return content.type === 'text' ? content.text : '';
 }
 
+async function streamText(
+  messages: Array<{ role: string; content: string }>,
+  maxTokens: number,
+  onChunk: (text: string) => void,
+  onRetry: () => void,
+  aiModel?: 'based' | 'free',
+  taskType: 'fast_chat' | 'chat' = 'chat'
+): Promise<string> {
+  if (aiModel === 'free' && process.env.GROQ_API_KEY) {
+    return streamGroqCollecting(messages, maxTokens, onChunk);
+  }
+  return streamPantheonCollecting(messages, taskType, maxTokens, onChunk, onRetry);
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { messages, existingFiles, personality, memory, globalMemory: clientGlobalMemory, location } = await req.json();
+    const { messages, existingFiles, personality, memory, globalMemory: clientGlobalMemory, location, aiModel } = await req.json();
+    const usingFreeModel = aiModel === 'free' && !!process.env.GROQ_API_KEY;
 
     // Free tier generation gate — fail open so DB issues never block users
     // ALWAYS_PRO=true bypasses all tier checks (set on beta deployment)
+    // Free AI model bypasses limits entirely (uses Groq, not our Anthropic credits)
     const alwaysPro = process.env.ALWAYS_PRO === 'true';
     const authToken = req.headers.get('Authorization')?.replace('Bearer ', '');
-    if (!alwaysPro && authToken) {
+    if (!alwaysPro && !usingFreeModel && authToken) {
       try {
         const { data: { user } } = await supabaseAdmin.auth.getUser(authToken);
         if (user) {
@@ -982,7 +1049,7 @@ VAGUE examples (only these should ever be false): "make an app", "build somethin
             ? [...imageBlocks, { type: 'text' as const, text: lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '') }]
             : lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '');
 
-          const planText = await callModel(plannerPromptContent, PLANNER_SYSTEM_BLOCKS, 'planner');
+          const planText = await callModel(plannerPromptContent, PLANNER_SYSTEM_BLOCKS, 'planner', usingFreeModel ? 'free' : 'based');
 
           let filePlan: { name: string; language: string; description: string }[] = [];
           let routeToChat = false;
@@ -1018,9 +1085,10 @@ VAGUE examples (only these should ever be false): "make an app", "build somethin
               } else {
                 const sysText = systemBlocks.map(b => b.text).join('\n');
                 const msgs = [{ role: 'system', content: sysText }, ...anthropicMessages.map((m: { role: string; content: unknown }) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : lastUserMessage }))];
-                fullText = await streamPantheonCollecting(msgs, 'chat', 16000,
+                fullText = await streamText(msgs, 16000,
                   t => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
-                  () => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`))
+                  () => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)),
+                  usingFreeModel ? 'free' : 'based'
                 );
               }
               const files = parseFiles(fullText);
@@ -1049,9 +1117,10 @@ VAGUE examples (only these should ever be false): "make an app", "build somethin
             } else {
               const sysText = systemBlocks.map(b => b.text).join('\n');
               const msgs = [{ role: 'system', content: sysText }, ...anthropicMessages.map((m: { role: string; content: unknown }) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : lastUserMessage }))];
-              fullText = await streamPantheonCollecting(msgs, 'chat', 4096,
+              fullText = await streamText(msgs, 4096,
                 t => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
-                () => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`))
+                () => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)),
+                usingFreeModel ? 'free' : 'based'
               );
             }
             const files = parseFiles(fullText);
@@ -1131,14 +1200,14 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
                 }
               }
             } else {
-              // Text-only files routed through Pantheon (multi-provider fallback)
               const msgs = [
                 { role: 'system', content: FILE_GENERATOR_SYSTEM },
                 { role: 'user', content: filePrompt },
               ];
-              fileText = await streamPantheonCollecting(msgs, 'chat', 16000,
+              fileText = await streamText(msgs, 16000,
                 t => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
-                () => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`))
+                () => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)),
+                usingFreeModel ? 'free' : 'based'
               );
             }
 
@@ -1168,7 +1237,7 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
           // Step 3: Brief summary — use a minimal system to avoid code-gen rules confusing haiku
           const summarySystem = 'You are Based. Reply with 1-2 plain sentences describing what was just built. No code, no forge tags, no lists.';
           const summaryPrompt = `User asked: "${lastUserMessage}"\nFiles generated: ${generatedFiles.map(f => f.name).join(', ')}\n\nDescribe what was built in 1-2 sentences.`;
-          const reply = await callModel(summaryPrompt, summarySystem, 'summary')
+          const reply = await callModel(summaryPrompt, summarySystem, 'summary', usingFreeModel ? 'free' : 'based')
             || `Built ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}`;
 
           let suggestions: string[] = [];
@@ -1176,7 +1245,8 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
             const suggestText = await callModel(
               `The user just built: "${lastUserMessage}"\nFiles: ${generatedFiles.map(f => f.name).join(', ')}\n\nOutput exactly 3 short follow-up action suggestions as a JSON array. Max 5 words each. Be specific to what was built.\nExamples: ["Add dark mode", "Make it mobile-friendly", "Add sound effects"]\nJSON only, no explanation.`,
               'Output only a valid JSON array of exactly 3 short strings. No markdown.',
-              'planner'
+              'planner',
+              usingFreeModel ? 'free' : 'based'
             );
             const match = suggestText.match(/\[[\s\S]*?\]/);
             if (match) suggestions = (JSON.parse(match[0]) as unknown[]).filter((s): s is string => typeof s === 'string').slice(0, 3);

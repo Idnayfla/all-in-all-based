@@ -828,6 +828,19 @@ body {
 .settings-section { display: flex; flex-direction: column; gap: 8px; }
 .settings-account-row { flex-direction: row; align-items: center; justify-content: space-between; }
 
+/* AI model toggle */
+.model-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.model-toggle-btn {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg2); cursor: pointer; text-align: left; transition: border-color 0.15s, background 0.15s;
+}
+.model-toggle-btn:hover { border-color: var(--accent3); background: var(--bg3); }
+.model-toggle-btn.active { border-color: var(--accent); background: rgba(139,118,255,0.1); }
+.model-toggle-name { font-size: 12px; font-weight: 700; color: var(--text); font-family: var(--font-mono); }
+.model-toggle-btn.active .model-toggle-name { color: var(--accent); }
+.model-toggle-sub { font-size: 10px; color: var(--text3); font-family: var(--font-mono); }
+
 /* Support card */
 .settings-support-card .support-card-body {
   display: flex; flex-direction: column; gap: 10px;
@@ -4394,7 +4407,8 @@ body:has(.beta-banner) .app-root { margin-top: 28px; height: calc(100vh - 28px);
 /* ── Roadmap page ────────────────────────────────────────────────────────── */
 
 .rm-root {
-  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
   background: var(--bg0);
   color: var(--text1);
   font-family: var(--font-mono);
@@ -4798,7 +4812,8 @@ body:has(.beta-banner) .app-root { margin-top: 28px; height: calc(100vh - 28px);
 /* __ Gallery page ____________________________________________________________ */
 
 .gal-root {
-  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
   background: var(--bg0);
   color: var(--text1);
   font-family: var(--font-mono);

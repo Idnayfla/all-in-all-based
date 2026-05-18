@@ -106,6 +106,8 @@ export default function Home() {
   const [pricingReason, setPricingReason] = useState<'generations' | 'projects' | 'upgrade'>('upgrade');
   const [showFeedback, setShowFeedback] = useState(false);
   const [checkin, setCheckin] = useState<{ id: string; name: string } | null>(null);
+  const [aiModel, setAiModelState] = useState<'based' | 'free'>('based');
+  const setAiModel = (m: 'based' | 'free') => { setAiModelState(m); try { localStorage.setItem('based_ai_model', m); } catch {} };
   const [wallpaper, setWallpaper] = useState<string | null>(null);
   const [wallpaperBlur, setWallpaperBlur] = useState(0);
   const wallpaperInputRef = useRef<HTMLInputElement>(null);
@@ -137,6 +139,12 @@ export default function Home() {
     const cached = localStorage.getItem('based_sub_tier');
     if (cached === 'pro') setSubscription(s => ({ ...s, tier: 'pro' }));
   }, []);
+
+  // ── Restore AI model preference ──────────────────────────────────────────
+  useEffect(() => {
+    const saved = localStorage.getItem('based_ai_model');
+    if (saved === 'free' || saved === 'based') setAiModelState(saved);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Apply theme on mount from localStorage ──────────────────────────────
   useEffect(() => {
@@ -907,6 +915,20 @@ export default function Home() {
                 />
                 </div>
               </div>
+              <div className="settings-section">
+                <label className="settings-label">AI Model</label>
+                <div className="model-toggle">
+                  <button className={`model-toggle-btn${aiModel === 'based' ? ' active' : ''}`} onClick={() => setAiModel('based')}>
+                    <span className="model-toggle-name">Based AI</span>
+                    <span className="model-toggle-sub">Claude · Best quality</span>
+                  </button>
+                  <button className={`model-toggle-btn${aiModel === 'free' ? ' active' : ''}`} onClick={() => setAiModel('free')}>
+                    <span className="model-toggle-name">Free AI</span>
+                    <span className="model-toggle-sub">Llama · Unlimited · Unrestricted</span>
+                  </button>
+                </div>
+                <div className="settings-hint">Free AI uses Llama 3.3 70B — no generation limits, no content restrictions.</div>
+              </div>
               <div className="settings-section" style={{ position: 'relative' }}>
                 <label className="settings-label">AI Personality</label>
                 {subscription.tier === 'free' && <div className="pro-gate-overlay" onClick={() => { setPricingReason('upgrade'); setShowPricing(true); setShowSettings(false); }}><span className="pro-gate-badge">⬡ Pro</span></div>}
@@ -1075,6 +1097,7 @@ export default function Home() {
                 incognito={true}
                 authToken={authToken}
                 onReportBug={() => setShowFeedback(true)}
+                aiModel={aiModel}
               />
             </div>
           ) : !currentProject ? (
@@ -1137,6 +1160,7 @@ export default function Home() {
                   prefillMessage={pendingPrompt}
                   onProRequired={() => { setPricingReason('upgrade'); setShowPricing(true); }}
                   onReportBug={() => setShowFeedback(true)}
+                  aiModel={aiModel}
                 />
               </div>
               <div className={`panel ${activePanel === 'editor' ? 'panel-active' : ''}`}>
