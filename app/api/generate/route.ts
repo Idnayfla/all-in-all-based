@@ -459,6 +459,13 @@ BUG FIXES AND CORRECTIONS:
 - A button fix is never a reason to regenerate a working game engine or style file
 - Only include a file if you are genuinely changing something in it
 
+ELEMENT-LEVEL CHANGES (most important rule for modifications):
+- "Change the icon", "swap the logo", "replace the image", "make the button X", "change the color of Y" → output ONLY the file containing that element, change ONLY that element
+- NEVER interpret "change [specific element] to X" as "rebuild the whole project with X as the theme"
+- "Change the icon to a star" = find the icon in the existing files, replace just that shape/SVG/element, keep everything else identical
+- "Change it to X" with existing files = surgical swap of the mentioned thing, all surrounding code stays
+- If the user says "change to [thing]" without specifying what to change, ask which element they mean — do NOT regenerate the whole project
+
 FEEDBACK FOR IMPROVEMENT:
 - If the user gives subjective feedback ("looks bad", "make it prettier", "feels slow", "boring", "too basic", "needs polish", "ugly", "improve the design", "doesn't feel right", "make it better"):
   - Treat as targeted refinement — only output files that directly address the feedback
@@ -509,6 +516,12 @@ CRITICAL RULES:
 - Generate ONLY what belongs in this file based on its description — nothing more
 - No placeholders, no TODOs, no truncation — complete working code only
 - Assume all other project files are loaded before this one
+
+SURGICAL EDIT RULE (when existing file content is provided):
+- If you are modifying an existing file: preserve ALL code that was not mentioned in the request
+- Only change the specific element, section, or value that was asked about
+- "Change the icon" = replace only the icon SVG/shape/element — keep layout, styles, logic, and all other elements exactly as they were
+- Do not reorganise, reformat, or improve unrelated parts while making a targeted change
 
 INTERACTIVITY RULES (non-negotiable):
 - NEVER use onclick="..." in HTML — attach all listeners in JS with addEventListener
