@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&family=Fira+Code:wght@400;700&family=IBM+Plex+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&family=Fira+Code:wght@400;700&family=IBM+Plex+Mono:wght@400;700&family=Courier+Prime:wght@400;700&family=Inconsolata:wght@400;700&family=Share+Tech+Mono&family=Source+Code+Pro:wght@400;700&family=Oxanium:wght@400;700&family=Syne+Mono&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 button, a { touch-action: manipulation; }
@@ -2915,13 +2915,46 @@ html.has-wallpaper .editor-panel {
   font-size: 16px;
 }
 
-.theme-font-select {
-  width: 100%; padding: 9px 12px;
-  background: var(--bg); border: 1px solid var(--border);
-  border-radius: var(--r-lg); color: var(--text);
-  font-size: 13px; font-family: var(--font-mono);
-  cursor: pointer; transition: border-color 0.15s;
-  appearance: none;
+.theme-row--font { align-items: flex-start; flex-direction: column; gap: 8px; }
+
+.theme-font-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  width: 100%;
+}
+
+.theme-font-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--bg0);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.theme-font-btn:hover { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
+.theme-font-btn.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.theme-font-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text1);
+  line-height: 1.2;
+}
+
+.theme-font-hint {
+  font-size: 10px;
+  color: var(--text3);
+  font-family: var(--font-mono);
+  letter-spacing: 0.03em;
+  line-height: 1.2;
 }
 
 /* ── Launch Splash ── */

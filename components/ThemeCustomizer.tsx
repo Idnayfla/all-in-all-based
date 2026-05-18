@@ -23,10 +23,16 @@ const ACCENT_SWATCHES = [
 ];
 
 const FONTS = [
-  { value: "'Space Mono', monospace",    label: 'Space Mono' },
-  { value: "'JetBrains Mono', monospace", label: 'JetBrains Mono' },
-  { value: "'Fira Code', monospace",     label: 'Fira Code' },
-  { value: "'IBM Plex Mono', monospace", label: 'IBM Plex Mono' },
+  { value: "'Space Mono', monospace",       label: 'Space Mono',       hint: 'Geometric · default' },
+  { value: "'JetBrains Mono', monospace",   label: 'JetBrains Mono',   hint: 'Developer clean' },
+  { value: "'Fira Code', monospace",        label: 'Fira Code',        hint: 'Warm · ligatures' },
+  { value: "'IBM Plex Mono', monospace",    label: 'IBM Plex Mono',    hint: 'Corporate precise' },
+  { value: "'Source Code Pro', monospace",  label: 'Source Code Pro',  hint: 'Minimal · sharp' },
+  { value: "'Inconsolata', monospace",      label: 'Inconsolata',      hint: 'Slim · elegant' },
+  { value: "'Courier Prime', monospace",    label: 'Courier Prime',    hint: 'Typewriter classic' },
+  { value: "'Share Tech Mono', monospace",  label: 'Share Tech Mono',  hint: 'Retro terminal' },
+  { value: "'Oxanium', monospace",          label: 'Oxanium',          hint: 'Futuristic · sci-fi' },
+  { value: "'Syne Mono', monospace",        label: 'Syne Mono',        hint: 'Artistic · editorial' },
 ];
 
 export function applyTheme(theme: AppTheme) {
@@ -113,20 +119,22 @@ export default function ThemeCustomizer({ theme, onChange }: Props) {
       </div>
 
       {/* Font */}
-      <div className="theme-row">
+      <div className="theme-row theme-row--font">
         <span className="theme-row-label">Font</span>
-        <select
-          className="theme-font-select"
-          value={theme.fontMono}
-          onChange={e => update({ fontMono: e.target.value })}
-          style={{ fontFamily: theme.fontMono }}
-        >
+        <div className="theme-font-grid">
           {FONTS.map(f => (
-            <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>
-              {f.label}
-            </option>
+            <button
+              key={f.value}
+              className={`theme-font-btn${theme.fontMono === f.value ? ' active' : ''}`}
+              style={{ fontFamily: f.value }}
+              onClick={() => update({ fontMono: f.value })}
+              title={f.hint}
+            >
+              <span className="theme-font-name">{f.label}</span>
+              <span className="theme-font-hint">{f.hint}</span>
+            </button>
           ))}
-        </select>
+        </div>
       </div>
     </div>
   );
