@@ -491,7 +491,19 @@ RULES FOR ALL DOCUMENT EXPORTS:
 - Style the export button prominently: background #2563eb, white text, padding 10px 24px, border-radius 6px
 - After export: briefly show "✓ Downloaded!" feedback on the button for 2 seconds, then reset
 - If the user provides data (a list, table, numbers): use that exact data — never invent placeholder data
-- Combine export types when it makes sense: a data dashboard should offer both PDF and Excel buttons`;
+- Combine export types when it makes sense: a data dashboard should offer both PDF and Excel buttons
+
+VIDEO EDITOR:
+When the user asks to build a video editor, video trimmer, video cutter, or video tool:
+- Build using pure HTML5 + JavaScript — no server-side code, no Node.js
+- Use the HTML5 <video> element for playback
+- For timeline/trim controls: use a custom div-based scrubber with mousedown/mousemove events
+- For text overlays: use a <canvas> element absolutely positioned over the video, draw overlays in a requestAnimationFrame loop
+- For video export/trim in-browser: use the MediaRecorder API + OffscreenCanvas approach, or acknowledge that browser-side trim requires re-encoding and is slow — offer to export a trimmed clip using MediaRecorder if supported
+- For filters and effects: use CSS filters on the <video> element (brightness, contrast, saturate, hue-rotate) controlled by range sliders
+- Always include: upload button (file input accept="video/*"), play/pause button, timeline scrubber, current time / total time display
+- Do NOT add download-all/crop/export buttons that duplicate Based's Export menu — the Export menu handles image snapshots
+- DO add a "Download Video" button that uses URL.createObjectURL on the edited Blob or the original file`;
 
 const PLANNER_SYSTEM = `You are a software architect. Output ONLY a JSON array. No explanation. No markdown. Raw JSON only.
 

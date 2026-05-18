@@ -27,6 +27,8 @@
     "@capacitor/core": "^8.3.4",
     "@capacitor/ios": "^8.3.4",
     "@fal-ai/client": "^1.10.1",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@gsap/react": "^2.1.2",
     "@monaco-editor/react": "^4.7.0",
     "@supabase/supabase-js": "^2.105.4",
