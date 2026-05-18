@@ -505,8 +505,8 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
 
             if (data.clarify) {
               doneHandled = true;
-              setGenProgress(null);
               setIsGenerating(false);
+              setGenProgress(null);
               setMessages(prev => {
                 const last = prev[prev.length - 1];
                 const hasText = typeof last?.content === 'string'
@@ -525,6 +525,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             if (data.error) {
               window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'error', data: data.error } }));
               doneHandled = true;
+              setIsGenerating(false);
               setGenProgress(null);
               setMessages(prev => [
                 ...prev.slice(0, -1),
@@ -539,6 +540,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'done', data: JSON.stringify({ filesCount: resolvedFiles.length, reply: data.reply?.slice(0, 100) }) } }));
               doneHandled = true;
               setGenProgress(null);
+              setIsGenerating(false);
               setMessages(prev => [
                 ...prev.slice(0, -1),
                 { role: 'assistant', content: data.reply || '✓ Done — check the editor.' }
