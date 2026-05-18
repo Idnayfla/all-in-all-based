@@ -7,6 +7,7 @@ function BetaGateForm() {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [peeking, setPeeking] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchParams = useSearchParams();
 
@@ -23,8 +24,7 @@ function BetaGateForm() {
     });
 
     if (res.ok) {
-      const from = searchParams.get('from') ?? '/';
-      window.location.href = from;
+      window.location.href = searchParams.get('from') ?? '/';
     } else {
       setError('Invalid access code.');
       setLoading(false);
@@ -34,17 +34,31 @@ function BetaGateForm() {
 
   return (
     <form onSubmit={submit} className="gate-form">
-      <input
-        ref={inputRef}
-        className={`gate-input${error ? ' gate-input--error' : ''}`}
-        type="text"
-        value={code}
-        onChange={e => { setCode(e.target.value); setError(''); }}
-        placeholder="Access code"
-        autoFocus
-        autoComplete="off"
-        spellCheck={false}
-      />
+      <div className="gate-input-wrap">
+        <input
+          ref={inputRef}
+          className={`gate-input${error ? ' gate-input--error' : ''}`}
+          type={peeking ? 'text' : 'password'}
+          value={code}
+          onChange={e => { setCode(e.target.value); setError(''); }}
+          placeholder="Access code"
+          autoFocus
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <button
+          type="button"
+          className="gate-peek-btn"
+          onMouseDown={() => setPeeking(true)}
+          onMouseUp={() => setPeeking(false)}
+          onMouseLeave={() => setPeeking(false)}
+          onTouchStart={() => setPeeking(true)}
+          onTouchEnd={() => setPeeking(false)}
+          title="Hold to reveal"
+        >
+          {peeking ? '◉' : '⊙'}
+        </button>
+      </div>
       {error && <div className="gate-error">{error}</div>}
       <button className="gate-btn" type="submit" disabled={loading || !code.trim()}>
         {loading ? '…' : 'Enter →'}
@@ -64,10 +78,6 @@ export default function BetaGatePage() {
         <Suspense fallback={<div className="gate-loading">Loading…</div>}>
           <BetaGateForm />
         </Suspense>
-
-        <p className="gate-hint">
-          No code? <a href="mailto:husgogogo@gmail.com" className="gate-hint-link">Request access</a>
-        </p>
       </div>
     </div>
   );

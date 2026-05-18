@@ -4288,3 +4288,27 @@ html.has-wallpaper .editor-panel {
 }
 .gate-hint-link { color: var(--accent); text-decoration: none; }
 .gate-hint-link:hover { opacity: 0.75; }
+
+.gate-input-wrap {
+  position: relative;
+  width: 100%;
+}
+.gate-input-wrap .gate-input {
+  padding-right: 44px;
+}
+.gate-peek-btn {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: var(--text3);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+  line-height: 1;
+  user-select: none;
+  transition: color 0.15s;
+}
+.gate-peek-btn:hover { color: var(--text1); }
