@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileNode } from '@/app/page';
 
 export default function PreviewPanel({ files, projectType, subscriptionTier, onProRequired }: {
@@ -27,6 +27,15 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
     }
     return html;
   }, [htmlFile, cssFile, jsFile]);
+
+  useEffect(() => {
+    if (!previewHtml || !iframeRef.current) return;
+    const doc = iframeRef.current.contentDocument;
+    if (!doc) return;
+    doc.open();
+    doc.write(previewHtml);
+    doc.close();
+  }, [previewHtml]);
 
   const runCode = async () => {
     setIsRunning(true);
@@ -306,7 +315,6 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
       <iframe
         ref={iframeRef}
         className="preview-frame"
-        srcDoc={previewHtml}
         sandbox="allow-scripts allow-same-origin allow-modals allow-downloads"
         title="Preview"
         onClick={() => setShowExportMenu(false)}

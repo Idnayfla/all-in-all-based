@@ -3674,7 +3674,7 @@ html.has-wallpaper .editor-panel {
   color: var(--text2);
   text-align: center;
 }
-body:has(.beta-banner) { padding-top: 28px; }
+body:has(.beta-banner) .app-root { margin-top: 28px; height: calc(100vh - 28px); }
 .beta-banner a { color: var(--accent); text-decoration: none; }
 .beta-banner a:hover { text-decoration: underline; }
 
