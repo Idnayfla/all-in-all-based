@@ -4191,3 +4191,100 @@ html.has-wallpaper .editor-panel {
   padding: 8px 18px; border-radius: 7px; cursor: pointer; transition: opacity 0.15s;
 }
 .gpm-confirm:hover { opacity: 0.85; }
+
+/* __ Beta gate page _________________________________________________________ */
+
+.gate-root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg0);
+  font-family: var(--font-mono);
+  padding: 24px;
+}
+
+.gate-card {
+  width: min(400px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.gate-logo {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: -1px;
+}
+
+.gate-title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text1);
+  margin: 0;
+}
+
+.gate-desc {
+  font-size: var(--fs-sm);
+  color: var(--text3);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.gate-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.gate-input {
+  width: 100%;
+  background: var(--bg1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  color: var(--text1);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  text-align: center;
+  letter-spacing: 0.12em;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+.gate-input:focus { outline: none; border-color: var(--accent); }
+.gate-input--error { border-color: #f76a6a; }
+
+.gate-error {
+  font-size: var(--fs-xs);
+  color: #f76a6a;
+  text-align: center;
+}
+
+.gate-btn {
+  width: 100%;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 10px;
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.gate-btn:hover:not(:disabled) { opacity: 0.85; }
+.gate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.gate-hint {
+  font-size: var(--fs-xs);
+  color: var(--text3);
+  margin: 0;
+}
+.gate-hint-link { color: var(--accent); text-decoration: none; }
+.gate-hint-link:hover { opacity: 0.75; }
