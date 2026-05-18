@@ -138,18 +138,30 @@ async function* streamPantheon(
   }
 }
 
+// Groq free tier: 6K TPM — cap tokens to stay within limits
+const GROQ_MAX_TOKENS = 8000;
+
 async function callGroq(
   messages: Array<{ role: string; content: string }>,
-  maxTokens = 8000
+  maxTokens = GROQ_MAX_TOKENS
 ): Promise<string> {
-  const res = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-    body: JSON.stringify({ model: GROQ_MODEL, messages, stream: false, max_tokens: maxTokens }),
-  });
-  if (!res.ok) throw new Error(`Groq ${res.status}: ${await res.text()}`);
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? '';
+  const capped = Math.min(maxTokens, GROQ_MAX_TOKENS);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+      body: JSON.stringify({ model: GROQ_MODEL, messages, stream: false, max_tokens: capped }),
+    });
+    if (res.status === 429) {
+      const retryAfter = parseInt(res.headers.get('retry-after') ?? '10', 10);
+      await new Promise(r => setTimeout(r, retryAfter * 1000));
+      continue;
+    }
+    if (!res.ok) throw new Error(`Groq ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content ?? '';
+  }
+  throw new Error('Groq rate limit — try again in a moment.');
 }
 
 async function streamGroqCollecting(
@@ -157,35 +169,44 @@ async function streamGroqCollecting(
   maxTokens: number,
   onChunk: (text: string) => void
 ): Promise<string> {
-  const res = await fetch(GROQ_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
-    body: JSON.stringify({ model: GROQ_MODEL, messages, stream: true, max_tokens: maxTokens }),
-  });
-  if (!res.ok) throw new Error(`Groq ${res.status}: ${await res.text()}`);
-  const reader = res.body?.getReader();
-  if (!reader) throw new Error('No body');
-  const decoder = new TextDecoder();
-  let buffer = '';
-  let accumulated = '';
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() ?? '';
-    for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
-      const payload = line.slice(6).trim();
-      if (payload === '[DONE]') continue;
-      try {
-        const parsed = JSON.parse(payload);
-        const text: string = parsed.choices?.[0]?.delta?.content ?? '';
-        if (text) { accumulated += text; onChunk(text); }
-      } catch {}
+  const capped = Math.min(maxTokens, GROQ_MAX_TOKENS);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+      body: JSON.stringify({ model: GROQ_MODEL, messages, stream: true, max_tokens: capped }),
+    });
+    if (res.status === 429) {
+      const retryAfter = parseInt(res.headers.get('retry-after') ?? '10', 10);
+      await new Promise(r => setTimeout(r, retryAfter * 1000));
+      continue;
     }
+    if (!res.ok) throw new Error(`Groq ${res.status}: ${await res.text()}`);
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('No body');
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let accumulated = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const payload = line.slice(6).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(payload);
+          const text: string = parsed.choices?.[0]?.delta?.content ?? '';
+          if (text) { accumulated += text; onChunk(text); }
+        } catch {}
+      }
+    }
+    return accumulated;
   }
-  return accumulated;
+  throw new Error('Groq rate limit — try again in a moment.');
 }
 
 const SYSTEM = `You are Based — a sharp, direct AI that can do anything: answer questions, do math, analyse data, write, explain, plan, AND build fully working web apps, games, dashboards, and tools.

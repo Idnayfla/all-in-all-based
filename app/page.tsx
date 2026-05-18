@@ -1232,6 +1232,7 @@ export default function Home() {
             projectCount={projects.length}
             onClose={() => setShowPricing(false)}
             getHeaders={getHeaders}
+            onSwitchToFreeAI={pricingReason === 'generations' ? () => { setAiModel('free'); setShowPricing(false); } : undefined}
           />
         )}
       </AnimatePresence>

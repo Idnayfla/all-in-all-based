@@ -4161,6 +4161,13 @@ html.has-wallpaper .editor-panel {
 }
 .pricing-upgrade-btn:hover { background: var(--accent-hover); }
 .pricing-upgrade-btn:disabled { opacity: 0.6; cursor: wait; }
+.pricing-free-ai-btn {
+  width: 100%; background: transparent; border: 1px solid var(--border);
+  color: var(--text2); font-size: var(--fs-xs); font-family: var(--font-mono);
+  padding: 10px 16px; border-radius: 8px; cursor: pointer; text-align: center;
+  transition: border-color 0.15s, color 0.15s; touch-action: manipulation;
+}
+.pricing-free-ai-btn:hover { border-color: var(--accent3); color: var(--text); }
 .pricing-note {
   text-align: center;
   font-size: var(--fs-xs);

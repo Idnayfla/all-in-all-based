@@ -8,6 +8,7 @@ interface PricingModalProps {
   projectCount?: number;
   onClose: () => void;
   getHeaders: () => Promise<HeadersInit>;
+  onSwitchToFreeAI?: () => void;
 }
 
 const REASON_MSG: Record<string, string> = {
@@ -30,7 +31,7 @@ const FREE_LIMITS = [
   'Cloud sync across devices',
 ];
 
-export default function PricingModal({ reason = 'upgrade', generationsUsed, projectCount, onClose, getHeaders }: PricingModalProps) {
+export default function PricingModal({ reason = 'upgrade', generationsUsed, projectCount, onClose, getHeaders, onSwitchToFreeAI }: PricingModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
 
@@ -102,6 +103,11 @@ export default function PricingModal({ reason = 'upgrade', generationsUsed, proj
         <button className="pricing-upgrade-btn" onClick={upgrade} disabled={loading}>
           {loading ? 'Redirecting to Stripe...' : 'Upgrade to Pro — $12/month'}
         </button>
+        {onSwitchToFreeAI && (
+          <button className="pricing-free-ai-btn" onClick={onSwitchToFreeAI}>
+            Or use Free AI — Llama 3.3 70B, unlimited, unrestricted →
+          </button>
+        )}
         <p className="pricing-note">Cancel anytime. Powered by Stripe.</p>
       </motion.div>
     </motion.div>
