@@ -252,14 +252,19 @@ export default function Home() {
 
   // ── Proactive check-in: offer to resume last project ────────────────────
   useEffect(() => {
+    console.log('[checkin] effect ran', { user: !!user, authReady, currentProject: !!currentProject });
     if (!user || !authReady || currentProject) return;
     try {
       const raw = localStorage.getItem(LAST_PROJECT_KEY);
+      console.log('[checkin] raw', raw);
       if (!raw) return;
       const { id, name, at } = JSON.parse(raw) as { id: string; name: string; at: number };
+      const minsAgo = (Date.now() - at) / 1000 / 60;
+      console.log('[checkin] minsAgo', minsAgo, 'id', id, 'name', name);
       if (Date.now() - at < 3 * 60 * 1000) return;        // same session — skip
+      console.log('[checkin] calling setCheckin');
       setCheckin({ id, name });
-    } catch {}
+    } catch (e) { console.log('[checkin] error', e); }
   }, [user, authReady, currentProject]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auth headers helper ──────────────────────────────────────────────────
