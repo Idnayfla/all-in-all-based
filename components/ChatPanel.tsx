@@ -742,7 +742,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                 <div className="message-role">{m.role === 'user' ? 'YOU' : 'BASED'}</div>
                 <div className="message-content">
                   {m.role === 'assistant' && isGenerating && i === messages.length - 1
-                    ? <ProgressBar progress={genProgress ?? { files: [], completed: 0, total: 0, file: typeof m.content === 'string' && m.content !== '... Working' ? m.content : '', chunks: 0 }} />
+                    ? <ProgressBar progress={genProgress ?? { files: [], completed: 0, total: 0, file: '', chunks: 0 }} />
                     : renderContent(m.content)
                   }
                 </div>
