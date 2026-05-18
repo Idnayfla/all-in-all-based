@@ -834,6 +834,21 @@ export default function Home() {
                       Manage billing
                     </button>
                   )}
+                  <button className="plan-resync-btn" onClick={async () => {
+                    const headers = await getHeaders();
+                    const res = await fetch('/api/stripe/sync', { method: 'POST', headers });
+                    if (res.ok) {
+                      const settingsRes = await fetch('/api/settings', { headers });
+                      if (settingsRes.ok) {
+                        const { subscriptionTier, subscriptionStatus, generationsUsed, subscriptionPeriodStart, subscriptionPeriodEnd } = await settingsRes.json();
+                        const tier = subscriptionTier ?? 'free';
+                        setSubscription({ tier, status: subscriptionStatus ?? 'active', generationsUsed: generationsUsed ?? 0, periodStart: subscriptionPeriodStart ?? null, periodEnd: subscriptionPeriodEnd ?? null });
+                        localStorage.setItem('based_sub_tier', tier);
+                      }
+                    }
+                  }}>
+                    ↻ Re-sync subscription
+                  </button>
                 </div>
               )}
 

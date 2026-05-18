@@ -818,11 +818,14 @@ export async function POST(req: NextRequest) {
         if (user) {
           const { data: s } = await supabaseAdmin
             .from('user_settings')
-            .select('subscription_tier, generations_used, generations_reset_at')
+            .select('subscription_tier, generations_used, generations_reset_at, pro_bonus_expires_at')
             .eq('user_id', user.id)
             .single();
 
-          if ((s?.subscription_tier ?? 'free') === 'free') {
+          const hasBonusPro = !!s?.pro_bonus_expires_at && new Date(s.pro_bonus_expires_at) > new Date();
+          const effectiveTier = s?.subscription_tier === 'pro' || hasBonusPro ? 'pro' : 'free';
+
+          if (effectiveTier === 'free') {
             const now = new Date();
             const needsReset = !s?.generations_reset_at ||
               new Date(s.generations_reset_at).getMonth() !== now.getMonth() ||
