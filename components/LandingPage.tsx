@@ -147,7 +147,7 @@ export default function LandingPage({ onSignIn }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          ◈ Overly Attached Companion AI · Born in Singapore
+          ◈ Overly Attached Companion AI
         </motion.div>
         <motion.h1
           className="landing-headline"
@@ -397,8 +397,6 @@ export default function LandingPage({ onSignIn }: Props) {
       </section>
 
       <footer className="landing-footer">
-        <span>Built by Hus Alfyandi · Born in Singapore, for the world</span>
-        <span className="landing-footer-sep">·</span>
         <a href="/roadmap" className="landing-footer-link">Roadmap</a>
         <span className="landing-footer-sep">·</span>
         <a href="/gallery" className="landing-footer-link">Gallery</a>

@@ -110,9 +110,8 @@ export default function RoadmapPage() {
         <div className="rm-mission-inner">
           <div className="rm-mission-icon">B&gt;</div>
           <blockquote className="rm-mission-quote">
-            &ldquo;Everyone&apos;s personal overattached companion. Everywhere you go, Based will just be floating — waiting for your response, constantly keeping you in check. One day, Singapore&apos;s greatest companion.&rdquo;
+            &ldquo;Everyone&apos;s personal overattached companion. Everywhere you go, Based will just be floating — waiting for your response, constantly keeping you in check.&rdquo;
           </blockquote>
-          <div className="rm-mission-author">— Hus Alfyandi, Creator</div>
           <div className="rm-mission-actions">
             <Link href="/" className="rm-cta-primary">Try Based free →</Link>
           </div>
@@ -120,10 +119,6 @@ export default function RoadmapPage() {
       </section>
 
       <footer className="rm-footer">
-        <span>Built by Hus Alfyandi · Singapore</span>
-        <span className="rm-footer-sep">·</span>
-        <a href="mailto:husgogogo@gmail.com" className="rm-footer-link">husgogogo@gmail.com</a>
-        <span className="rm-footer-sep">·</span>
         <Link href="/gallery" className="rm-footer-link">Gallery</Link>
         <span className="rm-footer-sep">·</span>
         <a href="https://ko-fi.com/basedfund" target="_blank" rel="noopener noreferrer" className="rm-footer-link">◈ Ko-fi</a>
