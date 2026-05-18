@@ -350,7 +350,8 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     if (isGenerating) return;
 
     // Client-side pre-check so limit modal shows even if server count is stale
-    if (subscriptionTier === 'free' && (generationsUsed ?? 0) >= 10) {
+    // Free AI bypasses limits entirely — only gate Based AI (Claude)
+    if (aiModel !== 'free' && subscriptionTier === 'free' && (generationsUsed ?? 0) >= 10) {
       window.dispatchEvent(new CustomEvent('generation-limit-reached'));
       return;
     }
