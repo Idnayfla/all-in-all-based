@@ -160,15 +160,16 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
 
   const FLAG_REASONS = ['Wrong type of response', 'Misunderstood my request', 'Too much / too little', 'Broke existing code'];
 
-  const submitFlag = async (msgIdx: number, msgContent: string) => {
+  const submitFlag = async (msgIdx: number, msgContent: string, userPrompt: string) => {
     if (flagSending) return;
     setFlagSending(true);
     const body = [flagReason, flagText.trim()].filter(Boolean).join(' — ') || 'Not what I expected';
+    const context = `INPUT: ${userPrompt.slice(0, 300)}\n\nOUTPUT: ${msgContent.slice(0, 400)}`;
     try {
       await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: body, type: 'response', context: msgContent.slice(0, 500) }),
+        body: JSON.stringify({ message: body, type: 'response', context }),
       });
       setFlaggedSet(prev => new Set(prev).add(msgIdx));
       setFlaggingIdx(null);
@@ -763,7 +764,9 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                             disabled={flagSending}
                             onClick={() => {
                               const txt = typeof m.content === 'string' ? m.content : (m.content as any[]).filter((b: any) => b.type === 'text').map((b: any) => b.text).join(' ');
-                              submitFlag(i, txt);
+                              const prev = messages[i - 1];
+                              const userTxt = prev?.role === 'user' ? (typeof prev.content === 'string' ? prev.content : (prev.content as any[]).filter((b: any) => b.type === 'text').map((b: any) => b.text).join(' ')) : '';
+                              submitFlag(i, txt, userTxt);
                             }}
                           >{flagSending ? '◈ Sending…' : '→ Send'}</button>
                         </div>
