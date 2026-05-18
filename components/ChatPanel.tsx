@@ -109,7 +109,7 @@ function ProgressBar({ progress }: { progress: GenerationProgress }) {
   );
 }
 
-export default function ChatPanel({ messages, setMessages, files, onFilesUpdate, isGenerating, setIsGenerating, personality, memory, globalMemory, incognito, authToken, subscriptionTier, generationsUsed, prefillMessage, onProRequired }: {
+export default function ChatPanel({ messages, setMessages, files, onFilesUpdate, isGenerating, setIsGenerating, personality, memory, globalMemory, incognito, authToken, subscriptionTier, generationsUsed, prefillMessage, onProRequired, onReportBug }: {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   files: FileNode[];
@@ -125,6 +125,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   generationsUsed?: number;
   prefillMessage?: string;
   onProRequired?: () => void;
+  onReportBug?: () => void;
 }) {
   const [input, setInput] = useState(prefillMessage ?? '');
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
@@ -234,7 +235,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     } catch (err: any) {
       setMessages(prev => [
         ...prev.slice(0, -1),
-        { role: 'assistant', content: `✕ Image generation failed: ${err.message}` },
+        { role: 'assistant', content: [{ type: 'error' as const, message: `Image generation failed. Try rephrasing your prompt — if it keeps happening, tap Report.` }] },
       ]);
     } finally {
       setIsGeneratingMedia(false);
@@ -266,7 +267,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     } catch (err: any) {
       setMessages(prev => [
         ...prev.slice(0, -1),
-        { role: 'assistant', content: `✕ Music generation failed: ${err.message}` },
+        { role: 'assistant', content: [{ type: 'error' as const, message: `Music generation failed. Try describing a different style or mood.` }] },
       ]);
     } finally {
       setIsGeneratingMedia(false);
@@ -305,7 +306,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     } catch (err: any) {
       setMessages(prev => [
         ...prev.slice(0, -1),
-        { role: 'assistant', content: `✕ Video generation failed: ${err.message}` },
+        { role: 'assistant', content: [{ type: 'error' as const, message: `Video generation failed. Complex scenes can time out — try a simpler description.` }] },
       ]);
     } finally {
       setIsGeneratingMedia(false);
@@ -477,7 +478,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               setGenProgress(null);
               setMessages(prev => [
                 ...prev.slice(0, -1),
-                { role: 'assistant', content: `✕ Generation failed: ${data.error}` },
+                { role: 'assistant', content: [{ type: 'error' as const, message: data.error }] },
               ]);
             }
 
@@ -517,7 +518,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       } else {
         setMessages(prev => [...prev, {
           role: 'assistant',
-          content: "Hmm, something went wrong on my end — give it another shot. If it keeps happening, try refreshing the page.",
+          content: [{ type: 'error' as const, message: "Something went wrong on my end — give it another shot. If it keeps happening, tap Report." }],
         }]);
       }
     } finally {
@@ -526,7 +527,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         setMessages(prev => {
           const last = prev[prev.length - 1];
           if (last?.content === '◈ Working...') {
-            return [...prev.slice(0, -1), { role: 'assistant', content: '! Response cut off. Try again.' }];
+            return [...prev.slice(0, -1), { role: 'assistant', content: [{ type: 'error' as const, message: 'Response was cut off — please try again.' }] }];
           }
           return prev;
         });
@@ -608,6 +609,19 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           }
           if (block.type === 'text' && block.text === '__generating-music__') {
             return <GeneratingCard key={i} type="music" />;
+          }
+          if (block.type === 'error') {
+            return (
+              <div key={i} className="chat-error-block">
+                <span className="chat-error-icon">!</span>
+                <div className="chat-error-body">
+                  <div className="chat-error-msg">{block.message}</div>
+                  {onReportBug && (
+                    <button className="chat-error-report" onClick={onReportBug}>⬡ Report</button>
+                  )}
+                </div>
+              </div>
+            );
           }
           if (block.type === 'clarify') {
             return (

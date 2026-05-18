@@ -34,7 +34,8 @@ export type ContentBlock =
   | { type: 'generated-image'; url: string; prompt: string }
   | { type: 'generated-video'; url: string; prompt: string }
   | { type: 'generated-music'; url: string; prompt: string }
-  | { type: 'clarify'; question: string; options: string[] };
+  | { type: 'clarify'; question: string; options: string[] }
+  | { type: 'error'; message: string };
 
 export interface Message {
   role: 'user' | 'assistant';
@@ -831,6 +832,22 @@ export default function Home() {
                 </div>
               )}
 
+              <div className="settings-section settings-support-card">
+                <label className="settings-label">Support Development</label>
+                <div className="support-card-body">
+                  <div className="support-card-text">
+                    Based is built solo by one developer. Your support funds server costs, AI credits, and new features.
+                  </div>
+                  <a
+                    href="https://ko-fi.com/basedfund"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="support-kofi-btn"
+                  >
+                    ◈ Support on Ko-fi
+                  </a>
+                </div>
+              </div>
               <div className="settings-section settings-credits">
                 <label className="settings-label">Credits</label>
                 <div className="credit-row">
@@ -843,8 +860,6 @@ export default function Home() {
                 </div>
                 <div className="credits-footer">
                   <a href="mailto:husgogogo@gmail.com" className="credits-email">husgogogo@gmail.com</a>
-                  <span className="credits-dot">·</span>
-                  <a href="https://ko-fi.com/basedfund" target="_blank" rel="noopener noreferrer" className="credits-kofi">◈ Support</a>
                 </div>
               </div>
             </motion.div>
@@ -870,6 +885,7 @@ export default function Home() {
                 globalMemory={globalMemory}
                 incognito={true}
                 authToken={authToken}
+                onReportBug={() => setShowFeedback(true)}
               />
             </div>
           ) : !currentProject ? (
@@ -918,6 +934,7 @@ export default function Home() {
                   incognito={incognito}
                   prefillMessage={pendingPrompt}
                   onProRequired={() => { setPricingReason('upgrade'); setShowPricing(true); }}
+                  onReportBug={() => setShowFeedback(true)}
                 />
               </div>
               <div className={`panel ${activePanel === 'editor' ? 'panel-active' : ''}`}>
