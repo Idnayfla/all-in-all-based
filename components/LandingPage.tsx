@@ -5,11 +5,19 @@ interface Props {
   onSignIn: (tab?: 'signin' | 'signup') => void;
 }
 
-const FEATURES = [
-  { icon: '▶', title: 'Live Preview',    desc: 'Your app renders in real time as Based writes each file — no refresh, no copy-paste.' },
-  { icon: '◉', title: 'AI Memory',       desc: 'Based remembers your style, stack preferences, and project context across sessions.' },
-  { icon: '◈', title: 'Image · Video · Music', desc: 'Generate visuals, animated video, and audio tracks alongside your code — all in one place.' },
-  { icon: '⬡', title: 'Any language',    desc: 'HTML/CSS/JS, Python, Node — describe what you need and Based picks the right stack.' },
+const PILLARS = [
+  { icon: '◈', title: 'All Models',      desc: 'Based routes every request to the best AI model for the job — code, vision, audio, reasoning. You never choose.' },
+  { icon: '⬡', title: 'All Tasks',       desc: 'Build apps, answer questions, analyse data, write content, generate media. One companion, every task.' },
+  { icon: '◉', title: 'All Generation',  desc: 'Code · Images · Video · Music — describe it, Based creates it. Live preview updates as each file is written.' },
+  { icon: '⊙', title: 'Community-Driven','desc': 'Hit a bug? Report it. Love a feature? Support it. Based gets better every time you use it.' },
+];
+
+const COMPARISONS = [
+  { them: 'One AI, one job',         us: 'One AI, every job' },
+  { them: 'Outputs text',            us: 'Outputs apps, images, video, music' },
+  { them: 'You manage the tools',    us: 'Based manages everything' },
+  { them: 'Forgets you every session', us: 'Remembers your style forever' },
+  { them: 'You find the bugs',       us: 'Report it — we fix it' },
 ];
 
 export default function LandingPage({ onSignIn }: Props) {
@@ -27,7 +35,7 @@ export default function LandingPage({ onSignIn }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          AI Dev Studio
+          Your Companion AI — All Models · All Tasks · All Generation
         </motion.div>
         <motion.h1
           className="landing-headline"
@@ -43,8 +51,7 @@ export default function LandingPage({ onSignIn }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          Describe what you want — Based writes the code, generates images, and renders a live preview.
-          No setup. No IDE. Just ship.
+          Not just code. Not just chat. Based is your overly attached companion AI — it builds apps, generates images, edits video, composes music, answers anything, and remembers everything. One place for all of it.
         </motion.p>
         <motion.div
           className="landing-ctas"
@@ -89,8 +96,20 @@ export default function LandingPage({ onSignIn }: Props) {
         </motion.div>
       </section>
 
+      <section className="landing-manifesto">
+        <motion.p
+          className="landing-manifesto-text"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          All model. All task. All generation. There is a problem? Report it, support it, and it becomes better.
+          <br />That is what you call <strong>All-In-All-Based</strong> — your world, overly attached companion AI.
+        </motion.p>
+      </section>
+
       <section className="landing-features">
-        {FEATURES.map((f, i) => (
+        {PILLARS.map((f, i) => (
           <motion.div
             key={f.title}
             className="landing-feature-card"
@@ -103,6 +122,36 @@ export default function LandingPage({ onSignIn }: Props) {
             <div className="landing-feature-desc">{f.desc}</div>
           </motion.div>
         ))}
+      </section>
+
+      <section className="landing-comparison">
+        <motion.div
+          className="landing-comparison-title"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.7 }}
+        >
+          Based vs everything else
+        </motion.div>
+        <motion.div
+          className="landing-comparison-table"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+        >
+          <div className="landing-comparison-col landing-comparison-col--them">
+            <div className="landing-comparison-col-header">Others</div>
+            {COMPARISONS.map(c => (
+              <div key={c.them} className="landing-comparison-row landing-comparison-row--them">✕ {c.them}</div>
+            ))}
+          </div>
+          <div className="landing-comparison-col landing-comparison-col--us">
+            <div className="landing-comparison-col-header">Based</div>
+            {COMPARISONS.map(c => (
+              <div key={c.us} className="landing-comparison-row landing-comparison-row--us">◈ {c.us}</div>
+            ))}
+          </div>
+        </motion.div>
       </section>
 
       <section className="landing-pricing">
