@@ -409,8 +409,11 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       const decoder = new TextDecoder();
       let assistantMsg = '';
       let buffer = '';
+      let planReceived = false;
 
-      setMessages(prev => [...prev, { role: 'assistant', content: '... Working' }]);
+      flushSync(() => {
+        setMessages(prev => [...prev, { role: 'assistant', content: '... Working' }]);
+      });
 
       while (true) {
         const { done, value } = await reader.read();
@@ -454,6 +457,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             }
 
             if (data.plan) {
+              planReceived = true;
               flushSync(() => {
                 setGenProgress({ files: data.plan, completed: 0, total: data.plan.length, file: '', chunks: 0 });
               });
@@ -482,13 +486,13 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               assistantMsg += data.chunk;
               setGenProgress(prev => prev && prev.file ? { ...prev, chunks: prev.chunks + 1 } : prev);
               const hasForge = assistantMsg.includes('<forge_file') || assistantMsg.includes('<forge_type');
-              if (!hasForge) {
+              if (!planReceived && !hasForge) {
                 setMessages(prev => {
                   const updated = [...prev];
                   updated[updated.length - 1] = { role: 'assistant', content: assistantMsg.trim() || '◈ Working...' };
                   return updated;
                 });
-              } else {
+              } else if (hasForge) {
                 setMessages(prev => {
                   const updated = [...prev];
                   const last = updated[updated.length - 1];
@@ -503,8 +507,8 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
 
             if (data.clarify) {
               doneHandled = true;
-              setGenProgress(null);
               setIsGenerating(false);
+              setGenProgress(null);
               setMessages(prev => {
                 const last = prev[prev.length - 1];
                 const hasText = typeof last?.content === 'string'
@@ -523,6 +527,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             if (data.error) {
               window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'error', data: data.error } }));
               doneHandled = true;
+              setIsGenerating(false);
               setGenProgress(null);
               setMessages(prev => [
                 ...prev.slice(0, -1),
@@ -537,6 +542,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'done', data: JSON.stringify({ filesCount: resolvedFiles.length, reply: data.reply?.slice(0, 100) }) } }));
               doneHandled = true;
               setGenProgress(null);
+              setIsGenerating(false);
               setMessages(prev => [
                 ...prev.slice(0, -1),
                 { role: 'assistant', content: data.reply || '✓ Done — check the editor.' }
@@ -740,7 +746,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                 <div className="message-role">{m.role === 'user' ? 'YOU' : 'BASED'}</div>
                 <div className="message-content">
                   {m.role === 'assistant' && isGenerating && i === messages.length - 1
-                    ? <ProgressBar progress={genProgress ?? { files: [], completed: 0, total: 0, file: typeof m.content === 'string' && m.content !== '... Working' ? m.content : '', chunks: 0 }} />
+                    ? <ProgressBar progress={genProgress ?? { files: [], completed: 0, total: 0, file: '', chunks: 0 }} />
                     : renderContent(m.content)
                   }
                 </div>

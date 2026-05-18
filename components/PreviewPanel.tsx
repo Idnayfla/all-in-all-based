@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileNode } from '@/app/page';
+import ImageCropModal from './ImageCropModal';
 
 export default function PreviewPanel({ files, projectType, subscriptionTier, onProRequired }: {
   files: FileNode[];
@@ -12,6 +13,7 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
   const [isRunning, setIsRunning] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [cropData, setCropData] = useState<{ url: string; format: 'png' | 'jpg' } | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const htmlFile = files.find(f => f.language === 'html');
   const cssFile  = files.find(f => f.language === 'css');
@@ -77,10 +79,7 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
     try {
       const canvas = await captureCanvas();
       if (!canvas) return;
-      const link = document.createElement('a');
-      link.download = 'based-export.png';
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      setCropData({ url: canvas.toDataURL('image/png'), format: 'png' });
     } finally { setIsExporting(false); }
   };
 
@@ -90,10 +89,7 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
     try {
       const canvas = await captureCanvas();
       if (!canvas) return;
-      const link = document.createElement('a');
-      link.download = 'based-export.jpg';
-      link.href = canvas.toDataURL('image/jpeg', 0.92);
-      link.click();
+      setCropData({ url: canvas.toDataURL('image/png'), format: 'jpg' });
     } finally { setIsExporting(false); }
   };
 
@@ -319,6 +315,13 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
         title="Preview"
         onClick={() => setShowExportMenu(false)}
       />
+      {cropData && (
+        <ImageCropModal
+          url={cropData.url}
+          format={cropData.format}
+          onClose={() => setCropData(null)}
+        />
+      )}
     </div>
   );
 }

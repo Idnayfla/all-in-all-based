@@ -1,7 +1,7 @@
 'use client';
 import { useRef, useState, useEffect } from 'react';
 
-interface Props { url: string; onClose: () => void; }
+interface Props { url: string; onClose: () => void; format?: 'png' | 'jpg'; }
 interface CropRect { x: number; y: number; w: number; h: number; }
 type Handle = 'nw' | 'ne' | 'sw' | 'se' | 'move' | null;
 
@@ -14,7 +14,7 @@ const RATIOS: { label: string; ratio: number | null }[] = [
   { label: '9:16',  ratio: 9 / 16 },
 ];
 
-export default function ImageCropModal({ url, onClose }: Props) {
+export default function ImageCropModal({ url, onClose, format = 'png' }: Props) {
   const imgRef  = useRef<HTMLImageElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [crop, setCrop]           = useState<CropRect>({ x: 10, y: 10, w: 80, h: 80 });
@@ -114,13 +114,14 @@ export default function ImageCropModal({ url, onClose }: Props) {
     const canvas = document.createElement('canvas');
     canvas.width = sw; canvas.height = sh;
     canvas.getContext('2d')!.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-    setCroppedUrl(canvas.toDataURL('image/png'));
+    const mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
+    setCroppedUrl(canvas.toDataURL(mime, format === 'jpg' ? 0.92 : undefined));
   };
 
   const download = () => {
     if (!croppedUrl) return;
     const a = document.createElement('a');
-    a.href = croppedUrl; a.download = 'cropped.png'; a.click();
+    a.href = croppedUrl; a.download = `cropped.${format}`; a.click();
   };
 
   return (
@@ -204,7 +205,7 @@ export default function ImageCropModal({ url, onClose }: Props) {
             Apply Crop
           </button>
           {croppedUrl && (
-            <button className="crop-download-btn" onClick={download}>↓ Download PNG</button>
+            <button className="crop-download-btn" onClick={download}>↓ Download {format.toUpperCase()}</button>
           )}
         </div>
       </div>

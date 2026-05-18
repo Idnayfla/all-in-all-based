@@ -250,7 +250,7 @@ IMAGE MANIPULATION:
 - Reference the user's image with the exact source string __BASED_IMAGE_SRC__ — the real base64 data URL will be injected at build time
 - Never use a placeholder URL like "image.jpg" or "your-image.png" — only __BASED_IMAGE_SRC__ for user-provided images
 - Load the image onto a canvas, apply the requested filter/transform, display the result immediately on page load
-- Always include a Download button that saves the canvas output as a PNG via canvas.toDataURL()
+- Do NOT add a Download button — the Based platform provides its own Export menu for downloading the result
 - Supported operations: brightness/contrast/saturation via ctx.filter, hue rotation, grayscale, sepia, blur, crop, flip, rotate, composite overlay, text watermark, color pop, vignette
 
 3D DESIGN:
@@ -416,7 +416,7 @@ CUSTOM TEXT EFFECTS:
 - Neon effect: draw text multiple times with increasing shadowBlur and decreasing alpha
 - Curved/path text: use SVG <textPath> with a <path> element for text that follows a curve
 - 3D text illusion: draw text offset multiple times in darker shade (depth layers), then bright on top
-- Always include Download PNG button: canvas.toBlob(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'text.png'; a.click(); })
+- Do NOT add a Download button — the Based platform's Export menu handles downloading
 
 ICON TYPE DISAMBIGUATION — read the context before building:
 - "profile icon" / "profile picture" / "avatar icon" → circular or rounded-square SVG avatar — abstract shape, initials, or illustrated face — NOT a favicon or website icon
@@ -424,7 +424,7 @@ ICON TYPE DISAMBIGUATION — read the context before building:
 - "favicon" / "website icon" / "tab icon" → small 32×32 or 64×64 optimised SVG, simple enough to read tiny
 - "icon" alone with no other context → ask: "What's this icon for — a profile/avatar, an app, a website tab, or a UI element?" — do NOT default to favicon
 - "social media icon" → rounded square 1:1 format, designed for profile photos on platforms
-- Profile icons: fill the ENTIRE canvas edge-to-edge — use viewBox="0 0 500 500", canvas 500×500. The design must bleed to all 4 edges with no empty margins or padding. NEVER use a narrow/portrait layout. User has a built-in crop tool to trim to their preferred ratio (1:1, 2:1, etc.). Use a circle clip-path (<clipPath><circle/></clipPath>) to frame the content; include a Download PNG button
+- Profile icons: fill the ENTIRE canvas edge-to-edge — use viewBox="0 0 500 500", canvas 500×500. The design must bleed to all 4 edges with no empty margins or padding. NEVER use a narrow/portrait layout. Do NOT add any download, crop, or export controls — the Based platform provides those via its Export menu and built-in crop tool
 - Mobile/device mockups (Android, iPhone, phone screen): portrait frame is correct for the device shell, but MUST also show how the content looks on a desktop — include a toggle or tab to switch between mobile and desktop preview
 
 CUSTOM LOGO:
@@ -435,9 +435,7 @@ CUSTOM LOGO:
 - Shapes: combine <circle>, <rect>, <path>, <polygon>, <ellipse> — never use a single shape for a real logo
 - SVG text: <text font-family="system-ui, sans-serif" font-weight="700" font-size="48" letter-spacing="4">BRAND</text>
 - Drop shadow on SVG: <filter id="shadow"><feDropShadow dx="2" dy="4" stdDeviation="4" flood-opacity="0.3"/></filter>
-- Always provide two download buttons:
-  1. "Download SVG" — Blob from outerHTML, type image/svg+xml, URL.createObjectURL
-  2. "Download PNG" — draw SVG onto canvas via Image src = 'data:image/svg+xml,...', then canvas.toDataURL()
+- Do NOT add download buttons — the Based platform's Export menu handles PNG/SVG/PDF download
 - Make logos look professional: use 2-3 colors max, clean geometry, deliberate negative space
 
 DOCUMENT GENERATION — EXPORT PDF / EXCEL / POWERPOINT / WORD:
@@ -811,8 +809,10 @@ export async function POST(req: NextRequest) {
     const { messages, existingFiles, personality, memory, globalMemory: clientGlobalMemory, location } = await req.json();
 
     // Free tier generation gate — fail open so DB issues never block users
+    // ALWAYS_PRO=true bypasses all tier checks (set on beta deployment)
+    const alwaysPro = process.env.ALWAYS_PRO === 'true';
     const authToken = req.headers.get('Authorization')?.replace('Bearer ', '');
-    if (authToken) {
+    if (!alwaysPro && authToken) {
       try {
         const { data: { user } } = await supabaseAdmin.auth.getUser(authToken);
         if (user) {
