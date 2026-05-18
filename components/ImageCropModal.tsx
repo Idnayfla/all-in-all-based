@@ -5,13 +5,42 @@ interface Props { url: string; onClose: () => void; }
 interface CropRect { x: number; y: number; w: number; h: number; }
 type Handle = 'nw' | 'ne' | 'sw' | 'se' | 'move' | null;
 
+const RATIOS: { label: string; ratio: number | null }[] = [
+  { label: 'Free',  ratio: null },
+  { label: '1:1',   ratio: 1 },
+  { label: '4:3',   ratio: 4 / 3 },
+  { label: '16:9',  ratio: 16 / 9 },
+  { label: '2:1',   ratio: 2 },
+  { label: '9:16',  ratio: 9 / 16 },
+];
+
 export default function ImageCropModal({ url, onClose }: Props) {
   const imgRef  = useRef<HTMLImageElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [crop, setCrop]           = useState<CropRect>({ x: 10, y: 10, w: 80, h: 80 });
   const [imgLoaded, setImgLoaded] = useState(false);
   const [croppedUrl, setCroppedUrl] = useState<string | null>(null);
+  const [activeRatio, setActiveRatio] = useState<number | null>(null);
   const dragging = useRef<{ handle: Handle; startMx: number; startMy: number; startCrop: CropRect } | null>(null);
+
+  const applyRatio = (ratio: number | null) => {
+    setActiveRatio(ratio);
+    if (!ratio || !wrapRef.current) return;
+    const wRect = wrapRef.current.getBoundingClientRect();
+    const imgAspect = wRect.width / wRect.height;
+    setCrop(prev => {
+      const cx = prev.x + prev.w / 2;
+      const cy = prev.y + prev.h / 2;
+      const pixelRatio = ratio / imgAspect;
+      let w = prev.w;
+      let h = w / pixelRatio;
+      if (h > 100) { h = 100; w = h * pixelRatio; }
+      if (w > 100) { w = 100; h = w / pixelRatio; }
+      const x = Math.max(0, Math.min(100 - w, cx - w / 2));
+      const y = Math.max(0, Math.min(100 - h, cy - h / 2));
+      return { x, y, w, h };
+    });
+  };
 
   const startDrag = (handle: Handle, e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault(); e.stopPropagation();
@@ -30,6 +59,7 @@ export default function ImageCropModal({ url, onClose }: Props) {
       const dy = ((clientY - dragging.current.startMy) / wRect.height) * 100;
       const s = dragging.current.startCrop;
       const MIN = 5;
+      const ratio = activeRatio ? activeRatio / (wRect.width / wRect.height) : null;
       setCrop(() => {
         let { x, y, w, h } = s;
         if (dragging.current!.handle === 'move') {
@@ -37,15 +67,20 @@ export default function ImageCropModal({ url, onClose }: Props) {
           y = Math.max(0, Math.min(100 - h, s.y + dy));
         } else if (dragging.current!.handle === 'nw') {
           const nx = Math.min(s.x + dx, s.x + s.w - MIN); w = s.w - (nx - s.x); x = nx;
-          const ny = Math.min(s.y + dy, s.y + s.h - MIN); h = s.h - (ny - s.y); y = ny;
+          if (ratio) { h = w / ratio; } else {
+            const ny = Math.min(s.y + dy, s.y + s.h - MIN); h = s.h - (ny - s.y); y = ny;
+          }
         } else if (dragging.current!.handle === 'ne') {
           w = Math.max(MIN, s.w + dx);
-          const ny = Math.min(s.y + dy, s.y + s.h - MIN); h = s.h - (ny - s.y); y = ny;
+          if (ratio) { h = w / ratio; } else {
+            const ny = Math.min(s.y + dy, s.y + s.h - MIN); h = s.h - (ny - s.y); y = ny;
+          }
         } else if (dragging.current!.handle === 'sw') {
           const nx = Math.min(s.x + dx, s.x + s.w - MIN); w = s.w - (nx - s.x); x = nx;
-          h = Math.max(MIN, s.h + dy);
+          if (ratio) { h = w / ratio; } else { h = Math.max(MIN, s.h + dy); }
         } else if (dragging.current!.handle === 'se') {
-          w = Math.max(MIN, s.w + dx); h = Math.max(MIN, s.h + dy);
+          w = Math.max(MIN, s.w + dx);
+          if (ratio) { h = w / ratio; } else { h = Math.max(MIN, s.h + dy); }
         }
         return {
           x: Math.max(0, x), y: Math.max(0, y),
@@ -65,7 +100,7 @@ export default function ImageCropModal({ url, onClose }: Props) {
       window.removeEventListener('touchmove', onMove);
       window.removeEventListener('touchend', onUp);
     };
-  }, []);
+  }, [activeRatio]);
 
   const applyCrop = () => {
     const img = imgRef.current;
@@ -93,6 +128,17 @@ export default function ImageCropModal({ url, onClose }: Props) {
       <div className="crop-modal" onClick={e => e.stopPropagation()}>
         <div className="crop-modal-header">
           <span className="crop-modal-title">◈ Crop Image</span>
+          <div className="crop-ratio-pills">
+            {RATIOS.map(r => (
+              <button
+                key={r.label}
+                className={`crop-ratio-pill${activeRatio === r.ratio ? ' active' : ''}`}
+                onClick={() => applyRatio(r.ratio)}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
           <button className="crop-modal-close" onClick={onClose}>✕</button>
         </div>
 
