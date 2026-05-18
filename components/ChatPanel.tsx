@@ -149,6 +149,32 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   } | null>(null);
   const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
   const [suggestions] = useState(getRandomSuggestions);
+  const [flaggingIdx, setFlaggingIdx] = useState<number | null>(null);
+  const [flaggedSet, setFlaggedSet]   = useState<Set<number>>(new Set());
+  const [flagReason, setFlagReason]   = useState('');
+  const [flagText, setFlagText]       = useState('');
+  const [flagSending, setFlagSending] = useState(false);
+
+  const FLAG_REASONS = ['Wrong type of response', 'Misunderstood my request', 'Too much / too little', 'Broke existing code'];
+
+  const submitFlag = async (msgIdx: number, msgContent: string) => {
+    if (flagSending) return;
+    setFlagSending(true);
+    const body = [flagReason, flagText.trim()].filter(Boolean).join(' — ') || 'Not what I expected';
+    try {
+      await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: body, type: 'response', context: msgContent.slice(0, 500) }),
+      });
+      setFlaggedSet(prev => new Set(prev).add(msgIdx));
+      setFlaggingIdx(null);
+      setFlagReason('');
+      setFlagText('');
+    } finally {
+      setFlagSending(false);
+    }
+  };
 
   const { state: voiceState, transcript: voiceTranscript, error: voiceError, toggle: toggleVoice } =
     useVoiceActivation((command) => {
@@ -690,6 +716,47 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                     : renderContent(m.content)
                   }
                 </div>
+                {m.role === 'assistant' && !(isGenerating && i === messages.length - 1) && (
+                  <div className="msg-flag-area">
+                    {flaggedSet.has(i) ? (
+                      <span className="msg-flag-noted">◈ Noted — thanks</span>
+                    ) : flaggingIdx === i ? (
+                      <div className="msg-flag-form">
+                        <div className="msg-flag-question">What were you expecting?</div>
+                        <div className="msg-flag-chips">
+                          {FLAG_REASONS.map(r => (
+                            <button
+                              key={r}
+                              className={`msg-flag-chip${flagReason === r ? ' active' : ''}`}
+                              onClick={() => setFlagReason(prev => prev === r ? '' : r)}
+                            >{r}</button>
+                          ))}
+                        </div>
+                        <input
+                          className="msg-flag-input"
+                          placeholder="Anything else? (optional)"
+                          value={flagText}
+                          onChange={e => setFlagText(e.target.value)}
+                        />
+                        <div className="msg-flag-actions">
+                          <button className="msg-flag-cancel" onClick={() => { setFlaggingIdx(null); setFlagReason(''); setFlagText(''); }}>Cancel</button>
+                          <button
+                            className="msg-flag-send"
+                            disabled={flagSending}
+                            onClick={() => {
+                              const txt = typeof m.content === 'string' ? m.content : (m.content as any[]).filter((b: any) => b.type === 'text').map((b: any) => b.text).join(' ');
+                              submitFlag(i, txt);
+                            }}
+                          >{flagSending ? '◈ Sending…' : '→ Send'}</button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button className="msg-flag-btn" onClick={() => setFlaggingIdx(i)} title="Not what you expected?">
+                        ⊙ Not what I expected
+                      </button>
+                    )}
+                  </div>
+                )}
               </motion.div>
             ))}
           </AnimatePresence>

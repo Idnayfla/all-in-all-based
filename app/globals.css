@@ -2735,6 +2735,50 @@ body {
 .chat-empty-title { animation: fadeSlideUp 0.5s 0.1s cubic-bezier(0.16,1,0.3,1) both; }
 .chat-empty-sub   { animation: fadeSlideUp 0.5s 0.2s cubic-bezier(0.16,1,0.3,1) both; }
 
+/* ── Response flag ── */
+.msg-flag-area { margin-top: 6px; }
+.msg-flag-btn {
+  background: none; border: none; cursor: pointer;
+  font-size: 10px; font-family: var(--font-mono);
+  color: var(--text3); padding: 2px 0;
+  opacity: 0; transition: opacity 0.15s;
+}
+.message.assistant:hover .msg-flag-btn { opacity: 1; }
+.msg-flag-noted { font-size: 10px; color: var(--accent3); font-family: var(--font-mono); }
+.msg-flag-form {
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: 10px 12px; margin-top: 4px;
+}
+.msg-flag-question { font-size: 11px; color: var(--text2); font-weight: 600; letter-spacing: 0.3px; }
+.msg-flag-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.msg-flag-chip {
+  background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text2); font-size: 11px; font-family: var(--font-mono);
+  padding: 3px 8px; border-radius: 4px; cursor: pointer;
+  transition: all 0.15s;
+}
+.msg-flag-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(124,106,247,0.1); }
+.msg-flag-chip:hover { border-color: var(--text3); }
+.msg-flag-input {
+  background: var(--bg2); border: 1px solid var(--border); color: var(--text);
+  font-family: var(--font-mono); font-size: 11px; padding: 6px 8px;
+  border-radius: 4px; outline: none;
+}
+.msg-flag-input:focus { border-color: var(--accent); }
+.msg-flag-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.msg-flag-cancel {
+  background: none; border: 1px solid var(--border); color: var(--text3);
+  font-size: 11px; font-family: var(--font-mono); padding: 4px 10px;
+  border-radius: 4px; cursor: pointer;
+}
+.msg-flag-send {
+  background: var(--accent); border: none; color: #fff;
+  font-size: 11px; font-family: var(--font-mono); padding: 4px 12px;
+  border-radius: 4px; cursor: pointer; font-weight: 600;
+}
+.msg-flag-send:disabled { opacity: 0.5; cursor: default; }
+
 /* ── Error block ── */
 .chat-error-block {
   display: flex; align-items: flex-start; gap: 10px;

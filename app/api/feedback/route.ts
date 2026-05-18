@@ -3,7 +3,7 @@ import { supabaseAdmin } from '@/app/api/_auth';
 
 export async function POST(req: NextRequest) {
   try {
-    const { message, email, type } = await req.json();
+    const { message, email, type, context } = await req.json();
     if (!message?.trim()) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
@@ -12,6 +12,7 @@ export async function POST(req: NextRequest) {
       message: message.trim(),
       email:   email?.trim() || null,
       type:    type || 'general',
+      context: context?.trim() || null,
     });
 
     if (error) throw error;
