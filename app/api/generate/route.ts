@@ -811,8 +811,10 @@ export async function POST(req: NextRequest) {
     const { messages, existingFiles, personality, memory, globalMemory: clientGlobalMemory, location } = await req.json();
 
     // Free tier generation gate — fail open so DB issues never block users
+    // ALWAYS_PRO=true bypasses all tier checks (set on beta deployment)
+    const alwaysPro = process.env.ALWAYS_PRO === 'true';
     const authToken = req.headers.get('Authorization')?.replace('Bearer ', '');
-    if (authToken) {
+    if (!alwaysPro && authToken) {
       try {
         const { data: { user } } = await supabaseAdmin.auth.getUser(authToken);
         if (user) {
