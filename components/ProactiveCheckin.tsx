@@ -9,12 +9,13 @@ interface Props {
 }
 
 export default function ProactiveCheckin({ projectName, onContinue, onDismiss }: Props) {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dismissRef = useRef(onDismiss);
+  useEffect(() => { dismissRef.current = onDismiss; });
 
   useEffect(() => {
-    timerRef.current = setTimeout(onDismiss, 8000);
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [onDismiss]);
+    const t = setTimeout(() => dismissRef.current(), 8000);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <motion.div

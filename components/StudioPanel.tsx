@@ -97,14 +97,24 @@ export default function StudioPanel() {
     await Tone.start();
     Tone.Transport.bpm.value = bpm;
 
-    const dest = Tone.getDestination();
+    // Master bus — all audio forks to speakers and recorder
+    const masterGain = new Tone.Gain(1).toDestination();
+    const recorder   = new Tone.Recorder();
+    masterGain.connect(recorder);
 
-    // Shared effects (created once, each track gets its own chain built on play)
-    const mkReverb = () => new Tone.Reverb({ decay: 3, wet: 0 }).toDestination();
-    const mkDelay  = () => new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.35, wet: 0 }).toDestination();
-    const mkDist   = () => new Tone.Distortion({ distortion: 0, wet: 0 }).toDestination();
+    // Per-instrument fx chain: synth → reverb → delay → distortion → pitchShift → panner → master
+    const mkFxChain = () => {
+      const reverb      = new Tone.Reverb({ decay: 3, wet: 0 });
+      const delay       = new Tone.FeedbackDelay({ delayTime: '8n', feedback: 0.35, wet: 0 });
+      const distortion  = new Tone.Distortion({ distortion: 0.5, wet: 0 });
+      const pitchShift  = new Tone.PitchShift({ pitch: 0, wet: 0 });
+      const panner      = new Tone.Panner(0).connect(masterGain);
+      reverb.chain(delay, distortion, pitchShift, panner);
+      return { reverb, delay, distortion, pitchShift, panner };
+    };
 
-    // ── Synths ─────────────────────────────────────────────────────────
+    // ── Synths (each connected to its own fx chain) ────────────────────
+    const pianoFx = mkFxChain();
     const piano = new Tone.Sampler({
       urls: {
         C4: 'C4.mp3', 'D#4': 'Ds4.mp3', 'F#4': 'Fs4.mp3', A4: 'A4.mp3',
@@ -115,75 +125,94 @@ export default function StudioPanel() {
       release: 1,
       baseUrl: 'https://tonejs.github.io/audio/salamander/',
       onload: () => setStatus(''),
-    }).toDestination();
+    }).connect(pianoFx.reverb);
 
+    const leadFx = mkFxChain();
     const lead = new Tone.Synth({
       oscillator: { type: 'sawtooth' },
       envelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.5 },
-    }).toDestination();
+    }).connect(leadFx.reverb);
 
+    const padFx = mkFxChain();
     const pad = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: 'triangle' },
       envelope: { attack: 0.8, decay: 0.3, sustain: 0.7, release: 1.5 },
-    }).toDestination();
+    }).connect(padFx.reverb);
 
+    const bassFx = mkFxChain();
     const bass = new Tone.Synth({
       oscillator: { type: 'sine' },
       envelope: { attack: 0.05, decay: 0.1, sustain: 0.8, release: 0.3 },
-    }).toDestination();
+    }).connect(bassFx.reverb);
 
+    const organFx = mkFxChain();
     const organ = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: 'square' },
       envelope: { attack: 0.01, sustain: 1, release: 0.1 },
-    }).toDestination();
+    }).connect(organFx.reverb);
 
+    const stringsFx = mkFxChain();
     const strings = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: 'triangle' },
       envelope: { attack: 0.4, decay: 0.2, sustain: 0.8, release: 1.2 },
-    }).toDestination();
+    }).connect(stringsFx.reverb);
 
-    const pluck = new Tone.PluckSynth({ attackNoise: 1, dampening: 4000, resonance: 0.75 }).toDestination();
+    const pluckFx = mkFxChain();
+    const pluck = new Tone.PluckSynth({ attackNoise: 1, dampening: 4000, resonance: 0.75 }).connect(pluckFx.reverb);
 
+    const epFx = mkFxChain();
     const epiano = new Tone.PolySynth(Tone.FMSynth, {
       harmonicity: 3, modulationIndex: 10,
       envelope: { attack: 0.01, decay: 0.3, sustain: 0.4, release: 0.8 },
-    }).toDestination();
+    }).connect(epFx.reverb);
 
+    const choirFx = mkFxChain();
     const choir = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: 'sine' },
       envelope: { attack: 0.6, sustain: 0.9, release: 1.5 },
-    }).toDestination();
+    }).connect(choirFx.reverb);
 
+    const guitarFx = mkFxChain();
     const guitar = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: 'triangle' },
       envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.8 },
-    }).toDestination();
+    }).connect(guitarFx.reverb);
 
+    const brassFx = mkFxChain();
     const brass = new Tone.PolySynth(Tone.Synth, {
       oscillator: { type: 'sawtooth' },
       envelope: { attack: 0.1, decay: 0.2, sustain: 0.7, release: 0.4 },
-    }).toDestination();
+    }).connect(brassFx.reverb);
 
+    const fluteFx = mkFxChain();
     const flute = new Tone.Synth({
       oscillator: { type: 'sine' },
       envelope: { attack: 0.1, decay: 0.1, sustain: 0.8, release: 0.5 },
-    }).toDestination();
+    }).connect(fluteFx.reverb);
 
-    // ── Drums ──────────────────────────────────────────────────────────
-    const kick   = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 6, envelope: { attack: 0.001, decay: 0.3 } }).toDestination();
-    const snare  = new Tone.NoiseSynth({ noise: { type: 'white' as any }, envelope: { attack: 0.001, decay: 0.15 } }).toDestination();
-    const hhc    = new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: 0.05 }, resonance: 5000, harmonicity: 5.1, modulationIndex: 32, octaves: 1.5 }).toDestination();
-    const hhopen = new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: 0.4 }, resonance: 5000, harmonicity: 5.1, modulationIndex: 32, octaves: 1.5 }).toDestination();
-    const clap   = new Tone.NoiseSynth({ noise: { type: 'pink' as any }, envelope: { attack: 0.005, decay: 0.1 } }).toDestination();
-    const tom1   = new Tone.MembraneSynth({ pitchDecay: 0.08, octaves: 4 }).toDestination();
-    const tom2   = new Tone.MembraneSynth({ pitchDecay: 0.1, octaves: 3 }).toDestination();
-    const ride   = new Tone.MetalSynth({ frequency: 250, envelope: { attack: 0.001, decay: 0.5 }, resonance: 3000, harmonicity: 5.1, modulationIndex: 16, octaves: 1.5 }).toDestination();
+    // ── Drums (direct to master) ────────────────────────────────────────
+    const kick   = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 6, envelope: { attack: 0.001, decay: 0.3 } }).connect(masterGain);
+    const snare  = new Tone.NoiseSynth({ noise: { type: 'white' as any }, envelope: { attack: 0.001, decay: 0.15 } }).connect(masterGain);
+    const hhc    = new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: 0.05 }, resonance: 5000, harmonicity: 5.1, modulationIndex: 32, octaves: 1.5 }).connect(masterGain);
+    const hhopen = new Tone.MetalSynth({ frequency: 400, envelope: { attack: 0.001, decay: 0.4 }, resonance: 5000, harmonicity: 5.1, modulationIndex: 32, octaves: 1.5 }).connect(masterGain);
+    const clap   = new Tone.NoiseSynth({ noise: { type: 'pink' as any }, envelope: { attack: 0.005, decay: 0.1 } }).connect(masterGain);
+    const tom1   = new Tone.MembraneSynth({ pitchDecay: 0.08, octaves: 4 }).connect(masterGain);
+    const tom2   = new Tone.MembraneSynth({ pitchDecay: 0.1, octaves: 3 }).connect(masterGain);
+    const ride   = new Tone.MetalSynth({ frequency: 250, envelope: { attack: 0.001, decay: 0.5 }, resonance: 3000, harmonicity: 5.1, modulationIndex: 16, octaves: 1.5 }).connect(masterGain);
+
+    const synthFx: Record<string, any> = {
+      piano: pianoFx, epiano: epFx, synth: leadFx, pad: padFx,
+      strings: stringsFx, organ: organFx, bass: bassFx, pluck: pluckFx,
+      choir: choirFx, guitar: guitarFx, brass: brassFx, flute: fluteFx,
+    };
 
     const obj = {
       Tone,
       synths: { piano, lead, pad, bass, organ, strings, pluck, epiano, choir, guitar, brass, flute },
       drums:  { kick, snare, hhc, hhopen, clap, tom1, tom2, ride },
-      mkReverb, mkDelay, mkDist,
+      synthFx,
+      recorder,
+      masterGain,
     };
     tRef.current = obj;
     setToneReady(true);
@@ -203,9 +232,22 @@ export default function StudioPanel() {
   // ── Play a note ─────────────────────────────────────────────────────────
   const playNote = useCallback(async (note: string, duration = '8n') => {
     const t = await initTone();
-    const instrument = tracks.find(tr => tr.id === selTrack)?.instrument ?? 'piano';
+    const track = tracks.find(tr => tr.id === selTrack);
+    const instrument = track?.instrument ?? 'piano';
     const synth = getSynth(instrument);
     if (!synth) return;
+
+    synth.volume.value = track?.muted ? -Infinity : t.Tone.gainToDb(track?.volume ?? 0.8);
+    const fx = t.synthFx[instrument];
+    if (fx && track) {
+      fx.reverb.wet.value     = track.effects.reverb;
+      fx.delay.wet.value      = track.effects.delay;
+      fx.distortion.wet.value = track.effects.distortion;
+      fx.pitchShift.pitch     = track.effects.pitchShift;
+      fx.pitchShift.wet.value = track.effects.pitchShift !== 0 ? 1 : 0;
+      fx.panner.pan.value     = track.pan;
+    }
+
     try { synth.triggerAttackRelease(note, duration); } catch {}
     setLitKeys(s => new Set([...s, note]));
     setTimeout(() => setLitKeys(s => { const n = new Set(s); n.delete(note); return n; }), 200);
@@ -234,6 +276,7 @@ export default function StudioPanel() {
           const d = drumMap[drumId];
           if (!d) return;
           try {
+            d.volume.value = Tone.gainToDb(track.volume);
             if (drumId === 'kick')  d.triggerAttackRelease('C1', '8n', time);
             else if (drumId === 'snare' || drumId === 'clap') d.triggerAttackRelease('8n', time);
             else d.triggerAttackRelease('8n', time);
@@ -253,6 +296,22 @@ export default function StudioPanel() {
     if (seqRef.current) { seqRef.current.dispose(); seqRef.current = null; }
     setPlaying(false);
     setCurrentStep(-1);
+  };
+
+  const startExport = async () => {
+    const { recorder } = await initTone();
+    recorder.start();
+    setExporting(true);
+    setExportUrl('');
+    if (!playing) startPlayback();
+  };
+
+  const stopExport = async () => {
+    if (!tRef.current) return;
+    const blob = await tRef.current.recorder.stop();
+    setExportUrl(URL.createObjectURL(blob));
+    setExporting(false);
+    stopPlayback();
   };
 
   useEffect(() => {
@@ -522,6 +581,9 @@ export default function StudioPanel() {
             ↑ Audio
             <input type="file" accept="audio/*" style={{ display: 'none' }} onChange={handleAudioUpload} />
           </label>
+          <button className="studio-btn studio-btn-sm" onClick={exporting ? stopExport : startExport}>
+            {exporting ? '⏹ Stop Export' : '⬇ Export Mix'}
+          </button>
           {exportUrl && <a className="studio-btn studio-btn-success" href={exportUrl} download="based-mix.webm">↓ Download</a>}
         </div>
       </div>

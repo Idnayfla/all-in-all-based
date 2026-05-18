@@ -3089,6 +3089,103 @@ body {
   to   { width: 0%; }
 }
 
+/* ── Image Studio ── */
+.image-studio { display: flex; flex-direction: column; height: 100%; background: var(--bg1); overflow: hidden; }
+.image-studio-toolbar {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  background: var(--bg2); border-bottom: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap;
+}
+.image-studio-logo { font-size: 12px; font-weight: 700; color: var(--accent); white-space: nowrap; margin-right: 4px; }
+.image-studio-tools { display: flex; gap: 4px; }
+.image-tool-btn {
+  padding: 5px 10px; font-size: 11px; border-radius: 5px; border: 1px solid var(--border);
+  background: var(--bg3); color: var(--text2); cursor: pointer; transition: all 0.15s;
+}
+.image-tool-btn:hover { border-color: var(--accent); color: var(--text); }
+.image-tool-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.image-studio-header-right { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.image-color-picker { width: 28px; height: 28px; border: 1px solid var(--border); border-radius: 4px; cursor: pointer; background: none; padding: 0; }
+.image-size-slider { width: 70px; accent-color: var(--accent); }
+.image-size-label { font-size: 10px; color: var(--text3); min-width: 26px; }
+.image-studio-status { font-size: 11px; color: var(--accent); opacity: 0.8; }
+.image-btn {
+  padding: 5px 10px; font-size: 11px; border-radius: 5px; border: 1px solid var(--border);
+  background: var(--bg3); color: var(--text2); cursor: pointer; transition: all 0.15s; white-space: nowrap;
+}
+.image-btn:hover { border-color: var(--accent); color: var(--text); }
+.image-btn.image-btn-sm { padding: 4px 8px; font-size: 10px; }
+.image-btn.image-btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; width: 100%; padding: 8px; margin-top: 8px; }
+.image-btn.image-btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+.image-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.image-studio-body { display: flex; flex: 1; overflow: hidden; }
+
+.image-canvas-wrap {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  overflow: auto; background: var(--bg1); padding: 16px; gap: 8px;
+}
+.image-canvas {
+  max-width: 100%; max-height: calc(100vh - 160px); border-radius: 4px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4); cursor: crosshair;
+  touch-action: none;
+}
+.image-mask-hint {
+  font-size: 11px; color: var(--accent); display: flex; align-items: center; gap: 4px; opacity: 0.9;
+}
+
+.image-right-panel { width: 240px; flex-shrink: 0; border-left: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg2); overflow: hidden; }
+.image-panel-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.image-panel-tab {
+  flex: 1; padding: 8px 4px; font-size: 10px; background: none; border: none; color: var(--text3);
+  cursor: pointer; transition: all 0.15s; border-bottom: 2px solid transparent; font-weight: 600;
+}
+.image-panel-tab:hover { color: var(--text2); }
+.image-panel-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Layers */
+.image-layers { flex: 1; overflow-y: auto; padding: 8px; }
+.image-layers-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: 11px; color: var(--text2); font-weight: 600; }
+.image-layer-row {
+  display: flex; align-items: center; gap: 4px; padding: 5px 6px; border-radius: 5px;
+  cursor: pointer; border: 1px solid transparent; margin-bottom: 3px; transition: all 0.12s;
+}
+.image-layer-row:hover { background: var(--bg3); }
+.image-layer-row.active { background: var(--bg3); border-color: var(--accent); }
+.image-layer-vis { background: none; border: none; cursor: pointer; color: var(--text3); font-size: 12px; padding: 0 2px; flex-shrink: 0; }
+.image-layer-name {
+  flex: 1; background: none; border: none; color: var(--text); font-size: 11px; min-width: 0;
+  padding: 2px 4px; border-radius: 3px;
+}
+.image-layer-name:focus { background: var(--bg1); outline: none; }
+.image-layer-opacity { width: 40px; accent-color: var(--accent); flex-shrink: 0; }
+.image-layer-btns { display: flex; gap: 1px; flex-shrink: 0; }
+.image-layer-btns button { background: none; border: none; cursor: pointer; color: var(--text3); font-size: 11px; padding: 1px 3px; border-radius: 3px; }
+.image-layer-btns button:hover { color: var(--accent); background: var(--bg1); }
+
+/* Filters */
+.image-filters { padding: 12px; overflow-y: auto; }
+.image-filter-row { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.image-filter-label { font-size: 11px; color: var(--text2); width: 72px; flex-shrink: 0; }
+.image-filter-slider { flex: 1; accent-color: var(--accent); }
+.image-filter-value { font-size: 10px; color: var(--text3); width: 34px; text-align: right; }
+
+/* AI Panel */
+.image-ai-panel { padding: 12px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.image-ai-mode-row { display: flex; gap: 4px; }
+.image-ai-mode-btn {
+  flex: 1; padding: 5px 4px; font-size: 10px; border-radius: 5px; border: 1px solid var(--border);
+  background: var(--bg3); color: var(--text2); cursor: pointer; transition: all 0.15s; font-weight: 600;
+}
+.image-ai-mode-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.image-ai-desc { font-size: 10px; color: var(--text3); line-height: 1.4; }
+.image-ai-prompt {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); font-size: 12px; padding: 8px; resize: vertical; font-family: inherit;
+  line-height: 1.4;
+}
+.image-ai-prompt:focus { outline: none; border-color: var(--accent); }
+.image-ai-mask-note { font-size: 10px; color: var(--text3); line-height: 1.4; background: var(--bg3); border-radius: 5px; padding: 6px 8px; }
+
 /* ── Suggestion chips ── */
 .suggestion-btn {
   animation: staggerFade 0.4s cubic-bezier(0.16,1,0.3,1) both;

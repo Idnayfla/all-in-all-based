@@ -23,6 +23,7 @@ import FeedbackModal from '@/components/FeedbackModal';
 import ReferralPanel from '@/components/ReferralPanel';
 import VideoEditorPanel from '@/components/VideoEditorPanel';
 import StudioPanel from '@/components/StudioPanel';
+import ImageStudioPanel from '@/components/ImageStudioPanel';
 import ProactiveCheckin from '@/components/ProactiveCheckin';
 
 export interface FileNode {
@@ -76,7 +77,7 @@ export default function Home() {
   const [globalMemory, setGlobalMemory] = useState('');
   const [incognito, setIncognito]     = useState(false);
   const [incognitoMessages, setIncognitoMessages] = useState<Message[]>([]);
-  const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview' | 'debug' | 'video' | 'studio'>('chat');
+  const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview' | 'debug' | 'video' | 'studio' | 'image'>('chat');
   const [projects, setProjects]       = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   useSwipePanels(activePanel, setActivePanel, !incognito && !!currentProject);
@@ -251,16 +252,15 @@ export default function Home() {
 
   // ── Proactive check-in: offer to resume last project ────────────────────
   useEffect(() => {
-    if (!user || !authReady || currentProject || projects.length === 0) return;
+    if (!user || !authReady || currentProject) return;
     try {
       const raw = localStorage.getItem(LAST_PROJECT_KEY);
       if (!raw) return;
       const { id, name, at } = JSON.parse(raw) as { id: string; name: string; at: number };
       if (Date.now() - at < 3 * 60 * 1000) return;        // same session — skip
-      if (!projects.find(p => p.id === id)) return;        // project deleted — skip
       setCheckin({ id, name });
     } catch {}
-  }, [user, authReady, projects.length, currentProject]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, authReady, currentProject]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auth headers helper ──────────────────────────────────────────────────
   const getHeaders = useCallback(async (): Promise<HeadersInit> => {
@@ -709,6 +709,7 @@ export default function Home() {
             <button className={`tab-btn ${activePanel === 'preview' ? 'active' : ''}`} onClick={() => { setActivePanel('preview'); setShowSettings(false); }}>Preview</button>
             <button className={`tab-btn ${activePanel === 'video' ? 'active' : ''}`} onClick={() => { setActivePanel('video'); setShowSettings(false); }}>Video</button>
             <button className={`tab-btn ${activePanel === 'studio' ? 'active' : ''}`} onClick={() => { setActivePanel('studio'); setShowSettings(false); }}>Studio</button>
+            <button className={`tab-btn ${activePanel === 'image' ? 'active' : ''}`} onClick={() => { setActivePanel('image'); setShowSettings(false); }}>Image</button>
             <button className={`tab-btn tab-btn-debug ${activePanel === 'debug' ? 'active' : ''}`} onClick={() => { setActivePanel('debug'); setShowSettings(false); }} title="Debug stream">◈</button>
           </div>
           <div className="header-controls">
@@ -1104,6 +1105,9 @@ export default function Home() {
               </div>
               <div className={`panel ${activePanel === 'studio' ? 'panel-active' : ''}`}>
                 <StudioPanel />
+              </div>
+              <div className={`panel ${activePanel === 'image' ? 'panel-active' : ''}`}>
+                <ImageStudioPanel />
               </div>
             </>
           )}
