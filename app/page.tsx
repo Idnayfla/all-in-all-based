@@ -93,6 +93,8 @@ export default function Home() {
   const [authReady, setAuthReady]     = useState(false);
   const [authToken, setAuthToken]     = useState<string>('');
   const isExplicitSignOut             = useRef(false);
+  const currentProjectRef             = useRef<Project | null>(null);
+  useEffect(() => { currentProjectRef.current = currentProject; }, [currentProject]);
   const [showSplash, setShowSplash]   = useState(true);
   const [showAuth, setShowAuth]       = useState(false);
   const [authTab, setAuthTab]         = useState<'signin' | 'signup'>('signin');
@@ -250,10 +252,34 @@ export default function Home() {
     }
   }, []);
 
+  // ── Write interrupted-session marker on abrupt exit (refresh / tab close) ─
+  useEffect(() => {
+    const handleUnload = () => {
+      const p = currentProjectRef.current;
+      if (!p) return;
+      try { localStorage.setItem('based_interrupted', JSON.stringify({ id: p.id, name: p.name, at: Date.now() })); } catch {}
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('pagehide', handleUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('pagehide', handleUnload);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Proactive check-in: offer to resume last project ────────────────────
   useEffect(() => {
     if (!user || !authReady || currentProject) return;
     try {
+      // Abrupt exit (refresh / close mid-session) — no time guard needed
+      const interrupted = localStorage.getItem('based_interrupted');
+      if (interrupted) {
+        const { id, name } = JSON.parse(interrupted);
+        localStorage.removeItem('based_interrupted');
+        setCheckin({ id, name });
+        return;
+      }
+      // New session (came back after 3+ minutes)
       const raw = localStorage.getItem(LAST_PROJECT_KEY);
       if (!raw) return;
       const { id, name, at } = JSON.parse(raw) as { id: string; name: string; at: number };
@@ -262,7 +288,7 @@ export default function Home() {
     } catch {}
   }, [user, authReady, currentProject]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // dev-only console helper: window.__triggerCheckin() to test the card
+  // dev-only console helpers
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development') return;
     (window as any).__triggerCheckin = () => {
@@ -271,7 +297,17 @@ export default function Home() {
       const { id, name } = JSON.parse(raw);
       setCheckin({ id, name });
     };
-    return () => { delete (window as any).__triggerCheckin; };
+    // simulate abrupt exit then reload to test interrupted flow
+    (window as any).__simulateInterrupt = () => {
+      const p = currentProjectRef.current;
+      if (!p) { console.warn('[checkin] no active project'); return; }
+      localStorage.setItem('based_interrupted', JSON.stringify({ id: p.id, name: p.name, at: Date.now() }));
+      console.log('[checkin] interrupted marker set — refresh to trigger check-in');
+    };
+    return () => {
+      delete (window as any).__triggerCheckin;
+      delete (window as any).__simulateInterrupt;
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Auth headers helper ──────────────────────────────────────────────────
