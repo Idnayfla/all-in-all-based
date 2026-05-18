@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Message, FileNode, ContentBlock } from '@/app/page';
 import ReactMarkdown from 'react-markdown';
 import ImageEditorModal from './ImageEditorModal';
+import ImageCropModal from './ImageCropModal';
 import ModeDropdown, { GenerationMode } from './ModeDropdown';
 import GeneratedVideoCard from './GeneratedVideoCard';
 import GeneratedMusicCard from './GeneratedMusicCard';
@@ -148,6 +149,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     previewUrl: string;
   } | null>(null);
   const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
+  const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
   const [suggestions] = useState(getRandomSuggestions);
   const [flaggingIdx, setFlaggingIdx] = useState<number | null>(null);
   const [flaggedSet, setFlaggedSet]   = useState<Set<number>>(new Set());
@@ -616,6 +618,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                 <div className="generated-image-prompt">{block.prompt}</div>
                 <div className="generated-image-actions">
                   <a className="generated-image-download" href={block.url} download target="_blank" rel="noreferrer">↓ Download</a>
+                  <button className="generated-image-edit-btn" onClick={() => setCropImageUrl(block.url)}>◈ Crop</button>
                   <button className="generated-image-edit-btn" onClick={() => setEditingImageUrl(block.url)}>✏ Edit</button>
                 </div>
               </motion.div>
@@ -908,6 +911,9 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           }}
           onClose={() => setEditingImageUrl(null)}
         />
+      )}
+      {cropImageUrl && (
+        <ImageCropModal url={cropImageUrl} onClose={() => setCropImageUrl(null)} />
       )}
     </div>
   );

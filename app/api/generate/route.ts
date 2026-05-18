@@ -355,7 +355,8 @@ ICON TYPE DISAMBIGUATION — read the context before building:
 - "favicon" / "website icon" / "tab icon" → small 32×32 or 64×64 optimised SVG, simple enough to read tiny
 - "icon" alone with no other context → ask: "What's this icon for — a profile/avatar, an app, a website tab, or a UI element?" — do NOT default to favicon
 - "social media icon" → rounded square 1:1 format, designed for profile photos on platforms
-- Profile icons: use a circle clip-path (<clipPath><circle/></clipPath>) to frame the content; include a Download PNG button
+- Profile icons: ALWAYS generate in full-screen square 1:1 format (e.g. viewBox="0 0 500 500", canvas 500×500) — NEVER portrait or tall format. User can crop with the built-in crop tool. Use a circle clip-path (<clipPath><circle/></clipPath>) to frame the content; include a Download PNG button
+- Mobile/device mockups (Android, iPhone, phone screen): portrait frame is correct for the device shell, but MUST also show how the content looks on a desktop — include a toggle or tab to switch between mobile and desktop preview
 
 CUSTOM LOGO:
 - Build logos as inline SVG — always vector, never raster
