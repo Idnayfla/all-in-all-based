@@ -866,9 +866,6 @@ export default function Home() {
                   <span className="credit-row-name">Claude by Anthropic</span>
                   <span className="credit-row-role">AI Development Partner</span>
                 </div>
-                <div className="credits-footer">
-                  <a href="mailto:husgogogo@gmail.com" className="credits-email">husgogogo@gmail.com</a>
-                </div>
               </div>
             </motion.div>
 
