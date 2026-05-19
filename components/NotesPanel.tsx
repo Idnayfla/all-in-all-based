@@ -81,6 +81,7 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
   const [saving, setSaving]           = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading]         = useState(true);
+  const [showExport, setShowExport]   = useState(false);
 
   const saveTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canvasRef   = useRef<HTMLCanvasElement>(null);
@@ -135,9 +136,13 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
     setSelId(note.id);
     setTitle(note.title);
     editor?.commands.setContent(note.content || '<p></p>');
-    const strk = note.drawing_data ? JSON.parse(note.drawing_data) : [];
+    let strk: DrawStroke[] = [];
+    try { strk = note.drawing_data ? JSON.parse(note.drawing_data) : []; } catch {}
     setStrokes(strk);
     setDrawMode(false);
+    // Force canvas clear so stale strokes don't persist between notes
+    const canvas = canvasRef.current;
+    if (canvas) canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
   }, [editor]);
 
   // ── Draw strokes onto canvas ───────────────────────────────────────────────
@@ -287,21 +292,49 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
   };
 
   // ── Export ─────────────────────────────────────────────────────────────────
-  const exportNote = (format: 'html' | 'txt') => {
-    const content = editor?.getHTML() ?? '';
+  const htmlToMarkdown = (html: string): string => {
+    return html
+      .replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n')
+      .replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n')
+      .replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n')
+      .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
+      .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
+      .replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
+      .replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*')
+      .replace(/<u[^>]*>(.*?)<\/u>/gi, '__$1__')
+      .replace(/<s[^>]*>(.*?)<\/s>/gi, '~~$1~~')
+      .replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`')
+      .replace(/<pre[^>]*>[\s\S]*?<\/pre>/gi, (m) => '```\n' + m.replace(/<[^>]+>/g, '') + '\n```\n')
+      .replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, c) => '> ' + c.replace(/<[^>]+>/g, '') + '\n')
+      .replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
+      .replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  };
+
+  const exportNote = (format: 'html' | 'txt' | 'md') => {
+    const html = editor?.getHTML() ?? '';
     let blob: Blob;
     let name: string;
+    const base = title || 'note';
     if (format === 'html') {
-      blob = new Blob([`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title></head><body>${content}</body></html>`], { type: 'text/html' });
-      name = `${title || 'note'}.html`;
+      blob = new Blob([`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:sans-serif;max-width:720px;margin:40px auto;padding:0 20px;line-height:1.7}pre{background:#111;padding:16px;border-radius:6px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 10px}</style></head><body>${html}</body></html>`], { type: 'text/html' });
+      name = `${base}.html`;
+    } else if (format === 'md') {
+      blob = new Blob([htmlToMarkdown(html)], { type: 'text/markdown' });
+      name = `${base}.md`;
     } else {
       blob = new Blob([editor?.getText() ?? ''], { type: 'text/plain' });
-      name = `${title || 'note'}.txt`;
+      name = `${base}.txt`;
     }
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = name;
     a.click();
+    setShowExport(false);
   };
 
   // ── Filtered notes ─────────────────────────────────────────────────────────
@@ -386,12 +419,15 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
               >✏ Draw</button>
 
               {/* Export */}
-              <div className="notes-export-wrap">
-                <button className="notes-export-btn">↓ Export</button>
-                <div className="notes-export-menu">
-                  <button onClick={() => exportNote('html')}>HTML</button>
-                  <button onClick={() => exportNote('txt')}>Plain text</button>
-                </div>
+              <div className="notes-export-wrap" style={{ position: 'relative' }}>
+                <button className="notes-export-btn" onClick={() => setShowExport(s => !s)}>↓ Export</button>
+                {showExport && (
+                  <div className="notes-export-menu" style={{ display: 'flex' }}>
+                    <button onClick={() => exportNote('md')}>Markdown</button>
+                    <button onClick={() => exportNote('html')}>HTML</button>
+                    <button onClick={() => exportNote('txt')}>Plain text</button>
+                  </div>
+                )}
               </div>
             </>
           ) : (

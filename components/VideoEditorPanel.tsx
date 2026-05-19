@@ -48,14 +48,31 @@ export default function VideoEditorPanel() {
   const durationRef     = useRef(0);
   const canvasDragRef   = useRef<{ id: string; offX: number; offY: number } | null>(null);
 
-  // Undo stack for overlay edits
-  const undoStack = useRef<TextOverlay[][]>([]);
+  const [aiProcessing, setAiProcessing] = useState(false);
+  const [aiMessage,    setAiMessage]    = useState('');
+
+  // Full undo stack: overlays + trim + speed
+  interface UndoSnap { overlays: TextOverlay[]; trimStart: number; trimEnd: number; speed: number; }
+  const undoStack = useRef<UndoSnap[]>([]);
   const pushUndo = useCallback((snap: TextOverlay[]) => {
-    undoStack.current = [...undoStack.current.slice(-19), snap.map(o => ({ ...o }))];
+    undoStack.current = [...undoStack.current.slice(-29), {
+      overlays: snap.map(o => ({ ...o })),
+      trimStart: trimStartRef.current,
+      trimEnd: trimEndRef.current,
+      speed: 1,
+    }];
+  }, []);
+  const pushFullUndo = useCallback((overl: TextOverlay[], ts: number, te: number, sp: number) => {
+    undoStack.current = [...undoStack.current.slice(-29), { overlays: overl.map(o => ({ ...o })), trimStart: ts, trimEnd: te, speed: sp }];
   }, []);
   const undo = useCallback(() => {
     const prev = undoStack.current.pop();
-    if (prev) setOverlays(prev);
+    if (!prev) return;
+    setOverlays(prev.overlays);
+    setTrimStart(prev.trimStart); trimStartRef.current = prev.trimStart;
+    setTrimEnd(prev.trimEnd);     trimEndRef.current   = prev.trimEnd;
+    setSpeed(prev.speed);
+    if (videoRef.current) videoRef.current.playbackRate = prev.speed;
   }, []);
 
   // Keep refs in sync with state
@@ -359,47 +376,77 @@ export default function VideoEditorPanel() {
     if (selOverlay === id) setSelOverlay(null);
   };
 
-  // ── AI command parser ─────────────────────────────────────────────────────
-  const applyAI = () => {
-    const s = aiInput.trim().toLowerCase();
-    const raw = aiInput.trim();
-    let matched = false;
+  // ── AI command — powered by Claude ───────────────────────────────────────
+  const applyAI = async () => {
+    const cmd = aiInput.trim();
+    if (!cmd) return;
+    setAiProcessing(true);
+    setAiMessage('');
+    try {
+      const res = await fetch('/api/video-command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: cmd, duration }),
+      });
+      const data = await res.json();
+      if (data.message) setAiMessage(data.message);
 
-    const trimRange = s.match(/trim.*?(\d+\.?\d*)\s*(?:s|sec)?\s*to\s*(\d+\.?\d*)/);
-    if (trimRange) {
-      setTrimStart(Math.max(0, parseFloat(trimRange[1])));
-      setTrimEnd(Math.min(duration, parseFloat(trimRange[2])));
-      matched = true;
+      const currentOverlays = overlays;
+      let newOverlays = [...currentOverlays];
+      let newTrimStart = trimStartRef.current;
+      let newTrimEnd   = trimEndRef.current;
+      let newSpeed     = speed;
+
+      for (const action of (data.actions ?? [])) {
+        if (action.type === 'trim') {
+          newTrimStart = Math.max(0, action.start);
+          newTrimEnd   = Math.min(duration, action.end);
+        } else if (action.type === 'trimStart') {
+          newTrimStart = 0;
+          newTrimEnd   = Math.min(duration, action.seconds);
+        } else if (action.type === 'speed') {
+          newSpeed = Math.max(0.25, Math.min(4, action.value));
+          if (videoRef.current) videoRef.current.playbackRate = newSpeed;
+        } else if (action.type === 'addText') {
+          const id = Date.now().toString() + Math.random();
+          const start = action.at ?? 0;
+          newOverlays = [...newOverlays, {
+            id,
+            text: action.text,
+            x: action.x ?? 0.05,
+            y: action.y ?? 0.15,
+            startTime: start,
+            endTime: Math.min(start + (action.duration ?? 3), duration),
+            fontSize: action.fontSize ?? 56,
+            color: action.color ?? '#ffffff',
+            fontWeight: 'bold',
+          }];
+          setSelOverlay(id);
+        } else if (action.type === 'removeText') {
+          newOverlays = [];
+        } else if (action.type === 'mute') {
+          setMuted(action.value);
+        } else if (action.type === 'loop') {
+          setLoop(action.value);
+        } else if (action.type === 'reset') {
+          newTrimStart = 0;
+          newTrimEnd   = duration;
+        }
+      }
+
+      if ((data.actions ?? []).length > 0) {
+        pushFullUndo(currentOverlays, trimStartRef.current, trimEndRef.current, speed);
+        setOverlays(newOverlays);
+        setTrimStart(newTrimStart); trimStartRef.current = newTrimStart;
+        setTrimEnd(newTrimEnd);     trimEndRef.current   = newTrimEnd;
+        setSpeed(newSpeed);
+        setAiInput('');
+      }
+    } catch {
+      setAiMessage('Could not reach AI — check connection.');
+    } finally {
+      setAiProcessing(false);
     }
-    const trimTo = s.match(/(?:trim to|keep first|first)\s*(\d+\.?\d*)\s*(?:s|sec)/);
-    if (!matched && trimTo) { setTrimStart(0); setTrimEnd(Math.min(duration, parseFloat(trimTo[1]))); matched = true; }
-
-    const speedM = s.match(/(?:speed|rate|playback)\s*([\d.]+)/);
-    if (!matched && speedM) {
-      const sp = Math.max(0.25, Math.min(4, parseFloat(speedM[1])));
-      setSpeed(sp);
-      if (videoRef.current) videoRef.current.playbackRate = sp;
-      matched = true;
-    }
-
-    const addTextM = raw.match(/add text\s+['"](.+?)['"]\s+at\s+(\d+\.?\d*)/i)
-                  ?? raw.match(/add text\s+(.+?)\s+at\s+(\d+\.?\d*)/i);
-    if (!matched && addTextM) {
-      pushUndo(overlays);
-      const id = Date.now().toString();
-      const start = parseFloat(addTextM[2]);
-      setOverlays(prev => [...prev, { id, text: addTextM[1], x: 0.05, y: 0.15, startTime: start, endTime: Math.min(start + 3, duration), fontSize: 56, color: '#ffffff', fontWeight: 'bold' }]);
-      setSelOverlay(id);
-      matched = true;
-    }
-    if (!matched && s.includes('remove') && s.includes('text'))  { pushUndo(overlays); setOverlays([]); matched = true; }
-    if (!matched && (s.includes('reset') || s.includes('full video'))) { setTrimStart(0); setTrimEnd(duration); matched = true; }
-    if (!matched && s.includes('mute'))   { setMuted(true);  matched = true; }
-    if (!matched && s.includes('unmute')) { setMuted(false); matched = true; }
-    if (!matched && s.includes('loop'))   { setLoop(l => !l); matched = true; }
-
-    if (matched) setAiInput('');
-    else alert(`Couldn't understand: "${aiInput}"\n\nTry:\n· "trim from 5 to 30"\n· "speed 2x"\n· "add text 'Hello' at 5"\n· "trim to 20s"\n· "mute"`);
   };
 
   // ── FFmpeg export ─────────────────────────────────────────────────────────
@@ -696,13 +743,18 @@ export default function VideoEditorPanel() {
         <span className="ve-ai-icon">◈</span>
         <input
           className="ve-ai-input"
-          placeholder={`AI edit: "trim from 5 to 30", "speed 2x", "add text 'Hello' at 5", "mute"`}
+          placeholder='Tell Based what to edit — "cut the first 5 seconds", "make it 2x faster", "add title at 0"…'
           value={aiInput}
-          onChange={e => setAiInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && applyAI()}
+          onChange={e => { setAiInput(e.target.value); setAiMessage(''); }}
+          onKeyDown={e => e.key === 'Enter' && !aiProcessing && applyAI()}
         />
-        <button className="ve-btn ve-btn-primary" onClick={applyAI} disabled={!aiInput.trim()}>Apply</button>
+        <button className="ve-btn ve-btn-primary" onClick={applyAI} disabled={!aiInput.trim() || aiProcessing}>
+          {aiProcessing ? '◈ Thinking…' : '◈ Apply AI'}
+        </button>
       </div>
+      {aiMessage && (
+        <div className="ve-ai-message">{aiMessage}</div>
+      )}
     </div>
   );
 }

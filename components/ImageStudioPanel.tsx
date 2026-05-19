@@ -16,7 +16,7 @@ interface Filters {
   blur: number;        // 0–20 px
 }
 
-type Tool = 'brush' | 'eraser' | 'fill' | 'mask';
+type Tool = 'brush' | 'eraser' | 'fill' | 'mask' | 'text' | 'eyedropper';
 type AiMode = 'generate' | 'transform' | 'inpaint';
 
 const W = 800;
@@ -61,6 +61,12 @@ export default function ImageStudioPanel() {
   const [status, setStatus]     = useState('');
   const [activeTab, setActiveTab] = useState<'tools' | 'layers' | 'filters' | 'ai'>('tools');
 
+  const [textInput,   setTextInput]   = useState('');
+  const [textPos,     setTextPos]     = useState<{ x: number; y: number } | null>(null);
+  const [fontSize,    setFontSize]    = useState(32);
+  const [undoStack,   setUndoStack]   = useState<Map<string, ImageData>[]>([]);
+  const [redoStack,   setRedoStack]   = useState<Map<string, ImageData>[]>([]);
+
   const displayRef  = useRef<HTMLCanvasElement>(null);
   const maskRef     = useRef<HTMLCanvasElement>(null);
   const offscreens  = useRef<Record<string, HTMLCanvasElement>>({});
@@ -102,6 +108,50 @@ export default function ImageStudioPanel() {
     dc.globalAlpha = 1;
     if (showMask && maskRef.current) dc.drawImage(maskRef.current, 0, 0);
   }, []);
+
+  // ── Undo / Redo ─────────────────────────────────────────────────────
+  const captureSnapshot = useCallback((): Map<string, ImageData> => {
+    const snap = new Map<string, ImageData>();
+    Object.entries(offscreens.current).forEach(([id, c]) => {
+      snap.set(id, c.getContext('2d')!.getImageData(0, 0, W, H));
+    });
+    return snap;
+  }, []);
+
+  const pushUndo = useCallback(() => {
+    setUndoStack(prev => [...prev.slice(-29), captureSnapshot()]);
+    setRedoStack([]);
+  }, [captureSnapshot]);
+
+  const applySnapshot = useCallback((snap: Map<string, ImageData>, layerList: Layer[]) => {
+    snap.forEach((data, id) => {
+      const c = offscreens.current[id];
+      if (c) c.getContext('2d')!.putImageData(data, 0, 0);
+    });
+    composite(layerList, false);
+  }, [composite]);
+
+  const undo = useCallback(() => {
+    setUndoStack(prev => {
+      if (!prev.length) return prev;
+      const snap = prev[prev.length - 1];
+      const next = prev.slice(0, -1);
+      setRedoStack(r => [...r, captureSnapshot()]);
+      applySnapshot(snap, layers);
+      return next;
+    });
+  }, [captureSnapshot, applySnapshot, layers]);
+
+  const redo = useCallback(() => {
+    setRedoStack(prev => {
+      if (!prev.length) return prev;
+      const snap = prev[prev.length - 1];
+      const next = prev.slice(0, -1);
+      setUndoStack(u => [...u, captureSnapshot()]);
+      applySnapshot(snap, layers);
+      return next;
+    });
+  }, [captureSnapshot, applySnapshot, layers]);
 
   useEffect(() => { composite(layers, tool === 'mask'); }, [layers, composite, tool]);
 
@@ -169,9 +219,34 @@ export default function ImageStudioPanel() {
   }, [activeId, color, layers, composite, getOffscreen]);
 
   // ── Mouse / touch handlers ──────────────────────────────────────────
+  const commitText = useCallback(() => {
+    if (!textInput.trim() || !textPos) { setTextPos(null); setTextInput(''); return; }
+    pushUndo();
+    const oc = getOffscreen(activeId);
+    const ctx = oc.getContext('2d')!;
+    ctx.font = `${fontSize}px Inter, sans-serif`;
+    ctx.fillStyle = color;
+    ctx.fillText(textInput, textPos.x, textPos.y);
+    composite(layers, false);
+    setTextPos(null);
+    setTextInput('');
+  }, [textInput, textPos, fontSize, color, activeId, layers, composite, getOffscreen, pushUndo]);
+
+  const sampleColor = useCallback((x: number, y: number) => {
+    const oc = getOffscreen(activeId);
+    const d = oc.getContext('2d')!.getImageData(Math.floor(x), Math.floor(y), 1, 1).data;
+    if (d[3] === 0) return; // transparent — don't pick
+    const hex = '#' + [d[0], d[1], d[2]].map(v => v.toString(16).padStart(2, '0')).join('');
+    setColor(hex);
+    setTool('brush');
+  }, [activeId, getOffscreen]);
+
   const onMouseDown = (e: MouseEvent<HTMLCanvasElement>) => {
     const pos = getPos(e);
-    if (tool === 'fill') { floodFill(pos.x, pos.y); return; }
+    if (tool === 'fill')       { pushUndo(); floodFill(pos.x, pos.y); return; }
+    if (tool === 'eyedropper') { sampleColor(pos.x, pos.y); return; }
+    if (tool === 'text')       { setTextPos(pos); return; }
+    pushUndo();
     drawing.current = true;
     lastPos.current = pos;
     drawStroke(pos, pos);
@@ -358,25 +433,39 @@ export default function ImageStudioPanel() {
 
         <div className="image-studio-tools">
           {([
-            { id: 'brush',  label: '✏ Brush' },
-            { id: 'eraser', label: '⌫ Eraser' },
-            { id: 'fill',   label: '⬡ Fill' },
-            { id: 'mask',   label: '⊙ Mask' },
+            { id: 'brush',      label: '✏ Brush' },
+            { id: 'eraser',     label: '⌫ Eraser' },
+            { id: 'fill',       label: '⬡ Fill' },
+            { id: 'text',       label: 'T Text' },
+            { id: 'eyedropper', label: '◉ Pick' },
+            { id: 'mask',       label: '⊙ Mask' },
           ] as { id: Tool; label: string }[]).map(t => (
             <button
               key={t.id}
               className={`image-tool-btn${tool === t.id ? ' active' : ''}`}
               onClick={() => setTool(t.id)}
-              title={t.id === 'mask' ? 'Paint mask for AI inpaint' : undefined}
+              title={t.id === 'mask' ? 'Paint mask for AI inpaint' : t.id === 'eyedropper' ? 'Pick color from canvas' : t.id === 'text' ? 'Click canvas to place text' : undefined}
             >{t.label}</button>
           ))}
+          <div className="image-tool-sep" />
+          <button className="image-tool-btn" onClick={undo} disabled={undoStack.length === 0} title="Undo">↩ Undo</button>
+          <button className="image-tool-btn" onClick={redo} disabled={redoStack.length === 0} title="Redo">↪ Redo</button>
         </div>
 
         <div className="image-studio-header-right">
           {status && <span className="image-studio-status">{status}</span>}
-          <input type="color" value={color} onChange={e => setColor(e.target.value)} className="image-color-picker" title="Brush color" />
-          <input type="range" min={1} max={80} value={brushSize} onChange={e => setBrushSize(parseInt(e.target.value))} className="image-size-slider" title={`Brush size: ${brushSize}px`} />
-          <span className="image-size-label">{brushSize}px</span>
+          <input type="color" value={color} onChange={e => setColor(e.target.value)} className="image-color-picker" title="Color" />
+          {tool === 'text' ? (
+            <>
+              <input type="range" min={8} max={120} value={fontSize} onChange={e => setFontSize(parseInt(e.target.value))} className="image-size-slider" title={`Font size: ${fontSize}px`} />
+              <span className="image-size-label">{fontSize}px</span>
+            </>
+          ) : (
+            <>
+              <input type="range" min={1} max={80} value={brushSize} onChange={e => setBrushSize(parseInt(e.target.value))} className="image-size-slider" title={`Brush size: ${brushSize}px`} />
+              <span className="image-size-label">{brushSize}px</span>
+            </>
+          )}
           <label className="image-btn image-btn-sm" title="Import image">
             ↑ Import
             <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImport} />
@@ -403,7 +492,6 @@ export default function ImageStudioPanel() {
             onTouchMove={onTouchMove}
             onTouchEnd={onMouseUp}
           />
-          {/* Hidden mask canvas (same size, only shown composited) */}
           <canvas ref={maskRef} width={W} height={H} style={{ display: 'none' }} />
           {tool === 'mask' && (
             <div className="image-mask-hint">
@@ -411,17 +499,82 @@ export default function ImageStudioPanel() {
               <button className="image-btn image-btn-sm" style={{ marginLeft: 8 }} onClick={clearMask}>Clear mask</button>
             </div>
           )}
+          {textPos && (
+            <div
+              className="image-text-overlay"
+              style={{
+                left: `${(textPos.x / W) * 100}%`,
+                top:  `${(textPos.y / H) * 100}%`,
+              }}
+            >
+              <input
+                autoFocus
+                className="image-text-input"
+                style={{ fontSize: `${fontSize * (displayRef.current?.getBoundingClientRect().width ?? W) / W}px`, color }}
+                value={textInput}
+                onChange={e => setTextInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') commitText(); if (e.key === 'Escape') { setTextPos(null); setTextInput(''); } }}
+                onBlur={commitText}
+                placeholder="Type here…"
+              />
+            </div>
+          )}
         </div>
 
         {/* Right panel */}
         <div className="image-right-panel">
           <div className="image-panel-tabs">
-            {(['layers', 'filters', 'ai'] as const).map(tab => (
+            {(['tools', 'layers', 'filters', 'ai'] as const).map(tab => (
               <button key={tab} className={`image-panel-tab${activeTab === tab ? ' active' : ''}`} onClick={() => setActiveTab(tab)}>
-                {tab === 'layers' ? '⬡ Layers' : tab === 'filters' ? '◉ Filters' : '◈ AI'}
+                {tab === 'tools' ? '✏ Tools' : tab === 'layers' ? '⬡ Layers' : tab === 'filters' ? '◉ Filters' : '◈ AI'}
               </button>
             ))}
           </div>
+
+          {/* Tools panel */}
+          {activeTab === 'tools' && (
+            <div className="image-tools-panel">
+              <div className="image-tools-section">
+                <div className="image-tools-label">Tool</div>
+                <div className="image-tools-grid">
+                  {([
+                    { id: 'brush',      label: '✏',  title: 'Brush' },
+                    { id: 'eraser',     label: '⌫',  title: 'Eraser' },
+                    { id: 'fill',       label: '⬡',  title: 'Fill bucket' },
+                    { id: 'text',       label: 'T',   title: 'Text' },
+                    { id: 'eyedropper', label: '◉',  title: 'Color picker' },
+                    { id: 'mask',       label: '⊙',  title: 'Mask (for AI inpaint)' },
+                  ] as { id: Tool; label: string; title: string }[]).map(t => (
+                    <button key={t.id} className={`image-tool-grid-btn${tool === t.id ? ' active' : ''}`} onClick={() => setTool(t.id)} title={t.title}>
+                      <span className="image-tool-icon">{t.label}</span>
+                      <span className="image-tool-name">{t.title}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="image-tools-section">
+                <div className="image-tools-label">Color</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input type="color" value={color} onChange={e => setColor(e.target.value)} className="image-color-picker-lg" />
+                  <span style={{ fontSize: 11, color: 'var(--fg3)', fontFamily: 'monospace' }}>{color}</span>
+                </div>
+              </div>
+              <div className="image-tools-section">
+                <div className="image-tools-label">{tool === 'text' ? 'Font Size' : 'Brush Size'} — {tool === 'text' ? fontSize : brushSize}px</div>
+                {tool === 'text'
+                  ? <input type="range" min={8} max={120} value={fontSize} onChange={e => setFontSize(parseInt(e.target.value))} className="image-filter-slider" />
+                  : <input type="range" min={1} max={80} value={brushSize} onChange={e => setBrushSize(parseInt(e.target.value))} className="image-filter-slider" />
+                }
+              </div>
+              <div className="image-tools-section">
+                <div className="image-tools-label">History</div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="image-btn image-btn-sm" onClick={undo} disabled={undoStack.length === 0}>↩ Undo ({undoStack.length})</button>
+                  <button className="image-btn image-btn-sm" onClick={redo} disabled={redoStack.length === 0}>↪ Redo ({redoStack.length})</button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Layers */}
           {activeTab === 'layers' && (

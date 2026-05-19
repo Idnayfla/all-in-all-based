@@ -9,12 +9,14 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
   subscriptionTier?: 'free' | 'pro';
   onProRequired?: () => void;
 }) {
-  const [output, setOutput] = useState('');
+  const [output, setOutput]   = useState('');
+  const [stderr, setStderr]   = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [cropData, setCropData] = useState<{ url: string; format: 'png' | 'jpg' } | null>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const iframeRef  = useRef<HTMLIFrameElement>(null);
+  const abortRef   = useRef<AbortController | null>(null);
   const htmlFile = files.find(f => f.language === 'html');
   const cssFile  = files.find(f => f.language === 'css');
   const jsFile   = files.find(f => f.language === 'javascript' || f.language === 'js');
@@ -40,21 +42,40 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
   }, [previewHtml]);
 
   const runCode = async () => {
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
     setIsRunning(true);
     setOutput('');
+    setStderr('');
     try {
       const res = await fetch('/api/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ files, projectType }),
+        signal: ctrl.signal,
       });
       const data = await res.json();
-      setOutput(data.output);
-    } catch {
-      setOutput('Error: Could not execute code.');
+      setOutput(data.output ?? '');
+      setStderr(data.stderr ?? '');
+    } catch (err: any) {
+      if (err.name !== 'AbortError') setOutput('Error: Could not execute code.');
     } finally {
       setIsRunning(false);
+      abortRef.current = null;
     }
+  };
+
+  const cancelRun = () => {
+    abortRef.current?.abort();
+    setIsRunning(false);
+    setOutput('· Execution cancelled.');
+  };
+
+  const openInTab = () => {
+    if (!previewHtml) return;
+    const blob = new Blob([previewHtml], { type: 'text/html' });
+    window.open(URL.createObjectURL(blob), '_blank');
   };
 
   const captureCanvas = async (scale = Math.max(window.devicePixelRatio ?? 1, 2)): Promise<HTMLCanvasElement | null> => {
@@ -89,7 +110,7 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
     try {
       const canvas = await captureCanvas();
       if (!canvas) return;
-      setCropData({ url: canvas.toDataURL('image/png'), format: 'jpg' });
+      setCropData({ url: canvas.toDataURL('image/jpeg', 0.92), format: 'jpg' });
     } finally { setIsExporting(false); }
   };
 
@@ -145,9 +166,26 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
     } finally { setIsExporting(false); }
   };
 
-  const exportPDF = () => {
-    iframeRef.current?.contentWindow?.print();
+  const exportPDF = async () => {
+    setIsExporting(true);
     setShowExportMenu(false);
+    try {
+      const canvas = await captureCanvas(2);
+      if (!canvas) return;
+      const { PDFDocument } = await import('pdf-lib');
+      const jpegData = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+      const bytes = new Uint8Array(Array.from(atob(jpegData), c => c.charCodeAt(0)));
+      const pdf = await PDFDocument.create();
+      const img = await pdf.embedJpg(bytes);
+      const page = pdf.addPage([img.width / 2, img.height / 2]);
+      page.drawImage(img, { x: 0, y: 0, width: page.getWidth(), height: page.getHeight() });
+      const pdfBytes = await pdf.save();
+      const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'based-export.pdf';
+      a.click();
+    } finally { setIsExporting(false); }
   };
 
   const exportDOCX = async () => {
@@ -250,19 +288,25 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
       <div className="preview-panel">
         <div className="preview-header">
           <span>⬡ {LANG_LABELS[projectType] ?? projectType} — Terminal</span>
-          <button className="run-btn" onClick={runCode} disabled={isRunning || files.length === 0}>
-            {isRunning ? '◈ Running...' : '▶ Run'}
-          </button>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {isRunning
+              ? <button className="run-btn run-btn-cancel" onClick={cancelRun}>◼ Cancel</button>
+              : <button className="run-btn" onClick={runCode} disabled={files.length === 0}>▶ Run</button>
+            }
+          </div>
         </div>
         <div className="terminal-output">
-          {output ? (
-            <pre className="terminal-text">{output}</pre>
+          {(output || stderr) ? (
+            <>
+              {output && <pre className="terminal-text">{output}</pre>}
+              {stderr && <pre className="terminal-text terminal-stderr">{stderr}</pre>}
+            </>
           ) : (
             <div className="terminal-empty">
-            {['java', 'go', 'rust'].includes(projectType)
-              ? `Click Run — Based will compile and execute your ${LANG_LABELS[projectType]} code in a sandbox.`
-              : 'Click Run to execute your code in a live sandbox.'}
-          </div>
+              {['java', 'go', 'rust'].includes(projectType)
+                ? `Click Run — Based will compile and execute your ${LANG_LABELS[projectType]} code in a sandbox.`
+                : 'Click Run to execute your code in a live sandbox.'}
+            </div>
           )}
         </div>
       </div>
@@ -283,7 +327,8 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
     <div className="preview-panel">
       <div className="preview-header">
         <span>⬡ Preview — Live</span>
-        <div className="preview-actions" style={{ position: 'relative' }}>
+        <div className="preview-actions" style={{ position: 'relative', display: 'flex', gap: 6 }}>
+          <button className="run-btn" onClick={openInTab} title="Open in new browser tab">↗ New Tab</button>
           <button
             className="run-btn"
             onClick={() => setShowExportMenu(s => !s)}
