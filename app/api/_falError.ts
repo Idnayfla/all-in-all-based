@@ -1,15 +1,15 @@
 const ERROR_MESSAGES: Record<string, string> = {
   no_media_generated:
     'Unable to generate — the prompt may contain unsafe content or be incompatible with this model. Try rephrasing.',
-  content_moderation:
-    'Blocked by content moderation. Please revise your prompt.',
-  invalid_input:
-    'Invalid input — please check your prompt and try again.',
-  rate_limit_exceeded:
-    'Too many requests — please wait a moment and try again.',
+  content_moderation: 'Blocked by content moderation. Please revise your prompt.',
+  invalid_input: 'Invalid input — please check your prompt and try again.',
+  rate_limit_exceeded: 'Too many requests — please wait a moment and try again.',
 };
 
-export function friendlyFalError(err: any, fallback = 'Generation failed — please try again.'): string {
+export function friendlyFalError(
+  err: any,
+  fallback = 'Generation failed — please try again.'
+): string {
   const body = err.body;
   if (body) {
     if (Array.isArray(body.detail) && body.detail.length > 0) {

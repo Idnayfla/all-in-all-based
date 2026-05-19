@@ -24,9 +24,14 @@ export async function GET() {
 
   // Test a dry-run INSERT into projects (then immediately delete)
   const testId = '00000000-0000-0000-0000-000000000001';
-  const { error: insertError } = await supabaseAdmin
-    .from('projects')
-    .insert({ id: testId, user_id: '00000000-0000-0000-0000-000000000000', name: '__debug_test__', files: [], messages: [], memory: '' });
+  const { error: insertError } = await supabaseAdmin.from('projects').insert({
+    id: testId,
+    user_id: '00000000-0000-0000-0000-000000000000',
+    name: '__debug_test__',
+    files: [],
+    messages: [],
+    memory: '',
+  });
 
   if (!insertError) {
     await supabaseAdmin.from('projects').delete().eq('id', testId);
@@ -41,6 +46,9 @@ export async function GET() {
     anthropic_key: process.env.APP_ANTHROPIC_API_KEY ? 'set' : 'MISSING',
   };
 
-  const allOk = (results.projects_table as any).ok && (results.user_settings_table as any).ok && (results.insert_test as any).ok;
+  const allOk =
+    (results.projects_table as any).ok &&
+    (results.user_settings_table as any).ok &&
+    (results.insert_test as any).ok;
   return NextResponse.json({ status: allOk ? 'healthy' : 'errors_found', ...results });
 }

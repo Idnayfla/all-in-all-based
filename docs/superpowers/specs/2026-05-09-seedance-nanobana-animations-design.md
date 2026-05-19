@@ -21,14 +21,15 @@ Accept two additional optional fields in the request body:
 
 **Routing logic:**
 
-| model | sourceImageData present? | FAL model called |
-|---|---|---|
-| `flux` | no | `fal-ai/flux/dev` (existing) |
-| `flux` | yes | `fal-ai/flux/dev/image-to-image` (upload base64 to FAL storage first) |
-| `nano-banana` | no | `fal-ai/nano-banana-2` |
-| `nano-banana` | yes | `fal-ai/nano-banana-2/edit` (upload base64 to FAL storage first) |
+| model         | sourceImageData present? | FAL model called                                                      |
+| ------------- | ------------------------ | --------------------------------------------------------------------- |
+| `flux`        | no                       | `fal-ai/flux/dev` (existing)                                          |
+| `flux`        | yes                      | `fal-ai/flux/dev/image-to-image` (upload base64 to FAL storage first) |
+| `nano-banana` | no                       | `fal-ai/nano-banana-2`                                                |
+| `nano-banana` | yes                      | `fal-ai/nano-banana-2/edit` (upload base64 to FAL storage first)      |
 
 Input shapes:
+
 - `fal-ai/nano-banana-2`: `{ prompt, num_images: 1 }`
 - `fal-ai/nano-banana-2/edit`: `{ image_url, prompt }` — maskless semantic editing, no mask required
 - `fal-ai/flux/dev/image-to-image`: `{ image_url, prompt, strength: 0.85, num_inference_steps: 28, guidance_scale: 3.5, num_images: 1, enable_safety_checker: true }`
@@ -67,10 +68,13 @@ Add `generated-video` to the `ContentBlock` union:
 ### 3a. State change
 
 Replace:
+
 ```ts
 const [imageMode, setImageMode] = useState(false);
 ```
+
 With:
+
 ```ts
 type GenerationMode = 'chat' | 'flux' | 'nano-banana' | 'seedance';
 const [generationMode, setGenerationMode] = useState<GenerationMode>('chat');
@@ -85,6 +89,7 @@ When `generationMode` is `'seedance'`, call `sendVideo()` instead (see below).
 ### 3c. `sendVideo()`
 
 New function mirroring `sendImage()`:
+
 - Loading message: `'🎬 Generating video...'`
 - POST to `/api/video` with `{ prompt, imageData?, mediaType? }` (include pending image data if present)
 - On success: append `{ type: 'generated-video', url, prompt }` content block
@@ -101,11 +106,13 @@ else sendImage(); // flux or nano-banana
 ```
 
 Placeholder text by mode:
+
 - `chat`: `'Ask Based anything...'`
 - `flux` / `nano-banana`: `'Describe an image to generate...'`
 - `seedance`: `'Describe a video to generate...'`
 
 Send button label by mode:
+
 - `chat`: `'Send'`
 - `flux` / `nano-banana`: `'Generate'`
 - `seedance`: `'Generate'`
@@ -121,6 +128,7 @@ Disable `📎` when `generationMode === 'chat'` (existing behaviour). Enable for
 **File:** `components/ModeDropdown.tsx`
 
 Props:
+
 ```ts
 { mode: GenerationMode; onChange: (m: GenerationMode) => void; disabled: boolean }
 ```
@@ -128,6 +136,7 @@ Props:
 Renders a button showing the current mode icon + `▼`. On click, toggles `open` state.
 
 Dropdown panel uses Framer Motion `AnimatePresence` + `motion.div`:
+
 - `initial={{ opacity: 0, y: -8, scale: 0.97 }}`
 - `animate={{ opacity: 1, y: 0, scale: 1 }}`
 - `exit={{ opacity: 0, y: -8, scale: 0.97 }}`
@@ -156,6 +165,7 @@ Replace the existing `<button className="image-mode-btn">` in ChatPanel with `<M
 Props: `{ url: string; prompt: string }`
 
 **Anatomy:**
+
 - `motion.div` wrapper: entry animation `initial={{ opacity: 0, scale: 0.95 }}` → `animate={{ opacity: 1, scale: 1 }}`, spring transition
 - Thumbnail area: dark gradient placeholder (`background: linear-gradient(135deg, #1a1a2e, #16213e)`)
   - When `playing === false`: centred purple play button (Framer Motion `whileHover={{ scale: 1.1 }}`, `whileTap={{ scale: 0.95 }}`)
@@ -172,7 +182,9 @@ Local state: `const [playing, setPlaying] = useState(false)`. Clicking the play 
 Apply to existing components in ChatPanel:
 
 ### Messages
+
 Wrap the messages list with `<AnimatePresence>`. Each message `<div>` becomes:
+
 ```tsx
 <motion.div
   key={i}
@@ -183,14 +195,21 @@ Wrap the messages list with `<AnimatePresence>`. Each message `<div>` becomes:
 ```
 
 ### Generated image cards
+
 Wrap the `generated-image` block in:
+
 ```tsx
-<motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-  transition={{ type: 'spring', stiffness: 350, damping: 28 }} />
+<motion.div
+  initial={{ opacity: 0, scale: 0.95 }}
+  animate={{ opacity: 1, scale: 1 }}
+  transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+/>
 ```
 
 ### Suggestion chips
+
 Wrap each chip in `motion.button` with staggered entry:
+
 ```tsx
 <motion.button
   initial={{ opacity: 0, y: 8 }}
@@ -202,10 +221,13 @@ Wrap each chip in `motion.button` with staggered entry:
 ```
 
 ### Send button
+
 Add `whileTap={{ scale: 0.95 }}` via `motion.button`.
 
 ### Progress bar fill
+
 Replace the CSS-width div with:
+
 ```tsx
 <motion.div
   className="gen-progress-bar-fill"
@@ -215,21 +237,22 @@ Replace the CSS-width div with:
 ```
 
 ### Image preview (pending upload)
+
 Wrap in `motion.div` with `initial={{ opacity: 0, scale: 0.9 }}` → `animate={{ opacity: 1, scale: 1 }}`.
 
 ---
 
 ## 7. Files Changed / Created
 
-| File | Change |
-|---|---|
-| `app/api/image/route.ts` | Add `model` + `sourceImageData` support |
-| `app/api/video/route.ts` | New — Seedance 2.0 text-to-video + image-to-video |
-| `app/page.tsx` | Add `generated-video` to `ContentBlock` union |
-| `components/ChatPanel.tsx` | Replace imageMode, add sendVideo, wire animations, use ModeDropdown |
-| `components/ModeDropdown.tsx` | New — animated model picker dropdown |
-| `components/GeneratedVideoCard.tsx` | New — Option B video player card |
-| `app/globals.css` | Add styles for video card, mode dropdown |
+| File                                | Change                                                              |
+| ----------------------------------- | ------------------------------------------------------------------- |
+| `app/api/image/route.ts`            | Add `model` + `sourceImageData` support                             |
+| `app/api/video/route.ts`            | New — Seedance 2.0 text-to-video + image-to-video                   |
+| `app/page.tsx`                      | Add `generated-video` to `ContentBlock` union                       |
+| `components/ChatPanel.tsx`          | Replace imageMode, add sendVideo, wire animations, use ModeDropdown |
+| `components/ModeDropdown.tsx`       | New — animated model picker dropdown                                |
+| `components/GeneratedVideoCard.tsx` | New — Option B video player card                                    |
+| `app/globals.css`                   | Add styles for video card, mode dropdown                            |
 
 ---
 

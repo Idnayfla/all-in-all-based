@@ -15,10 +15,11 @@ Replace the current single-user localStorage + shared Redis storage with real pe
 
 ## Architecture
 
-**Approach:** Supabase Auth + Next.js server-side API routes  
-- Supabase handles authentication and PostgreSQL storage  
-- All data access goes through existing `/api/*` Next.js routes (service key stays server-side)  
-- No client-side Supabase data calls — consistent with the existing codebase pattern  
+**Approach:** Supabase Auth + Next.js server-side API routes
+
+- Supabase handles authentication and PostgreSQL storage
+- All data access goes through existing `/api/*` Next.js routes (service key stays server-side)
+- No client-side Supabase data calls — consistent with the existing codebase pattern
 - Frontend sends `Authorization: Bearer <token>` with every request; API routes verify it and scope queries to `user_id`
 
 ---
@@ -59,14 +60,16 @@ Row Level Security is **disabled** — the server enforces user isolation in cod
 ## 2. Auth Flow
 
 ### Sign-in Modal
+
 Appears on app load if no valid session exists. Animated Framer Motion modal (same spring style as `ProjectNameModal`). Closes automatically once authenticated.
 
 **Two tabs: Sign In / Sign Up**
 
 **OAuth buttons (both tabs):** Google · GitHub · Microsoft · Apple  
-*(Apple required for iOS App Store compliance — Phase 4)*
+_(Apple required for iOS App Store compliance — Phase 4)_
 
 ### Sign Up (email + password)
+
 1. User enters email, password, confirm password → Submit
 2. Supabase creates account, sends verification email
 3. Modal shows "Check your inbox to verify your email"
@@ -74,40 +77,46 @@ Appears on app load if no valid session exists. Animated Framer Motion modal (sa
 5. First-login migration runs automatically (see Section 5)
 
 ### Sign In (email + password)
+
 1. User enters email + password → Submit
 2. Supabase validates credentials → returns session token
 3. Modal closes, app loads with user's cloud data
 
 ### OAuth (Google / GitHub / Microsoft / Apple)
+
 1. User clicks provider button → redirected to provider consent screen
 2. Provider redirects to `/auth/callback`
 3. `app/auth/callback/route.ts` exchanges the OAuth code for a Supabase session
 4. App loads with user's cloud data (first-login migration runs if needed)
 
 ### Session Handling
+
 - Supabase JS client (`@supabase/supabase-js`) manages the session cookie
 - Session persists across browser restarts — user stays logged in
 - All API routes read `Authorization: Bearer <token>` to identify the user
 - **Mobile (Phase 3):** OAuth uses deep links (`allinallbased://auth/callback`) instead of browser redirects — no auth rewrite required
 
 ### Sign Out
+
 - Button in the Settings panel (bottom)
 - Clears Supabase session → AuthModal reappears
 
 ### Password Reset
+
 - "Forgot password?" link on Sign In tab
 - Supabase sends a reset link to the user's email
 - User clicks link → redirected to app with reset token → new password form shown
 
 ### Platform Coverage
-| Platform | Auth method | Works? |
-|----------|------------|--------|
-| Web browser (Chrome, Firefox, Safari, Edge) | All | ✅ Phase 1 |
-| Windows / Mac / Linux desktop browser | All | ✅ Phase 1 |
-| Android | All (deep links for OAuth) | ✅ Phase 3 |
-| iOS | All + Sign in with Apple | ✅ Phase 3 |
-| Play Store app | All | ✅ Phase 3 |
-| App Store app | All + Sign in with Apple | ✅ Phase 3 |
+
+| Platform                                    | Auth method                | Works?     |
+| ------------------------------------------- | -------------------------- | ---------- |
+| Web browser (Chrome, Firefox, Safari, Edge) | All                        | ✅ Phase 1 |
+| Windows / Mac / Linux desktop browser       | All                        | ✅ Phase 1 |
+| Android                                     | All (deep links for OAuth) | ✅ Phase 3 |
+| iOS                                         | All + Sign in with Apple   | ✅ Phase 3 |
+| Play Store app                              | All                        | ✅ Phase 3 |
+| App Store app                               | All + Sign in with Apple   | ✅ Phase 3 |
 
 ---
 
@@ -115,17 +124,17 @@ Appears on app load if no valid session exists. Animated Framer Motion modal (sa
 
 ### New Routes
 
-| Route | Method | Purpose |
-|-------|--------|---------|
-| `app/auth/callback/route.ts` | GET | Exchange OAuth code for session |
-| `app/api/projects/route.ts` | GET | List all projects for authenticated user |
-| `app/api/projects/route.ts` | POST | Create new project |
-| `app/api/projects/[id]/route.ts` | GET | Load one project |
-| `app/api/projects/[id]/route.ts` | PUT | Save project (files + messages + memory + name) |
-| `app/api/projects/[id]/route.ts` | DELETE | Delete project |
-| `app/api/settings/route.ts` | GET | Load personality + global memory |
-| `app/api/settings/route.ts` | PUT | Save personality + global memory (upsert) |
-| `app/api/migrate/route.ts` | POST | One-time: import localStorage dump into Supabase |
+| Route                            | Method | Purpose                                          |
+| -------------------------------- | ------ | ------------------------------------------------ |
+| `app/auth/callback/route.ts`     | GET    | Exchange OAuth code for session                  |
+| `app/api/projects/route.ts`      | GET    | List all projects for authenticated user         |
+| `app/api/projects/route.ts`      | POST   | Create new project                               |
+| `app/api/projects/[id]/route.ts` | GET    | Load one project                                 |
+| `app/api/projects/[id]/route.ts` | PUT    | Save project (files + messages + memory + name)  |
+| `app/api/projects/[id]/route.ts` | DELETE | Delete project                                   |
+| `app/api/settings/route.ts`      | GET    | Load personality + global memory                 |
+| `app/api/settings/route.ts`      | PUT    | Save personality + global memory (upsert)        |
+| `app/api/migrate/route.ts`       | POST   | One-time: import localStorage dump into Supabase |
 
 ### Modified Existing Routes
 
@@ -139,7 +148,10 @@ export async function getUserId(req: NextRequest): Promise<string> {
   const token = req.headers.get('Authorization')?.replace('Bearer ', '');
   if (!token) throw new Error('Unauthorized');
   const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
-  const { data: { user }, error } = await supabase.auth.getUser(token);
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(token);
   if (error || !user) throw new Error('Unauthorized');
   return user.id;
 }
@@ -154,10 +166,12 @@ export async function getUserId(req: NextRequest): Promise<string> {
 Every fetch to `/api/*` includes the session token:
 
 ```ts
-const { data: { session } } = await supabase.auth.getSession();
+const {
+  data: { session },
+} = await supabase.auth.getSession();
 const headers = {
   'Content-Type': 'application/json',
-  'Authorization': `Bearer ${session?.access_token ?? ''}`,
+  Authorization: `Bearer ${session?.access_token ?? ''}`,
 };
 ```
 
@@ -166,11 +180,13 @@ const headers = {
 ## 4. Frontend Changes
 
 ### New Files
+
 - `components/AuthModal.tsx` — sign in / sign up modal with Framer Motion animations
 - `lib/supabase.ts` — browser Supabase client (anon key only, used for auth session management)
 - `app/auth/callback/route.ts` — OAuth callback handler
 
 ### `app/page.tsx` Changes
+
 - On mount: check Supabase session → if none, show `<AuthModal />`
 - Replace all `localStorage` reads/writes for projects with `/api/projects` calls
 - Replace `localStorage` reads/writes for personality with `/api/settings` calls
@@ -180,6 +196,7 @@ const headers = {
 - Sign Out button at bottom of Settings panel
 
 ### `components/AuthModal.tsx` Design
+
 ```
 ┌─────────────────────────────────────┐
 │         Welcome to Based            │
@@ -199,17 +216,20 @@ const headers = {
 │  Forgot password?                   │
 └─────────────────────────────────────┘
 ```
+
 - Entry: `initial={{ opacity: 0, scale: 0.94, y: -12 }}` spring stiffness 400 damping 30
 - Overlay: fade in/out `duration: 0.15`
 - Tab switch: slide animation between Sign In / Sign Up
 
 ### `components/Sidebar.tsx` Changes
+
 - Projects loaded from `GET /api/projects` on mount
 - Create → `POST /api/projects`
 - Rename → `PUT /api/projects/[id]` (name only)
 - Delete → `DELETE /api/projects/[id]`
 
 ### `components/ChatPanel.tsx` Changes
+
 - Memory extraction after generation: `PUT /api/settings` instead of `POST /api/memory`
 - Auto-save project after generation: `PUT /api/projects/[id]`
 - All fetches include auth header
@@ -221,6 +241,7 @@ const headers = {
 Runs automatically once on first login. If localStorage has no projects, migration is skipped silently.
 
 **`POST /api/migrate` flow:**
+
 1. Frontend sends: `{ projects: Project[], personality: string, globalMemory: string }`
 2. Server inserts all projects into `projects` table (batch insert)
 3. Server upserts `user_settings` with personality + global memory
@@ -228,6 +249,7 @@ Runs automatically once on first login. If localStorage has no projects, migrati
 5. Frontend clears localStorage on success
 
 **First-login detection:**
+
 ```ts
 // After login, check if user has any projects in Supabase
 const res = await fetch('/api/projects', { headers });
@@ -263,22 +285,22 @@ SUPABASE_SERVICE_KEY=eyJ...                   # server-side only, never exposed 
 
 ## 8. Files Created / Modified
 
-| File | Change |
-|------|--------|
-| `app/auth/callback/route.ts` | New — OAuth code exchange |
-| `app/api/_auth.ts` | New — shared `getUserId()` helper |
-| `app/api/projects/route.ts` | New — list + create projects |
-| `app/api/projects/[id]/route.ts` | New — get, update, delete project |
-| `app/api/settings/route.ts` | New — get + save user settings |
-| `app/api/migrate/route.ts` | New — one-time localStorage import |
-| `app/api/memory/route.ts` | Modify — replace Redis with Supabase |
-| `app/api/memory/save/route.ts` | Modify — replace Redis with Supabase |
-| `app/page.tsx` | Modify — session check, cloud data loading, migration, user avatar |
-| `components/AuthModal.tsx` | New — animated sign in / sign up modal |
-| `components/ChatPanel.tsx` | Modify — auth headers on all fetches, auto-save project |
-| `components/Sidebar.tsx` | Modify — project CRUD via API |
-| `lib/supabase.ts` | New — browser Supabase client |
-| `app/globals.css` | Modify — AuthModal styles, user avatar styles |
+| File                             | Change                                                             |
+| -------------------------------- | ------------------------------------------------------------------ |
+| `app/auth/callback/route.ts`     | New — OAuth code exchange                                          |
+| `app/api/_auth.ts`               | New — shared `getUserId()` helper                                  |
+| `app/api/projects/route.ts`      | New — list + create projects                                       |
+| `app/api/projects/[id]/route.ts` | New — get, update, delete project                                  |
+| `app/api/settings/route.ts`      | New — get + save user settings                                     |
+| `app/api/migrate/route.ts`       | New — one-time localStorage import                                 |
+| `app/api/memory/route.ts`        | Modify — replace Redis with Supabase                               |
+| `app/api/memory/save/route.ts`   | Modify — replace Redis with Supabase                               |
+| `app/page.tsx`                   | Modify — session check, cloud data loading, migration, user avatar |
+| `components/AuthModal.tsx`       | New — animated sign in / sign up modal                             |
+| `components/ChatPanel.tsx`       | Modify — auth headers on all fetches, auto-save project            |
+| `components/Sidebar.tsx`         | Modify — project CRUD via API                                      |
+| `lib/supabase.ts`                | New — browser Supabase client                                      |
+| `app/globals.css`                | Modify — AuthModal styles, user avatar styles                      |
 
 ---
 

@@ -1,12 +1,11 @@
-export async function getWeather(
-  location: string | { lat: number; lon: number }
-): Promise<string> {
+export async function getWeather(location: string | { lat: number; lon: number }): Promise<string> {
   const key = process.env.OPENWEATHER_API_KEY;
   if (!key) return '';
 
-  const q = typeof location === 'string'
-    ? `q=${encodeURIComponent(location)}`
-    : `lat=${location.lat}&lon=${location.lon}`;
+  const q =
+    typeof location === 'string'
+      ? `q=${encodeURIComponent(location)}`
+      : `lat=${location.lat}&lon=${location.lon}`;
 
   const res = await fetch(
     `https://api.openweathermap.org/data/2.5/weather?${q}&appid=${key}&units=metric`

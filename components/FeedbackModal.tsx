@@ -3,9 +3,9 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const TYPES = [
-  { value: 'bug',        label: '◈ Bug' },
+  { value: 'bug', label: '◈ Bug' },
   { value: 'suggestion', label: '⬡ Suggestion' },
-  { value: 'general',    label: '· General' },
+  { value: 'general', label: '· General' },
 ];
 
 export default function FeedbackModal({
@@ -15,11 +15,11 @@ export default function FeedbackModal({
   onClose: () => void;
   userEmail?: string;
 }) {
-  const [type, setType]       = useState('general');
+  const [type, setType] = useState('general');
   const [message, setMessage] = useState('');
-  const [email, setEmail]     = useState(userEmail ?? '');
+  const [email, setEmail] = useState(userEmail ?? '');
   const [sending, setSending] = useState(false);
-  const [done, setDone]       = useState(false);
+  const [done, setDone] = useState(false);
 
   const submit = async () => {
     if (!message.trim() || sending) return;
@@ -48,7 +48,9 @@ export default function FeedbackModal({
       >
         <div className="feedback-header">
           <span className="feedback-title">⬡ Feedback</span>
-          <button className="feedback-close" onClick={onClose}>✕</button>
+          <button className="feedback-close" onClick={onClose}>
+            ✕
+          </button>
         </div>
 
         <AnimatePresence mode="wait">
@@ -63,7 +65,9 @@ export default function FeedbackModal({
               <div className="feedback-done-icon">◈</div>
               <div className="feedback-done-text">Received — thank you.</div>
               <div className="feedback-done-sub">This helps improve Based for everyone.</div>
-              <button className="feedback-submit" onClick={onClose}>Close</button>
+              <button className="feedback-submit" onClick={onClose}>
+                Close
+              </button>
             </motion.div>
           ) : (
             <motion.div key="form" initial={{ opacity: 1 }} exit={{ opacity: 0 }}>
@@ -97,7 +101,9 @@ export default function FeedbackModal({
               />
 
               <div className="feedback-footer">
-                <span className="feedback-hint">Sent to <a href="mailto:husgogogo@gmail.com">husgogogo@gmail.com</a></span>
+                <span className="feedback-hint">
+                  Sent to <a href="mailto:husgogogo@gmail.com">husgogogo@gmail.com</a>
+                </span>
                 <button
                   className="feedback-submit"
                   onClick={submit}

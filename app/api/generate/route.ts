@@ -12,8 +12,8 @@ const client = new Anthropic({
 
 const PANTHEON_KEY = process.env.PANTHEON_OWNER_KEY ?? 'pk_owner_based_internal';
 const PANTHEON_URL = process.env.PANTHEON_API_URL ?? 'https://pantheon-api.vercel.app';
-const GROQ_URL     = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL   = 'llama-3.3-70b-versatile';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 function friendlyError(e: any): string {
   const raw: string = e?.message ?? String(e);
@@ -21,12 +21,16 @@ function friendlyError(e: any): string {
     const parsed = JSON.parse(raw);
     const t = parsed?.error?.type ?? parsed?.type;
     const m = parsed?.error?.message ?? parsed?.message;
-    if (t === 'overloaded_error') return 'Based is a bit overloaded right now — wait a moment and try again.';
-    if (t === 'rate_limit_error')  return 'Rate limit hit — please wait a few seconds and try again.';
+    if (t === 'overloaded_error')
+      return 'Based is a bit overloaded right now — wait a moment and try again.';
+    if (t === 'rate_limit_error')
+      return 'Rate limit hit — please wait a few seconds and try again.';
     if (m) return m;
   } catch {}
-  if (raw.toLowerCase().includes('overload')) return 'Based is a bit overloaded right now — wait a moment and try again.';
-  if (raw.toLowerCase().includes('rate limit') || raw.toLowerCase().includes('429')) return 'Rate limit hit — please wait a few seconds and try again.';
+  if (raw.toLowerCase().includes('overload'))
+    return 'Based is a bit overloaded right now — wait a moment and try again.';
+  if (raw.toLowerCase().includes('rate limit') || raw.toLowerCase().includes('429'))
+    return 'Rate limit hit — please wait a few seconds and try again.';
   return raw || 'Something went wrong — please try again.';
 }
 
@@ -47,7 +51,12 @@ async function callPantheon(
       const res = await fetch(`${PANTHEON_URL}/api/v1/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${PANTHEON_KEY}` },
-        body: JSON.stringify({ messages, task_type: taskType, stream: false, max_tokens: maxTokens }),
+        body: JSON.stringify({
+          messages,
+          task_type: taskType,
+          stream: false,
+          max_tokens: maxTokens,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText }));
@@ -122,17 +131,23 @@ async function* streamPantheon(
       try {
         const parsed = JSON.parse(payload);
         // detect forwarded Anthropic error events
-        if (parsed.type === 'error') throw new Error(parsed.error?.message ?? JSON.stringify(parsed));
+        if (parsed.type === 'error')
+          throw new Error(parsed.error?.message ?? JSON.stringify(parsed));
         if (parsed.type === 'text') {
           const txt: string = parsed.text;
           // detect error JSON forwarded as text content
           if (txt.trimStart().startsWith('{"type":"error"')) {
-            try { throw new Error(JSON.parse(txt)?.error?.message ?? txt); } catch (inner) { throw inner; }
+            try {
+              throw new Error(JSON.parse(txt)?.error?.message ?? txt);
+            } catch (inner) {
+              throw inner;
+            }
           }
           yield txt;
         }
       } catch (e) {
-        if ((e as any).message?.includes('yield') || (e as any).constructor?.name !== 'SyntaxError') throw e;
+        if ((e as any).message?.includes('yield') || (e as any).constructor?.name !== 'SyntaxError')
+          throw e;
       }
     }
   }
@@ -149,7 +164,10 @@ async function callGroq(
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await fetch(GROQ_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
       body: JSON.stringify({ model: GROQ_MODEL, messages, stream: false, max_tokens: capped }),
     });
     if (res.status === 429) {
@@ -174,7 +192,10 @@ async function streamGroqCollecting(
   for (let attempt = 0; attempt < 2; attempt++) {
     const res = await fetch(GROQ_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
       body: JSON.stringify({ model: GROQ_MODEL, messages, stream: true, max_tokens: capped }),
     });
     if (res.status === 429) {
@@ -201,7 +222,10 @@ async function streamGroqCollecting(
         try {
           const parsed = JSON.parse(payload);
           const text: string = parsed.choices?.[0]?.delta?.content ?? '';
-          if (text) { accumulated += text; onChunk(text); }
+          if (text) {
+            accumulated += text;
+            onChunk(text);
+          }
         } catch {}
       }
     }
@@ -737,7 +761,11 @@ const PLANNER_SYSTEM_BLOCKS = [
 ];
 
 const FILE_GENERATOR_SYSTEM_BLOCKS = [
-  { type: 'text' as const, text: FILE_GENERATOR_SYSTEM, cache_control: { type: 'ephemeral' as const } },
+  {
+    type: 'text' as const,
+    text: FILE_GENERATOR_SYSTEM,
+    cache_control: { type: 'ephemeral' as const },
+  },
 ];
 
 const IMAGE_SRC_PLACEHOLDER = '__BASED_IMAGE_SRC__';
@@ -854,7 +882,14 @@ function toClaudeContent(
     if (block.type === 'text') {
       blocks.push({ type: 'text', text: block.text });
     } else if (block.type === 'image' && block.mediaType && block.data) {
-      blocks.push({ type: 'image', source: { type: 'base64' as const, media_type: block.mediaType as ImageMediaType, data: block.data } });
+      blocks.push({
+        type: 'image',
+        source: {
+          type: 'base64' as const,
+          media_type: block.mediaType as ImageMediaType,
+          data: block.data,
+        },
+      });
     } else if (block.type === 'clarify') {
       // clarify blocks become a plain-text summary so conversation history stays coherent
       blocks.push({ type: 'text', text: `[Asked for clarification: "${block.question}"]` });
@@ -883,14 +918,24 @@ async function callModel(
   if (!hasImages) {
     const systemText = Array.isArray(systemPrompt)
       ? systemPrompt.map((b: any) => b.text ?? '').join('\n')
-      : (systemPrompt as string) ?? '';
+      : ((systemPrompt as string) ?? '');
     const userText = Array.isArray(prompt)
-      ? prompt.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n')
+      ? prompt
+          .filter((b: any) => b.type === 'text')
+          .map((b: any) => b.text)
+          .join('\n')
       : (prompt as string);
-    const msgs = [{ role: 'system', content: systemText }, { role: 'user', content: userText }];
+    const msgs = [
+      { role: 'system', content: systemText },
+      { role: 'user', content: userText },
+    ];
     const maxTokens = modelType === 'generator' ? 8000 : modelType === 'planner' ? 300 : 800;
     if (aiModel === 'free' && process.env.GROQ_API_KEY) {
-      try { return await callGroq(msgs, maxTokens); } catch { /* fall through to Pantheon */ }
+      try {
+        return await callGroq(msgs, maxTokens);
+      } catch {
+        /* fall through to Pantheon */
+      }
     }
     return callPantheon(msgs, modelType === 'generator' ? 'chat' : 'fast_chat', maxTokens);
   }
@@ -915,14 +960,26 @@ async function streamText(
   taskType: 'fast_chat' | 'chat' = 'chat'
 ): Promise<string> {
   if (aiModel === 'free' && process.env.GROQ_API_KEY) {
-    try { return await streamGroqCollecting(messages, maxTokens, onChunk); } catch { /* fall through */ }
+    try {
+      return await streamGroqCollecting(messages, maxTokens, onChunk);
+    } catch {
+      /* fall through */
+    }
   }
   return streamPantheonCollecting(messages, taskType, maxTokens, onChunk, onRetry);
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { messages, existingFiles, personality, memory, globalMemory: clientGlobalMemory, location, aiModel } = await req.json();
+    const {
+      messages,
+      existingFiles,
+      personality,
+      memory,
+      globalMemory: clientGlobalMemory,
+      location,
+      aiModel,
+    } = await req.json();
     const usingFreeModel = aiModel === 'free' && !!process.env.GROQ_API_KEY;
 
     // Free tier generation gate — fail open so DB issues never block users
@@ -932,20 +989,26 @@ export async function POST(req: NextRequest) {
     const authToken = req.headers.get('Authorization')?.replace('Bearer ', '');
     if (!alwaysPro && !usingFreeModel && authToken) {
       try {
-        const { data: { user } } = await supabaseAdmin.auth.getUser(authToken);
+        const {
+          data: { user },
+        } = await supabaseAdmin.auth.getUser(authToken);
         if (user) {
           const { data: s } = await supabaseAdmin
             .from('user_settings')
-            .select('subscription_tier, generations_used, generations_reset_at, pro_bonus_expires_at')
+            .select(
+              'subscription_tier, generations_used, generations_reset_at, pro_bonus_expires_at'
+            )
             .eq('user_id', user.id)
             .single();
 
-          const hasBonusPro = !!s?.pro_bonus_expires_at && new Date(s.pro_bonus_expires_at) > new Date();
+          const hasBonusPro =
+            !!s?.pro_bonus_expires_at && new Date(s.pro_bonus_expires_at) > new Date();
           const effectiveTier = s?.subscription_tier === 'pro' || hasBonusPro ? 'pro' : 'free';
 
           if (effectiveTier === 'free') {
             const now = new Date();
-            const needsReset = !s?.generations_reset_at ||
+            const needsReset =
+              !s?.generations_reset_at ||
               new Date(s.generations_reset_at).getMonth() !== now.getMonth() ||
               new Date(s.generations_reset_at).getFullYear() !== now.getFullYear();
             const used = needsReset ? 0 : (s?.generations_used ?? 0);
@@ -954,14 +1017,23 @@ export async function POST(req: NextRequest) {
               return NextResponse.json({ error: 'generation_limit_reached' }, { status: 402 });
             }
 
-            void (async () => { try { await supabaseAdmin.from('user_settings').upsert({
-              user_id: user.id,
-              generations_used: used + 1,
-              generations_reset_at: needsReset ? now.toISOString() : s.generations_reset_at,
-            }, { onConflict: 'user_id' }); } catch {} })();
+            void (async () => {
+              try {
+                await supabaseAdmin.from('user_settings').upsert(
+                  {
+                    user_id: user.id,
+                    generations_used: used + 1,
+                    generations_reset_at: needsReset ? now.toISOString() : s.generations_reset_at,
+                  },
+                  { onConflict: 'user_id' }
+                );
+              } catch {}
+            })();
           }
         }
-      } catch { /* fail open */ }
+      } catch {
+        /* fail open */
+      }
     }
 
     let globalMemory = clientGlobalMemory || '';
@@ -970,7 +1042,7 @@ export async function POST(req: NextRequest) {
         const { createClient } = await import('redis');
         const redis = createClient({ url: process.env.REDIS_URL });
         await redis.connect();
-        globalMemory = await redis.get('based_memory') ?? '';
+        globalMemory = (await redis.get('based_memory')) ?? '';
         await redis.disconnect();
       } catch (e) {}
     }
@@ -980,16 +1052,26 @@ export async function POST(req: NextRequest) {
     const lastUserMessage = msgToString(lastUserMsg?.content ?? '');
 
     // Extract image blocks from the last user message for reuse in planner + file generators
-    const hasImage = Array.isArray(lastUserMsg?.content) &&
+    const hasImage =
+      Array.isArray(lastUserMsg?.content) &&
       (lastUserMsg.content as any[]).some((b: any) => b.type === 'image');
-    const VALID_MEDIA_TYPES: ImageMediaType[] = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const VALID_MEDIA_TYPES: ImageMediaType[] = [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+    ];
     const imageBlocks: ClaudeImageBlock[] = hasImage
       ? (lastUserMsg.content as ApiContentBlock[])
           .filter((b): b is Extract<ApiContentBlock, { type: 'image' }> => b.type === 'image')
           .filter(b => VALID_MEDIA_TYPES.includes(b.mediaType as ImageMediaType))
           .map(b => ({
             type: 'image' as const,
-            source: { type: 'base64' as const, media_type: b.mediaType as ImageMediaType, data: b.data },
+            source: {
+              type: 'base64' as const,
+              media_type: b.mediaType as ImageMediaType,
+              data: b.data,
+            },
           }))
       : [];
 
@@ -999,19 +1081,30 @@ export async function POST(req: NextRequest) {
 
     const anthropicMessages = recentMessages.map((m: any, i: number) => ({
       role: m.role,
-      content: i === recentMessages.length - 1 && m.role === 'user'
-        ? toClaudeContent(m.content, context || undefined)
-        : toClaudeContent(m.content),
+      content:
+        i === recentMessages.length - 1 && m.role === 'user'
+          ? toClaudeContent(m.content, context || undefined)
+          : toClaudeContent(m.content),
     }));
 
     // Static SYSTEM is first so it caches across all requests; dynamic parts appended after.
-    const systemBlocks: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> = [
-      { type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } },
-    ];
-    if (personality) systemBlocks.push({ type: 'text', text: `\nPERSONALITY (adjusts tone and verbosity only — never changes what action to take, never adds greetings, never delays code generation):\n${personality}` });
-    if (globalMemory) systemBlocks.push({ type: 'text', text: `\nGLOBAL USER MEMORY:\n${globalMemory}` });
+    const systemBlocks: Array<{
+      type: 'text';
+      text: string;
+      cache_control?: { type: 'ephemeral' };
+    }> = [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }];
+    if (personality)
+      systemBlocks.push({
+        type: 'text',
+        text: `\nPERSONALITY (adjusts tone and verbosity only — never changes what action to take, never adds greetings, never delays code generation):\n${personality}`,
+      });
+    if (globalMemory)
+      systemBlocks.push({ type: 'text', text: `\nGLOBAL USER MEMORY:\n${globalMemory}` });
     if (memory) systemBlocks.push({ type: 'text', text: `\nPROJECT MEMORY:\n${memory}` });
-    systemBlocks.push({ type: 'text', text: '\nCRITICAL RULE (overrides everything above): When the user asks to build, create, make, design, animate, fix, or generate anything — output forge_file code immediately. Never greet, ask clarifying questions, or refuse a code request. Go straight to the files.' });
+    systemBlocks.push({
+      type: 'text',
+      text: '\nCRITICAL RULE (overrides everything above): When the user asks to build, create, make, design, animate, fix, or generate anything — output forge_file code immediately. Never greet, ask clarifying questions, or refuse a code request. Go straight to the files.',
+    });
 
     const encoder = new TextEncoder();
 
@@ -1031,56 +1124,87 @@ export async function POST(req: NextRequest) {
               if (match) {
                 const needs = JSON.parse(match[0]);
                 if (needs.needsSearch && process.env.TAVILY_API_KEY && needs.searchQuery) {
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ searching: 'web' })}\n\n`));
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ searching: 'web' })}\n\n`)
+                  );
                   const results = await searchWeb(needs.searchQuery);
-                  if (results) realtimeContext += `\nWEB SEARCH for "${needs.searchQuery}":\n${results}`;
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ searching: null })}\n\n`));
+                  if (results)
+                    realtimeContext += `\nWEB SEARCH for "${needs.searchQuery}":\n${results}`;
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ searching: null })}\n\n`)
+                  );
                 }
                 if (needs.needsWeather && process.env.OPENWEATHER_API_KEY) {
-                  const loc = needs.weatherLocation
-                    ? needs.weatherLocation
-                    : location ?? null;
+                  const loc = needs.weatherLocation ? needs.weatherLocation : (location ?? null);
                   if (loc) {
                     const weather = await getWeather(loc);
                     if (weather) realtimeContext += `\nCURRENT WEATHER:\n${weather}`;
                   }
                 }
               }
-            } catch { /* fail open */ }
+            } catch {
+              /* fail open */
+            }
           }
           if (realtimeContext) {
-            systemBlocks.push({ type: 'text', text: `\nREAL-TIME DATA (use this as actual data in the generated app — do not invent fake values when real data is provided):\n${realtimeContext}` });
+            systemBlocks.push({
+              type: 'text',
+              text: `\nREAL-TIME DATA (use this as actual data in the generated app — do not invent fake values when real data is provided):\n${realtimeContext}`,
+            });
           }
 
           // ── Intent clarity check (Akinator-style) ──────────────────────
           // Fast check before planning — if the request is too vague, ask one
           // clarifying question with chip options instead of guessing wrong.
-          const msgWords = typeof lastUserMessage === 'string' ? lastUserMessage.trim().split(/\s+/).length : 0;
-          const skipClarity = imageBlocks.length > 0
-            || msgWords < 4  // "Hi", "Hello", "Thanks", "ok cool" — skip entirely
-            || /^(hi|hey|hello|thanks|thank you|ok|okay|sure|lol|nice|cool|great|good|sounds good|got it|understood|yep|yup|nope|yes|no|what|why|how|hmm)\b/i.test(typeof lastUserMessage === 'string' ? lastUserMessage.trim() : '');
+          const msgWords =
+            typeof lastUserMessage === 'string' ? lastUserMessage.trim().split(/\s+/).length : 0;
+          const skipClarity =
+            imageBlocks.length > 0 ||
+            msgWords < 4 || // "Hi", "Hello", "Thanks", "ok cool" — skip entirely
+            /^(hi|hey|hello|thanks|thank you|ok|okay|sure|lol|nice|cool|great|good|sounds good|got it|understood|yep|yup|nope|yes|no|what|why|how|hmm)\b/i.test(
+              typeof lastUserMessage === 'string' ? lastUserMessage.trim() : ''
+            );
 
-          if (!skipClarity && typeof lastUserMessage === 'string' && lastUserMessage.trim().length > 0) {
+          if (
+            !skipClarity &&
+            typeof lastUserMessage === 'string' &&
+            lastUserMessage.trim().length > 0
+          ) {
             try {
               const clarityRaw = await callPantheon(
                 [
-                  { role: 'system', content: `Analyze this request. Return ONLY raw JSON, no markdown or explanation.
+                  {
+                    role: 'system',
+                    content: `Analyze this request. Return ONLY raw JSON, no markdown or explanation.
 If it is a question, calculation, analysis, or data task (not a build request) — always: {"clear":true}
 If it is a greeting, casual conversation, feedback, or anything that is not a build request — always: {"clear":true}
 If it is a build request specific enough to build directly: {"clear":true}
 If it is a genuinely vague BUILD request (only "build"/"make"/"create"/"make me" with NO subject) and one question would significantly improve the result: {"clear":false,"question":"short question?","options":["Option A","Option B","Option C"]}
 Options must be 2-5 words. Be extremely generous with "clear" — only fire for pure "make me something" with zero details.
 CLEAR examples: "snake game", "todo list with drag and drop", "what is 20% of 500", "translate this text", "write a cover letter", "hi", "hello", "how are you"
-VAGUE examples (ONLY these should ever be false): "make an app", "build something", "a game" (with NO other details), "make something nice"` },
+VAGUE examples (ONLY these should ever be false): "make an app", "build something", "a game" (with NO other details), "make something nice"`,
+                  },
                   { role: 'user', content: lastUserMessage.trim() },
                 ],
                 'fast_chat',
                 120
               );
-              const cleaned = clarityRaw.trim().replace(/^```json|^```|```$/g, '').trim();
+              const cleaned = clarityRaw
+                .trim()
+                .replace(/^```json|^```|```$/g, '')
+                .trim();
               const clarity = JSON.parse(cleaned);
-              if (!clarity.clear && clarity.question && Array.isArray(clarity.options) && clarity.options.length >= 2) {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ clarify: true, question: clarity.question, options: clarity.options.slice(0, 3) })}\n\n`));
+              if (
+                !clarity.clear &&
+                clarity.question &&
+                Array.isArray(clarity.options) &&
+                clarity.options.length >= 2
+              ) {
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ clarify: true, question: clarity.question, options: clarity.options.slice(0, 3) })}\n\n`
+                  )
+                );
                 controller.close();
                 return;
               }
@@ -1090,11 +1214,30 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
           }
 
           // Step 1: Planner classifies intent and plans files
-          const plannerPromptContent = imageBlocks.length > 0
-            ? [...imageBlocks, { type: 'text' as const, text: lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '') }]
-            : lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '');
+          const plannerPromptContent =
+            imageBlocks.length > 0
+              ? [
+                  ...imageBlocks,
+                  {
+                    type: 'text' as const,
+                    text:
+                      lastUserMessage +
+                      (existingFiles?.length
+                        ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}`
+                        : ''),
+                  },
+                ]
+              : lastUserMessage +
+                (existingFiles?.length
+                  ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}`
+                  : '');
 
-          const planText = await callModel(plannerPromptContent, PLANNER_SYSTEM_BLOCKS, 'planner', usingFreeModel ? 'free' : 'based');
+          const planText = await callModel(
+            plannerPromptContent,
+            PLANNER_SYSTEM_BLOCKS,
+            'planner',
+            usingFreeModel ? 'free' : 'based'
+          );
 
           let filePlan: { name: string; language: string; description: string }[] = [];
           let routeToChat = false;
@@ -1106,7 +1249,11 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
               routeToChat = true;
             } else if (Array.isArray(parsed) && parsed.length > 0) {
               filePlan = parsed;
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ plan: filePlan.map((f: any) => f.name) })}\n\n`));
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ plan: filePlan.map((f: any) => f.name) })}\n\n`
+                )
+              );
             } else {
               throw new Error('empty plan');
             }
@@ -1118,30 +1265,54 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                 const stream = await client.messages.stream({
                   model: 'claude-opus-4-7',
                   max_tokens: 16000,
-                  system: [{ type: 'text' as const, text: SYSTEM, cache_control: { type: 'ephemeral' as const } }],
+                  system: [
+                    {
+                      type: 'text' as const,
+                      text: SYSTEM,
+                      cache_control: { type: 'ephemeral' as const },
+                    },
+                  ],
                   messages: anthropicMessages,
                 });
                 for await (const chunk of stream) {
                   if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
                     fullText += chunk.delta.text;
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+                    controller.enqueue(
+                      encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
+                    );
                   }
                 }
               } else {
                 const sysText = usingFreeModel
                   ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally.'
                   : systemBlocks.map(b => b.text).join('\n');
-                const msgs = [{ role: 'system', content: sysText }, ...anthropicMessages.map((m: { role: string; content: unknown }) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : lastUserMessage }))];
-                fullText = await streamText(msgs, 16000,
-                  t => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
-                  () => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)),
+                const msgs = [
+                  { role: 'system', content: sysText },
+                  ...anthropicMessages.map((m: { role: string; content: unknown }) => ({
+                    role: m.role,
+                    content: typeof m.content === 'string' ? m.content : lastUserMessage,
+                  })),
+                ];
+                fullText = await streamText(
+                  msgs,
+                  16000,
+                  t =>
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+                  () =>
+                    controller.enqueue(
+                      encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)
+                    ),
                   usingFreeModel ? 'free' : 'based'
                 );
               }
               const files = parseFiles(fullText);
               const projectType = parseType(fullText);
               const reply = stripTags(fullText);
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, reply, files, projectType })}\n\n`));
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ done: true, reply, files, projectType })}\n\n`
+                )
+              );
               return;
             }
           }
@@ -1158,34 +1329,52 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
               for await (const chunk of stream) {
                 if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
                   fullText += chunk.delta.text;
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
+                  );
                 }
               }
             } else {
               const sysText = usingFreeModel
                 ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally.'
                 : systemBlocks.map(b => b.text).join('\n');
-              const msgs = [{ role: 'system', content: sysText }, ...anthropicMessages.map((m: { role: string; content: unknown }) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : lastUserMessage }))];
-              fullText = await streamText(msgs, 4096,
-                t => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
-                () => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)),
+              const msgs = [
+                { role: 'system', content: sysText },
+                ...anthropicMessages.map((m: { role: string; content: unknown }) => ({
+                  role: m.role,
+                  content: typeof m.content === 'string' ? m.content : lastUserMessage,
+                })),
+              ];
+              fullText = await streamText(
+                msgs,
+                4096,
+                t =>
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+                () =>
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)
+                  ),
                 usingFreeModel ? 'free' : 'based'
               );
             }
             const files = parseFiles(fullText);
             const projectType = parseType(fullText);
             const reply = stripTags(fullText);
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, reply, files, projectType })}\n\n`));
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ done: true, reply, files, projectType })}\n\n`
+              )
+            );
             return;
           }
 
           const projectType = (() => {
             const langs = filePlan.map((f: { language: string }) => f.language);
             if (langs.some(l => l === 'java')) return 'java';
-            if (langs.some(l => l === 'cpp'))  return 'cpp';
-            if (langs.some(l => l === 'go'))   return 'go';
-            if (langs.some(l => l === 'rust'))  return 'rust';
-            if (langs.some(l => l === 'bash'))  return 'bash';
+            if (langs.some(l => l === 'cpp')) return 'cpp';
+            if (langs.some(l => l === 'go')) return 'go';
+            if (langs.some(l => l === 'rust')) return 'rust';
+            if (langs.some(l => l === 'bash')) return 'bash';
             if (langs.some(l => l === 'python')) return 'python';
             return 'html';
           })();
@@ -1195,17 +1384,19 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
           for (let i = 0; i < filePlan.length; i++) {
             const fileSpec = filePlan[i];
 
-            const generatedContext = generatedFiles.length > 0
-              ? `\n\nAlready generated files:\n${generatedFiles.map(f => `--- ${f.name} ---\n${f.content.slice(0, 3000)}\n...[continues]`).join('\n\n')}`
-              : '';
+            const generatedContext =
+              generatedFiles.length > 0
+                ? `\n\nAlready generated files:\n${generatedFiles.map(f => `--- ${f.name} ---\n${f.content.slice(0, 3000)}\n...[continues]`).join('\n\n')}`
+                : '';
 
             const existingContext = existingFiles?.length
               ? `\n\nExisting files to preserve:\n${existingFiles.map((f: any) => `--- ${f.name} ---\n${f.content.slice(0, 400)}\n...[truncated]`).join('\n\n')}`
               : '';
 
-            const imagePlaceholderNote = imageBlocks.length > 0
-              ? `\n\nThe user has provided an image. Wherever you need the image source, use exactly: ${IMAGE_SRC_PLACEHOLDER}\nDo NOT use any other URL or path — only ${IMAGE_SRC_PLACEHOLDER}. It will be replaced with the real base64 data URL at build time.`
-              : '';
+            const imagePlaceholderNote =
+              imageBlocks.length > 0
+                ? `\n\nThe user has provided an image. Wherever you need the image source, use exactly: ${IMAGE_SRC_PLACEHOLDER}\nDo NOT use any other URL or path — only ${IMAGE_SRC_PLACEHOLDER}. It will be replaced with the real base64 data URL at build time.`
+                : '';
 
             const filePrompt = `Project: ${lastUserMessage}
 
@@ -1218,11 +1409,16 @@ ${generatedContext}${existingContext}${imagePlaceholderNote}
 
 Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
 
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`));
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ status: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`
+              )
+            );
 
-            const filePromptContent = imageBlocks.length > 0
-              ? [...imageBlocks, { type: 'text' as const, text: filePrompt }]
-              : filePrompt;
+            const filePromptContent =
+              imageBlocks.length > 0
+                ? [...imageBlocks, { type: 'text' as const, text: filePrompt }]
+                : filePrompt;
 
             let fileText = '';
             if (imageBlocks.length > 0) {
@@ -1236,7 +1432,9 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
               for await (const chunk of fileStream) {
                 if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
                   fileText += chunk.delta.text;
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
+                  );
                 }
               }
               const fileResult = await fileStream.finalMessage();
@@ -1253,7 +1451,9 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
                 for await (const chunk of contStream) {
                   if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
                     fileText += chunk.delta.text;
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+                    controller.enqueue(
+                      encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
+                    );
                   }
                 }
               }
@@ -1262,23 +1462,36 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
                 { role: 'system', content: FILE_GENERATOR_SYSTEM },
                 { role: 'user', content: filePrompt },
               ];
-              fileText = await streamText(msgs, 16000,
-                t => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
-                () => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)),
+              fileText = await streamText(
+                msgs,
+                16000,
+                t =>
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+                () =>
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)
+                  ),
                 usingFreeModel ? 'free' : 'based'
               );
             }
 
             const parsedFiles = parseFiles(fileText);
-            const filesToAdd = parsedFiles.length > 0 ? parsedFiles : [{
-              name: fileSpec.name,
-              language: fileSpec.language,
-              content: fileText.replace(/^<forge_file[^>]*>\n?/, '').trim() || fileText.trim(),
-            }];
+            const filesToAdd =
+              parsedFiles.length > 0
+                ? parsedFiles
+                : [
+                    {
+                      name: fileSpec.name,
+                      language: fileSpec.language,
+                      content:
+                        fileText.replace(/^<forge_file[^>]*>\n?/, '').trim() || fileText.trim(),
+                    },
+                  ];
 
-            const imageDataUrl = imageBlocks.length > 0
-              ? `data:${imageBlocks[0].source.media_type};base64,${imageBlocks[0].source.data}`
-              : null;
+            const imageDataUrl =
+              imageBlocks.length > 0
+                ? `data:${imageBlocks[0].source.media_type};base64,${imageBlocks[0].source.data}`
+                : null;
 
             for (const f of filesToAdd) {
               let content = imageDataUrl
@@ -1289,14 +1502,25 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
               );
             }
 
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`));
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ progress: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`
+              )
+            );
           }
 
           // Step 3: Brief summary — use a minimal system to avoid code-gen rules confusing haiku
-          const summarySystem = 'You are Based. Reply with 1-2 plain sentences describing what was just built. No code, no forge tags, no lists.';
+          const summarySystem =
+            'You are Based. Reply with 1-2 plain sentences describing what was just built. No code, no forge tags, no lists.';
           const summaryPrompt = `User asked: "${lastUserMessage}"\nFiles generated: ${generatedFiles.map(f => f.name).join(', ')}\n\nDescribe what was built in 1-2 sentences.`;
-          const reply = await callModel(summaryPrompt, summarySystem, 'summary', usingFreeModel ? 'free' : 'based')
-            || `Built ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}`;
+          const reply =
+            (await callModel(
+              summaryPrompt,
+              summarySystem,
+              'summary',
+              usingFreeModel ? 'free' : 'based'
+            )) ||
+            `Built ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}`;
 
           let suggestions: string[] = [];
           try {
@@ -1307,25 +1531,31 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
               usingFreeModel ? 'free' : 'based'
             );
             const match = suggestText.match(/\[[\s\S]*?\]/);
-            if (match) suggestions = (JSON.parse(match[0]) as unknown[]).filter((s): s is string => typeof s === 'string').slice(0, 3);
+            if (match)
+              suggestions = (JSON.parse(match[0]) as unknown[])
+                .filter((s): s is string => typeof s === 'string')
+                .slice(0, 3);
           } catch {}
 
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, reply, files: generatedFiles, projectType, suggestions })}\n\n`));
-
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ done: true, reply, files: generatedFiles, projectType, suggestions })}\n\n`
+            )
+          );
         } catch (e: any) {
           const friendly = friendlyError(e);
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: friendly })}\n\n`));
         } finally {
           controller.close();
         }
-      }
+      },
     });
 
     return new Response(readable, {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        Connection: 'keep-alive',
       },
     });
   } catch (err: any) {

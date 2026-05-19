@@ -10,8 +10,8 @@ export async function POST(req: NextRequest) {
 
     const { error } = await supabaseAdmin.from('feedback').insert({
       message: message.trim(),
-      email:   email?.trim() || null,
-      type:    type || 'general',
+      email: email?.trim() || null,
+      type: type || 'general',
       context: context?.trim() || null,
     });
 

@@ -12,20 +12,21 @@
 
 ## File Map
 
-| Action | Path | Responsibility |
-|--------|------|---------------|
-| Create | `hooks/useLogoConfig.ts` | Config type, defaults, localStorage r/w, reset |
-| Create | `components/LogoDisplay.tsx` | Shimmer animation, 4 SVG icons, CSS vars — no state |
-| Create | `components/LogoEditorModal.tsx` | Backdrop, draft state, live preview, all controls |
-| Create | `components/AnimatedLogo.tsx` | Hook + hover edit button + modal open/close |
-| Modify | `app/page.tsx` | Swap `<img>` + `<span>` for `<AnimatedLogo />` |
-| Modify | `app/globals.css` | Add new classes, remove old logo-img/logo-text/animations |
+| Action | Path                             | Responsibility                                            |
+| ------ | -------------------------------- | --------------------------------------------------------- |
+| Create | `hooks/useLogoConfig.ts`         | Config type, defaults, localStorage r/w, reset            |
+| Create | `components/LogoDisplay.tsx`     | Shimmer animation, 4 SVG icons, CSS vars — no state       |
+| Create | `components/LogoEditorModal.tsx` | Backdrop, draft state, live preview, all controls         |
+| Create | `components/AnimatedLogo.tsx`    | Hook + hover edit button + modal open/close               |
+| Modify | `app/page.tsx`                   | Swap `<img>` + `<span>` for `<AnimatedLogo />`            |
+| Modify | `app/globals.css`                | Add new classes, remove old logo-img/logo-text/animations |
 
 ---
 
 ## Task 1: Install Framer Motion
 
 **Files:**
+
 - Modify: `package.json` (via npm)
 
 - [ ] **Step 1: Install the package**
@@ -56,6 +57,7 @@ git commit -m "chore: add framer-motion dependency"
 ## Task 2: Create useLogoConfig hook
 
 **Files:**
+
 - Create: `hooks/useLogoConfig.ts`
 
 - [ ] **Step 1: Create the hooks directory and file**
@@ -98,12 +100,16 @@ export function useLogoConfig() {
 
   const setConfig = (c: LogoConfig) => {
     setConfigState(c);
-    try { localStorage.setItem(KEY, JSON.stringify(c)); } catch {}
+    try {
+      localStorage.setItem(KEY, JSON.stringify(c));
+    } catch {}
   };
 
   const reset = () => {
     setConfigState(LOGO_DEFAULTS);
-    try { localStorage.removeItem(KEY); } catch {}
+    try {
+      localStorage.removeItem(KEY);
+    } catch {}
   };
 
   return { config, setConfig, reset };
@@ -130,6 +136,7 @@ git commit -m "feat: add useLogoConfig hook with localStorage persistence"
 ## Task 3: Create LogoDisplay component
 
 **Files:**
+
 - Create: `components/LogoDisplay.tsx`
 
 This is a pure presentational component — no hooks, no state. It takes a `LogoConfig` prop and renders the shimmer animation. It is used by both `AnimatedLogo` (real header) and `LogoEditorModal` (live preview).
@@ -185,12 +192,14 @@ export default function LogoDisplay({ config }: { config: LogoConfig }) {
   return (
     <div
       className="animated-logo-wrap"
-      style={{
-        '--logo-shimmer-color': config.shimmerColor,
-        '--logo-speed': `${config.speed}s`,
-        '--logo-icon-bg': config.iconBg,
-        '--logo-shimmer-width': `${config.shimmerWidth}%`,
-      } as React.CSSProperties}
+      style={
+        {
+          '--logo-shimmer-color': config.shimmerColor,
+          '--logo-speed': `${config.speed}s`,
+          '--logo-icon-bg': config.iconBg,
+          '--logo-shimmer-width': `${config.shimmerWidth}%`,
+        } as React.CSSProperties
+      }
     >
       <div className="logo-icon-svg" style={{ background: config.iconBg }}>
         <IconComp color={config.shimmerColor} />
@@ -235,6 +244,7 @@ git commit -m "feat: add LogoDisplay component with Framer Motion shimmer"
 ## Task 4: Create LogoEditorModal component
 
 **Files:**
+
 - Create: `components/LogoEditorModal.tsx`
 
 - [ ] **Step 1: Create `components/LogoEditorModal.tsx`**
@@ -250,7 +260,11 @@ const ICON_BG_SWATCHES = ['#0a0a0f', '#15102a', '#0a1020', '#1a1018'];
 const SHAPES: LogoConfig['iconShape'][] = ['bolt', 'diamond', 'hex', 'circle'];
 const SHAPE_LABELS: Record<string, string> = { bolt: '⚡', diamond: '◆', hex: '⬡', circle: '●' };
 
-export default function LogoEditorModal({ config, onSave, onClose }: {
+export default function LogoEditorModal({
+  config,
+  onSave,
+  onClose,
+}: {
   config: LogoConfig;
   onSave: (c: LogoConfig) => void;
   onClose: () => void;
@@ -259,7 +273,9 @@ export default function LogoEditorModal({ config, onSave, onClose }: {
   const patch = (partial: Partial<LogoConfig>) => setDraft(d => ({ ...d, ...partial }));
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
@@ -270,10 +286,11 @@ export default function LogoEditorModal({ config, onSave, onClose }: {
   return (
     <div className="logo-editor-backdrop" onClick={onClose}>
       <div className="logo-editor-panel" onClick={e => e.stopPropagation()}>
-
         <div className="logo-editor-header">
           <span className="logo-editor-title">Customize Logo</span>
-          <button className="logo-editor-close" onClick={onClose}>✕</button>
+          <button className="logo-editor-close" onClick={onClose}>
+            ✕
+          </button>
         </div>
 
         <div className="logo-preview-wrap">
@@ -281,7 +298,6 @@ export default function LogoEditorModal({ config, onSave, onClose }: {
         </div>
 
         <div className="logo-editor-controls">
-
           <label className="logo-editor-label">Name</label>
           <input
             className="logo-editor-input"
@@ -329,7 +345,11 @@ export default function LogoEditorModal({ config, onSave, onClose }: {
               <button
                 key={c}
                 className={`logo-swatch${draft.iconBg === c ? ' active' : ''}`}
-                style={{ background: c, outline: c === '#0a0a0f' ? '1px solid #3a3060' : 'none', outlineOffset: '1px' }}
+                style={{
+                  background: c,
+                  outline: c === '#0a0a0f' ? '1px solid #3a3060' : 'none',
+                  outlineOffset: '1px',
+                }}
                 onClick={() => patch({ iconBg: c })}
               />
             ))}
@@ -348,7 +368,10 @@ export default function LogoEditorModal({ config, onSave, onClose }: {
           <div className="logo-slider-row">
             <span className="logo-slider-cap">Fast</span>
             <input
-              type="range" min="0.8" max="4.0" step="0.1"
+              type="range"
+              min="0.8"
+              max="4.0"
+              step="0.1"
               className="logo-editor-slider"
               value={draft.speed}
               onChange={e => patch({ speed: parseFloat(e.target.value) })}
@@ -362,22 +385,27 @@ export default function LogoEditorModal({ config, onSave, onClose }: {
           <div className="logo-slider-row">
             <span className="logo-slider-cap">Narrow</span>
             <input
-              type="range" min="15" max="70" step="5"
+              type="range"
+              min="15"
+              max="70"
+              step="5"
               className="logo-editor-slider"
               value={draft.shimmerWidth}
               onChange={e => patch({ shimmerWidth: parseInt(e.target.value) })}
             />
             <span className="logo-slider-cap">Wide</span>
           </div>
-
         </div>
 
         <div className="logo-editor-footer">
-          <button className="logo-reset-link" onClick={handleReset}>Reset to defaults</button>
+          <button className="logo-reset-link" onClick={handleReset}>
+            Reset to defaults
+          </button>
           {/* Note: reset only updates draft/preview — Save must be clicked to persist */}
-          <button className="logo-save-btn" onClick={() => onSave(draft)}>Save</button>
+          <button className="logo-save-btn" onClick={() => onSave(draft)}>
+            Save
+          </button>
         </div>
-
       </div>
     </div>
   );
@@ -404,6 +432,7 @@ git commit -m "feat: add LogoEditorModal with draft state and live preview"
 ## Task 5: Create AnimatedLogo component
 
 **Files:**
+
 - Create: `components/AnimatedLogo.tsx`
 
 - [ ] **Step 1: Create `components/AnimatedLogo.tsx`**
@@ -450,7 +479,10 @@ export default function AnimatedLogo() {
       {isEditing && (
         <LogoEditorModal
           config={config}
-          onSave={(c) => { setConfig(c); setIsEditing(false); }}
+          onSave={c => {
+            setConfig(c);
+            setIsEditing(false);
+          }}
           onClose={() => setIsEditing(false)}
         />
       )}
@@ -479,12 +511,16 @@ git commit -m "feat: add AnimatedLogo with hover edit trigger and modal"
 ## Task 6: Wire AnimatedLogo into page.tsx
 
 **Files:**
+
 - Modify: `app/page.tsx:134-137`
 
 The current logo markup (lines 134–137) is:
+
 ```tsx
 <div className="logo">
-  <button className="hamburger" onClick={() => setSidebarOpen(s => !s)}>☰</button>
+  <button className="hamburger" onClick={() => setSidebarOpen(s => !s)}>
+    ☰
+  </button>
   <img src="/icon-192.png" className="logo-img" alt="Based" />
   <span className="logo-text">BASED</span>
   {currentProject && <span className="project-name-display">{currentProject.name}</span>}
@@ -502,14 +538,16 @@ import AnimatedLogo from '@/components/AnimatedLogo';
 - [ ] **Step 2: Replace the img + span with AnimatedLogo**
 
 Replace:
+
 ```tsx
           <img src="/icon-192.png" className="logo-img" alt="Based" />
           <span className="logo-text">BASED</span>
 ```
 
 With:
+
 ```tsx
-          <AnimatedLogo />
+<AnimatedLogo />
 ```
 
 - [ ] **Step 3: Verify TypeScript**
@@ -523,6 +561,7 @@ Expected: no errors.
 - [ ] **Step 4: Verify the dev server renders without crashing**
 
 The dev server should already be running on port 3000. Open `http://localhost:3000` and confirm:
+
 - The logo area shows an icon + "BASED" text
 - The shimmer sweep animation is visible
 - No console errors in the browser
@@ -539,6 +578,7 @@ git commit -m "feat: replace static logo with AnimatedLogo component"
 ## Task 7: Update globals.css
 
 **Files:**
+
 - Modify: `app/globals.css`
 
 Two parts: add new CSS classes, then remove the old logo classes.
@@ -566,9 +606,12 @@ Append this entire block at the very end of the file:
 }
 
 .logo-icon-svg {
-  width: 36px; height: 36px;
+  width: 36px;
+  height: 36px;
   border-radius: 9px;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   border: 1px solid #2a2a3a;
 }
@@ -584,7 +627,8 @@ Append this entire block at the very end of the file:
 
 .logo-shimmer {
   position: absolute;
-  top: 0; left: 0;
+  top: 0;
+  left: 0;
   height: 100%;
   pointer-events: none;
 }
@@ -599,26 +643,39 @@ Append this entire block at the very end of the file:
   border-radius: 4px;
   color: var(--text2);
   font-size: 13px;
-  width: 22px; height: 22px;
-  display: flex; align-items: center; justify-content: center;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   padding: 0;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
   z-index: 10;
 }
 
-.logo-edit-btn:hover { color: var(--accent); border-color: var(--accent); }
+.logo-edit-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
 
 @media (max-width: 768px) {
-  .animated-logo-text { font-size: 14px; }
+  .animated-logo-text {
+    font-size: 14px;
+  }
 }
 
 /* ===== LOGO EDITOR MODAL ===== */
 .logo-editor-backdrop {
-  position: fixed; inset: 0;
+  position: fixed;
+  inset: 0;
   background: rgba(0, 0, 0, 0.65);
   z-index: 1000;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 16px;
 }
 
@@ -634,7 +691,9 @@ Append this entire block at the very end of the file:
 }
 
 .logo-editor-header {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 16px;
 }
 
@@ -646,20 +705,27 @@ Append this entire block at the very end of the file:
 }
 
 .logo-editor-close {
-  background: transparent; border: none;
-  color: var(--text2); cursor: pointer;
-  font-size: 16px; padding: 2px 6px;
+  background: transparent;
+  border: none;
+  color: var(--text2);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
   border-radius: 4px;
 }
 
-.logo-editor-close:hover { color: var(--text); }
+.logo-editor-close:hover {
+  color: var(--text);
+}
 
 .logo-preview-wrap {
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 16px;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 20px;
   min-height: 64px;
 }
@@ -676,7 +742,9 @@ Append this entire block at the very end of the file:
   letter-spacing: 1px;
   color: var(--text2);
   margin-top: 4px;
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .logo-editor-value {
@@ -699,9 +767,15 @@ Append this entire block at the very end of the file:
   width: 100%;
 }
 
-.logo-editor-input:focus { outline: none; border-color: var(--accent); }
+.logo-editor-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
 
-.logo-shape-picker { display: flex; gap: 6px; }
+.logo-shape-picker {
+  display: flex;
+  gap: 6px;
+}
 
 .logo-shape-btn {
   flex: 1;
@@ -712,7 +786,10 @@ Append this entire block at the very end of the file:
   font-size: 16px;
   padding: 8px 4px;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
 }
 
 .logo-shape-btn.active {
@@ -721,23 +798,35 @@ Append this entire block at the very end of the file:
   background: var(--bg);
 }
 
-.logo-swatch-row { display: flex; gap: 6px; align-items: center; }
+.logo-swatch-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
 
 .logo-swatch {
-  width: 24px; height: 24px;
+  width: 24px;
+  height: 24px;
   border-radius: 6px;
   cursor: pointer;
   border: 2px solid transparent;
-  transition: transform 0.15s, border-color 0.15s;
+  transition:
+    transform 0.15s,
+    border-color 0.15s;
   flex-shrink: 0;
   padding: 0;
 }
 
-.logo-swatch:hover { transform: scale(1.12); }
-.logo-swatch.active { border-color: white; }
+.logo-swatch:hover {
+  transform: scale(1.12);
+}
+.logo-swatch.active {
+  border-color: white;
+}
 
 .logo-color-input {
-  width: 28px; height: 24px;
+  width: 28px;
+  height: 24px;
   border-radius: 6px;
   border: 1px solid var(--border);
   padding: 0 2px;
@@ -747,22 +836,35 @@ Append this entire block at the very end of the file:
 }
 
 .logo-slider-row {
-  display: flex; align-items: center; gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.logo-editor-slider { flex: 1; accent-color: var(--accent); cursor: pointer; }
+.logo-editor-slider {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
 
-.logo-slider-cap { font-size: 10px; color: var(--text3); white-space: nowrap; }
+.logo-slider-cap {
+  font-size: 10px;
+  color: var(--text3);
+  white-space: nowrap;
+}
 
 .logo-editor-footer {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
 }
 
 .logo-reset-link {
-  background: transparent; border: none;
+  background: transparent;
+  border: none;
   color: var(--text2);
   font-size: 12px;
   cursor: pointer;
@@ -770,7 +872,9 @@ Append this entire block at the very end of the file:
   padding: 0;
 }
 
-.logo-reset-link:hover { color: var(--danger); }
+.logo-reset-link:hover {
+  color: var(--danger);
+}
 
 .logo-save-btn {
   background: var(--accent);
@@ -784,7 +888,9 @@ Append this entire block at the very end of the file:
   transition: opacity 0.15s;
 }
 
-.logo-save-btn:hover { opacity: 0.85; }
+.logo-save-btn:hover {
+  opacity: 0.85;
+}
 ```
 
 - [ ] **Step 2: Remove the old logo CSS blocks from `app/globals.css`**
@@ -792,21 +898,36 @@ Append this entire block at the very end of the file:
 Remove the following blocks entirely (they are replaced by the new classes above):
 
 **Block A** — line 39, `.logo-icon` single rule:
+
 ```css
-.logo-icon { font-size: 20px; color: var(--accent); }
+.logo-icon {
+  font-size: 20px;
+  color: var(--accent);
+}
 ```
 
 **Block B** — line 40, `.logo-text` single rule:
+
 ```css
-.logo-text { font-family: var(--font-display); font-weight: 800; font-size: 18px; letter-spacing: 3px; color: var(--text); }
+.logo-text {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: 3px;
+  color: var(--text);
+}
 ```
 
 **Block C** — inside the `@media (max-width: 768px)` block around line 282:
+
 ```css
-  .logo-text { font-size: 14px; }
+.logo-text {
+  font-size: 14px;
+}
 ```
 
 **Block D** — the `.logo-icon` hover animation block around lines 389–395:
+
 ```css
 /* Logo pulse on hover */
 .logo-icon {
@@ -820,10 +941,13 @@ Remove the following blocks entirely (they are replaced by the new classes above
 ```
 
 **Block E** — the entire `/* LOGO IMAGE */` section (lines 576–614):
+
 ```css
 /* LOGO IMAGE */
 .logo-img {
-  width: 40px; height: 40px; border-radius: 10px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   background: var(--bg);
   animation: logoPulse 3s ease-in-out infinite;
   flex-shrink: 0;
@@ -831,19 +955,24 @@ Remove the following blocks entirely (they are replaced by the new classes above
 
 @media (min-width: 769px) {
   .logo-img {
-    width: 40px; height: 40px; border-radius: 10px;
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
   }
 }
 
 @keyframes logoPulse {
-  0%, 100% { 
-    box-shadow: 0 0 0 0 rgba(212,175,55,0), 
-                0 0 8px rgba(212,175,55,0.3);
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(212, 175, 55, 0),
+      0 0 8px rgba(212, 175, 55, 0.3);
     opacity: 1;
   }
-  50% { 
-    box-shadow: 0 0 0 6px rgba(212,175,55,0.1), 
-                0 0 20px rgba(212,175,55,0.5);
+  50% {
+    box-shadow:
+      0 0 0 6px rgba(212, 175, 55, 0.1),
+      0 0 20px rgba(212, 175, 55, 0.5);
     opacity: 0.9;
   }
 }
@@ -853,9 +982,15 @@ Remove the following blocks entirely (they are replaced by the new classes above
 }
 
 @keyframes logoSpin {
-  0% { transform: rotate(0deg) scale(1); }
-  50% { transform: rotate(180deg) scale(1.1); }
-  100% { transform: rotate(360deg) scale(1); }
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.1);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
 }
 ```
 
@@ -870,6 +1005,7 @@ Expected: no errors.
 - [ ] **Step 4: Smoke-test in browser**
 
 Open `http://localhost:3000` and verify:
+
 1. The shimmer sweeps across icon + text continuously
 2. Hovering the logo reveals the ✎ edit button
 3. Clicking ✎ opens the modal with a live preview

@@ -12,7 +12,11 @@ interface GalleryItem {
   gallery_published_at: string;
 }
 
-function GalleryCard({ item, onRemix, remixing }: {
+function GalleryCard({
+  item,
+  onRemix,
+  remixing,
+}: {
   item: GalleryItem;
   onRemix: (item: GalleryItem) => void;
   remixing: boolean;
@@ -22,7 +26,9 @@ function GalleryCard({ item, onRemix, remixing }: {
 
   useEffect(() => {
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setVisible(true); },
+      ([entry]) => {
+        if (entry.isIntersecting) setVisible(true);
+      },
       { rootMargin: '300px' }
     );
     if (wrapRef.current) observer.observe(wrapRef.current);
@@ -51,11 +57,7 @@ function GalleryCard({ item, onRemix, remixing }: {
           <span className="gal-card-author">by {item.author_name ?? 'Anonymous'}</span>
           <span className="gal-card-remixes">↻ {item.remix_count}</span>
         </div>
-        <button
-          className="gal-card-remix-btn"
-          onClick={() => onRemix(item)}
-          disabled={remixing}
-        >
+        <button className="gal-card-remix-btn" onClick={() => onRemix(item)} disabled={remixing}>
           {remixing ? '…' : 'Remix →'}
         </button>
       </div>
@@ -71,12 +73,17 @@ export default function GalleryPage() {
   useEffect(() => {
     fetch('/api/gallery')
       .then(r => r.json())
-      .then(d => { setItems(d.items ?? []); setLoading(false); })
+      .then(d => {
+        setItems(d.items ?? []);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, []);
 
   async function handleRemix(item: GalleryItem) {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) {
       localStorage.setItem('based_pending_remix', item.id);
       window.location.href = '/';
@@ -84,7 +91,9 @@ export default function GalleryPage() {
     }
 
     setRemixingId(item.id);
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     await fetch(`/api/gallery/remix/${item.id}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
@@ -97,9 +106,13 @@ export default function GalleryPage() {
   return (
     <div className="gal-root">
       <header className="gal-header">
-        <Link href="/" className="gal-logo">B&gt;</Link>
+        <Link href="/" className="gal-logo">
+          B&gt;
+        </Link>
         <div className="gal-header-right">
-          <Link href="/" className="gal-back">← Back to Based</Link>
+          <Link href="/" className="gal-back">
+            ← Back to Based
+          </Link>
         </div>
       </header>
 
@@ -111,14 +124,20 @@ export default function GalleryPage() {
 
       {loading ? (
         <div className="gal-loading">
-          <div className="gal-loading-dots"><span /><span /><span /></div>
+          <div className="gal-loading-dots">
+            <span />
+            <span />
+            <span />
+          </div>
         </div>
       ) : items.length === 0 ? (
         <div className="gal-empty">
           <div className="gal-empty-icon">⬡</div>
           <div className="gal-empty-title">Nothing here yet.</div>
           <div className="gal-empty-sub">Be the first to publish a project to the gallery.</div>
-          <Link href="/" className="gal-empty-btn">Start Building →</Link>
+          <Link href="/" className="gal-empty-btn">
+            Start Building →
+          </Link>
         </div>
       ) : (
         <div className="gal-grid">
@@ -134,9 +153,13 @@ export default function GalleryPage() {
       )}
 
       <footer className="gal-footer">
-        <Link href="/" className="gal-footer-link">Build something →</Link>
+        <Link href="/" className="gal-footer-link">
+          Build something →
+        </Link>
         <span className="gal-footer-sep">·</span>
-        <Link href="/roadmap" className="gal-footer-link">Roadmap</Link>
+        <Link href="/roadmap" className="gal-footer-link">
+          Roadmap
+        </Link>
       </footer>
     </div>
   );

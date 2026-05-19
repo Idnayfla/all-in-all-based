@@ -49,6 +49,7 @@ Developer App / Based
 ```
 
 Three logical layers:
+
 - **Gateway** — auth, rate limiting, credit balance check before any model call
 - **Brain** — classifies intent, selects provider, assembles the upstream call
 - **Adapters** — thin translation wrappers per provider; each speaks Pantheon internally
@@ -63,17 +64,17 @@ Developers can pass `task_type` explicitly to skip classification and save ~200m
 
 ### Routing Table
 
-| task_type | Primary model | Fallback |
-|-----------|--------------|---------|
-| `code` | claude-opus-4-7 | claude-sonnet-4-6 |
-| `writing` | claude-sonnet-4-6 | gpt-4o |
-| `math` | deepseek-r1 | claude-sonnet-4-6 (extended thinking) |
-| `research` | gemini-2.5-pro + Tavily | perplexity-sonar-pro |
-| `video_analysis` | gemini-2.5-pro | gemini-2.5-flash |
-| `chat` | claude-sonnet-4-6 | gemini-2.5-flash |
-| `image` | fal/nano-banana | fal/flux-pro |
-| `music` | fal/stable-audio | suno-v4 |
-| `video_gen` | fal/seedance-2 | fal/kling |
+| task_type        | Primary model           | Fallback                              |
+| ---------------- | ----------------------- | ------------------------------------- |
+| `code`           | claude-opus-4-7         | claude-sonnet-4-6                     |
+| `writing`        | claude-sonnet-4-6       | gpt-4o                                |
+| `math`           | deepseek-r1             | claude-sonnet-4-6 (extended thinking) |
+| `research`       | gemini-2.5-pro + Tavily | perplexity-sonar-pro                  |
+| `video_analysis` | gemini-2.5-pro          | gemini-2.5-flash                      |
+| `chat`           | claude-sonnet-4-6       | gemini-2.5-flash                      |
+| `image`          | fal/nano-banana         | fal/flux-pro                          |
+| `music`          | fal/stable-audio        | suno-v4                               |
+| `video_gen`      | fal/seedance-2          | fal/kling                             |
 
 If a provider returns an error, Pantheon retries with the fallback automatically. The developer sees one seamless response.
 
@@ -82,17 +83,18 @@ If a provider returns an error, Pantheon retries with the fallback automatically
 ## API Specification
 
 ### Base URL
+
 ```
 https://api.pantheon.ai/v1
 ```
 
 ### API Key Types
 
-| Key prefix | Purpose | Credits charged |
-|-----------|---------|----------------|
-| `pk_live_` | Production key (developers) | Yes |
-| `pk_test_` | Test key (rate-limited, sandbox) | No |
-| `pk_owner_` | Internal key for Based | No |
+| Key prefix  | Purpose                          | Credits charged |
+| ----------- | -------------------------------- | --------------- |
+| `pk_live_`  | Production key (developers)      | Yes             |
+| `pk_test_`  | Test key (rate-limited, sandbox) | No              |
+| `pk_owner_` | Internal key for Based           | No              |
 
 ### Endpoints
 
@@ -139,6 +141,7 @@ Authorization: Bearer pk_live_...
 ```
 
 Response mirrors Anthropic's `MessageStreamEvent` format exactly. All Claude model names map transparently:
+
 - `claude-opus-*` → Pantheon routes as `task_type: code`
 - `claude-sonnet-*` → Pantheon routes as `task_type: chat`
 - `claude-haiku-*` → Pantheon routes as `task_type: chat` (fast/cheap path)
@@ -169,6 +172,7 @@ POST /v1/generate
 ```
 
 Response:
+
 ```json
 {
   "id": "gen_abc123",
@@ -210,15 +214,15 @@ A first-party VSCode extension that embeds Pantheon's full routing intelligence 
 
 ### Capabilities
 
-| Feature | Description |
-|---------|-------------|
-| Chat panel | Sidebar WebView — chat with Pantheon, context-aware of open files |
-| Inline completions | Ghost text suggestions as you type (like Copilot). Routes to Opus for complex code, Sonnet for simple completions |
-| Selection actions | Select code → right-click → "Explain", "Refactor", "Add tests", "Fix bug" |
-| File context | Automatically includes active file + relevant imports in every request |
-| Math mode | Detects math/algorithm problems → routes to DeepSeek R1 automatically |
-| Research panel | Run a Pantheon `/v1/research` query from inside the editor |
-| Multi-file awareness | Reads workspace symbol index for large codebase questions |
+| Feature              | Description                                                                                                       |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Chat panel           | Sidebar WebView — chat with Pantheon, context-aware of open files                                                 |
+| Inline completions   | Ghost text suggestions as you type (like Copilot). Routes to Opus for complex code, Sonnet for simple completions |
+| Selection actions    | Select code → right-click → "Explain", "Refactor", "Add tests", "Fix bug"                                         |
+| File context         | Automatically includes active file + relevant imports in every request                                            |
+| Math mode            | Detects math/algorithm problems → routes to DeepSeek R1 automatically                                             |
+| Research panel       | Run a Pantheon `/v1/research` query from inside the editor                                                        |
+| Multi-file awareness | Reads workspace symbol index for large codebase questions                                                         |
 
 ### Extension architecture
 
@@ -263,15 +267,15 @@ Requires: Pantheon API key (`pk_live_` or `pk_test_`)
 
 **Pricing:** $10 = 1,000 credits. Credits never expire.
 
-| Task | Upstream cost | Pantheon price | Margin |
-|------|--------------|----------------|--------|
-| chat | ~$0.003 | 5 credits ($0.005) | ~40% |
-| code (Opus) | ~$0.015 | 25 credits ($0.025) | ~40% |
-| math (DeepSeek) | ~$0.005 | 10 credits ($0.010) | ~50% |
-| research (deep) | ~$0.020 | 35 credits ($0.035) | ~43% |
-| image | ~$0.003 | 8 credits ($0.008) | ~60% |
-| music (30s) | ~$0.050 | 90 credits ($0.090) | ~44% |
-| video_gen | ~$0.100 | 180 credits ($0.180) | ~44% |
+| Task            | Upstream cost | Pantheon price       | Margin |
+| --------------- | ------------- | -------------------- | ------ |
+| chat            | ~$0.003       | 5 credits ($0.005)   | ~40%   |
+| code (Opus)     | ~$0.015       | 25 credits ($0.025)  | ~40%   |
+| math (DeepSeek) | ~$0.005       | 10 credits ($0.010)  | ~50%   |
+| research (deep) | ~$0.020       | 35 credits ($0.035)  | ~43%   |
+| image           | ~$0.003       | 8 credits ($0.008)   | ~60%   |
+| music (30s)     | ~$0.050       | 90 credits ($0.090)  | ~44%   |
+| video_gen       | ~$0.100       | 180 credits ($0.180) | ~44%   |
 
 Free tier: 100 credits on signup (no card required).
 
@@ -283,17 +287,17 @@ Billing flow: Stripe Checkout → webhook → Supabase credit ledger → immedia
 
 Pantheon is a standalone Next.js App Router project, deployed separately from Based.
 
-| Layer | Technology |
-|-------|-----------|
-| API | Next.js 16 App Router (TypeScript) |
-| Auth | Supabase Auth |
-| Database | Supabase Postgres (users, API keys, credit ledger, usage logs) |
-| Cache / Rate limit | Redis (Upstash) |
-| Payments | Stripe (Checkout + webhooks) |
-| Streaming | Server-Sent Events (SSE) — unified across all providers |
-| Hosting | Vercel |
-| Docs | `docs.pantheon.ai` — static site |
-| VSCode Extension | TypeScript, VS Code Extension API, WebView |
+| Layer              | Technology                                                     |
+| ------------------ | -------------------------------------------------------------- |
+| API                | Next.js 16 App Router (TypeScript)                             |
+| Auth               | Supabase Auth                                                  |
+| Database           | Supabase Postgres (users, API keys, credit ledger, usage logs) |
+| Cache / Rate limit | Redis (Upstash)                                                |
+| Payments           | Stripe (Checkout + webhooks)                                   |
+| Streaming          | Server-Sent Events (SSE) — unified across all providers        |
+| Hosting            | Vercel                                                         |
+| Docs               | `docs.pantheon.ai` — static site                               |
+| VSCode Extension   | TypeScript, VS Code Extension API, WebView                     |
 
 ---
 
@@ -311,6 +315,7 @@ After:  Based → Pantheon API → best model per task
 ## Phased Build Plan
 
 ### Phase 1 — MVP (weeks 1–6)
+
 - New repo: `pantheon-api/`
 - API gateway: Supabase auth, API key generation/validation, rate limiting via Redis
 - Provider adapters: Claude, Gemini, DeepSeek R1, FAL.ai
@@ -322,6 +327,7 @@ After:  Based → Pantheon API → best model per task
 - Minimal developer dashboard: key management, balance, usage graph
 
 ### Phase 2 — Full God Roster + VSCode (weeks 7–16)
+
 - Add Suno, Perplexity, OpenAI GPT-4o adapters
 - `/v1/research` endpoint (multi-step web search + synthesis)
 - Anthropic-compatible `/v1/messages` endpoint (Claude Code drop-in)
@@ -334,6 +340,7 @@ After:  Based → Pantheon API → best model per task
 - Public launch (Product Hunt, dev communities)
 
 ### Phase 3 — Pantheon Model (months 6–18)
+
 - Fine-tune Llama 3.1 70B or Qwen 2.5 72B on RunPod GPU (~$1–3/hr)
 - Training data: curated code, writing, reasoning — sourced from Pantheon usage logs (anonymised, opt-in)
 - Replace Claude Sonnet on `chat` + `writing` tasks with `pantheon-v1`
@@ -346,12 +353,14 @@ After:  Based → Pantheon API → best model per task
 ## Success Criteria
 
 **Phase 1 done when:**
+
 - A developer can sign up, get an API key, and make a successful `/v1/chat/completions` call
 - Based is wired to Pantheon's owner key and routing works
 - Stripe purchase flow works end to end
 - Credits deduct correctly per call
 
 **Phase 2 done when:**
+
 - All 8 task types route correctly
 - `/v1/research` returns cited multi-source answers
 - Claude Code users can point `ANTHROPIC_BASE_URL` at Pantheon and it works
@@ -360,6 +369,7 @@ After:  Based → Pantheon API → best model per task
 - First 10 external developers using the API
 
 **Phase 3 done when:**
+
 - `pantheon-v1` passes a blind quality eval vs Claude Sonnet on chat/writing tasks
 - Based and Pantheon both default to `pantheon-v1` for text
 

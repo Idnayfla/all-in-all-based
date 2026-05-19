@@ -41,15 +41,19 @@ export async function POST(req: NextRequest) {
     // Grant new user 7 days free Pro
     const bonusExpires = new Date(Date.now() + REFERRAL_BONUS_DAYS * 86400000).toISOString();
 
-    await supabaseAdmin.from('user_settings').upsert({
-      user_id: userId,
-      referred_by: code.toUpperCase(),
-      pro_bonus_expires_at: bonusExpires,
-    }, { onConflict: 'user_id' });
+    await supabaseAdmin.from('user_settings').upsert(
+      {
+        user_id: userId,
+        referred_by: code.toUpperCase(),
+        pro_bonus_expires_at: bonusExpires,
+      },
+      { onConflict: 'user_id' }
+    );
 
     return NextResponse.json({ ok: true, bonusDays: REFERRAL_BONUS_DAYS });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

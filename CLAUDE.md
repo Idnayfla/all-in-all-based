@@ -10,28 +10,31 @@ Personal AI dev studio. Users chat with "Based" (Claude-powered) and get generat
 Claude Code defaults to your **Claude.ai Pro/Max subscription** (no API credits consumed).
 
 If starting a new terminal session, activate it with:
+
 ```powershell
 . $PROFILE
 ```
 
 Claude Code provider options (this terminal, not the webapp):
+
 - `use-subscription` — Claude.ai Pro/Max (default)
 - `use-anthropic` — Anthropic API (pay as you go)
 
 ## Key Files
 
-| File | Purpose |
-|------|---------|
+| File                        | Purpose                                                           |
+| --------------------------- | ----------------------------------------------------------------- |
 | `app/api/generate/route.ts` | Main generation pipeline — planner → per-file generator → summary |
-| `app/api/memory/route.ts` | Redis-backed memory extraction (uses Haiku) |
-| `app/page.tsx` | Main shell — header, sidebar, panel switcher |
-| `components/ChatPanel.tsx` | Chat UI, streaming render, progress bar |
-| `components/Sidebar.tsx` | Project and file list |
-| `app/globals.css` | All styling, design tokens |
+| `app/api/memory/route.ts`   | Redis-backed memory extraction (uses Haiku)                       |
+| `app/page.tsx`              | Main shell — header, sidebar, panel switcher                      |
+| `components/ChatPanel.tsx`  | Chat UI, streaming render, progress bar                           |
+| `components/Sidebar.tsx`    | Project and file list                                             |
+| `app/globals.css`           | All styling, design tokens                                        |
 
 ## Generation Pipeline (route.ts)
 
 Three-step flow for code requests:
+
 1. **Planner** (`haiku`) — outputs JSON file plan sized to complexity
 2. **File generator** (`opus`) — generates each file individually, streams chunks
 3. **Summary** (`haiku`) — 1-2 sentence reply
@@ -46,35 +49,63 @@ Non-code chat uses `sonnet`. `sanitizeHTML()` post-processes all HTML before sen
 
 ## Agent System
 
-Eight senior specialist agents are defined in `.claude/agents/`. Invoke one by prefixing your message:
+Nine agents (8 specialists + 1 orchestrator) defined in `.claude/agents/`.
+
+### Single-agent invocation
 
 ```
-[Agent: Architect] Should we add a CDN for user-uploaded assets?
-[Agent: Product] What should Phase 10 be?
-[Agent: Designer] Review the Notes panel layout
-[Agent: Growth] Write the beta launch announcement
-[Agent: QA] Run the stable release gate checklist
-[Agent: DevOps] What's our Vercel spend per active user?
-[Agent: Security] Audit the Supabase RLS policies
-[Agent: Chief of Staff] Log today's decisions
+[Agent: Architect]      — system design, scalability, cost modeling
+[Agent: Product]        — roadmap, specs, prioritization
+[Agent: Designer]       — design system, layouts, brand
+[Agent: Growth]         — copy, SEO, launch, onboarding
+[Agent: QA]             — test plans, bug triage, release gate
+[Agent: DevOps]         — infra, cost per user, monitoring
+[Agent: Security]       — auth audit, API security, OWASP
+[Agent: Chief of Staff] — decisions log, changelog, roadmap status
 ```
 
-Without a prefix, default behaviour is **Full-Stack Engineer** (code, bugs, features).
+### Multi-agent workflows (Orchestrator coordinates all)
 
-Tracking documents:
-- `DECISIONS.md` — all significant product/tech decisions with rationale
+```
+[Workflow: New Feature]     — Product → Architect → Designer → Dev → QA → DevOps → Chief of Staff
+[Workflow: Bug Fix]         — QA → Security → Dev → QA verify → Chief of Staff
+[Workflow: Beta → Stable]   — QA gate → Product → Security → DevOps → Growth → Chief of Staff
+[Workflow: Architecture]    — Architect → Security + DevOps (parallel) → Chief of Staff
+[Workflow: Weekly Review]   — Chief of Staff → Product → DevOps
+[Workflow: Security Audit]  — Security → Architect → DevOps → Chief of Staff
+```
+
+See `.claude/agents/WORKFLOWS.md` for full step definitions.  
+Without a prefix: **Full-Stack Engineer** mode (code, bugs, features).
+
+### Tracking documents
+
+- `DECISIONS.md` — every significant decision with rationale
 - `CHANGELOG.md` — user-facing record of what shipped
+
+## Quality Gate (local)
+
+```bash
+npm run check          # typecheck + lint + format check (all three)
+npm run typecheck      # tsc --noEmit
+npm run lint           # ESLint
+npm run format         # Prettier write
+npm run format:check   # Prettier check only
+```
+
+CI runs automatically on every push to `dev` and `main` via `.github/workflows/ci.yml`:
+
+- TypeScript check → ESLint → Prettier check → Build
 
 ## Model Guide
 
-| Task | Model |
-|------|-------|
-| Questions, explanations | sonnet |
-| CSS / styling tweaks | sonnet |
-| Small fixes (1-2 files, clear bug) | sonnet |
-| Discussing approach / planning | sonnet |
-| New feature from scratch | opus |
-| Complex multi-file changes | opus |
-| Hard bug you've been stuck on | opus |
-| Changes to `generate/route.ts` logic | opus |
-
+| Task                                 | Model  |
+| ------------------------------------ | ------ |
+| Questions, explanations              | sonnet |
+| CSS / styling tweaks                 | sonnet |
+| Small fixes (1-2 files, clear bug)   | sonnet |
+| Discussing approach / planning       | sonnet |
+| New feature from scratch             | opus   |
+| Complex multi-file changes           | opus   |
+| Hard bug you've been stuck on        | opus   |
+| Changes to `generate/route.ts` logic | opus   |

@@ -12,19 +12,20 @@
 
 ## Files
 
-| File | Change |
-|------|--------|
-| `hooks/useLogoConfig.ts` | Add `'terminal'` to `iconShape` union; update `LOGO_DEFAULTS` |
-| `components/LogoDisplay.tsx` | Render gradient tile + `B>` text when `iconShape === 'terminal'`; override wordmark font |
-| `components/LogoEditorModal.tsx` | Add `'terminal'` to `SHAPES` array and `SHAPE_LABELS` map |
-| `app/page.tsx` | Add `B>` text content to the `.chat-empty-logo` div |
-| `app/globals.css` | Restyle `.chat-empty-logo` as the real gradient tile |
+| File                             | Change                                                                                   |
+| -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `hooks/useLogoConfig.ts`         | Add `'terminal'` to `iconShape` union; update `LOGO_DEFAULTS`                            |
+| `components/LogoDisplay.tsx`     | Render gradient tile + `B>` text when `iconShape === 'terminal'`; override wordmark font |
+| `components/LogoEditorModal.tsx` | Add `'terminal'` to `SHAPES` array and `SHAPE_LABELS` map                                |
+| `app/page.tsx`                   | Add `B>` text content to the `.chat-empty-logo` div                                      |
+| `app/globals.css`                | Restyle `.chat-empty-logo` as the real gradient tile                                     |
 
 ---
 
 ## Task 1: Extend LogoConfig type and update defaults
 
 **Files:**
+
 - Modify: `hooks/useLogoConfig.ts`
 
 - [ ] **Step 1: Update `iconShape` union type and `LOGO_DEFAULTS`**
@@ -32,6 +33,7 @@
   In `hooks/useLogoConfig.ts`, make these two changes:
 
   Change line 7:
+
   ```ts
   // Before
   iconShape: 'bolt' | 'diamond' | 'hex' | 'circle';
@@ -40,6 +42,7 @@
   ```
 
   Change lines 13–20 (`LOGO_DEFAULTS`):
+
   ```ts
   export const LOGO_DEFAULTS: LogoConfig = {
     text: 'BASED',
@@ -73,6 +76,7 @@
 ## Task 2: Add terminal rendering to LogoDisplay
 
 **Files:**
+
 - Modify: `components/LogoDisplay.tsx`
 
 - [ ] **Step 1: Replace the icon rendering block**
@@ -80,6 +84,7 @@
   The current `LogoDisplay` renders `<div className="logo-icon-svg" style={{ background: config.iconBg }}><IconComp /></div>` unconditionally. Replace the entire return statement with one that branches on `iconShape === 'terminal'`:
 
   Full new file content for `components/LogoDisplay.tsx`:
+
   ```tsx
   'use client';
   import { LogoConfig } from '@/hooks/useLogoConfig';
@@ -121,20 +126,22 @@
 
   export default function LogoDisplay({ config }: { config: LogoConfig }) {
     const isTerminal = config.iconShape === 'terminal';
-    const IconComp = isTerminal ? null : ICONS[config.iconShape as keyof typeof ICONS] ?? null;
+    const IconComp = isTerminal ? null : (ICONS[config.iconShape as keyof typeof ICONS] ?? null);
     const totalDuration = config.speed + 1.2;
     const movePct = Math.round((config.speed / totalDuration) * 100);
 
     return (
       <div
         className="animated-logo-wrap"
-        style={{
-          '--logo-shimmer-color': config.shimmerColor,
-          '--logo-speed': `${totalDuration}s`,
-          '--logo-icon-bg': config.iconBg,
-          '--logo-shimmer-width': `${config.shimmerWidth}%`,
-          '--shimmer-move-pct': `${movePct}%`,
-        } as React.CSSProperties}
+        style={
+          {
+            '--logo-shimmer-color': config.shimmerColor,
+            '--logo-speed': `${totalDuration}s`,
+            '--logo-icon-bg': config.iconBg,
+            '--logo-shimmer-width': `${config.shimmerWidth}%`,
+            '--shimmer-move-pct': `${movePct}%`,
+          } as React.CSSProperties
+        }
       >
         {isTerminal ? (
           <div
@@ -158,7 +165,16 @@
         )}
         <span
           className="animated-logo-text"
-          style={isTerminal ? { fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '13px', letterSpacing: '2px' } : undefined}
+          style={
+            isTerminal
+              ? {
+                  fontFamily: 'var(--font-mono)',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  letterSpacing: '2px',
+                }
+              : undefined
+          }
         >
           {config.text}
         </span>
@@ -194,20 +210,29 @@
 ## Task 3: Add terminal to LogoEditorModal
 
 **Files:**
+
 - Modify: `components/LogoEditorModal.tsx` (lines 8–9)
 
 - [ ] **Step 1: Add `terminal` to the SHAPES array and SHAPE_LABELS map**
 
   In `components/LogoEditorModal.tsx`, find these two lines:
+
   ```ts
   const SHAPES: LogoConfig['iconShape'][] = ['bolt', 'diamond', 'hex', 'circle'];
   const SHAPE_LABELS: Record<string, string> = { bolt: '⚡', diamond: '◆', hex: '⬡', circle: '●' };
   ```
 
   Replace with:
+
   ```ts
   const SHAPES: LogoConfig['iconShape'][] = ['terminal', 'bolt', 'diamond', 'hex', 'circle'];
-  const SHAPE_LABELS: Record<string, string> = { terminal: 'B>', bolt: '⚡', diamond: '◆', hex: '⬡', circle: '●' };
+  const SHAPE_LABELS: Record<string, string> = {
+    terminal: 'B>',
+    bolt: '⚡',
+    diamond: '◆',
+    hex: '⬡',
+    circle: '●',
+  };
   ```
 
   `terminal` is listed first so it appears as the default option in the picker.
@@ -232,40 +257,55 @@
 ## Task 4: Fix empty-state logo
 
 **Files:**
+
 - Modify: `app/page.tsx` (line 266)
 - Modify: `app/globals.css` (`.chat-empty-logo` block, lines 112–116)
 
 - [ ] **Step 1: Add `B>` text to the empty-state div**
 
   In `app/page.tsx`, find line 266:
+
   ```tsx
   <div className="chat-empty-logo" aria-hidden="true" />
   ```
 
   Replace with:
+
   ```tsx
-  <div className="chat-empty-logo" aria-hidden="true">B&gt;</div>
+  <div className="chat-empty-logo" aria-hidden="true">
+    B&gt;
+  </div>
   ```
 
 - [ ] **Step 2: Restyle `.chat-empty-logo` in globals.css**
 
   In `app/globals.css`, find the `.chat-empty-logo` block:
+
   ```css
   .chat-empty-logo {
-    width: 48px; height: 48px;
-    background: linear-gradient(135deg, rgba(124,106,247,0.25), rgba(106,247,200,0.15));
-    border-radius: 14px; border: 1px solid rgba(124,106,247,0.3);
+    width: 48px;
+    height: 48px;
+    background: linear-gradient(135deg, rgba(124, 106, 247, 0.25), rgba(106, 247, 200, 0.15));
+    border-radius: 14px;
+    border: 1px solid rgba(124, 106, 247, 0.3);
   }
   ```
 
   Replace with:
+
   ```css
   .chat-empty-logo {
-    width: 56px; height: 56px;
+    width: 56px;
+    height: 56px;
     background: linear-gradient(135deg, var(--accent), var(--accent3));
     border-radius: 14px;
-    display: flex; align-items: center; justify-content: center;
-    font-family: var(--font-mono); font-weight: 700; font-size: 22px; color: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    font-size: 22px;
+    color: var(--bg);
   }
   ```
 

@@ -14,27 +14,28 @@
 
 ## File Map
 
-| File | Action | Responsibility |
-|------|--------|---------------|
-| `lib/supabase.ts` | Create | Browser Supabase client (anon key, session only) |
-| `app/api/_auth.ts` | Create | Server `getUserId()` helper + admin client |
-| `app/auth/callback/page.tsx` | Create | OAuth redirect landing page |
-| `app/api/settings/route.ts` | Create | GET/PUT personality + global memory |
-| `app/api/projects/route.ts` | Create | GET list + POST create project |
-| `app/api/projects/[id]/route.ts` | Create | GET/PUT/DELETE single project |
-| `app/api/migrate/route.ts` | Create | One-time localStorage→Supabase import |
-| `app/api/memory/route.ts` | Modify | Replace Redis with Supabase user_settings |
-| `app/api/memory/save/route.ts` | Modify | Replace Redis with Supabase user_settings |
-| `components/AuthModal.tsx` | Create | Sign in / sign up / OAuth modal |
-| `app/globals.css` | Modify | Auth modal + user avatar styles |
-| `app/page.tsx` | Modify | Session check, API data loading, migration, avatar |
-| `components/ChatPanel.tsx` | Modify | Auth header on `/api/memory` POST |
+| File                             | Action | Responsibility                                     |
+| -------------------------------- | ------ | -------------------------------------------------- |
+| `lib/supabase.ts`                | Create | Browser Supabase client (anon key, session only)   |
+| `app/api/_auth.ts`               | Create | Server `getUserId()` helper + admin client         |
+| `app/auth/callback/page.tsx`     | Create | OAuth redirect landing page                        |
+| `app/api/settings/route.ts`      | Create | GET/PUT personality + global memory                |
+| `app/api/projects/route.ts`      | Create | GET list + POST create project                     |
+| `app/api/projects/[id]/route.ts` | Create | GET/PUT/DELETE single project                      |
+| `app/api/migrate/route.ts`       | Create | One-time localStorage→Supabase import              |
+| `app/api/memory/route.ts`        | Modify | Replace Redis with Supabase user_settings          |
+| `app/api/memory/save/route.ts`   | Modify | Replace Redis with Supabase user_settings          |
+| `components/AuthModal.tsx`       | Create | Sign in / sign up / OAuth modal                    |
+| `app/globals.css`                | Modify | Auth modal + user avatar styles                    |
+| `app/page.tsx`                   | Modify | Session check, API data loading, migration, avatar |
+| `components/ChatPanel.tsx`       | Modify | Auth header on `/api/memory` POST                  |
 
 ---
 
 ## Task 1: Install Supabase and configure environment
 
 **Files:**
+
 - Modify: `package.json` (via npm install)
 - Modify: `.env.local`
 
@@ -137,6 +138,7 @@ Expected: "Success. No rows returned."
 - [ ] **Step 3: Verify tables exist**
 
 Run in SQL editor:
+
 ```sql
 select table_name from information_schema.tables
 where table_schema = 'public' and table_name in ('projects', 'user_settings');
@@ -181,6 +183,7 @@ Add `http://localhost:3000/auth/callback` to Additional Redirect URLs.
 ## Task 4: Create browser Supabase client
 
 **Files:**
+
 - Create: `lib/supabase.ts`
 
 - [ ] **Step 1: Create lib directory and file**
@@ -227,9 +230,10 @@ git commit -m "feat: add browser Supabase client"
 ## Task 5: Create server-side auth helper
 
 **Files:**
+
 - Create: `app/api/_auth.ts`
 
-- [ ] **Step 1: Write app/api/_auth.ts**
+- [ ] **Step 1: Write app/api/\_auth.ts**
 
 ```ts
 import { createClient } from '@supabase/supabase-js';
@@ -243,7 +247,10 @@ export const supabaseAdmin = createClient(
 export async function getUserId(req: NextRequest): Promise<string> {
   const token = req.headers.get('Authorization')?.replace('Bearer ', '');
   if (!token) throw new Error('Unauthorized');
-  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+  const {
+    data: { user },
+    error,
+  } = await supabaseAdmin.auth.getUser(token);
   if (error || !user) throw new Error('Unauthorized');
   return user.id;
 }
@@ -269,6 +276,7 @@ git commit -m "feat: add server-side Supabase auth helper"
 ## Task 6: Create OAuth callback page
 
 **Files:**
+
 - Create: `app/auth/callback/page.tsx`
 
 - [ ] **Step 1: Create directory and page**
@@ -291,7 +299,9 @@ export default function AuthCallback() {
   useEffect(() => {
     // Supabase automatically detects the session from the URL hash/code
     // and fires SIGNED_IN once it's done. We just wait and redirect.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(event => {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         router.replace('/');
       }
@@ -306,11 +316,18 @@ export default function AuthCallback() {
   }, [router]);
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100vh', background: '#0d0d0d', color: '#a0a0a0',
-      fontFamily: 'monospace', fontSize: '14px',
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: '#0d0d0d',
+        color: '#a0a0a0',
+        fontFamily: 'monospace',
+        fontSize: '14px',
+      }}
+    >
       Signing in...
     </div>
   );
@@ -337,6 +354,7 @@ git commit -m "feat: add OAuth callback page"
 ## Task 7: Create settings API route
 
 **Files:**
+
 - Create: `app/api/settings/route.ts`
 
 - [ ] **Step 1: Create directory**
@@ -364,7 +382,8 @@ export async function GET(req: NextRequest) {
       globalMemory: data?.global_memory ?? '',
     });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -382,7 +401,8 @@ export async function PUT(req: NextRequest) {
     if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -408,6 +428,7 @@ git commit -m "feat: add /api/settings GET+PUT route"
 ## Task 8: Create projects list + create API route
 
 **Files:**
+
 - Create: `app/api/projects/route.ts`
 
 - [ ] **Step 1: Create directory**
@@ -441,7 +462,8 @@ export async function GET(req: NextRequest) {
     }));
     return NextResponse.json({ projects });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -468,7 +490,8 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -494,6 +517,7 @@ git commit -m "feat: add /api/projects GET+POST route"
 ## Task 9: Create single project API route
 
 **Files:**
+
 - Create: `app/api/projects/[id]/route.ts`
 
 - [ ] **Step 1: Create directory**
@@ -532,7 +556,8 @@ export async function GET(req: NextRequest, ctx: Ctx) {
       },
     });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -556,7 +581,8 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -573,7 +599,8 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
     if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -599,6 +626,7 @@ git commit -m "feat: add /api/projects/[id] GET+PUT+DELETE route"
 ## Task 10: Create migration API route
 
 **Files:**
+
 - Create: `app/api/migrate/route.ts`
 
 - [ ] **Step 1: Create directory**
@@ -633,30 +661,25 @@ export async function POST(req: NextRequest) {
             : m.content,
         })),
         memory: p.memory ?? '',
-        updated_at: p.updatedAt
-          ? new Date(p.updatedAt).toISOString()
-          : new Date().toISOString(),
+        updated_at: p.updatedAt ? new Date(p.updatedAt).toISOString() : new Date().toISOString(),
       }));
-      const { error } = await supabaseAdmin
-        .from('projects')
-        .upsert(rows, { onConflict: 'id' });
+      const { error } = await supabaseAdmin.from('projects').upsert(rows, { onConflict: 'id' });
       if (error) throw error;
     }
 
-    await supabaseAdmin
-      .from('user_settings')
-      .upsert(
-        {
-          user_id: userId,
-          personality: personality ?? '',
-          global_memory: globalMemory ?? '',
-        },
-        { onConflict: 'user_id' }
-      );
+    await supabaseAdmin.from('user_settings').upsert(
+      {
+        user_id: userId,
+        personality: personality ?? '',
+        global_memory: globalMemory ?? '',
+      },
+      { onConflict: 'user_id' }
+    );
 
     return NextResponse.json({ migrated: projects?.length ?? 0 });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -682,6 +705,7 @@ git commit -m "feat: add /api/migrate one-time localStorage import route"
 ## Task 11: Update memory routes to use Supabase
 
 **Files:**
+
 - Modify: `app/api/memory/route.ts`
 - Modify: `app/api/memory/save/route.ts`
 
@@ -715,7 +739,8 @@ export async function GET(req: NextRequest) {
       .single();
     return NextResponse.json({ memory: data?.global_memory ?? '' });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -740,9 +765,10 @@ export async function POST(req: NextRequest) {
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 500,
-      messages: [{
-        role: 'user',
-        content: `You are a memory extractor. Based on this conversation, extract key facts about the user (preferences, skills, projects, goals, personal details) and merge with existing memory.
+      messages: [
+        {
+          role: 'user',
+          content: `You are a memory extractor. Based on this conversation, extract key facts about the user (preferences, skills, projects, goals, personal details) and merge with existing memory.
 
 EXISTING MEMORY:
 ${existing || 'None yet'}
@@ -761,21 +787,20 @@ STRICT RULES:
 - No categories or labels
 - Just plain sentences
 - If nothing new to add, return existing memory unchanged.`,
-      }],
+        },
+      ],
     });
 
     const newMemory = response.content[0].type === 'text' ? response.content[0].text : existing;
 
     await supabaseAdmin
       .from('user_settings')
-      .upsert(
-        { user_id: userId, global_memory: newMemory },
-        { onConflict: 'user_id' }
-      );
+      .upsert({ user_id: userId, global_memory: newMemory }, { onConflict: 'user_id' });
 
     return NextResponse.json({ memory: newMemory });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -795,14 +820,12 @@ export async function POST(req: NextRequest) {
     const { memory } = await req.json();
     const { error } = await supabaseAdmin
       .from('user_settings')
-      .upsert(
-        { user_id: userId, global_memory: memory ?? '' },
-        { onConflict: 'user_id' }
-      );
+      .upsert({ user_id: userId, global_memory: memory ?? '' }, { onConflict: 'user_id' });
     if (error) throw error;
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -828,6 +851,7 @@ git commit -m "feat: replace Redis memory with Supabase user_settings"
 ## Task 12: Create AuthModal component
 
 **Files:**
+
 - Create: `components/AuthModal.tsx`
 
 - [ ] **Step 1: Write components/AuthModal.tsx**
@@ -841,27 +865,30 @@ import { supabase } from '@/lib/supabase';
 type Tab = 'signin' | 'signup';
 
 const OAUTH_PROVIDERS = [
-  { id: 'google'  as const, label: 'Google',    icon: 'G'  },
-  { id: 'github'  as const, label: 'GitHub',    icon: '⌥' },
-  { id: 'azure'   as const, label: 'Microsoft', icon: 'M'  },
-  { id: 'apple'   as const, label: 'Apple',     icon: ''  },
+  { id: 'google' as const, label: 'Google', icon: 'G' },
+  { id: 'github' as const, label: 'GitHub', icon: '⌥' },
+  { id: 'azure' as const, label: 'Microsoft', icon: 'M' },
+  { id: 'apple' as const, label: 'Apple', icon: '' },
 ];
 
 export default function AuthModal() {
-  const [tab, setTab]         = useState<Tab>('signin');
-  const [email, setEmail]     = useState('');
+  const [tab, setTab] = useState<Tab>('signin');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
+  const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
   const clearForm = () => {
-    setEmail(''); setPassword(''); setConfirm('');
-    setError(''); setMessage('');
+    setEmail('');
+    setPassword('');
+    setConfirm('');
+    setError('');
+    setMessage('');
   };
 
-  const handleOAuth = async (provider: typeof OAUTH_PROVIDERS[number]['id']) => {
+  const handleOAuth = async (provider: (typeof OAUTH_PROVIDERS)[number]['id']) => {
     setError('');
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
@@ -872,7 +899,8 @@ export default function AuthModal() {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(''); setLoading(true);
+    setError('');
+    setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) setError(error.message);
@@ -880,9 +908,16 @@ export default function AuthModal() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password !== confirm) { setError("Passwords don't match"); return; }
-    if (password.length < 8)  { setError('Password must be at least 8 characters'); return; }
-    setError(''); setLoading(true);
+    if (password !== confirm) {
+      setError("Passwords don't match");
+      return;
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+    setError('');
+    setLoading(true);
     const { error } = await supabase.auth.signUp({
       email,
       password,
@@ -894,7 +929,10 @@ export default function AuthModal() {
   };
 
   const handleForgotPassword = async () => {
-    if (!email) { setError('Enter your email address first'); return; }
+    if (!email) {
+      setError('Enter your email address first');
+      return;
+    }
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/callback`,
     });
@@ -922,28 +960,36 @@ export default function AuthModal() {
 
         <div className="auth-oauth-grid">
           {OAUTH_PROVIDERS.map(p => (
-            <button
-              key={p.id}
-              className="auth-oauth-btn"
-              onClick={() => handleOAuth(p.id)}
-            >
+            <button key={p.id} className="auth-oauth-btn" onClick={() => handleOAuth(p.id)}>
               <span className="auth-oauth-icon">{p.icon}</span>
               {p.label}
             </button>
           ))}
         </div>
 
-        <div className="auth-divider"><span>or</span></div>
+        <div className="auth-divider">
+          <span>or</span>
+        </div>
 
         <div className="auth-tabs">
           <button
             className={`auth-tab${tab === 'signin' ? ' active' : ''}`}
-            onClick={() => { setTab('signin'); clearForm(); }}
-          >Sign In</button>
+            onClick={() => {
+              setTab('signin');
+              clearForm();
+            }}
+          >
+            Sign In
+          </button>
           <button
             className={`auth-tab${tab === 'signup' ? ' active' : ''}`}
-            onClick={() => { setTab('signup'); clearForm(); }}
-          >Sign Up</button>
+            onClick={() => {
+              setTab('signup');
+              clearForm();
+            }}
+          >
+            Sign Up
+          </button>
         </div>
 
         {message ? (
@@ -989,11 +1035,7 @@ export default function AuthModal() {
               {loading ? '...' : tab === 'signin' ? 'Sign In' : 'Create Account'}
             </motion.button>
             {tab === 'signin' && (
-              <button
-                type="button"
-                className="auth-forgot"
-                onClick={handleForgotPassword}
-              >
+              <button type="button" className="auth-forgot" onClick={handleForgotPassword}>
                 Forgot password?
               </button>
             )}
@@ -1025,6 +1067,7 @@ git commit -m "feat: add AuthModal with email/password + OAuth"
 ## Task 13: Add CSS for AuthModal and user avatar
 
 **Files:**
+
 - Modify: `app/globals.css`
 
 - [ ] **Step 1: Append styles to app/globals.css**
@@ -1084,10 +1127,18 @@ Add the following at the end of `app/globals.css`:
   color: var(--text);
   font-size: 13px;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
-.auth-oauth-btn:hover { border-color: var(--accent); background: var(--surface); }
-.auth-oauth-icon { font-size: 15px; font-weight: 700; }
+.auth-oauth-btn:hover {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+.auth-oauth-icon {
+  font-size: 15px;
+  font-weight: 700;
+}
 .auth-divider {
   display: flex;
   align-items: center;
@@ -1118,9 +1169,14 @@ Add the following at the end of `app/globals.css`:
   color: var(--muted);
   font-size: 13px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
-.auth-tab.active { background: var(--surface); color: var(--text); }
+.auth-tab.active {
+  background: var(--surface);
+  color: var(--text);
+}
 .auth-input {
   width: 100%;
   padding: 10px 12px;
@@ -1133,7 +1189,10 @@ Add the following at the end of `app/globals.css`:
   transition: border-color 0.15s;
   box-sizing: border-box;
 }
-.auth-input:focus { outline: none; border-color: var(--accent); }
+.auth-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
 .auth-error {
   font-size: 12px;
   color: #ff6b6b;
@@ -1163,8 +1222,13 @@ Add the following at the end of `app/globals.css`:
   cursor: pointer;
   transition: opacity 0.15s;
 }
-.auth-submit:hover { opacity: 0.9; }
-.auth-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.auth-submit:hover {
+  opacity: 0.9;
+}
+.auth-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .auth-forgot {
   width: 100%;
   background: none;
@@ -1176,7 +1240,9 @@ Add the following at the end of `app/globals.css`:
   padding: 4px;
   transition: color 0.15s;
 }
-.auth-forgot:hover { color: var(--accent); }
+.auth-forgot:hover {
+  color: var(--accent);
+}
 
 /* ── User Avatar ── */
 .user-avatar-btn {
@@ -1196,8 +1262,14 @@ Add the following at the end of `app/globals.css`:
   overflow: hidden;
   transition: opacity 0.15s;
 }
-.user-avatar-btn:hover { opacity: 0.85; }
-.user-avatar-btn img { width: 100%; height: 100%; object-fit: cover; }
+.user-avatar-btn:hover {
+  opacity: 0.85;
+}
+.user-avatar-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 .auth-signout-btn {
   width: 100%;
   padding: 9px;
@@ -1210,7 +1282,9 @@ Add the following at the end of `app/globals.css`:
   transition: background 0.15s;
   margin-top: 8px;
 }
-.auth-signout-btn:hover { background: rgba(255, 107, 107, 0.15); }
+.auth-signout-btn:hover {
+  background: rgba(255, 107, 107, 0.15);
+}
 ```
 
 - [ ] **Step 2: Type-check (CSS doesn't need tsc, verify build)**
@@ -1233,6 +1307,7 @@ git commit -m "feat: add auth modal and user avatar CSS"
 ## Task 14: Update app/page.tsx for cloud auth and data
 
 **Files:**
+
 - Modify: `app/page.tsx`
 
 - [ ] **Step 1: Replace app/page.tsx with cloud-aware version**
@@ -1263,7 +1338,11 @@ export interface FileNode {
 
 export type ContentBlock =
   | { type: 'text'; text: string }
-  | { type: 'image'; mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'; data: string }
+  | {
+      type: 'image';
+      mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+      data: string;
+    }
   | { type: 'generated-image'; url: string; prompt: string }
   | { type: 'generated-video'; url: string; prompt: string };
 
@@ -1289,32 +1368,35 @@ export interface Project {
   memory?: string;
 }
 
-const DEFAULT_PERSONALITY = 'You are Based, the AI inside All in All Based — a sharp, witty, and direct coding assistant. You are confident, occasionally funny, and always helpful. You treat the user like a smart friend, not a customer. You get straight to the point, never over-explain, and celebrate when things work.';
+const DEFAULT_PERSONALITY =
+  'You are Based, the AI inside All in All Based — a sharp, witty, and direct coding assistant. You are confident, occasionally funny, and always helpful. You treat the user like a smart friend, not a customer. You get straight to the point, never over-explain, and celebrate when things work.';
 
 export default function Home() {
-  const [messages, setMessages]       = useState<Message[]>([]);
-  const [files, setFiles]             = useState<FileNode[]>([]);
-  const [activeFile, setActiveFile]   = useState<FileNode | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [files, setFiles] = useState<FileNode[]>([]);
+  const [activeFile, setActiveFile] = useState<FileNode | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [projectType, setProjectType] = useState('html');
   const [personality, setPersonality] = useState(DEFAULT_PERSONALITY);
   const [showSettings, setShowSettings] = useState(false);
   const [globalMemory, setGlobalMemory] = useState('');
-  const [incognito, setIncognito]     = useState(false);
+  const [incognito, setIncognito] = useState(false);
   const [incognitoMessages, setIncognitoMessages] = useState<Message[]>([]);
   const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview' | 'debug'>('chat');
-  const [projects, setProjects]       = useState<Project[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [projectModal, setProjectModal] = useState(false);
-  const [user, setUser]               = useState<any>(null);
-  const [authReady, setAuthReady]     = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   // ── Auth headers helper ──────────────────────────────────────────────────
   const getHeaders = useCallback(async (): Promise<HeadersInit> => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     return {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${session?.access_token ?? ''}`,
+      Authorization: `Bearer ${session?.access_token ?? ''}`,
     };
   }, []);
 
@@ -1380,7 +1462,9 @@ export default function Home() {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       if (event === 'SIGNED_IN' && currentUser) {
@@ -1396,9 +1480,13 @@ export default function Home() {
         await loadCloudData();
       }
       if (event === 'SIGNED_OUT') {
-        setProjects([]); setCurrentProject(null);
-        setFiles([]); setMessages([]); setActiveFile(null);
-        setGlobalMemory(''); setPersonality(DEFAULT_PERSONALITY);
+        setProjects([]);
+        setCurrentProject(null);
+        setFiles([]);
+        setMessages([]);
+        setActiveFile(null);
+        setGlobalMemory('');
+        setPersonality(DEFAULT_PERSONALITY);
       }
     });
 
@@ -1427,12 +1515,17 @@ export default function Home() {
     const strippedMessages = messages.map(m => ({
       ...m,
       content: Array.isArray(m.content)
-        ? m.content.map(b => b.type === 'image' ? { type: 'text' as const, text: '[image]' } : b)
+        ? m.content.map(b => (b.type === 'image' ? { type: 'text' as const, text: '[image]' } : b))
         : m.content,
     }));
-    const updated: Project = { ...currentProject, files, messages: strippedMessages, updatedAt: Date.now() };
+    const updated: Project = {
+      ...currentProject,
+      files,
+      messages: strippedMessages,
+      updatedAt: Date.now(),
+    };
     setCurrentProject(updated);
-    setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
+    setProjects(prev => prev.map(p => (p.id === updated.id ? updated : p)));
     getHeaders().then(headers => {
       fetch(`/api/projects/${currentProject.id}`, {
         method: 'PUT',
@@ -1457,7 +1550,10 @@ export default function Home() {
     const { project } = await res.json();
     setProjects(prev => [project, ...prev]);
     setCurrentProject(project);
-    setFiles([]); setMessages([]); setActiveFile(null); setActivePanel('chat');
+    setFiles([]);
+    setMessages([]);
+    setActiveFile(null);
+    setActivePanel('chat');
   };
 
   const loadProject = (project: Project) => {
@@ -1473,7 +1569,10 @@ export default function Home() {
     fetch(`/api/projects/${id}`, { method: 'DELETE', headers }).catch(() => {});
     setProjects(prev => prev.filter(p => p.id !== id));
     if (currentProject?.id === id) {
-      setCurrentProject(null); setFiles([]); setMessages([]); setActiveFile(null);
+      setCurrentProject(null);
+      setFiles([]);
+      setMessages([]);
+      setActiveFile(null);
     }
   };
 
@@ -1484,14 +1583,14 @@ export default function Home() {
       headers,
       body: JSON.stringify({ name }),
     }).catch(() => {});
-    setProjects(prev => prev.map(p => p.id === id ? { ...p, name } : p));
-    if (currentProject?.id === id) setCurrentProject(prev => prev ? { ...prev, name } : prev);
+    setProjects(prev => prev.map(p => (p.id === id ? { ...p, name } : p)));
+    if (currentProject?.id === id) setCurrentProject(prev => (prev ? { ...prev, name } : prev));
   };
 
   const updateFile = (updated: FileNode) => {
     setFiles(prev => {
       const exists = prev.find(f => f.name === updated.name);
-      if (exists) return prev.map(f => f.name === updated.name ? updated : f);
+      if (exists) return prev.map(f => (f.name === updated.name ? updated : f));
       return [...prev, updated];
     });
     setActiveFile(updated);
@@ -1517,27 +1616,59 @@ export default function Home() {
         </div>
         <nav className="header-nav">
           <div className="tab-switcher">
-            <button className={`tab-btn ${activePanel === 'chat' ? 'active' : ''}`} onClick={() => setActivePanel('chat')}>Chat</button>
-            <button className={`tab-btn ${activePanel === 'editor' ? 'active' : ''}`} onClick={() => setActivePanel('editor')}>Editor</button>
-            <button className={`tab-btn ${activePanel === 'preview' ? 'active' : ''}`} onClick={() => setActivePanel('preview')}>Preview</button>
-            <button className={`tab-btn tab-btn-debug ${activePanel === 'debug' ? 'active' : ''}`} onClick={() => setActivePanel('debug')} title="Debug stream">⚡</button>
+            <button
+              className={`tab-btn ${activePanel === 'chat' ? 'active' : ''}`}
+              onClick={() => setActivePanel('chat')}
+            >
+              Chat
+            </button>
+            <button
+              className={`tab-btn ${activePanel === 'editor' ? 'active' : ''}`}
+              onClick={() => setActivePanel('editor')}
+            >
+              Editor
+            </button>
+            <button
+              className={`tab-btn ${activePanel === 'preview' ? 'active' : ''}`}
+              onClick={() => setActivePanel('preview')}
+            >
+              Preview
+            </button>
+            <button
+              className={`tab-btn tab-btn-debug ${activePanel === 'debug' ? 'active' : ''}`}
+              onClick={() => setActivePanel('debug')}
+              title="Debug stream"
+            >
+              ⚡
+            </button>
           </div>
           <div className="header-controls">
             <button
               className={`icon-btn ${incognito ? 'incognito-active' : ''}`}
-              onClick={() => { setIncognito(s => !s); setIncognitoMessages([]); setActivePanel('chat'); }}
+              onClick={() => {
+                setIncognito(s => !s);
+                setIncognitoMessages([]);
+                setActivePanel('chat');
+              }}
               title="Temp chat — no memory saved"
-            >🕵️</button>
-            <button className={`icon-btn ${showSettings ? 'active' : ''}`} onClick={() => setShowSettings(s => !s)} title="Settings" aria-label="Toggle settings">⚙</button>
+            >
+              🕵️
+            </button>
+            <button
+              className={`icon-btn ${showSettings ? 'active' : ''}`}
+              onClick={() => setShowSettings(s => !s)}
+              title="Settings"
+              aria-label="Toggle settings"
+            >
+              ⚙
+            </button>
             {user && (
               <button
                 className="user-avatar-btn"
                 onClick={() => setShowSettings(s => !s)}
                 title={user.email}
               >
-                {avatarUrl
-                  ? <img src={avatarUrl} alt="avatar" />
-                  : avatarInitial}
+                {avatarUrl ? <img src={avatarUrl} alt="avatar" /> : avatarInitial}
               </button>
             )}
             <div className="header-status">
@@ -1582,7 +1713,9 @@ export default function Home() {
                   rows={6}
                   placeholder="Describe how Based should behave..."
                 />
-                <div className="settings-hint">This shapes how Based talks and thinks. Changes apply immediately.</div>
+                <div className="settings-hint">
+                  This shapes how Based talks and thinks. Changes apply immediately.
+                </div>
               </div>
               <div className="settings-section">
                 <label className="settings-label">Global Memory</label>
@@ -1593,15 +1726,23 @@ export default function Home() {
                   rows={8}
                   placeholder="Based will learn about you as you chat..."
                 />
-                <div className="settings-hint">Auto-updated after each conversation. Based remembers this across all projects.</div>
-                <button className="run-btn" style={{ marginTop: 8 }} onClick={async () => {
-                  const headers = await getHeaders();
-                  await fetch('/api/memory/save', {
-                    method: 'POST',
-                    headers,
-                    body: JSON.stringify({ memory: globalMemory }),
-                  });
-                }}>Save Memory</button>
+                <div className="settings-hint">
+                  Auto-updated after each conversation. Based remembers this across all projects.
+                </div>
+                <button
+                  className="run-btn"
+                  style={{ marginTop: 8 }}
+                  onClick={async () => {
+                    const headers = await getHeaders();
+                    await fetch('/api/memory/save', {
+                      method: 'POST',
+                      headers,
+                      body: JSON.stringify({ memory: globalMemory }),
+                    });
+                  }}
+                >
+                  Save Memory
+                </button>
               </div>
               {currentProject && (
                 <div className="settings-section">
@@ -1612,7 +1753,7 @@ export default function Home() {
                     onChange={async e => {
                       const updated = { ...currentProject, memory: e.target.value };
                       setCurrentProject(updated);
-                      setProjects(prev => prev.map(p => p.id === updated.id ? updated : p));
+                      setProjects(prev => prev.map(p => (p.id === updated.id ? updated : p)));
                       const headers = await getHeaders();
                       fetch(`/api/projects/${currentProject.id}`, {
                         method: 'PUT',
@@ -1623,13 +1764,19 @@ export default function Home() {
                     rows={4}
                     placeholder="Tell Based things to always remember about this project..."
                   />
-                  <div className="settings-hint">Based will remember this for every message in this project.</div>
+                  <div className="settings-hint">
+                    Based will remember this for every message in this project.
+                  </div>
                 </div>
               )}
               {user && (
                 <div className="settings-section">
-                  <div className="settings-hint" style={{ marginBottom: 4 }}>Signed in as {user.email}</div>
-                  <button className="auth-signout-btn" onClick={signOut}>Sign Out</button>
+                  <div className="settings-hint" style={{ marginBottom: 4 }}>
+                    Signed in as {user.email}
+                  </div>
+                  <button className="auth-signout-btn" onClick={signOut}>
+                    Sign Out
+                  </button>
                 </div>
               )}
             </div>
@@ -1637,7 +1784,9 @@ export default function Home() {
 
           {incognito ? (
             <div className="panel panel-active">
-              <div className="incognito-banner">🕵️ Incognito Mode — chat will be wiped when you exit</div>
+              <div className="incognito-banner">
+                🕵️ Incognito Mode — chat will be wiped when you exit
+              </div>
               <ChatPanel
                 messages={incognitoMessages}
                 setMessages={setIncognitoMessages}
@@ -1652,10 +1801,14 @@ export default function Home() {
             </div>
           ) : !currentProject ? (
             <div className="no-project">
-              <div className="chat-empty-logo" aria-hidden="true">B&gt;</div>
+              <div className="chat-empty-logo" aria-hidden="true">
+                B&gt;
+              </div>
               <div className="no-project-title">BASED</div>
               <div className="no-project-sub">Open a project or start a new one.</div>
-              <button className="new-project-btn-large" onClick={newProject}>+ New Project</button>
+              <button className="new-project-btn-large" onClick={newProject}>
+                + New Project
+              </button>
             </div>
           ) : (
             <>
@@ -1669,7 +1822,8 @@ export default function Home() {
                       const merged = [...prev];
                       newFiles.forEach(newFile => {
                         const idx = merged.findIndex(f => f.name === newFile.name);
-                        if (idx >= 0) merged[idx] = newFile; else merged.push(newFile);
+                        if (idx >= 0) merged[idx] = newFile;
+                        else merged.push(newFile);
                       });
                       return merged;
                     });
@@ -1699,14 +1853,9 @@ export default function Home() {
 
       <AnimatePresence>
         {projectModal && (
-          <ProjectNameModal
-            onConfirm={createProject}
-            onCancel={() => setProjectModal(false)}
-          />
+          <ProjectNameModal onConfirm={createProject} onCancel={() => setProjectModal(false)} />
         )}
-        {authReady && !user && (
-          <AuthModal key="auth-modal" />
-        )}
+        {authReady && !user && <AuthModal key="auth-modal" />}
       </AnimatePresence>
     </div>
   );
@@ -1741,6 +1890,7 @@ git commit -m "feat: wire Supabase auth + cloud data loading into page.tsx"
 ## Task 15: Add auth headers to ChatPanel memory call
 
 **Files:**
+
 - Modify: `components/ChatPanel.tsx`
 
 The memory extraction call (`POST /api/memory`) needs an auth header. Find the existing call and add the header.
@@ -1768,12 +1918,14 @@ await fetch('/api/memory', {
 - [ ] **Step 3: Replace with auth-header version**
 
 ```ts
-const { data: { session } } = await supabase.auth.getSession();
+const {
+  data: { session },
+} = await supabase.auth.getSession();
 await fetch('/api/memory', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${session?.access_token ?? ''}`,
+    Authorization: `Bearer ${session?.access_token ?? ''}`,
   },
   body: JSON.stringify({ messages: finalMessages }),
 });
@@ -1845,6 +1997,7 @@ git push
 ## Self-Review
 
 **Spec coverage check:**
+
 - ✅ Email/password sign up with verification email
 - ✅ Email/password sign in
 - ✅ Google / GitHub / Microsoft / Apple OAuth

@@ -12,18 +12,19 @@
 
 ## File Map
 
-| Action | File | Responsibility |
-|--------|------|----------------|
-| Create | `app/api/image/edit/route.ts` | POST endpoint — validates input, uploads mask to FAL storage, calls FAL, returns `{ url }` |
-| Create | `components/ImageEditorModal.tsx` | Full-screen editor — tabs, canvas brush, result panel, generate/download/chain/confirm |
-| Modify | `app/globals.css` | Append image editor CSS classes |
-| Modify | `components/ChatPanel.tsx` | Add "Edit" button on `generated-image` blocks + mount modal |
+| Action | File                              | Responsibility                                                                             |
+| ------ | --------------------------------- | ------------------------------------------------------------------------------------------ |
+| Create | `app/api/image/edit/route.ts`     | POST endpoint — validates input, uploads mask to FAL storage, calls FAL, returns `{ url }` |
+| Create | `components/ImageEditorModal.tsx` | Full-screen editor — tabs, canvas brush, result panel, generate/download/chain/confirm     |
+| Modify | `app/globals.css`                 | Append image editor CSS classes                                                            |
+| Modify | `components/ChatPanel.tsx`        | Add "Edit" button on `generated-image` blocks + mount modal                                |
 
 ---
 
 ## Task 1: API Route `/api/image/edit`
 
 **Files:**
+
 - Create: `app/api/image/edit/route.ts`
 
 - [ ] **Step 1: Create the route file**
@@ -124,6 +125,7 @@ git commit -m "feat: add /api/image/edit route for transform and inpaint"
 ## Task 2: Modal CSS
 
 **Files:**
+
 - Modify: `app/globals.css` (append to end)
 
 - [ ] **Step 1: Append image editor CSS to the bottom of `app/globals.css`**
@@ -133,137 +135,295 @@ Add the following block after the last existing rule:
 ```css
 /* ── Image Editor Modal ──────────────────────────── */
 .image-editor-overlay {
-  position: fixed; inset: 0; z-index: 1000;
-  background: rgba(10,10,15,0.97);
-  display: flex; flex-direction: column;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(10, 10, 15, 0.97);
+  display: flex;
+  flex-direction: column;
 }
 .image-editor-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 12px 20px; border-bottom: 1px solid var(--border);
-  background: var(--bg2); flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg2);
+  flex-shrink: 0;
 }
 .image-editor-title {
-  font-size: 12px; color: var(--accent); font-weight: 600;
-  letter-spacing: 2px; font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: 2px;
+  font-family: var(--font-mono);
 }
 .image-editor-tabs {
-  display: flex; background: var(--bg3); border: 1px solid var(--border);
-  border-radius: 6px; padding: 2px; gap: 2px;
+  display: flex;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
 }
 .image-editor-tab {
-  padding: 5px 16px; background: transparent; border: none;
-  color: var(--text2); font-family: var(--font-mono); font-size: 11px;
-  letter-spacing: 1px; cursor: pointer; border-radius: 4px; transition: all 0.15s;
+  padding: 5px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s;
 }
-.image-editor-tab.active { background: var(--accent); color: #fff; }
+.image-editor-tab.active {
+  background: var(--accent);
+  color: #fff;
+}
 .image-editor-close {
-  background: none; border: none; color: var(--text3); font-size: 18px;
-  cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: color 0.15s;
+  background: none;
+  border: none;
+  color: var(--text3);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: color 0.15s;
   line-height: 1;
 }
-.image-editor-close:hover { color: var(--text); }
+.image-editor-close:hover {
+  color: var(--text);
+}
 .image-editor-canvas-area {
-  flex: 1; display: flex; min-height: 0;
+  flex: 1;
+  display: flex;
+  min-height: 0;
 }
 .image-editor-pane {
-  flex: 1; display: flex; flex-direction: column;
-  padding: 16px; gap: 10px; min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 10px;
+  min-height: 0;
 }
-.image-editor-pane + .image-editor-pane { border-left: 1px solid var(--border); }
+.image-editor-pane + .image-editor-pane {
+  border-left: 1px solid var(--border);
+}
 .image-editor-pane-label {
-  font-size: 9px; color: var(--text3); text-transform: uppercase;
-  letter-spacing: 1px; font-family: var(--font-mono); flex-shrink: 0;
+  font-size: 9px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
 }
 .image-editor-image-wrap {
-  flex: 1; position: relative; overflow: hidden;
-  background: var(--bg3); border-radius: 8px; border: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: center; min-height: 0;
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: var(--bg3);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
 }
 .image-editor-source {
-  max-width: 100%; max-height: 100%; object-fit: contain;
-  border-radius: 6px; display: block; user-select: none;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  display: block;
+  user-select: none;
 }
 .image-editor-canvas {
-  position: absolute; cursor: crosshair; touch-action: none;
+  position: absolute;
+  cursor: crosshair;
+  touch-action: none;
 }
 .image-editor-brush-tools {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
 }
 .image-editor-brush-btn {
-  padding: 5px 10px; background: var(--bg3); border: 1px solid var(--border);
-  color: var(--text2); font-size: 11px; cursor: pointer; border-radius: 5px;
-  font-family: var(--font-mono); transition: all 0.15s;
+  padding: 5px 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  transition: all 0.15s;
 }
-.image-editor-brush-btn:hover { border-color: var(--accent); color: var(--accent); }
+.image-editor-brush-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .image-editor-brush-size {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 10px; color: var(--text3); font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--text3);
+  font-family: var(--font-mono);
 }
-.image-editor-brush-size input[type=range] { width: 80px; accent-color: var(--accent); cursor: pointer; }
+.image-editor-brush-size input[type='range'] {
+  width: 80px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
 .image-editor-placeholder {
-  display: flex; align-items: center; justify-content: center;
-  width: 100%; height: 100%; color: var(--text3);
-  font-size: 12px; font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text3);
+  font-size: 12px;
+  font-family: var(--font-mono);
 }
 .image-editor-result {
-  max-width: 100%; max-height: 100%; object-fit: contain;
-  border-radius: 6px; display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  display: block;
 }
 .image-editor-result-actions {
-  display: flex; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
 }
 .image-editor-error {
-  color: var(--danger); font-size: 12px; font-family: var(--font-mono);
-  padding: 8px 12px; background: rgba(255,107,107,0.08); border-radius: 6px;
-  border: 1px solid rgba(255,107,107,0.2); flex-shrink: 0;
+  color: var(--danger);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 8px 12px;
+  background: rgba(255, 107, 107, 0.08);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 107, 107, 0.2);
+  flex-shrink: 0;
 }
 .image-editor-footer {
-  padding: 12px 20px; border-top: 1px solid var(--border);
-  background: var(--bg2); display: flex; gap: 8px; align-items: center;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+  display: flex;
+  gap: 8px;
+  align-items: center;
   flex-shrink: 0;
 }
 .image-editor-prompt {
-  flex: 1; background: var(--bg3); border: 1px solid var(--border);
-  border-radius: 8px; padding: 10px 14px; font-size: 13px;
-  color: var(--text); font-family: var(--font-mono); outline: none;
-  resize: none; height: 42px; transition: border-color 0.15s;
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: var(--font-mono);
+  outline: none;
+  resize: none;
+  height: 42px;
+  transition: border-color 0.15s;
 }
-.image-editor-prompt:focus { border-color: var(--accent); }
+.image-editor-prompt:focus {
+  border-color: var(--accent);
+}
 .image-editor-generate-btn {
-  padding: 10px 20px; background: var(--accent); border: none;
-  color: #fff; font-family: var(--font-mono); font-size: 12px;
-  letter-spacing: 1px; cursor: pointer; border-radius: 8px;
-  transition: all 0.15s; white-space: nowrap; flex-shrink: 0;
+  padding: 10px 20px;
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
-.image-editor-generate-btn:hover:not(:disabled) { background: #6857e0; }
-.image-editor-generate-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.image-editor-generate-btn:hover:not(:disabled) {
+  background: #6857e0;
+}
+.image-editor-generate-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 .image-editor-confirm-btn {
-  padding: 10px 16px; background: var(--bg3);
-  border: 1px solid var(--accent3); color: var(--accent3);
-  font-family: var(--font-mono); font-size: 12px; cursor: pointer;
-  border-radius: 8px; transition: all 0.15s; white-space: nowrap; flex-shrink: 0;
+  padding: 10px 16px;
+  background: var(--bg3);
+  border: 1px solid var(--accent3);
+  color: var(--accent3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
-.image-editor-confirm-btn:hover:not(:disabled) { background: rgba(106,247,200,0.1); }
-.image-editor-confirm-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.image-editor-confirm-btn:hover:not(:disabled) {
+  background: rgba(106, 247, 200, 0.1);
+}
+.image-editor-confirm-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 .image-editor-chain-btn {
-  padding: 5px 10px; background: var(--bg3); border: 1px solid var(--border);
-  color: var(--text2); font-family: var(--font-mono); font-size: 11px;
-  cursor: pointer; border-radius: 5px; transition: all 0.15s;
+  padding: 5px 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: all 0.15s;
 }
-.image-editor-chain-btn:hover { border-color: var(--accent); color: var(--accent); }
+.image-editor-chain-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .image-editor-download-link {
-  font-size: 11px; color: var(--accent); text-decoration: none;
-  padding: 5px 10px; border: 1px solid var(--accent); border-radius: 5px;
-  transition: all 0.15s; font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 5px 10px;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  transition: all 0.15s;
+  font-family: var(--font-mono);
 }
-.image-editor-download-link:hover { background: rgba(124,106,247,0.15); }
+.image-editor-download-link:hover {
+  background: rgba(124, 106, 247, 0.15);
+}
 .generated-image-edit-btn {
-  font-size: 11px; color: var(--text2); background: var(--bg3);
-  border: 1px solid var(--border); border-radius: 5px;
-  padding: 4px 8px; cursor: pointer; transition: all 0.15s;
-  font-family: var(--font-mono); align-self: flex-start;
+  font-size: 11px;
+  color: var(--text2);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-mono);
+  align-self: flex-start;
 }
-.generated-image-edit-btn:hover { border-color: var(--accent); color: var(--accent); }
+.generated-image-edit-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 ```
 
 - [ ] **Step 2: Commit**
@@ -278,9 +438,11 @@ git commit -m "feat: add image editor modal CSS"
 ## Task 3: `ImageEditorModal` Component
 
 **Files:**
+
 - Create: `components/ImageEditorModal.tsx`
 
 **Key implementation notes:**
+
 - `clearCanvas` and `positionCanvas` must be `useCallback` so they can be safely listed as deps in `useEffect`
 - Canvas `width`/`height` attributes are set to the image's `naturalWidth`/`naturalHeight` so the exported mask PNG aligns pixel-perfectly with the source image when sent to FAL
 - Canvas CSS position is calculated from `getBoundingClientRect()` relative to its parent so it overlays the image element exactly regardless of flex centering
@@ -301,7 +463,11 @@ interface ImageEditorModalProps {
 
 type Mode = 'transform' | 'inpaint';
 
-export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }: ImageEditorModalProps) {
+export default function ImageEditorModal({
+  sourceImageUrl,
+  onConfirm,
+  onClose,
+}: ImageEditorModalProps) {
   const [mode, setMode] = useState<Mode>('transform');
   const [prompt, setPrompt] = useState('');
   const [currentSourceUrl, setCurrentSourceUrl] = useState(sourceImageUrl);
@@ -362,7 +528,9 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
     return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
   };
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+  const startDrawing = (
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+  ) => {
     e.preventDefault();
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext('2d')!;
@@ -388,7 +556,9 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
     ctx.stroke();
   };
 
-  const stopDrawing = () => { isDrawing.current = false; };
+  const stopDrawing = () => {
+    isDrawing.current = false;
+  };
 
   const undoStroke = () => {
     const canvas = canvasRef.current;
@@ -445,13 +615,19 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
           <button
             className={`image-editor-tab${mode === 'transform' ? ' active' : ''}`}
             onClick={() => setMode('transform')}
-          >Transform</button>
+          >
+            Transform
+          </button>
           <button
             className={`image-editor-tab${mode === 'inpaint' ? ' active' : ''}`}
             onClick={() => setMode('inpaint')}
-          >Inpaint</button>
+          >
+            Inpaint
+          </button>
         </div>
-        <button className="image-editor-close" onClick={onClose}>✕</button>
+        <button className="image-editor-close" onClick={onClose}>
+          ✕
+        </button>
       </div>
 
       <div className="image-editor-canvas-area">
@@ -482,12 +658,19 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
           </div>
           {mode === 'inpaint' && (
             <div className="image-editor-brush-tools">
-              <button className="image-editor-brush-btn" onClick={undoStroke}>↩ Undo</button>
-              <button className="image-editor-brush-btn" onClick={clearCanvas}>⬜ Clear</button>
+              <button className="image-editor-brush-btn" onClick={undoStroke}>
+                ↩ Undo
+              </button>
+              <button className="image-editor-brush-btn" onClick={clearCanvas}>
+                ⬜ Clear
+              </button>
               <div className="image-editor-brush-size">
                 <span>Size</span>
                 <input
-                  type="range" min={8} max={60} value={brushSize}
+                  type="range"
+                  min={8}
+                  max={60}
+                  value={brushSize}
                   onChange={e => setBrushSize(Number(e.target.value))}
                 />
                 <span>{brushSize}px</span>
@@ -515,8 +698,12 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
                 download
                 target="_blank"
                 rel="noreferrer"
-              >↓ Download</a>
-              <button className="image-editor-chain-btn" onClick={handleChain}>↺ Edit this</button>
+              >
+                ↓ Download
+              </a>
+              <button className="image-editor-chain-btn" onClick={handleChain}>
+                ↺ Edit this
+              </button>
             </div>
           )}
           {error && <div className="image-editor-error">❌ {error}</div>}
@@ -534,7 +721,10 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
               : 'Describe how to transform the image…'
           }
           onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); }
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleGenerate();
+            }
           }}
         />
         <button
@@ -548,7 +738,9 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
           className="image-editor-confirm-btn"
           onClick={handleConfirm}
           disabled={!resultUrl || isGenerating}
-        >Confirm ✓</button>
+        >
+          Confirm ✓
+        </button>
       </div>
     </div>
   );
@@ -575,9 +767,11 @@ git commit -m "feat: add ImageEditorModal — transform/inpaint/chain/download/c
 ## Task 4: ChatPanel Integration
 
 **Files:**
+
 - Modify: `components/ChatPanel.tsx`
 
 Four edits in this file:
+
 1. Add import for `ImageEditorModal`
 2. Add `editingImageUrl` state
 3. Add "✏ Edit" button inside the `generated-image` renderer in `renderContent`
@@ -608,7 +802,15 @@ return (
   <div key={i} className="generated-image-wrap">
     <img className="generated-image" src={block.url} alt={block.prompt} />
     <div className="generated-image-prompt">{block.prompt}</div>
-    <a className="generated-image-download" href={block.url} download target="_blank" rel="noreferrer">↓ Download</a>
+    <a
+      className="generated-image-download"
+      href={block.url}
+      download
+      target="_blank"
+      rel="noreferrer"
+    >
+      ↓ Download
+    </a>
   </div>
 );
 ```
@@ -621,8 +823,18 @@ return (
     <img className="generated-image" src={block.url} alt={block.prompt} />
     <div className="generated-image-prompt">{block.prompt}</div>
     <div style={{ display: 'flex', gap: '8px' }}>
-      <a className="generated-image-download" href={block.url} download target="_blank" rel="noreferrer">↓ Download</a>
-      <button className="generated-image-edit-btn" onClick={() => setEditingImageUrl(block.url)}>✏ Edit</button>
+      <a
+        className="generated-image-download"
+        href={block.url}
+        download
+        target="_blank"
+        rel="noreferrer"
+      >
+        ↓ Download
+      </a>
+      <button className="generated-image-edit-btn" onClick={() => setEditingImageUrl(block.url)}>
+        ✏ Edit
+      </button>
     </div>
   </div>
 );
@@ -633,19 +845,24 @@ return (
 In the `ChatPanel` return statement, the outermost element is `<div className="chat-panel">`. Add the modal just before its closing tag:
 
 ```tsx
-{editingImageUrl && (
-  <ImageEditorModal
-    sourceImageUrl={editingImageUrl}
-    onConfirm={(resultUrl, confirmedPrompt) => {
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: [{ type: 'generated-image', url: resultUrl, prompt: confirmedPrompt }] },
-      ]);
-      setEditingImageUrl(null);
-    }}
-    onClose={() => setEditingImageUrl(null)}
-  />
-)}
+{
+  editingImageUrl && (
+    <ImageEditorModal
+      sourceImageUrl={editingImageUrl}
+      onConfirm={(resultUrl, confirmedPrompt) => {
+        setMessages(prev => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: [{ type: 'generated-image', url: resultUrl, prompt: confirmedPrompt }],
+          },
+        ]);
+        setEditingImageUrl(null);
+      }}
+      onClose={() => setEditingImageUrl(null)}
+    />
+  );
+}
 ```
 
 - [ ] **Step 5: Type-check and lint**

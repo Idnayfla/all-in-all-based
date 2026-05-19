@@ -11,7 +11,8 @@ import BetaBanner from '@/components/BetaBanner';
 
 export const metadata: Metadata = {
   title: 'Based — AI Dev Studio',
-  description: 'Describe what you want to build. Based generates HTML, CSS, and JS apps with a live preview. Free to start.',
+  description:
+    'Describe what you want to build. Based generates HTML, CSS, and JS apps with a live preview. Free to start.',
   openGraph: {
     title: 'Based — AI Dev Studio',
     description: 'Describe what you want to build. Based generates it.',
@@ -35,7 +36,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Script src="/no-docwrite.js" strategy="beforeInteractive" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;700&family=Fira+Code:wght@400;700&family=IBM+Plex+Mono:wght@400;700&family=Courier+Prime:wght@400;700&family=Inconsolata:wght@400;700&family=Share+Tech+Mono&family=Source+Code+Pro:wght@400;700&family=Oxanium:wght@400;700&family=Syne+Mono&display=swap" rel="stylesheet" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;700&family=Fira+Code:wght@400;700&family=IBM+Plex+Mono:wght@400;700&family=Courier+Prime:wght@400;700&family=Inconsolata:wght@400;700&family=Share+Tech+Mono&family=Source+Code+Pro:wght@400;700&family=Oxanium:wght@400;700&family=Syne+Mono&display=swap"
+          rel="stylesheet"
+        />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="theme-color" content="#7c6af7" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -44,15 +48,52 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
         {/* iOS splash screens */}
-        <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)" href="/splash/splash-750x1334.png" />
-        <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" href="/splash/splash-1179x2556.png" />
-        <link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)" href="/splash/splash-1284x2778.png" />
-        <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" href="/splash/splash-1290x2796.png" />
-        <link rel="apple-touch-startup-image" media="(device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2)" href="/splash/splash-1640x2360.png" />
-        <link rel="apple-touch-startup-image" media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)" href="/splash/splash-1668x2388.png" />
-        <link rel="apple-touch-startup-image" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)" href="/splash/splash-2048x2732.png" />
+        <link
+          rel="apple-touch-startup-image"
+          media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)"
+          href="/splash/splash-750x1334.png"
+        />
+        <link
+          rel="apple-touch-startup-image"
+          media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)"
+          href="/splash/splash-1179x2556.png"
+        />
+        <link
+          rel="apple-touch-startup-image"
+          media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)"
+          href="/splash/splash-1284x2778.png"
+        />
+        <link
+          rel="apple-touch-startup-image"
+          media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)"
+          href="/splash/splash-1290x2796.png"
+        />
+        <link
+          rel="apple-touch-startup-image"
+          media="(device-width: 820px) and (device-height: 1180px) and (-webkit-device-pixel-ratio: 2)"
+          href="/splash/splash-1640x2360.png"
+        />
+        <link
+          rel="apple-touch-startup-image"
+          media="(device-width: 834px) and (device-height: 1194px) and (-webkit-device-pixel-ratio: 2)"
+          href="/splash/splash-1668x2388.png"
+        />
+        <link
+          rel="apple-touch-startup-image"
+          media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)"
+          href="/splash/splash-2048x2732.png"
+        />
       </head>
-      <body suppressHydrationWarning><BetaBanner /><LaunchSplash /><InstallPrompt /><ServiceWorkerInit /><ClientOnly><ErrorBoundary>{children}</ErrorBoundary></ClientOnly><Analytics /></body>
+      <body suppressHydrationWarning>
+        <BetaBanner />
+        <LaunchSplash />
+        <InstallPrompt />
+        <ServiceWorkerInit />
+        <ClientOnly>
+          <ErrorBoundary>{children}</ErrorBoundary>
+        </ClientOnly>
+        <Analytics />
+      </body>
     </html>
   );
 }

@@ -16,15 +16,15 @@ Add image editing and inpainting to the Based chat interface, modelled on ChatGP
 
 ### New files
 
-| File | Purpose |
-|---|---|
-| `app/api/image/edit/route.ts` | POST endpoint for transform + inpaint |
-| `components/ImageEditorModal.tsx` | Full-screen editor modal |
+| File                              | Purpose                               |
+| --------------------------------- | ------------------------------------- |
+| `app/api/image/edit/route.ts`     | POST endpoint for transform + inpaint |
+| `components/ImageEditorModal.tsx` | Full-screen editor modal              |
 
 ### Existing files touched
 
-| File | Change |
-|---|---|
+| File                       | Change                                                                    |
+| -------------------------- | ------------------------------------------------------------------------- |
 | `components/ChatPanel.tsx` | Add "Edit" button on `generated-image` blocks; add modal open/close state |
 
 No changes to `app/api/image/route.ts`, `app/api/generate/route.ts`, or any other existing file.
@@ -47,16 +47,20 @@ POST /api/image/edit
 
 ### FAL models
 
-| Mode | FAL model |
-|---|---|
+| Mode      | FAL model                        |
+| --------- | -------------------------------- |
 | transform | `fal-ai/flux/dev/image-to-image` |
-| inpaint | `fal-ai/flux-pro/inpainting` |
+| inpaint   | `fal-ai/flux-pro/inpainting`     |
 
 ### Response
 
 ```ts
-{ url: string }             // success
-{ error: string }           // failure — 400 or 500
+{
+  url: string;
+} // success
+{
+  error: string;
+} // failure — 400 or 500
 ```
 
 The response shape is identical to `/api/image` so `ChatPanel` can handle both the same way.
@@ -95,7 +99,7 @@ Full-screen overlay (fixed inset-0, z-index above everything). Three zones:
 ### Inpaint canvas
 
 - HTML `<canvas>` element positioned absolute over the source image, same display dimensions
-- Canvas internal resolution matches source image *natural* dimensions (`naturalWidth` × `naturalHeight`) so the mask aligns pixel-perfectly when sent to FAL
+- Canvas internal resolution matches source image _natural_ dimensions (`naturalWidth` × `naturalHeight`) so the mask aligns pixel-perfectly when sent to FAL
 - Mouse/touch events draw white semi-transparent strokes (the mask)
 - Brush size: slider (8–60px range), default 24px
 - Undo: stores stroke history, pops last stroke on click
@@ -108,18 +112,19 @@ Brush tools hidden. Source image displayed read-only. Prompt + Generate only.
 
 ### Result panel states
 
-| State | Display |
-|---|---|
-| No result yet | Dim placeholder: "generate to see result" |
-| Generating | Spinner / "Generating…" text |
-| Result ready | Result image + Download link + "↺ Edit this" button + Confirm button |
-| Error | Red error message inline |
+| State         | Display                                                              |
+| ------------- | -------------------------------------------------------------------- |
+| No result yet | Dim placeholder: "generate to see result"                            |
+| Generating    | Spinner / "Generating…" text                                         |
+| Result ready  | Result image + Download link + "↺ Edit this" button + Confirm button |
+| Error         | Red error message inline                                             |
 
 ### Chaining edits ("↺ Edit this")
 
 The modal tracks `currentSourceUrl` as internal state, initialized from the `sourceImageUrl` prop. This allows the source to be swapped without closing and reopening the modal.
 
 Clicking "↺ Edit this" on a result:
+
 - Sets `currentSourceUrl` to the result URL (re-renders left canvas with new source)
 - Clears mask canvas
 - Clears result panel
@@ -128,9 +133,11 @@ Clicking "↺ Edit this" on a result:
 ### Confirm flow
 
 `onConfirm(resultUrl, prompt)` is called. `ChatPanel` appends:
+
 ```ts
 { role: 'assistant', content: [{ type: 'generated-image', url: resultUrl, prompt }] }
 ```
+
 Same `ContentBlock` type already rendered by `renderContent()` — no new rendering logic needed.
 
 ---

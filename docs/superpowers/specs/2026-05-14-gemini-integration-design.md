@@ -11,17 +11,21 @@ This design adds native Gemini API support as an **automatic fallback provider**
 ## Architecture
 
 ### API Integration
+
 - Add `@google/generative-ai` SDK alongside existing Anthropic SDK
 - Both SDKs coexist in `app/api/generate/route.ts`
 - No changes to existing Claude/Anthropic flow for normal operation
 
 ### Generation Pipeline
+
 Three-step flow remains unchanged:
+
 1. **Planner** — outputs JSON file plan
 2. **File generator** — generates files individually
 3. **Summary** — 1-2 sentence reply
 
 Each step wraps Claude calls in try-catch:
+
 ```
 Try: Call Claude with Planner system prompt
 On error: Call Gemini with Planner system prompt
@@ -32,6 +36,7 @@ Continue to next step
 Fallback happens **per-step**, not globally. If planner succeeds with Claude but generator fails, only the generator falls back to Gemini.
 
 ### Model Mapping
+
 Map Claude models to Gemini equivalents:
 | Claude | Gemini |
 |--------|--------|
@@ -44,13 +49,15 @@ Mapping is deterministic: extract Claude model from environment or system contex
 ## Configuration
 
 ### Environment Variables
-| Variable | Source | Purpose |
-|----------|--------|---------|
-| `ANTHROPIC_API_KEY` | PowerShell or .env.local | Claude API key (subscription or Anthropic) |
-| `GEMINI_API_KEY` | PowerShell or .env.local | Gemini API key (free tier from Google AI Studio) |
-| `ANTHROPIC_BASE_URL` | PowerShell | Optional: custom Anthropic endpoint |
+
+| Variable             | Source                   | Purpose                                          |
+| -------------------- | ------------------------ | ------------------------------------------------ |
+| `ANTHROPIC_API_KEY`  | PowerShell or .env.local | Claude API key (subscription or Anthropic)       |
+| `GEMINI_API_KEY`     | PowerShell or .env.local | Gemini API key (free tier from Google AI Studio) |
+| `ANTHROPIC_BASE_URL` | PowerShell               | Optional: custom Anthropic endpoint              |
 
 ### Provider Switching (PowerShell)
+
 ```powershell
 use-subscription    # Claude only (no fallback)
 use-anthropic       # Anthropic API only (no fallback)
@@ -58,6 +65,7 @@ use-gemini          # Gemini only (or with Claude fallback?)
 ```
 
 **Decision needed:** Should `use-gemini` mean:
+
 - Option A: Use Gemini as primary, Claude as fallback
 - Option B: Use Gemini as primary only (no fallback)
 
@@ -66,7 +74,9 @@ use-gemini          # Gemini only (or with Claude fallback?)
 ## User Experience
 
 ### Fallback Notification
+
 When fallback occurs, append message to chat:
+
 ```
 [Based] Switched to Gemini (Claude unavailable) — response may differ
 ```
@@ -74,6 +84,7 @@ When fallback occurs, append message to chat:
 Appears in chat stream like a normal message. No blocking dialogs or interruptions.
 
 ### Error Visibility
+
 - User sees the generated code/response (from whichever provider succeeded)
 - System logs which provider was used to console (for debugging)
 - No breaking errors—fallback is transparent
@@ -81,12 +92,14 @@ Appears in chat stream like a normal message. No blocking dialogs or interruptio
 ## Error Handling
 
 ### Failure Scenarios
+
 1. **Claude fails, Gemini succeeds** → Use Gemini response, log notification
 2. **Claude fails, Gemini fails** → Return error (can't generate)
 3. **Claude succeeds** → Use Claude response, no fallback
 4. **Gemini API key missing** → Fall back disabled, only use Claude
 
 ### Implementation
+
 ```typescript
 async function generateWithFallback(prompt, system, fallbackModel) {
   try {
@@ -107,6 +120,7 @@ async function generateWithFallback(prompt, system, fallbackModel) {
 ## Implementation Scope
 
 ### Files to Modify
+
 1. `app/api/generate/route.ts` — Add Gemini SDK, fallback logic, model mapping
 2. `package.json` — Add `@google/generative-ai` dependency
 3. `.env.local` — Add `GEMINI_API_KEY`
@@ -114,6 +128,7 @@ async function generateWithFallback(prompt, system, fallbackModel) {
 5. PowerShell profile — Update `use-gemini` function (already exists)
 
 ### Files to Create
+
 None (reuse existing provider switching pattern)
 
 ## Testing Strategy

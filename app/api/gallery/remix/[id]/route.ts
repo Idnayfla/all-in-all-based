@@ -28,13 +28,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (!share) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-    await supabaseAdmin.from('shares').update({
-      remix_count: (share.remix_count ?? 0) + 1,
-    }).eq('id', id);
+    await supabaseAdmin
+      .from('shares')
+      .update({
+        remix_count: (share.remix_count ?? 0) + 1,
+      })
+      .eq('id', id);
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

@@ -56,18 +56,18 @@ function getRandomSuggestions() {
 
 interface GenerationProgress {
   files: string[];
-  completed: number;  // fully finished files
+  completed: number; // fully finished files
   total: number;
   file: string;
-  chunks: number;     // chunks received for the current file
+  chunks: number; // chunks received for the current file
 }
 
 function ProgressBar({ progress }: { progress: GenerationProgress }) {
-  const withinFile = progress.file
-    ? Math.min(1 - Math.exp(-progress.chunks / 50), 0.92)
-    : 0;
-  const pct = progress.total === 0 ? 0
-    : Math.round((progress.completed + withinFile) / progress.total * 100);
+  const withinFile = progress.file ? Math.min(1 - Math.exp(-progress.chunks / 50), 0.92) : 0;
+  const pct =
+    progress.total === 0
+      ? 0
+      : Math.round(((progress.completed + withinFile) / progress.total) * 100);
   const isIndeterminate = progress.total === 0;
 
   return (
@@ -75,10 +75,16 @@ function ProgressBar({ progress }: { progress: GenerationProgress }) {
       <div className="gen-progress-header">
         <span className="gen-progress-file">
           {isIndeterminate
-            ? (progress.file || '... Preparing')
-            : (progress.file ? `◈ ${progress.file}` : '... Preparing')}
+            ? progress.file || '... Preparing'
+            : progress.file
+              ? `◈ ${progress.file}`
+              : '... Preparing'}
         </span>
-        {!isIndeterminate && <span className="gen-progress-count">{progress.completed}/{progress.total}</span>}
+        {!isIndeterminate && (
+          <span className="gen-progress-count">
+            {progress.completed}/{progress.total}
+          </span>
+        )}
       </div>
       <div className="gen-progress-bar-track">
         {isIndeterminate ? (
@@ -99,7 +105,8 @@ function ProgressBar({ progress }: { progress: GenerationProgress }) {
             const active = i === progress.completed;
             return (
               <span key={f} className={`gen-file-chip ${done ? 'done' : active ? 'active' : ''}`}>
-                {done ? '✓ ' : active ? '◈ ' : ''}{f}
+                {done ? '✓ ' : active ? '◈ ' : ''}
+                {f}
               </span>
             );
           })}
@@ -109,7 +116,25 @@ function ProgressBar({ progress }: { progress: GenerationProgress }) {
   );
 }
 
-export default function ChatPanel({ messages, setMessages, files, onFilesUpdate, isGenerating, setIsGenerating, personality, memory, globalMemory, incognito, authToken, subscriptionTier, generationsUsed, prefillMessage, onProRequired, onReportBug, aiModel }: {
+export default function ChatPanel({
+  messages,
+  setMessages,
+  files,
+  onFilesUpdate,
+  isGenerating,
+  setIsGenerating,
+  personality,
+  memory,
+  globalMemory,
+  incognito,
+  authToken,
+  subscriptionTier,
+  generationsUsed,
+  prefillMessage,
+  onProRequired,
+  onReportBug,
+  aiModel,
+}: {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   files: FileNode[];
@@ -153,9 +178,9 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   const [showSupportNudge, setShowSupportNudge] = useState(false);
   const [suggestions] = useState(getRandomSuggestions);
   const [flaggingIdx, setFlaggingIdx] = useState<number | null>(null);
-  const [flaggedSet, setFlaggedSet]   = useState<Set<number>>(new Set());
-  const [flagReason, setFlagReason]   = useState('');
-  const [flagText, setFlagText]       = useState('');
+  const [flaggedSet, setFlaggedSet] = useState<Set<number>>(new Set());
+  const [flagReason, setFlagReason] = useState('');
+  const [flagText, setFlagText] = useState('');
   const [flagSending, setFlagSending] = useState(false);
   const [reportedErrors, setReportedErrors] = useState<Set<string>>(new Set());
   const reportingInFlight = useRef<Set<string>>(new Set());
@@ -163,7 +188,12 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
-  const FLAG_REASONS = ['Wrong type of response', 'Misunderstood my request', 'Too much / too little', 'Broke existing code'];
+  const FLAG_REASONS = [
+    'Wrong type of response',
+    'Misunderstood my request',
+    'Too much / too little',
+    'Broke existing code',
+  ];
 
   const submitFlag = async (msgIdx: number, msgContent: string, userPrompt: string) => {
     if (flagSending) return;
@@ -194,8 +224,12 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
-      const recorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg' });
-      recorder.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      const recorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg',
+      });
+      recorder.ondataavailable = e => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
         setMicState('transcribing');
@@ -207,7 +241,9 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           const { text } = await res.json();
           if (text?.trim()) {
             setInput(text.trim());
-            setTimeout(() => { if (!isGenerating) send(text.trim()); }, 200);
+            setTimeout(() => {
+              if (!isGenerating) send(text.trim());
+            }, 200);
           }
         } catch {
           // silently fail — user can type manually
@@ -223,21 +259,30 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     }
   };
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
 
   const autoResize = () => {
     const ta = textareaRef.current;
-    if (ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 200) + 'px'; }
+    if (ta) {
+      ta.style.height = 'auto';
+      ta.style.height = Math.min(ta.scrollHeight, 200) + 'px';
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = ev => {
       const dataUrl = ev.target?.result as string;
       const [meta, data] = dataUrl.split(',');
-      const mediaType = meta.match(/:(.*?);/)?.[1] as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+      const mediaType = meta.match(/:(.*?);/)?.[1] as
+        | 'image/jpeg'
+        | 'image/png'
+        | 'image/webp'
+        | 'image/gif';
       setPendingImage({ data, mediaType, previewUrl: dataUrl });
     };
     reader.onerror = () => {
@@ -261,7 +306,8 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       const content = m[1].trim();
       const nameMatch = tag.match(/name=["']([^"']+)["']/);
       const langMatch = tag.match(/language=["']([^"']+)["']/);
-      if (nameMatch && langMatch) forgeFiles.push({ name: nameMatch[1], language: langMatch[1], content });
+      if (nameMatch && langMatch)
+        forgeFiles.push({ name: nameMatch[1], language: langMatch[1], content });
     }
     return forgeFiles;
   };
@@ -273,10 +319,16 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     setIsGeneratingMedia(true);
 
     const userMsg: Message = { role: 'user', content: prompt };
-    const loadingMsg: Message = { role: 'assistant', content: [{ type: 'text', text: '__generating-image__' }] };
+    const loadingMsg: Message = {
+      role: 'assistant',
+      content: [{ type: 'text', text: '__generating-image__' }],
+    };
     setMessages(prev => [...prev, userMsg, loadingMsg]);
 
-    const body: Record<string, string> = { prompt, model: generationMode === 'nano-banana' ? 'nano-banana' : 'flux' };
+    const body: Record<string, string> = {
+      prompt,
+      model: generationMode === 'nano-banana' ? 'nano-banana' : 'flux',
+    };
     if (pendingImage) {
       body.sourceImageData = pendingImage.data;
       body.sourceMediaType = pendingImage.mediaType;
@@ -288,13 +340,16 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
         body: JSON.stringify(body),
       });
       const data = await res.json();
       if (res.status === 401 || res.status === 403) {
-        if (onProRequired) { onProRequired(); return; }
+        if (onProRequired) {
+          onProRequired();
+          return;
+        }
       }
       if (data.error) throw new Error(data.error);
       setMessages(prev => [
@@ -306,12 +361,15 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         ...prev.slice(0, -1),
         {
           role: 'assistant',
-          content: [{
-            type: 'error' as const,
-            message: 'Image generation failed. Try rephrasing your prompt — if it keeps happening, tap Report.',
-            prompt,
-            actualError: err?.message ?? String(err),
-          }],
+          content: [
+            {
+              type: 'error' as const,
+              message:
+                'Image generation failed. Try rephrasing your prompt — if it keeps happening, tap Report.',
+              prompt,
+              actualError: err?.message ?? String(err),
+            },
+          ],
         },
       ]);
     } finally {
@@ -326,7 +384,10 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     setIsGeneratingMedia(true);
 
     const userMsg: Message = { role: 'user', content: prompt };
-    const loadingMsg: Message = { role: 'assistant', content: [{ type: 'text', text: '__generating-music__' }] };
+    const loadingMsg: Message = {
+      role: 'assistant',
+      content: [{ type: 'text', text: '__generating-music__' }],
+    };
     setMessages(prev => [...prev, userMsg, loadingMsg]);
 
     try {
@@ -334,12 +395,15 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
         body: JSON.stringify({ prompt }),
       });
       const data = await res.json();
-      if ((res.status === 401 || res.status === 403) && onProRequired) { onProRequired(); return; }
+      if ((res.status === 401 || res.status === 403) && onProRequired) {
+        onProRequired();
+        return;
+      }
       if (data.error) throw new Error(data.error);
       setMessages(prev => [
         ...prev.slice(0, -1),
@@ -348,7 +412,15 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     } catch (err: any) {
       setMessages(prev => [
         ...prev.slice(0, -1),
-        { role: 'assistant', content: [{ type: 'error' as const, message: `Music generation failed. Try describing a different style or mood.` }] },
+        {
+          role: 'assistant',
+          content: [
+            {
+              type: 'error' as const,
+              message: `Music generation failed. Try describing a different style or mood.`,
+            },
+          ],
+        },
       ]);
     } finally {
       setIsGeneratingMedia(false);
@@ -362,7 +434,10 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     setIsGeneratingMedia(true);
 
     const userMsg: Message = { role: 'user', content: prompt };
-    const loadingMsg: Message = { role: 'assistant', content: [{ type: 'text', text: '__generating-video__' }] };
+    const loadingMsg: Message = {
+      role: 'assistant',
+      content: [{ type: 'text', text: '__generating-video__' }],
+    };
     setMessages(prev => [...prev, userMsg, loadingMsg]);
 
     const body: Record<string, string | boolean> = { prompt, generateAudio };
@@ -377,12 +452,15 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      if ((res.status === 401 || res.status === 403) && onProRequired) { onProRequired(); return; }
+      if ((res.status === 401 || res.status === 403) && onProRequired) {
+        onProRequired();
+        return;
+      }
       if (data.error) throw new Error(data.error);
       setMessages(prev => [
         ...prev.slice(0, -1),
@@ -391,7 +469,15 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     } catch (err: any) {
       setMessages(prev => [
         ...prev.slice(0, -1),
-        { role: 'assistant', content: [{ type: 'error' as const, message: `Video generation failed. Complex scenes can time out — try a simpler description.` }] },
+        {
+          role: 'assistant',
+          content: [
+            {
+              type: 'error' as const,
+              message: `Video generation failed. Complex scenes can time out — try a simpler description.`,
+            },
+          ],
+        },
       ]);
     } finally {
       setIsGeneratingMedia(false);
@@ -436,7 +522,10 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       if (!locationRef.current && typeof navigator !== 'undefined' && navigator.geolocation) {
         await new Promise<void>(resolve => {
           navigator.geolocation.getCurrentPosition(
-            pos => { locationRef.current = { lat: pos.coords.latitude, lon: pos.coords.longitude }; resolve(); },
+            pos => {
+              locationRef.current = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+              resolve();
+            },
             () => resolve(),
             { timeout: 2000, maximumAge: 600000 }
           );
@@ -448,9 +537,17 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         signal: abort.signal,
         headers: {
           'Content-Type': 'application/json',
-          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
-        body: JSON.stringify({ messages: newMessages, existingFiles: files, personality, memory, globalMemory, location: locationRef.current, aiModel }),
+        body: JSON.stringify({
+          messages: newMessages,
+          existingFiles: files,
+          personality,
+          memory,
+          globalMemory,
+          location: locationRef.current,
+          aiModel,
+        }),
       });
 
       if (res.status === 402) {
@@ -490,7 +587,10 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             if (data.searching === 'web') {
               setMessages(prev => {
                 const updated = [...prev];
-                updated[updated.length - 1] = { role: 'assistant', content: '◈ Searching the web...' };
+                updated[updated.length - 1] = {
+                  role: 'assistant',
+                  content: '◈ Searching the web...',
+                };
                 return updated;
               });
             }
@@ -515,37 +615,58 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             if (data.plan) {
               planReceived = true;
               flushSync(() => {
-                setGenProgress({ files: data.plan, completed: 0, total: data.plan.length, file: '', chunks: 0 });
+                setGenProgress({
+                  files: data.plan,
+                  completed: 0,
+                  total: data.plan.length,
+                  file: '',
+                  chunks: 0,
+                });
               });
               const fileNames = (data.plan as { name: string }[]).map(f => f.name).join(', ');
               setMessages(prev => {
                 const updated = [...prev];
-                updated[updated.length - 1] = { role: 'assistant', content: `⟳ Building ${fileNames}…` };
+                updated[updated.length - 1] = {
+                  role: 'assistant',
+                  content: `⟳ Building ${fileNames}…`,
+                };
                 return updated;
               });
             }
 
             if (data.status) {
               flushSync(() => {
-                setGenProgress(prev => prev ? { ...prev, file: data.status.file, chunks: 0 } : null);
+                setGenProgress(prev =>
+                  prev ? { ...prev, file: data.status.file, chunks: 0 } : null
+                );
               });
             }
 
             if (data.progress) {
               flushSync(() => {
-                setGenProgress(prev => prev ? { ...prev, completed: data.progress.current, chunks: 0 } : null);
+                setGenProgress(prev =>
+                  prev ? { ...prev, completed: data.progress.current, chunks: 0 } : null
+                );
               });
             }
 
             if (data.chunk) {
-              window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'chunk', data: data.chunk } }));
+              window.dispatchEvent(
+                new CustomEvent('debug-event', { detail: { type: 'chunk', data: data.chunk } })
+              );
               assistantMsg += data.chunk;
-              setGenProgress(prev => prev && prev.file ? { ...prev, chunks: prev.chunks + 1 } : prev);
-              const hasForge = assistantMsg.includes('<forge_file') || assistantMsg.includes('<forge_type');
+              setGenProgress(prev =>
+                prev && prev.file ? { ...prev, chunks: prev.chunks + 1 } : prev
+              );
+              const hasForge =
+                assistantMsg.includes('<forge_file') || assistantMsg.includes('<forge_type');
               if (!planReceived && !hasForge) {
                 setMessages(prev => {
                   const updated = [...prev];
-                  updated[updated.length - 1] = { role: 'assistant', content: assistantMsg.trim() || '◈ Working...' };
+                  updated[updated.length - 1] = {
+                    role: 'assistant',
+                    content: assistantMsg.trim() || '◈ Working...',
+                  };
                   return updated;
                 });
               } else if (hasForge) {
@@ -553,7 +674,12 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                   const updated = [...prev];
                   const last = updated[updated.length - 1];
                   const c = typeof last?.content === 'string' ? last.content : '';
-                  if (c && !c.startsWith('⟳') && !c.startsWith('◈ Searching') && c !== '◈ Working...') {
+                  if (
+                    c &&
+                    !c.startsWith('⟳') &&
+                    !c.startsWith('◈ Searching') &&
+                    c !== '◈ Working...'
+                  ) {
                     updated[updated.length - 1] = { role: 'assistant', content: '◈ Working...' };
                   }
                   return updated;
@@ -567,21 +693,27 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               setGenProgress(null);
               setMessages(prev => {
                 const last = prev[prev.length - 1];
-                const hasText = typeof last?.content === 'string'
-                  && last.content.trim()
-                  && last.content !== '◈ Working...'
-                  && !last.content.startsWith('⟳')
-                  && !last.content.startsWith('◈ Searching')
-                  && !last.content.startsWith('◈ Retrying');
-                const clarifyMsg = { role: 'assistant' as const, content: [{ type: 'clarify' as const, question: data.question, options: data.options }] };
-                return hasText
-                  ? [...prev, clarifyMsg]
-                  : [...prev.slice(0, -1), clarifyMsg];
+                const hasText =
+                  typeof last?.content === 'string' &&
+                  last.content.trim() &&
+                  last.content !== '◈ Working...' &&
+                  !last.content.startsWith('⟳') &&
+                  !last.content.startsWith('◈ Searching') &&
+                  !last.content.startsWith('◈ Retrying');
+                const clarifyMsg = {
+                  role: 'assistant' as const,
+                  content: [
+                    { type: 'clarify' as const, question: data.question, options: data.options },
+                  ],
+                };
+                return hasText ? [...prev, clarifyMsg] : [...prev.slice(0, -1), clarifyMsg];
               });
             }
 
             if (data.error) {
-              window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'error', data: data.error } }));
+              window.dispatchEvent(
+                new CustomEvent('debug-event', { detail: { type: 'error', data: data.error } })
+              );
               doneHandled = true;
               setIsGenerating(false);
               setGenProgress(null);
@@ -592,22 +724,33 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             }
 
             if (data.done) {
-              const resolvedFiles = data.files?.length
-                ? data.files
-                : parseForgeFiles(assistantMsg);
-              window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'done', data: JSON.stringify({ filesCount: resolvedFiles.length, reply: data.reply?.slice(0, 100) }) } }));
+              const resolvedFiles = data.files?.length ? data.files : parseForgeFiles(assistantMsg);
+              window.dispatchEvent(
+                new CustomEvent('debug-event', {
+                  detail: {
+                    type: 'done',
+                    data: JSON.stringify({
+                      filesCount: resolvedFiles.length,
+                      reply: data.reply?.slice(0, 100),
+                    }),
+                  },
+                })
+              );
               doneHandled = true;
               setGenProgress(null);
               setIsGenerating(false);
               setMessages(prev => [
                 ...prev.slice(0, -1),
-                { role: 'assistant', content: data.reply || '✓ Done — check the editor.' }
+                { role: 'assistant', content: data.reply || '✓ Done — check the editor.' },
               ]);
               if (resolvedFiles.length) {
                 onFilesUpdate(resolvedFiles, data.projectType);
                 const count = parseInt(localStorage.getItem('based_build_count') || '0', 10) + 1;
                 localStorage.setItem('based_build_count', String(count));
-                if ((count === 1 || count % 5 === 0) && !localStorage.getItem('based_nudge_dismissed')) {
+                if (
+                  (count === 1 || count % 5 === 0) &&
+                  !localStorage.getItem('based_nudge_dismissed')
+                ) {
                   setShowSupportNudge(true);
                 }
               }
@@ -615,11 +758,12 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               else setLastSuggestions([]);
             }
           } catch (e) {
-            window.dispatchEvent(new CustomEvent('debug-event', { detail: { type: 'parse-error', data: String(e) } }));
+            window.dispatchEvent(
+              new CustomEvent('debug-event', { detail: { type: 'parse-error', data: String(e) } })
+            );
           }
         }
       }
-
     } catch (e: any) {
       setGenProgress(null);
       if (e?.name === 'AbortError' || e?.message === 'limit') {
@@ -631,10 +775,19 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           return prev;
         });
       } else {
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: [{ type: 'error' as const, message: "Something went wrong on my end — give it another shot. If it keeps happening, tap Report." }],
-        }]);
+        setMessages(prev => [
+          ...prev,
+          {
+            role: 'assistant',
+            content: [
+              {
+                type: 'error' as const,
+                message:
+                  'Something went wrong on my end — give it another shot. If it keeps happening, tap Report.',
+              },
+            ],
+          },
+        ]);
       }
     } finally {
       if (!doneHandled) {
@@ -642,7 +795,15 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
         setMessages(prev => {
           const last = prev[prev.length - 1];
           if (last?.content === '◈ Working...') {
-            return [...prev.slice(0, -1), { role: 'assistant', content: [{ type: 'error' as const, message: 'Response was cut off — please try again.' }] }];
+            return [
+              ...prev.slice(0, -1),
+              {
+                role: 'assistant',
+                content: [
+                  { type: 'error' as const, message: 'Response was cut off — please try again.' },
+                ],
+              },
+            ];
           }
           return prev;
         });
@@ -661,7 +822,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+              ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
             },
             body: JSON.stringify({ messages: memMessages }),
           });
@@ -690,7 +851,14 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       <>
         {content.map((block, i) => {
           if (block.type === 'image') {
-            return <img key={i} className="chat-img-thumb" src={`data:${block.mediaType};base64,${block.data}`} alt="uploaded image" />;
+            return (
+              <img
+                key={i}
+                className="chat-img-thumb"
+                src={`data:${block.mediaType};base64,${block.data}`}
+                alt="uploaded image"
+              />
+            );
           }
           if (block.type === 'generated-image') {
             return (
@@ -704,9 +872,27 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                 <img className="generated-image" src={block.url} alt={block.prompt} />
                 <div className="generated-image-prompt">{block.prompt}</div>
                 <div className="generated-image-actions">
-                  <a className="generated-image-download" href={block.url} download target="_blank" rel="noreferrer">↓ Download</a>
-                  <button className="generated-image-edit-btn" onClick={() => setCropImageUrl(block.url)}>◈ Crop</button>
-                  <button className="generated-image-edit-btn" onClick={() => setEditingImageUrl(block.url)}>✏ Edit</button>
+                  <a
+                    className="generated-image-download"
+                    href={block.url}
+                    download
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    ↓ Download
+                  </a>
+                  <button
+                    className="generated-image-edit-btn"
+                    onClick={() => setCropImageUrl(block.url)}
+                  >
+                    ◈ Crop
+                  </button>
+                  <button
+                    className="generated-image-edit-btn"
+                    onClick={() => setEditingImageUrl(block.url)}
+                  >
+                    ✏ Edit
+                  </button>
                 </div>
               </motion.div>
             );
@@ -743,17 +929,26 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                       if (reportingInFlight.current.has(reportKey)) return;
                       reportingInFlight.current.add(reportKey);
                       setReportedErrors(prev => new Set(prev).add(reportKey));
-                      const context = [
-                        block.prompt      ? `PROMPT: ${block.prompt}` : null,
-                        block.actualError ? `ACTUAL ERROR: ${block.actualError}` : null,
-                      ].filter(Boolean).join('\n') || block.message;
+                      const context =
+                        [
+                          block.prompt ? `PROMPT: ${block.prompt}` : null,
+                          block.actualError ? `ACTUAL ERROR: ${block.actualError}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join('\n') || block.message;
                       await fetch('/api/feedback', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: block.message, type: 'image_error', context }),
+                        body: JSON.stringify({
+                          message: block.message,
+                          type: 'image_error',
+                          context,
+                        }),
                       });
                     }}
-                  >{alreadyReported ? '◉ Reported' : '⬡ Report'}</button>
+                  >
+                    {alreadyReported ? '◉ Reported' : '⬡ Report'}
+                  </button>
                 </div>
               </div>
             );
@@ -764,11 +959,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                 <div className="clarify-question">{block.question}</div>
                 <div className="clarify-options">
                   {block.options.map((opt: string) => (
-                    <button
-                      key={opt}
-                      className="clarify-option-btn"
-                      onClick={() => send(opt)}
-                    >
+                    <button key={opt} className="clarify-option-btn" onClick={() => send(opt)}>
                       {opt}
                     </button>
                   ))}
@@ -790,9 +981,13 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
       <div className="chat-messages">
         {messages.length === 0 ? (
           <div className="chat-empty">
-            <div className="chat-empty-logo" aria-hidden="true">B&gt;</div>
+            <div className="chat-empty-logo" aria-hidden="true">
+              B&gt;
+            </div>
             <div className="chat-empty-title">BASED</div>
-            <div className="chat-empty-sub">Describe what you want to build — Based brings it to life.</div>
+            <div className="chat-empty-sub">
+              Describe what you want to build — Based brings it to life.
+            </div>
             <div className="chat-suggestions">
               {suggestions.map((s, index) => (
                 <motion.button
@@ -804,7 +999,9 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                   transition={{ delay: index * 0.06, type: 'spring', stiffness: 400, damping: 30 }}
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.97 }}
-                >{s}</motion.button>
+                >
+                  {s}
+                </motion.button>
               ))}
             </div>
           </div>
@@ -820,55 +1017,94 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               >
                 <div className="message-role">{m.role === 'user' ? 'YOU' : 'BASED'}</div>
                 <div className="message-content">
-                  {m.role === 'assistant' && isGenerating && i === messages.length - 1
-                    ? <ProgressBar progress={genProgress ?? { files: [], completed: 0, total: 0, file: '', chunks: 0 }} />
-                    : renderContent(m.content, i)
-                  }
+                  {m.role === 'assistant' && isGenerating && i === messages.length - 1 ? (
+                    <ProgressBar
+                      progress={
+                        genProgress ?? { files: [], completed: 0, total: 0, file: '', chunks: 0 }
+                      }
+                    />
+                  ) : (
+                    renderContent(m.content, i)
+                  )}
                 </div>
-                {m.role === 'assistant' && !(isGenerating && i === messages.length - 1) &&
-                  !(Array.isArray(m.content) && m.content.every((b: any) => b.type === 'error')) && (
-                  <div className="msg-flag-area">
-                    {flaggedSet.has(i) ? (
-                      <span className="msg-flag-noted">◈ Noted — thanks</span>
-                    ) : flaggingIdx === i ? (
-                      <div className="msg-flag-form">
-                        <div className="msg-flag-question">What were you expecting?</div>
-                        <div className="msg-flag-chips">
-                          {FLAG_REASONS.map(r => (
+                {m.role === 'assistant' &&
+                  !(isGenerating && i === messages.length - 1) &&
+                  !(
+                    Array.isArray(m.content) && m.content.every((b: any) => b.type === 'error')
+                  ) && (
+                    <div className="msg-flag-area">
+                      {flaggedSet.has(i) ? (
+                        <span className="msg-flag-noted">◈ Noted — thanks</span>
+                      ) : flaggingIdx === i ? (
+                        <div className="msg-flag-form">
+                          <div className="msg-flag-question">What were you expecting?</div>
+                          <div className="msg-flag-chips">
+                            {FLAG_REASONS.map(r => (
+                              <button
+                                key={r}
+                                className={`msg-flag-chip${flagReason === r ? ' active' : ''}`}
+                                onClick={() => setFlagReason(prev => (prev === r ? '' : r))}
+                              >
+                                {r}
+                              </button>
+                            ))}
+                          </div>
+                          <input
+                            className="msg-flag-input"
+                            placeholder="Anything else? (optional)"
+                            value={flagText}
+                            onChange={e => setFlagText(e.target.value)}
+                          />
+                          <div className="msg-flag-actions">
                             <button
-                              key={r}
-                              className={`msg-flag-chip${flagReason === r ? ' active' : ''}`}
-                              onClick={() => setFlagReason(prev => prev === r ? '' : r)}
-                            >{r}</button>
-                          ))}
+                              className="msg-flag-cancel"
+                              onClick={() => {
+                                setFlaggingIdx(null);
+                                setFlagReason('');
+                                setFlagText('');
+                              }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              className="msg-flag-send"
+                              disabled={flagSending}
+                              onClick={() => {
+                                const txt =
+                                  typeof m.content === 'string'
+                                    ? m.content
+                                    : (m.content as any[])
+                                        .filter((b: any) => b.type === 'text')
+                                        .map((b: any) => b.text)
+                                        .join(' ');
+                                const prev = messages[i - 1];
+                                const userTxt =
+                                  prev?.role === 'user'
+                                    ? typeof prev.content === 'string'
+                                      ? prev.content
+                                      : (prev.content as any[])
+                                          .filter((b: any) => b.type === 'text')
+                                          .map((b: any) => b.text)
+                                          .join(' ')
+                                    : '';
+                                submitFlag(i, txt, userTxt);
+                              }}
+                            >
+                              {flagSending ? '◈ Sending…' : '→ Send'}
+                            </button>
+                          </div>
                         </div>
-                        <input
-                          className="msg-flag-input"
-                          placeholder="Anything else? (optional)"
-                          value={flagText}
-                          onChange={e => setFlagText(e.target.value)}
-                        />
-                        <div className="msg-flag-actions">
-                          <button className="msg-flag-cancel" onClick={() => { setFlaggingIdx(null); setFlagReason(''); setFlagText(''); }}>Cancel</button>
-                          <button
-                            className="msg-flag-send"
-                            disabled={flagSending}
-                            onClick={() => {
-                              const txt = typeof m.content === 'string' ? m.content : (m.content as any[]).filter((b: any) => b.type === 'text').map((b: any) => b.text).join(' ');
-                              const prev = messages[i - 1];
-                              const userTxt = prev?.role === 'user' ? (typeof prev.content === 'string' ? prev.content : (prev.content as any[]).filter((b: any) => b.type === 'text').map((b: any) => b.text).join(' ')) : '';
-                              submitFlag(i, txt, userTxt);
-                            }}
-                          >{flagSending ? '◈ Sending…' : '→ Send'}</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <button className="msg-flag-btn" onClick={() => setFlaggingIdx(i)} title="Not what you expected?">
-                        ⊙ Not what I expected
-                      </button>
-                    )}
-                  </div>
-                )}
+                      ) : (
+                        <button
+                          className="msg-flag-btn"
+                          onClick={() => setFlaggingIdx(i)}
+                          title="Not what you expected?"
+                        >
+                          ⊙ Not what I expected
+                        </button>
+                      )}
+                    </div>
+                  )}
               </motion.div>
             ))}
           </AnimatePresence>
@@ -879,7 +1115,10 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               <button
                 key={i}
                 className="suggestion-chip"
-                onClick={() => { setLastSuggestions([]); send(s); }}
+                onClick={() => {
+                  setLastSuggestions([]);
+                  send(s);
+                }}
               >
                 {s}
               </button>
@@ -900,7 +1139,10 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             >
               <div className="support-nudge-text">
                 <span className="support-nudge-icon">◈</span>
-                <span>Based runs on community support — API costs add up fast. If it's been useful, consider backing it.</span>
+                <span>
+                  Based runs on community support — API costs add up fast. If it's been useful,
+                  consider backing it.
+                </span>
               </div>
               <div className="support-nudge-actions">
                 <a
@@ -949,7 +1191,9 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             >
               <img className="chat-img-thumb" src={pendingImage.previewUrl} alt="pending upload" />
-              <button className="img-clear-btn" onClick={clearPendingImage} title="Remove image">✕</button>
+              <button className="img-clear-btn" onClick={clearPendingImage} title="Remove image">
+                ✕
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -966,7 +1210,9 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             onClick={() => fileInputRef.current?.click()}
             disabled={isGenerating || generationMode === 'chat'}
             title="Attach image"
-          >◆</button>
+          >
+            ◆
+          </button>
           <ModeDropdown
             mode={generationMode}
             onChange={setGenerationMode}
@@ -979,9 +1225,11 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             className={`voice-btn voice-btn--${micState === 'recording' ? 'listening' : micState === 'transcribing' ? 'activated' : 'idle'}`}
             onClick={toggleMic}
             title={
-              micState === 'idle' ? 'Press to record — speak, then press again to send' :
-              micState === 'recording' ? 'Recording… press to stop and send' :
-              'Transcribing…'
+              micState === 'idle'
+                ? 'Press to record — speak, then press again to send'
+                : micState === 'recording'
+                  ? 'Recording… press to stop and send'
+                  : 'Transcribing…'
             }
             disabled={isGenerating || isGeneratingMedia || micState === 'transcribing'}
           >
@@ -993,7 +1241,11 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                 key="audio-toggle"
                 className={`audio-toggle-btn${generateAudio ? ' audio-toggle-btn--on' : ''}`}
                 onClick={() => setGenerateAudio(v => !v)}
-                title={generateAudio ? 'Audio: on (2× cost) — click to disable' : 'Audio: off — click to enable'}
+                title={
+                  generateAudio
+                    ? 'Audio: on (2× cost) — click to disable'
+                    : 'Audio: off — click to enable'
+                }
                 initial={{ opacity: 0, scale: 0.8, width: 0 }}
                 animate={{ opacity: 1, scale: 1, width: 'auto' }}
                 exit={{ opacity: 0, scale: 0.8, width: 0 }}
@@ -1009,15 +1261,23 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             ref={textareaRef}
             className="chat-textarea"
             value={input}
-            onChange={e => { setInput(e.target.value); autoResize(); }}
+            onChange={e => {
+              setInput(e.target.value);
+              autoResize();
+            }}
             onKeyDown={handleKey}
             placeholder={
-              micState === 'recording' ? 'Recording — press mic again to send…' :
-              micState === 'transcribing' ? 'Transcribing…' :
-              generationMode === 'seedance' ? 'Describe a video to generate...' :
-              generationMode === 'music' ? 'Describe the music to generate...' :
-              generationMode !== 'chat' ? 'Describe an image to generate...' :
-              'Ask Based anything...'
+              micState === 'recording'
+                ? 'Recording — press mic again to send…'
+                : micState === 'transcribing'
+                  ? 'Transcribing…'
+                  : generationMode === 'seedance'
+                    ? 'Describe a video to generate...'
+                    : generationMode === 'music'
+                      ? 'Describe the music to generate...'
+                      : generationMode !== 'chat'
+                        ? 'Describe an image to generate...'
+                        : 'Ask Based anything...'
             }
             rows={1}
             disabled={isGenerating || isGeneratingMedia}
@@ -1033,15 +1293,19 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             disabled={isGenerating || isGeneratingMedia || (!input.trim() && !pendingImage)}
             whileTap={{ scale: 0.95 }}
           >
-            {isGeneratingMedia ? <span className="spinner" /> : generationMode !== 'chat' ? 'Generate' : 'Send'}
+            {isGeneratingMedia ? (
+              <span className="spinner" />
+            ) : generationMode !== 'chat' ? (
+              'Generate'
+            ) : (
+              'Send'
+            )}
           </motion.button>
         </div>
         {micState === 'recording' && (
           <div className="voice-hint">Recording — press mic again to stop and send</div>
         )}
-        {micState === 'transcribing' && (
-          <div className="voice-hint">Transcribing your voice…</div>
-        )}
+        {micState === 'transcribing' && <div className="voice-hint">Transcribing your voice…</div>}
       </div>
       {editingImageUrl && (
         <ImageEditorModal
@@ -1049,16 +1313,17 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           onConfirm={(resultUrl, confirmedPrompt) => {
             setMessages(prev => [
               ...prev,
-              { role: 'assistant', content: [{ type: 'generated-image', url: resultUrl, prompt: confirmedPrompt }] },
+              {
+                role: 'assistant',
+                content: [{ type: 'generated-image', url: resultUrl, prompt: confirmedPrompt }],
+              },
             ]);
             setEditingImageUrl(null);
           }}
           onClose={() => setEditingImageUrl(null)}
         />
       )}
-      {cropImageUrl && (
-        <ImageCropModal url={cropImageUrl} onClose={() => setCropImageUrl(null)} />
-      )}
+      {cropImageUrl && <ImageCropModal url={cropImageUrl} onClose={() => setCropImageUrl(null)} />}
     </div>
   );
 }

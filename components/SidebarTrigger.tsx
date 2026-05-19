@@ -16,11 +16,21 @@ interface SidebarTriggerProps {
   onRenameProject: (id: string, name: string) => void;
 }
 
-export default function SidebarTrigger({ onNewProject, onLoadProject, ...props }: SidebarTriggerProps) {
+export default function SidebarTrigger({
+  onNewProject,
+  onLoadProject,
+  ...props
+}: SidebarTriggerProps) {
   const [open, setOpen] = useState(false);
 
-  const handleNewProject = () => { onNewProject(); setOpen(false); };
-  const handleLoadProject = (p: Project) => { onLoadProject(p); setOpen(false); };
+  const handleNewProject = () => {
+    onNewProject();
+    setOpen(false);
+  };
+  const handleLoadProject = (p: Project) => {
+    onLoadProject(p);
+    setOpen(false);
+  };
 
   return (
     <>
@@ -43,11 +53,7 @@ export default function SidebarTrigger({ onNewProject, onLoadProject, ...props }
           animate={{ width: open ? 220 : 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         >
-          <Sidebar
-            {...props}
-            onNewProject={handleNewProject}
-            onLoadProject={handleLoadProject}
-          />
+          <Sidebar {...props} onNewProject={handleNewProject} onLoadProject={handleLoadProject} />
         </motion.div>
         <button
           className="sidebar-tab"

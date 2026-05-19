@@ -5,7 +5,7 @@ export async function generateMusic(prompt: string, durationSeconds = 30): Promi
   const res = await fetch('https://fal.run/fal-ai/stable-audio', {
     method: 'POST',
     headers: {
-      'Authorization': `Key ${key}`,
+      Authorization: `Key ${key}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({

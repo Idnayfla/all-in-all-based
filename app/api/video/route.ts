@@ -39,7 +39,17 @@ export async function POST(req: NextRequest) {
     if (!url) return NextResponse.json({ error: 'No video returned' }, { status: 500 });
     return NextResponse.json({ url, prompt });
   } catch (err: any) {
-    console.error('[video] FAL error — status:', err.status, '| body:', JSON.stringify(err.body), '| message:', err.message);
-    return NextResponse.json({ error: friendlyFalError(err, 'Video generation failed — please try again.') }, { status: 500 });
+    console.error(
+      '[video] FAL error — status:',
+      err.status,
+      '| body:',
+      JSON.stringify(err.body),
+      '| message:',
+      err.message
+    );
+    return NextResponse.json(
+      { error: friendlyFalError(err, 'Video generation failed — please try again.') },
+      { status: 500 }
+    );
   }
 }

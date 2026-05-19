@@ -2,29 +2,36 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface Particle {
-  x: number; y: number;
-  tx: number; ty: number;
-  size: number; alpha: number;
-  progress: number; delay: number; speed: number;
+  x: number;
+  y: number;
+  tx: number;
+  ty: number;
+  size: number;
+  alpha: number;
+  progress: number;
+  delay: number;
+  speed: number;
 }
 
 function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 }
 
-interface Props { onDone: () => void; }
+interface Props {
+  onDone: () => void;
+}
 
 export default function SplashScreen({ onDone }: Props) {
-  const canvasRef     = useRef<HTMLCanvasElement>(null);
-  const audioCtxRef   = useRef<AudioContext | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
-  const exitedRef     = useRef(false);
-  const [logoIn,    setLogoIn]    = useState(false);
+  const exitedRef = useRef(false);
+  const [logoIn, setLogoIn] = useState(false);
   const [taglineIn, setTaglineIn] = useState(false);
-  const [subIn,     setSubIn]     = useState(false);
+  const [subIn, setSubIn] = useState(false);
   const [ringPulse, setRingPulse] = useState(false);
-  const [exiting,   setExiting]   = useState(false);
-  const [showMute,  setShowMute]  = useState(false);
+  const [exiting, setExiting] = useState(false);
+  const [showMute, setShowMute] = useState(false);
 
   const exit = useCallback(() => {
     if (exitedRef.current) return;
@@ -45,20 +52,21 @@ export default function SplashScreen({ onDone }: Props) {
     const ctx = canvas.getContext('2d')!;
     let raf = 0;
 
-    const W = (canvas.width  = window.innerWidth);
+    const W = (canvas.width = window.innerWidth);
     const H = (canvas.height = window.innerHeight);
-    const cx = W / 2, cy = H / 2;
+    const cx = W / 2,
+      cy = H / 2;
 
     const particles: Particle[] = Array.from({ length: 120 }, () => ({
       x: Math.random() * W,
       y: Math.random() * H,
       tx: cx + (Math.random() - 0.5) * 100,
       ty: cy + (Math.random() - 0.5) * 50,
-      size:     Math.random() * 1.5 + 0.3,
-      alpha:    Math.random() * 0.7 + 0.3,
+      size: Math.random() * 1.5 + 0.3,
+      alpha: Math.random() * 0.7 + 0.3,
       progress: 0,
-      delay:    Math.random() * 0.4,
-      speed:    0.02 + Math.random() * 0.03,
+      delay: Math.random() * 0.4,
+      speed: 0.02 + Math.random() * 0.03,
     }));
 
     let t = 0;
@@ -68,12 +76,10 @@ export default function SplashScreen({ onDone }: Props) {
       for (const p of particles) {
         if (t < p.delay) continue;
         p.progress = Math.min(1, p.progress + p.speed);
-        const e  = easeInOutQuad(p.progress);
+        const e = easeInOutQuad(p.progress);
         const px = p.x + (p.tx - p.x) * e;
         const py = p.y + (p.ty - p.y) * e;
-        const a  = p.progress > 0.85
-          ? ((1 - p.progress) / 0.15) * p.alpha
-          : p.alpha;
+        const a = p.progress > 0.85 ? ((1 - p.progress) / 0.15) * p.alpha : p.alpha;
         ctx.beginPath();
         ctx.arc(px, py, p.size, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(124,106,247,${(a * 0.8).toFixed(3)})`;
@@ -87,11 +93,19 @@ export default function SplashScreen({ onDone }: Props) {
 
   /* ── Reveal timers ── */
   useEffect(() => {
-    const t1 = setTimeout(() => { setLogoIn(true); setRingPulse(true); }, 1200);
+    const t1 = setTimeout(() => {
+      setLogoIn(true);
+      setRingPulse(true);
+    }, 1200);
     const t2 = setTimeout(() => setTaglineIn(true), 1800);
     const t3 = setTimeout(() => setSubIn(true), 2200);
     const t4 = setTimeout(exit, 3800);
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); clearTimeout(t4); };
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+    };
   }, [exit]);
 
   /* ── Audio ── */
@@ -122,9 +136,7 @@ export default function SplashScreen({ onDone }: Props) {
           <div className={`splash-ring${ringPulse ? ' pulse' : ''}`} />
           <div className={`splash-mark${logoIn ? ' visible' : ''}`}>B&gt;</div>
         </div>
-        <div className={`splash-tagline${taglineIn ? ' visible' : ''}`}>
-          All in All Based
-        </div>
+        <div className={`splash-tagline${taglineIn ? ' visible' : ''}`}>All in All Based</div>
         <div className={`splash-sub${subIn ? ' visible' : ''}`}>
           Describe it. Based builds it. Ships in seconds.
         </div>
@@ -133,37 +145,42 @@ export default function SplashScreen({ onDone }: Props) {
       {showMute && (
         <button
           className="splash-mute"
-          onClick={e => { e.stopPropagation(); unmute(); }}
+          onClick={e => {
+            e.stopPropagation();
+            unmute();
+          }}
           title="Unmute"
-        >&#9658;</button>
+        >
+          &#9658;
+        </button>
       )}
     </div>
   );
 }
 
 function startAudio(ctx: AudioContext): GainNode {
-  const now    = ctx.currentTime;
+  const now = ctx.currentTime;
   const master = ctx.createGain();
   master.gain.setValueAtTime(1, now);
   master.connect(ctx.destination);
 
   /* sub-bass drone: 40 Hz, fades in then out before impact */
-  const bass     = ctx.createOscillator();
+  const bass = ctx.createOscillator();
   const bassGain = ctx.createGain();
   bass.frequency.setValueAtTime(40, now);
   bass.type = 'sine';
   bassGain.gain.setValueAtTime(0, now);
   bassGain.gain.linearRampToValueAtTime(0.3, now + 0.5);
-  bassGain.gain.linearRampToValueAtTime(0,   now + 1.4);
+  bassGain.gain.linearRampToValueAtTime(0, now + 1.4);
   bass.connect(bassGain);
   bassGain.connect(master);
   bass.start(now);
   bass.stop(now + 1.5);
 
   /* rising frequency sweep: 80→200 Hz at t=0.8s */
-  const sweep     = ctx.createOscillator();
+  const sweep = ctx.createOscillator();
   const sweepGain = ctx.createGain();
-  sweep.frequency.setValueAtTime(80,  now + 0.8);
+  sweep.frequency.setValueAtTime(80, now + 0.8);
   sweep.frequency.linearRampToValueAtTime(200, now + 1.2);
   sweepGain.gain.setValueAtTime(0.2, now + 0.8);
   sweepGain.gain.linearRampToValueAtTime(0, now + 1.2);
@@ -174,7 +191,7 @@ function startAudio(ctx: AudioContext): GainNode {
 
   /* impact thud at t=1.2s: two detuned sines */
   for (const freq of [80, 84]) {
-    const osc  = ctx.createOscillator();
+    const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.frequency.setValueAtTime(freq, now + 1.2);
     gain.gain.setValueAtTime(0.45, now + 1.2);
@@ -187,7 +204,7 @@ function startAudio(ctx: AudioContext): GainNode {
 
   /* crystalline chord at t=1.2s: Bb4=466 Hz, D5=587 Hz, F#5=740 Hz */
   for (const freq of [466, 587, 740]) {
-    const osc  = ctx.createOscillator();
+    const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(freq, now + 1.2);
@@ -200,19 +217,19 @@ function startAudio(ctx: AudioContext): GainNode {
   }
 
   /* white-noise shimmer at t=1.4s */
-  const bufLen  = Math.ceil(ctx.sampleRate * 0.06);
-  const buffer  = ctx.createBuffer(1, bufLen, ctx.sampleRate);
-  const data    = buffer.getChannelData(0);
+  const bufLen = Math.ceil(ctx.sampleRate * 0.06);
+  const buffer = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
   for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
-  const noise       = ctx.createBufferSource();
+  const noise = ctx.createBufferSource();
   const noiseFilter = ctx.createBiquadFilter();
-  const noiseGain   = ctx.createGain();
+  const noiseGain = ctx.createGain();
   noise.buffer = buffer;
   noiseFilter.type = 'highpass';
   noiseFilter.frequency.setValueAtTime(3000, now + 1.4);
   noiseGain.gain.setValueAtTime(0, now + 1.4);
   noiseGain.gain.linearRampToValueAtTime(0.1, now + 1.42);
-  noiseGain.gain.linearRampToValueAtTime(0,   now + 1.46);
+  noiseGain.gain.linearRampToValueAtTime(0, now + 1.46);
   noise.connect(noiseFilter);
   noiseFilter.connect(noiseGain);
   noiseGain.connect(master);

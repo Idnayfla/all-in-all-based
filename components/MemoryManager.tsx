@@ -26,16 +26,28 @@ export default function MemoryManager({ memory, onSave, onClose }: Props) {
   const [editOpen, setEditOpen] = useState(false);
   const [draft, setDraft] = useState('');
 
-  const openAdd = () => { setDraft(''); setEditIndex(null); setEditOpen(true); };
-  const openEdit = (i: number) => { setDraft(items[i]); setEditIndex(i); setEditOpen(true); };
-  const closeEdit = () => { setEditOpen(false); setDraft(''); };
+  const openAdd = () => {
+    setDraft('');
+    setEditIndex(null);
+    setEditOpen(true);
+  };
+  const openEdit = (i: number) => {
+    setDraft(items[i]);
+    setEditIndex(i);
+    setEditOpen(true);
+  };
+  const closeEdit = () => {
+    setEditOpen(false);
+    setDraft('');
+  };
 
   const handleSave = () => {
     const text = draft.trim();
     if (!text) return;
-    const next = editIndex === null
-      ? [...items, text]
-      : items.map((item, i) => (i === editIndex ? text : item));
+    const next =
+      editIndex === null
+        ? [...items, text]
+        : items.map((item, i) => (i === editIndex ? text : item));
     onSave(stringifyMemories(next));
     closeEdit();
   };
@@ -65,12 +77,16 @@ export default function MemoryManager({ memory, onSave, onClose }: Props) {
       >
         <div className="memwin-header">
           <span className="memwin-title">⬡ Global Memory</span>
-          <button className="memwin-close" onClick={onClose} aria-label="Close">×</button>
+          <button className="memwin-close" onClick={onClose} aria-label="Close">
+            ×
+          </button>
         </div>
 
         <div className="memwin-body">
           {items.length === 0 ? (
-            <div className="memwin-empty">No memories yet — Based will learn about you as you chat.</div>
+            <div className="memwin-empty">
+              No memories yet — Based will learn about you as you chat.
+            </div>
           ) : (
             <div className="memwin-list">
               {items.map((item, i) => (
@@ -86,8 +102,16 @@ export default function MemoryManager({ memory, onSave, onClose }: Props) {
                   <span className="memory-chip-num">{i + 1}</span>
                   <span className="memory-chip-text">{item}</span>
                   <div className="memory-chip-actions">
-                    <button className="memory-chip-btn" onClick={() => openEdit(i)} title="Edit">✎</button>
-                    <button className="memory-chip-btn memory-chip-delete" onClick={() => handleDelete(i)} title="Delete">×</button>
+                    <button className="memory-chip-btn" onClick={() => openEdit(i)} title="Edit">
+                      ✎
+                    </button>
+                    <button
+                      className="memory-chip-btn memory-chip-delete"
+                      onClick={() => handleDelete(i)}
+                      title="Delete"
+                    >
+                      ×
+                    </button>
                   </div>
                 </motion.div>
               ))}
@@ -96,8 +120,12 @@ export default function MemoryManager({ memory, onSave, onClose }: Props) {
         </div>
 
         <div className="memwin-footer">
-          <span className="memwin-count">{items.length} {items.length === 1 ? 'memory' : 'memories'}</span>
-          <button className="memwin-add-btn" onClick={openAdd}>+ Add memory</button>
+          <span className="memwin-count">
+            {items.length} {items.length === 1 ? 'memory' : 'memories'}
+          </span>
+          <button className="memwin-add-btn" onClick={openAdd}>
+            + Add memory
+          </button>
         </div>
       </motion.div>
 
@@ -136,7 +164,9 @@ export default function MemoryManager({ memory, onSave, onClose }: Props) {
                 }}
               />
               <div className="memory-modal-actions">
-                <button className="memory-modal-cancel" onClick={closeEdit}>Cancel</button>
+                <button className="memory-modal-cancel" onClick={closeEdit}>
+                  Cancel
+                </button>
                 <button className="memory-modal-save" onClick={handleSave} disabled={!draft.trim()}>
                   {editIndex === null ? 'Add' : 'Save'}
                 </button>

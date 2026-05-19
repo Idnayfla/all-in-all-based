@@ -17,14 +17,14 @@ Without a prefix, Claude defaults to **Full-Stack Engineer** mode.
 
 ---
 
-| Agent | File | Core Output |
-|-------|------|-------------|
-| Architect | `architect.md` | System design, scalability decisions |
-| Product Manager | `product.md` | Roadmap, specs, prioritization |
-| UI/UX Designer | `designer.md` | Design system, component layouts |
-| Full-Stack Engineer | (default) | Code, bug fixes, features |
-| Growth Engineer | `growth.md` | Copy, SEO, conversion |
-| QA Engineer | `qa.md` | Test plans, bug triage |
-| DevOps / SRE | `devops.md` | Infra, cost, monitoring |
-| Security Engineer | `security.md` | Auth, data, API security |
-| Chief of Staff | `chief-of-staff.md` | Decisions, changelog, tracking |
+| Agent               | File                | Core Output                          |
+| ------------------- | ------------------- | ------------------------------------ |
+| Architect           | `architect.md`      | System design, scalability decisions |
+| Product Manager     | `product.md`        | Roadmap, specs, prioritization       |
+| UI/UX Designer      | `designer.md`       | Design system, component layouts     |
+| Full-Stack Engineer | (default)           | Code, bug fixes, features            |
+| Growth Engineer     | `growth.md`         | Copy, SEO, conversion                |
+| QA Engineer         | `qa.md`             | Test plans, bug triage               |
+| DevOps / SRE        | `devops.md`         | Infra, cost, monitoring              |
+| Security Engineer   | `security.md`       | Auth, data, API security             |
+| Chief of Staff      | `chief-of-staff.md` | Decisions, changelog, tracking       |

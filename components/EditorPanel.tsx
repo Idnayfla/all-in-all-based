@@ -5,12 +5,15 @@ import { FileNode } from '@/app/page';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 
-export default function EditorPanel({ activeFile, onFileUpdate }: {
+export default function EditorPanel({
+  activeFile,
+  onFileUpdate,
+}: {
   activeFile: FileNode | null;
   onFileUpdate: (f: FileNode) => void;
 }) {
   const editorRef = useRef<any>(null);
-  const [copied, setCopied]   = useState(false);
+  const [copied, setCopied] = useState(false);
   const [wordWrap, setWordWrap] = useState<'off' | 'on'>('off');
 
   const copy = async () => {
@@ -36,14 +39,17 @@ export default function EditorPanel({ activeFile, onFileUpdate }: {
   const lineCount = activeFile?.content.split('\n').length ?? 0;
   const charCount = activeFile?.content.length ?? 0;
 
-  if (!activeFile) return (
-    <div className="editor-panel">
-      <div className="editor-empty">
-        <div className="editor-empty-icon">{'{ }'}</div>
-        <div className="editor-empty-text">Select a file from the sidebar, or describe what to build in chat.</div>
+  if (!activeFile)
+    return (
+      <div className="editor-panel">
+        <div className="editor-empty">
+          <div className="editor-empty-icon">{'{ }'}</div>
+          <div className="editor-empty-text">
+            Select a file from the sidebar, or describe what to build in chat.
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
 
   return (
     <div className="editor-panel">
@@ -54,16 +60,24 @@ export default function EditorPanel({ activeFile, onFileUpdate }: {
         <div className="editor-actions">
           <button
             className="editor-action-btn"
-            onClick={() => setWordWrap(w => w === 'off' ? 'on' : 'off')}
+            onClick={() => setWordWrap(w => (w === 'off' ? 'on' : 'off'))}
             title="Toggle word wrap"
-          >{wordWrap === 'on' ? '⇌ Wrap on' : '→ Wrap off'}</button>
-          <button className="editor-action-btn" onClick={format} title="Format document">◈ Format</button>
+          >
+            {wordWrap === 'on' ? '⇌ Wrap on' : '→ Wrap off'}
+          </button>
+          <button className="editor-action-btn" onClick={format} title="Format document">
+            ◈ Format
+          </button>
           <button className="editor-action-btn" onClick={copy} title="Copy all">
             {copied ? '✓ Copied' : '⎘ Copy'}
           </button>
-          <button className="editor-action-btn" onClick={download} title="Download file">↓ Download</button>
+          <button className="editor-action-btn" onClick={download} title="Download file">
+            ↓ Download
+          </button>
         </div>
-        <span className="editor-stats">{lineCount.toLocaleString()} lines · {charCount.toLocaleString()} chars</span>
+        <span className="editor-stats">
+          {lineCount.toLocaleString()} lines · {charCount.toLocaleString()} chars
+        </span>
       </div>
       <div style={{ flex: 1 }}>
         <MonacoEditor
@@ -71,7 +85,9 @@ export default function EditorPanel({ activeFile, onFileUpdate }: {
           language={activeFile.language}
           value={activeFile.content}
           theme="vs-dark"
-          onMount={ed => { editorRef.current = ed; }}
+          onMount={ed => {
+            editorRef.current = ed;
+          }}
           onChange={val => onFileUpdate({ ...activeFile, content: val ?? '' })}
           options={{
             fontSize: 13,

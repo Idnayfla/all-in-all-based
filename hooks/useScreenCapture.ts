@@ -33,7 +33,9 @@ export async function captureScreen(): Promise<string | null> {
     const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
     const video = document.createElement('video');
     video.srcObject = stream;
-    await new Promise<void>(resolve => { video.onloadedmetadata = () => resolve(); });
+    await new Promise<void>(resolve => {
+      video.onloadedmetadata = () => resolve();
+    });
     await video.play();
 
     const canvas = document.createElement('canvas');

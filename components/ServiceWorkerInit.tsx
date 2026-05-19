@@ -16,7 +16,8 @@ export default function ServiceWorkerInit() {
     }
 
     navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
-    return () => navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+    return () =>
+      navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
   }, []);
 
   useEffect(() => {
@@ -37,10 +38,7 @@ export default function ServiceWorkerInit() {
           transition={{ type: 'spring', stiffness: 280, damping: 28 }}
         >
           <span>Based updated</span>
-          <button
-            className="sw-update-toast__reload"
-            onClick={() => window.location.reload()}
-          >
+          <button className="sw-update-toast__reload" onClick={() => window.location.reload()}>
             Reload
           </button>
         </motion.div>

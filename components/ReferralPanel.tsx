@@ -19,7 +19,7 @@ export default function ReferralPanel({ getHeaders }: Props) {
   useEffect(() => {
     getHeaders().then(headers =>
       fetch('/api/referral', { headers })
-        .then(r => r.ok ? r.json() : null)
+        .then(r => (r.ok ? r.json() : null))
         .then(d => d && setData(d))
         .catch(() => {})
     );
@@ -38,9 +38,9 @@ export default function ReferralPanel({ getHeaders }: Props) {
   return (
     <div className="referral-panel">
       <p className="referral-desc">
-        Share Based, earn Pro time for you and a friend.
-        Your friend gets <strong>3 days free Pro</strong> when they sign up.
-        You get <strong>7 days free Pro</strong> when they subscribe.
+        Share Based, earn Pro time for you and a friend. Your friend gets{' '}
+        <strong>3 days free Pro</strong> when they sign up. You get <strong>7 days free Pro</strong>{' '}
+        when they subscribe.
       </p>
 
       <div className="referral-link-row">

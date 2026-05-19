@@ -16,25 +16,33 @@ import { Extension } from '@tiptap/core';
 // ── Custom FontSize extension ─────────────────────────────────────────────────
 const FontSize = Extension.create({
   name: 'fontSize',
-  addOptions() { return { types: ['textStyle'] }; },
+  addOptions() {
+    return { types: ['textStyle'] };
+  },
   addGlobalAttributes() {
-    return [{
-      types: this.options.types,
-      attributes: {
-        fontSize: {
-          default: null,
-          parseHTML: el => el.style.fontSize || null,
-          renderHTML: attrs => attrs.fontSize ? { style: `font-size: ${attrs.fontSize}` } : {},
+    return [
+      {
+        types: this.options.types,
+        attributes: {
+          fontSize: {
+            default: null,
+            parseHTML: el => el.style.fontSize || null,
+            renderHTML: attrs => (attrs.fontSize ? { style: `font-size: ${attrs.fontSize}` } : {}),
+          },
         },
       },
-    }];
+    ];
   },
   addCommands() {
     return {
-      setFontSize: (size: string) => ({ chain }: any) =>
-        chain().setMark('textStyle', { fontSize: size }).run(),
-      unsetFontSize: () => ({ chain }: any) =>
-        chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(),
+      setFontSize:
+        (size: string) =>
+        ({ chain }: any) =>
+          chain().setMark('textStyle', { fontSize: size }).run(),
+      unsetFontSize:
+        () =>
+        ({ chain }: any) =>
+          chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(),
     } as any;
   },
 });
@@ -58,36 +66,59 @@ interface DrawStroke {
 
 const FONTS = [
   { label: 'Sans-serif', value: 'Inter, sans-serif' },
-  { label: 'Serif',      value: 'Georgia, serif' },
-  { label: 'Mono',       value: 'JetBrains Mono, monospace' },
-  { label: 'Cursive',    value: 'cursive' },
+  { label: 'Serif', value: 'Georgia, serif' },
+  { label: 'Mono', value: 'JetBrains Mono, monospace' },
+  { label: 'Cursive', value: 'cursive' },
 ];
-const FONT_SIZES = ['10px','12px','14px','16px','18px','20px','24px','28px','32px','40px','48px','64px'];
-const COLORS = ['#ffffff','#f87171','#fb923c','#facc15','#4ade80','#60a5fa','#a78bfa','#f472b6','#000000'];
-const HIGHLIGHT_COLORS = ['#fef08a','#bbf7d0','#bfdbfe','#fde8d8','#f5d0fe'];
+const FONT_SIZES = [
+  '10px',
+  '12px',
+  '14px',
+  '16px',
+  '18px',
+  '20px',
+  '24px',
+  '28px',
+  '32px',
+  '40px',
+  '48px',
+  '64px',
+];
+const COLORS = [
+  '#ffffff',
+  '#f87171',
+  '#fb923c',
+  '#facc15',
+  '#4ade80',
+  '#60a5fa',
+  '#a78bfa',
+  '#f472b6',
+  '#000000',
+];
+const HIGHLIGHT_COLORS = ['#fef08a', '#bbf7d0', '#bfdbfe', '#fde8d8', '#f5d0fe'];
 const PEN_SIZES = [2, 4, 8, 16];
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function NotesPanel({ authToken }: { authToken?: string }) {
-  const [notes, setNotes]             = useState<Note[]>([]);
-  const [selId, setSelId]             = useState<string | null>(null);
-  const [title, setTitle]             = useState('');
-  const [drawMode, setDrawMode]       = useState(false);
-  const [strokes, setStrokes]         = useState<DrawStroke[]>([]);
-  const [penColor, setPenColor]       = useState('#60a5fa');
-  const [penSize, setPenSize]         = useState(4);
-  const [eraser, setEraser]           = useState(false);
-  const [search, setSearch]           = useState('');
-  const [saving, setSaving]           = useState(false);
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [selId, setSelId] = useState<string | null>(null);
+  const [title, setTitle] = useState('');
+  const [drawMode, setDrawMode] = useState(false);
+  const [strokes, setStrokes] = useState<DrawStroke[]>([]);
+  const [penColor, setPenColor] = useState('#60a5fa');
+  const [penSize, setPenSize] = useState(4);
+  const [eraser, setEraser] = useState(false);
+  const [search, setSearch] = useState('');
+  const [saving, setSaving] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [loading, setLoading]         = useState(true);
-  const [showExport, setShowExport]   = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [showExport, setShowExport] = useState(false);
 
-  const saveTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const canvasRef   = useRef<HTMLCanvasElement>(null);
-  const isDrawing   = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isDrawing = useRef(false);
   const currentStroke = useRef<DrawStroke | null>(null);
-  const titleTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Tiptap editor ──────────────────────────────────────────────────────────
   const editor = useEditor({
@@ -115,14 +146,20 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
   });
 
   // ── Auth headers ───────────────────────────────────────────────────────────
-  const headers = useCallback(() => ({
-    'Content-Type': 'application/json',
-    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-  }), [authToken]);
+  const headers = useCallback(
+    () => ({
+      'Content-Type': 'application/json',
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+    }),
+    [authToken]
+  );
 
   // ── Load notes ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!authToken) { setLoading(false); return; }
+    if (!authToken) {
+      setLoading(false);
+      return;
+    }
     fetch('/api/notes', { headers: headers() })
       .then(r => r.json())
       .then((data: Note[]) => {
@@ -132,18 +169,23 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
   }, [authToken]);
 
   // ── Select note ────────────────────────────────────────────────────────────
-  const selectNote = useCallback((note: Note) => {
-    setSelId(note.id);
-    setTitle(note.title);
-    editor?.commands.setContent(note.content || '<p></p>');
-    let strk: DrawStroke[] = [];
-    try { strk = note.drawing_data ? JSON.parse(note.drawing_data) : []; } catch {}
-    setStrokes(strk);
-    setDrawMode(false);
-    // Force canvas clear so stale strokes don't persist between notes
-    const canvas = canvasRef.current;
-    if (canvas) canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
-  }, [editor]);
+  const selectNote = useCallback(
+    (note: Note) => {
+      setSelId(note.id);
+      setTitle(note.title);
+      editor?.commands.setContent(note.content || '<p></p>');
+      let strk: DrawStroke[] = [];
+      try {
+        strk = note.drawing_data ? JSON.parse(note.drawing_data) : [];
+      } catch {}
+      setStrokes(strk);
+      setDrawMode(false);
+      // Force canvas clear so stale strokes don't persist between notes
+      const canvas = canvasRef.current;
+      if (canvas) canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+    },
+    [editor]
+  );
 
   // ── Draw strokes onto canvas ───────────────────────────────────────────────
   const redrawCanvas = useCallback(() => {
@@ -168,7 +210,9 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
     ctx.globalCompositeOperation = 'source-over';
   }, [strokes]);
 
-  useEffect(() => { redrawCanvas(); }, [redrawCanvas]);
+  useEffect(() => {
+    redrawCanvas();
+  }, [redrawCanvas]);
 
   // Resize canvas to match container
   useEffect(() => {
@@ -177,7 +221,7 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
     const resize = () => {
       const rect = canvas.parentElement?.getBoundingClientRect();
       if (!rect) return;
-      canvas.width  = rect.width;
+      canvas.width = rect.width;
       canvas.height = rect.height;
       redrawCanvas();
     };
@@ -235,41 +279,55 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
   };
 
   // ── Save logic ─────────────────────────────────────────────────────────────
-  const scheduleNoteSave = useCallback((html: string, overrideStrokes?: DrawStroke[]) => {
-    if (!selId) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      setSaving(true);
-      const strokesData = overrideStrokes ?? strokes;
+  const scheduleNoteSave = useCallback(
+    (html: string, overrideStrokes?: DrawStroke[]) => {
+      if (!selId) return;
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(async () => {
+        setSaving(true);
+        const strokesData = overrideStrokes ?? strokes;
+        await fetch(`/api/notes/${selId}`, {
+          method: 'PUT',
+          headers: headers(),
+          body: JSON.stringify({
+            content: html,
+            drawing_data: strokesData.length > 0 ? JSON.stringify(strokesData) : null,
+          }),
+        });
+        setSaving(false);
+        setNotes(prev =>
+          prev.map(n =>
+            n.id === selId
+              ? {
+                  ...n,
+                  content: html,
+                  drawing_data: strokesData.length > 0 ? JSON.stringify(strokesData) : null,
+                  updated_at: new Date().toISOString(),
+                }
+              : n
+          )
+        );
+      }, 800);
+    },
+    [selId, strokes, headers]
+  );
+
+  const saveTitleNow = useCallback(
+    async (newTitle: string) => {
+      if (!selId) return;
       await fetch(`/api/notes/${selId}`, {
         method: 'PUT',
         headers: headers(),
-        body: JSON.stringify({
-          content: html,
-          drawing_data: strokesData.length > 0 ? JSON.stringify(strokesData) : null,
-        }),
+        body: JSON.stringify({ title: newTitle }),
       });
-      setSaving(false);
-      setNotes(prev => prev.map(n => n.id === selId
-        ? { ...n, content: html, drawing_data: strokesData.length > 0 ? JSON.stringify(strokesData) : null, updated_at: new Date().toISOString() }
-        : n
-      ));
-    }, 800);
-  }, [selId, strokes, headers]);
-
-  const saveTitleNow = useCallback(async (newTitle: string) => {
-    if (!selId) return;
-    await fetch(`/api/notes/${selId}`, {
-      method: 'PUT',
-      headers: headers(),
-      body: JSON.stringify({ title: newTitle }),
-    });
-    setNotes(prev => prev.map(n => n.id === selId ? { ...n, title: newTitle } : n));
-  }, [selId, headers]);
+      setNotes(prev => prev.map(n => (n.id === selId ? { ...n, title: newTitle } : n)));
+    },
+    [selId, headers]
+  );
 
   // ── New note ───────────────────────────────────────────────────────────────
   const createNote = async () => {
-    const res  = await fetch('/api/notes', {
+    const res = await fetch('/api/notes', {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify({ title: 'Untitled', content: '<p></p>' }),
@@ -304,13 +362,19 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
       .replace(/<u[^>]*>(.*?)<\/u>/gi, '__$1__')
       .replace(/<s[^>]*>(.*?)<\/s>/gi, '~~$1~~')
       .replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`')
-      .replace(/<pre[^>]*>[\s\S]*?<\/pre>/gi, (m) => '```\n' + m.replace(/<[^>]+>/g, '') + '\n```\n')
-      .replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (_, c) => '> ' + c.replace(/<[^>]+>/g, '') + '\n')
+      .replace(/<pre[^>]*>[\s\S]*?<\/pre>/gi, m => '```\n' + m.replace(/<[^>]+>/g, '') + '\n```\n')
+      .replace(
+        /<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi,
+        (_, c) => '> ' + c.replace(/<[^>]+>/g, '') + '\n'
+      )
       .replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
       .replace(/<p[^>]*>(.*?)<\/p>/gi, '$1\n\n')
       .replace(/<br\s*\/?>/gi, '\n')
       .replace(/<[^>]+>/g, '')
-      .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
       .replace(/\n{3,}/g, '\n\n')
       .trim();
   };
@@ -321,7 +385,12 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
     let name: string;
     const base = title || 'note';
     if (format === 'html') {
-      blob = new Blob([`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:sans-serif;max-width:720px;margin:40px auto;padding:0 20px;line-height:1.7}pre{background:#111;padding:16px;border-radius:6px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 10px}</style></head><body>${html}</body></html>`], { type: 'text/html' });
+      blob = new Blob(
+        [
+          `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title><style>body{font-family:sans-serif;max-width:720px;margin:40px auto;padding:0 20px;line-height:1.7}pre{background:#111;padding:16px;border-radius:6px}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:6px 10px}</style></head><body>${html}</body></html>`,
+        ],
+        { type: 'text/html' }
+      );
       name = `${base}.html`;
     } else if (format === 'md') {
       blob = new Blob([htmlToMarkdown(html)], { type: 'text/markdown' });
@@ -338,16 +407,17 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
   };
 
   // ── Filtered notes ─────────────────────────────────────────────────────────
-  const filtered = notes.filter(n =>
-    n.title.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = notes.filter(n => n.title.toLowerCase().includes(search.toLowerCase()));
 
   const sel = notes.find(n => n.id === selId) ?? null;
 
   // ── Toolbar helpers ────────────────────────────────────────────────────────
   const isActive = (name: string, attrs?: Record<string, any>) =>
     editor?.isActive(name, attrs) ?? false;
-  const cmd = (fn: () => void) => { fn(); editor?.view.focus(); };
+  const cmd = (fn: () => void) => {
+    fn();
+    editor?.view.focus();
+  };
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -355,7 +425,9 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
       {/* Sidebar */}
       <div className={`notes-sidebar${sidebarOpen ? ' open' : ''}`}>
         <div className="notes-sidebar-top">
-          <button className="notes-new-btn" onClick={createNote}>+ New Note</button>
+          <button className="notes-new-btn" onClick={createNote}>
+            + New Note
+          </button>
           <input
             className="notes-search"
             placeholder="Search notes…"
@@ -376,12 +448,19 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
               onClick={() => selectNote(note)}
             >
               <div className="notes-list-title">{note.title || 'Untitled'}</div>
-              <div className="notes-list-date">{new Date(note.updated_at).toLocaleDateString()}</div>
+              <div className="notes-list-date">
+                {new Date(note.updated_at).toLocaleDateString()}
+              </div>
               <button
                 className="notes-list-del"
-                onClick={e => { e.stopPropagation(); deleteNote(note.id); }}
+                onClick={e => {
+                  e.stopPropagation();
+                  deleteNote(note.id);
+                }}
                 title="Delete"
-              >✕</button>
+              >
+                ✕
+              </button>
             </div>
           ))}
         </div>
@@ -395,7 +474,9 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
             className="notes-sidebar-toggle"
             onClick={() => setSidebarOpen(s => !s)}
             title="Toggle sidebar"
-          >☰</button>
+          >
+            ☰
+          </button>
 
           {sel ? (
             <>
@@ -416,11 +497,15 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
                 className={`notes-mode-btn${drawMode ? ' active' : ''}`}
                 onClick={() => setDrawMode(d => !d)}
                 title="Toggle drawing layer"
-              >✏ Draw</button>
+              >
+                ✏ Draw
+              </button>
 
               {/* Export */}
               <div className="notes-export-wrap" style={{ position: 'relative' }}>
-                <button className="notes-export-btn" onClick={() => setShowExport(s => !s)}>↓ Export</button>
+                <button className="notes-export-btn" onClick={() => setShowExport(s => !s)}>
+                  ↓ Export
+                </button>
                 {showExport && (
                   <div className="notes-export-menu" style={{ display: 'flex' }}>
                     <button onClick={() => exportNote('md')}>Markdown</button>
@@ -444,9 +529,15 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
                 <select
                   className="notes-select"
                   title="Font family"
-                  onChange={e => cmd(() => editor?.chain().focus().setFontFamily(e.target.value).run())}
+                  onChange={e =>
+                    cmd(() => editor?.chain().focus().setFontFamily(e.target.value).run())
+                  }
                 >
-                  {FONTS.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
+                  {FONTS.map(f => (
+                    <option key={f.value} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
                 </select>
 
                 {/* Font size */}
@@ -454,43 +545,138 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
                   className="notes-select notes-select-sm"
                   title="Font size"
                   defaultValue="16px"
-                  onChange={e => cmd(() => (editor?.chain().focus() as any).setFontSize(e.target.value).run())}
+                  onChange={e =>
+                    cmd(() => (editor?.chain().focus() as any).setFontSize(e.target.value).run())
+                  }
                 >
-                  {FONT_SIZES.map(s => <option key={s} value={s}>{s.replace('px','')}</option>)}
+                  {FONT_SIZES.map(s => (
+                    <option key={s} value={s}>
+                      {s.replace('px', '')}
+                    </option>
+                  ))}
                 </select>
 
                 <div className="notes-toolbar-sep" />
 
                 {/* Text formatting */}
-                <button className={`notes-tool-btn${isActive('bold') ? ' on' : ''}`} title="Bold" onClick={() => cmd(() => editor?.chain().focus().toggleBold().run())}><b>B</b></button>
-                <button className={`notes-tool-btn${isActive('italic') ? ' on' : ''}`} title="Italic" onClick={() => cmd(() => editor?.chain().focus().toggleItalic().run())}><i>I</i></button>
-                <button className={`notes-tool-btn${isActive('underline') ? ' on' : ''}`} title="Underline" onClick={() => cmd(() => editor?.chain().focus().toggleUnderline().run())}><u>U</u></button>
-                <button className={`notes-tool-btn${isActive('strike') ? ' on' : ''}`} title="Strikethrough" onClick={() => cmd(() => editor?.chain().focus().toggleStrike().run())}><s>S</s></button>
+                <button
+                  className={`notes-tool-btn${isActive('bold') ? ' on' : ''}`}
+                  title="Bold"
+                  onClick={() => cmd(() => editor?.chain().focus().toggleBold().run())}
+                >
+                  <b>B</b>
+                </button>
+                <button
+                  className={`notes-tool-btn${isActive('italic') ? ' on' : ''}`}
+                  title="Italic"
+                  onClick={() => cmd(() => editor?.chain().focus().toggleItalic().run())}
+                >
+                  <i>I</i>
+                </button>
+                <button
+                  className={`notes-tool-btn${isActive('underline') ? ' on' : ''}`}
+                  title="Underline"
+                  onClick={() => cmd(() => editor?.chain().focus().toggleUnderline().run())}
+                >
+                  <u>U</u>
+                </button>
+                <button
+                  className={`notes-tool-btn${isActive('strike') ? ' on' : ''}`}
+                  title="Strikethrough"
+                  onClick={() => cmd(() => editor?.chain().focus().toggleStrike().run())}
+                >
+                  <s>S</s>
+                </button>
 
                 <div className="notes-toolbar-sep" />
 
                 {/* Headings */}
-                {([1,2,3] as const).map(l => (
-                  <button key={l} className={`notes-tool-btn${isActive('heading', { level: l }) ? ' on' : ''}`} title={`Heading ${l}`} onClick={() => cmd(() => editor?.chain().focus().toggleHeading({ level: l }).run())}>H{l}</button>
+                {([1, 2, 3] as const).map(l => (
+                  <button
+                    key={l}
+                    className={`notes-tool-btn${isActive('heading', { level: l }) ? ' on' : ''}`}
+                    title={`Heading ${l}`}
+                    onClick={() =>
+                      cmd(() => editor?.chain().focus().toggleHeading({ level: l }).run())
+                    }
+                  >
+                    H{l}
+                  </button>
                 ))}
 
                 <div className="notes-toolbar-sep" />
 
                 {/* Lists */}
-                <button className={`notes-tool-btn${isActive('bulletList') ? ' on' : ''}`} title="Bullet list" onClick={() => cmd(() => editor?.chain().focus().toggleBulletList().run())}>• –</button>
-                <button className={`notes-tool-btn${isActive('orderedList') ? ' on' : ''}`} title="Ordered list" onClick={() => cmd(() => editor?.chain().focus().toggleOrderedList().run())}>1.</button>
-                <button className={`notes-tool-btn${isActive('blockquote') ? ' on' : ''}`} title="Blockquote" onClick={() => cmd(() => editor?.chain().focus().toggleBlockquote().run())}>"</button>
-                <button className={`notes-tool-btn${isActive('codeBlock') ? ' on' : ''}`} title="Code block" onClick={() => cmd(() => editor?.chain().focus().toggleCodeBlock().run())}>&lt;/&gt;</button>
+                <button
+                  className={`notes-tool-btn${isActive('bulletList') ? ' on' : ''}`}
+                  title="Bullet list"
+                  onClick={() => cmd(() => editor?.chain().focus().toggleBulletList().run())}
+                >
+                  • –
+                </button>
+                <button
+                  className={`notes-tool-btn${isActive('orderedList') ? ' on' : ''}`}
+                  title="Ordered list"
+                  onClick={() => cmd(() => editor?.chain().focus().toggleOrderedList().run())}
+                >
+                  1.
+                </button>
+                <button
+                  className={`notes-tool-btn${isActive('blockquote') ? ' on' : ''}`}
+                  title="Blockquote"
+                  onClick={() => cmd(() => editor?.chain().focus().toggleBlockquote().run())}
+                >
+                  "
+                </button>
+                <button
+                  className={`notes-tool-btn${isActive('codeBlock') ? ' on' : ''}`}
+                  title="Code block"
+                  onClick={() => cmd(() => editor?.chain().focus().toggleCodeBlock().run())}
+                >
+                  &lt;/&gt;
+                </button>
 
                 <div className="notes-toolbar-sep" />
 
                 {/* Table */}
-                <button className="notes-tool-btn" title="Insert table" onClick={() => cmd(() => editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run())}>⊞ Table</button>
+                <button
+                  className="notes-tool-btn"
+                  title="Insert table"
+                  onClick={() =>
+                    cmd(() =>
+                      editor
+                        ?.chain()
+                        .focus()
+                        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+                        .run()
+                    )
+                  }
+                >
+                  ⊞ Table
+                </button>
                 {isActive('table') && (
                   <>
-                    <button className="notes-tool-btn" title="Add row" onClick={() => cmd(() => editor?.chain().focus().addRowAfter().run())}>+Row</button>
-                    <button className="notes-tool-btn" title="Add column" onClick={() => cmd(() => editor?.chain().focus().addColumnAfter().run())}>+Col</button>
-                    <button className="notes-tool-btn" title="Delete table" onClick={() => cmd(() => editor?.chain().focus().deleteTable().run())}>✕Table</button>
+                    <button
+                      className="notes-tool-btn"
+                      title="Add row"
+                      onClick={() => cmd(() => editor?.chain().focus().addRowAfter().run())}
+                    >
+                      +Row
+                    </button>
+                    <button
+                      className="notes-tool-btn"
+                      title="Add column"
+                      onClick={() => cmd(() => editor?.chain().focus().addColumnAfter().run())}
+                    >
+                      +Col
+                    </button>
+                    <button
+                      className="notes-tool-btn"
+                      title="Delete table"
+                      onClick={() => cmd(() => editor?.chain().focus().deleteTable().run())}
+                    >
+                      ✕Table
+                    </button>
                   </>
                 )}
 
@@ -504,7 +690,10 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
                       <button
                         key={c}
                         className="notes-color-dot"
-                        style={{ background: c, border: c === '#ffffff' ? '1px solid #555' : 'none' }}
+                        style={{
+                          background: c,
+                          border: c === '#ffffff' ? '1px solid #555' : 'none',
+                        }}
                         onClick={() => cmd(() => editor?.chain().focus().setColor(c).run())}
                       />
                     ))}
@@ -520,14 +709,24 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
                         key={c}
                         className="notes-color-dot"
                         style={{ background: c }}
-                        onClick={() => cmd(() => editor?.chain().focus().toggleHighlight({ color: c }).run())}
+                        onClick={() =>
+                          cmd(() => editor?.chain().focus().toggleHighlight({ color: c }).run())
+                        }
                       />
                     ))}
                   </div>
                 </div>
 
                 <div className="notes-toolbar-sep" />
-                <button className="notes-tool-btn" title="Clear formatting" onClick={() => cmd(() => editor?.chain().focus().unsetAllMarks().clearNodes().run())}>✕ fmt</button>
+                <button
+                  className="notes-tool-btn"
+                  title="Clear formatting"
+                  onClick={() =>
+                    cmd(() => editor?.chain().focus().unsetAllMarks().clearNodes().run())
+                  }
+                >
+                  ✕ fmt
+                </button>
               </div>
             )}
 
@@ -540,7 +739,10 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
                     key={c}
                     className={`notes-color-dot${penColor === c && !eraser ? ' selected' : ''}`}
                     style={{ background: c }}
-                    onClick={() => { setPenColor(c); setEraser(false); }}
+                    onClick={() => {
+                      setPenColor(c);
+                      setEraser(false);
+                    }}
                   />
                 ))}
                 <div className="notes-toolbar-sep" />
@@ -549,17 +751,33 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
                   <button
                     key={s}
                     className={`notes-tool-btn${penSize === s && !eraser ? ' on' : ''}`}
-                    onClick={() => { setPenSize(s); setEraser(false); }}
-                  >{s}</button>
+                    onClick={() => {
+                      setPenSize(s);
+                      setEraser(false);
+                    }}
+                  >
+                    {s}
+                  </button>
                 ))}
                 <div className="notes-toolbar-sep" />
-                <button className={`notes-tool-btn${eraser ? ' on' : ''}`} onClick={() => setEraser(e => !e)}>◻ Eraser</button>
-                <button className="notes-tool-btn" onClick={() => {
-                  setStrokes([]);
-                  const canvas = canvasRef.current;
-                  if (canvas) canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
-                  scheduleNoteSave(editor?.getHTML() ?? '', []);
-                }}>✕ Clear</button>
+                <button
+                  className={`notes-tool-btn${eraser ? ' on' : ''}`}
+                  onClick={() => setEraser(e => !e)}
+                >
+                  ◻ Eraser
+                </button>
+                <button
+                  className="notes-tool-btn"
+                  onClick={() => {
+                    setStrokes([]);
+                    const canvas = canvasRef.current;
+                    if (canvas)
+                      canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+                    scheduleNoteSave(editor?.getHTML() ?? '', []);
+                  }}
+                >
+                  ✕ Clear
+                </button>
                 <div className="notes-toolbar-sep" />
                 <span className="notes-draw-hint">Draw on top of your text</span>
               </div>
@@ -585,7 +803,9 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
             <div className="notes-empty-title">Personal Notes</div>
             <div className="notes-empty-sub">Write, draw, code — syncs across all your devices</div>
             {authToken && (
-              <button className="notes-empty-btn" onClick={createNote}>+ Create your first note</button>
+              <button className="notes-empty-btn" onClick={createNote}>
+                + Create your first note
+              </button>
             )}
           </div>
         )}

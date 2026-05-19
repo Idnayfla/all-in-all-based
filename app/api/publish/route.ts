@@ -8,10 +8,12 @@ export async function POST(req: NextRequest) {
     const siteRes = await fetch('https://api.netlify.com/api/v1/sites', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.NETLIFY_TOKEN}`,
+        Authorization: `Bearer ${process.env.NETLIFY_TOKEN}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ name: projectName.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now() }),
+      body: JSON.stringify({
+        name: projectName.toLowerCase().replace(/\s+/g, '-') + '-' + Date.now(),
+      }),
     });
 
     const site = await siteRes.json();
@@ -35,7 +37,7 @@ export async function POST(req: NextRequest) {
     const deployRes = await fetch(`https://api.netlify.com/api/v1/sites/${site.id}/deploys`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.NETLIFY_TOKEN}`,
+        Authorization: `Bearer ${process.env.NETLIFY_TOKEN}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ files: fileMap }),
@@ -47,14 +49,15 @@ export async function POST(req: NextRequest) {
     // Upload required files
     for (const [sha, content] of Object.entries(fileContents)) {
       if (deploy.required?.includes(sha)) {
-        const fileName = files.find((f: any) => {
-          return true;
-        })?.name ?? 'index.html';
+        const fileName =
+          files.find((f: any) => {
+            return true;
+          })?.name ?? 'index.html';
 
         await fetch(`https://api.netlify.com/api/v1/deploys/${deploy.id}/files/${fileName}`, {
           method: 'PUT',
           headers: {
-            'Authorization': `Bearer ${process.env.NETLIFY_TOKEN}`,
+            Authorization: `Bearer ${process.env.NETLIFY_TOKEN}`,
             'Content-Type': 'application/octet-stream',
           },
           body: content,
@@ -62,7 +65,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ url: site.ssl_url || site.url || `https://${site.subdomain}.netlify.app` });
+    return NextResponse.json({
+      url: site.ssl_url || site.url || `https://${site.subdomain}.netlify.app`,
+    });
   } catch (err: any) {
     console.error(err);
     return NextResponse.json({ error: err.message }, { status: 500 });

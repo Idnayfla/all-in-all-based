@@ -2,15 +2,19 @@
 import { useEffect, useRef, useState } from 'react';
 
 export interface PersonalitySettings {
-  tone:         number;  // 0=Casual, 100=Formal
-  length:       number;  // 0=Concise, 100=Detailed
-  humour:       number;  // 0=Dry, 100=Playful
-  technicality: number;  // 0=Simplified, 100=Expert
-  notes:        string;
+  tone: number; // 0=Casual, 100=Formal
+  length: number; // 0=Concise, 100=Detailed
+  humour: number; // 0=Dry, 100=Playful
+  technicality: number; // 0=Simplified, 100=Expert
+  notes: string;
 }
 
 const DEFAULTS: PersonalitySettings = {
-  tone: 30, length: 25, humour: 65, technicality: 75, notes: '',
+  tone: 30,
+  length: 25,
+  humour: 65,
+  technicality: 75,
+  notes: '',
 };
 
 const LS_KEY = 'based_personality';
@@ -26,7 +30,9 @@ function load(): PersonalitySettings {
 }
 
 function save(s: PersonalitySettings) {
-  try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch {}
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(s));
+  } catch {}
 }
 
 function blend(value: number, low: string, high: string): string {
@@ -49,9 +55,9 @@ export function buildPersonalityModifier(s: PersonalitySettings): string {
 }
 
 interface SliderProps {
-  value:      number;
-  onChange:   (v: number) => void;
-  leftLabel:  string;
+  value: number;
+  onChange: (v: number) => void;
+  leftLabel: string;
   rightLabel: string;
 }
 
@@ -65,13 +71,17 @@ function Slider({ value, onChange, leftLabel, rightLabel }: SliderProps) {
   };
 
   useEffect(() => {
-    const move = (e: PointerEvent) => { if (dragging.current) onChange(compute(e.clientX)); };
-    const up   = ()                 => { dragging.current = false; };
+    const move = (e: PointerEvent) => {
+      if (dragging.current) onChange(compute(e.clientX));
+    };
+    const up = () => {
+      dragging.current = false;
+    };
     window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup',   up);
+    window.addEventListener('pointerup', up);
     return () => {
       window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup',   up);
+      window.removeEventListener('pointerup', up);
     };
   }, [onChange]);
 
@@ -84,7 +94,10 @@ function Slider({ value, onChange, leftLabel, rightLabel }: SliderProps) {
       <div
         ref={trackRef}
         className="personality-slider-track"
-        onPointerDown={e => { dragging.current = true; onChange(compute(e.clientX)); }}
+        onPointerDown={e => {
+          dragging.current = true;
+          onChange(compute(e.clientX));
+        }}
       >
         <div className="personality-slider-fill" style={{ width: `${value}%` }} />
         <div className="personality-slider-thumb" style={{ left: `${value}%` }} />
@@ -98,7 +111,10 @@ interface PersonalityPanelProps {
   initialSettings?: PersonalitySettings;
 }
 
-export default function PersonalityPanel({ onPersonalityChange, initialSettings }: PersonalityPanelProps) {
+export default function PersonalityPanel({
+  onPersonalityChange,
+  initialSettings,
+}: PersonalityPanelProps) {
   const [settings, setSettings] = useState<PersonalitySettings>(DEFAULTS);
 
   useEffect(() => {
@@ -106,7 +122,7 @@ export default function PersonalityPanel({ onPersonalityChange, initialSettings 
     setSettings(s);
     save(s);
     onPersonalityChange(buildPersonalityModifier(s), s);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSettings]);
 
   const update = (partial: Partial<PersonalitySettings>) => {
@@ -119,18 +135,40 @@ export default function PersonalityPanel({ onPersonalityChange, initialSettings 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div className="settings-label">Tone</div>
-      <Slider value={settings.tone} onChange={v => update({ tone: v })} leftLabel="Casual" rightLabel="Formal" />
+      <Slider
+        value={settings.tone}
+        onChange={v => update({ tone: v })}
+        leftLabel="Casual"
+        rightLabel="Formal"
+      />
 
       <div className="settings-label">Response length</div>
-      <Slider value={settings.length} onChange={v => update({ length: v })} leftLabel="Concise" rightLabel="Detailed" />
+      <Slider
+        value={settings.length}
+        onChange={v => update({ length: v })}
+        leftLabel="Concise"
+        rightLabel="Detailed"
+      />
 
       <div className="settings-label">Humour</div>
-      <Slider value={settings.humour} onChange={v => update({ humour: v })} leftLabel="Dry" rightLabel="Playful" />
+      <Slider
+        value={settings.humour}
+        onChange={v => update({ humour: v })}
+        leftLabel="Dry"
+        rightLabel="Playful"
+      />
 
       <div className="settings-label">Technicality</div>
-      <Slider value={settings.technicality} onChange={v => update({ technicality: v })} leftLabel="Simplified" rightLabel="Expert" />
+      <Slider
+        value={settings.technicality}
+        onChange={v => update({ technicality: v })}
+        leftLabel="Simplified"
+        rightLabel="Expert"
+      />
 
-      <div className="settings-label" style={{ marginTop: 4 }}>Extra notes</div>
+      <div className="settings-label" style={{ marginTop: 4 }}>
+        Extra notes
+      </div>
       <textarea
         className="settings-textarea"
         rows={2}

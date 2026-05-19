@@ -20,7 +20,8 @@ export async function GET(req: NextRequest) {
     }));
     return NextResponse.json({ projects });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -30,7 +31,13 @@ export async function POST(req: NextRequest) {
     const userId = await getUserId(req);
     const { name, id } = await req.json();
     if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 });
-    const row: Record<string, unknown> = { user_id: userId, name: name.trim(), files: [], messages: [], memory: '' };
+    const row: Record<string, unknown> = {
+      user_id: userId,
+      name: name.trim(),
+      files: [],
+      messages: [],
+      memory: '',
+    };
     if (id) row.id = id;
     const { data, error } = await supabaseAdmin
       .from('projects')
@@ -49,7 +56,8 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     console.error('[POST /api/projects]', err.message, err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }

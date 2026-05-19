@@ -21,13 +21,9 @@ export async function POST(req: NextRequest) {
             : m.content,
         })),
         memory: p.memory ?? '',
-        updated_at: p.updatedAt
-          ? new Date(p.updatedAt).toISOString()
-          : new Date().toISOString(),
+        updated_at: p.updatedAt ? new Date(p.updatedAt).toISOString() : new Date().toISOString(),
       }));
-      const { error } = await supabaseAdmin
-        .from('projects')
-        .upsert(rows, { onConflict: 'id' });
+      const { error } = await supabaseAdmin.from('projects').upsert(rows, { onConflict: 'id' });
       if (error) throw error;
     }
 
@@ -40,7 +36,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ migrated: projects?.length ?? 0 });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

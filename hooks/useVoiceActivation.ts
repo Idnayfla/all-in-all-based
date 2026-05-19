@@ -16,10 +16,15 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
   // Accumulate all transcript text while the user is speaking (push-to-talk mode)
   const accumulatedRef = useRef('');
 
-  const updateState = (s: VoiceState) => { stateRef.current = s; setState(s); };
+  const updateState = (s: VoiceState) => {
+    stateRef.current = s;
+    setState(s);
+  };
 
   const stop = useCallback((submitAccumulated = false) => {
-    try { activeRef.current?.stop(); } catch {}
+    try {
+      activeRef.current?.stop();
+    } catch {}
     activeRef.current = null;
 
     // Push-to-talk: if the user manually stopped, submit whatever they said
@@ -43,9 +48,10 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
   }, []);
 
   const startRec = useCallback(() => {
-    const SR = typeof window !== 'undefined'
-      ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      : null;
+    const SR =
+      typeof window !== 'undefined'
+        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        : null;
     if (!SR) return;
 
     accumulatedRef.current = '';
@@ -69,7 +75,10 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
       const lower = full.toLowerCase();
       const idx = lower.indexOf(triggerWord);
       if (idx !== -1) {
-        const command = full.slice(idx + triggerWord.length).replace(/^[,!.?\s]+/, '').trim();
+        const command = full
+          .slice(idx + triggerWord.length)
+          .replace(/^[,!.?\s]+/, '')
+          .trim();
         if (command && command !== lastCommandRef.current) {
           const lastResult = e.results[e.results.length - 1];
           if (lastResult.isFinal) {
@@ -107,16 +116,19 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
       }
     };
 
-    try { rec.start(); } catch (err: any) {
+    try {
+      rec.start();
+    } catch (err: any) {
       setError(`Could not start mic: ${err.message}`);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [triggerWord]);
 
   const start = useCallback(async () => {
-    const SR = typeof window !== 'undefined'
-      ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      : null;
+    const SR =
+      typeof window !== 'undefined'
+        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        : null;
     if (!SR) {
       updateState('unsupported');
       setError('Speech recognition not supported — use Chrome or Edge');
@@ -157,7 +169,14 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
     }
   }, [start, stop]);
 
-  useEffect(() => () => { try { activeRef.current?.stop(); } catch {} }, []);
+  useEffect(
+    () => () => {
+      try {
+        activeRef.current?.stop();
+      } catch {}
+    },
+    []
+  );
 
   return { state, transcript, error, toggle };
 }

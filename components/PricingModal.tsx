@@ -13,8 +13,8 @@ interface PricingModalProps {
 
 const REASON_MSG: Record<string, string> = {
   generations: "You've used all 10 free generations this month.",
-  projects:    "Free accounts are limited to 3 projects.",
-  upgrade:     "Unlock everything Based has to offer.",
+  projects: 'Free accounts are limited to 3 projects.',
+  upgrade: 'Unlock everything Based has to offer.',
 };
 
 const PRO_FEATURES = [
@@ -31,9 +31,16 @@ const FREE_LIMITS = [
   'Cloud sync across devices',
 ];
 
-export default function PricingModal({ reason = 'upgrade', generationsUsed, projectCount, onClose, getHeaders, onSwitchToFreeAI }: PricingModalProps) {
+export default function PricingModal({
+  reason = 'upgrade',
+  generationsUsed,
+  projectCount,
+  onClose,
+  getHeaders,
+  onSwitchToFreeAI,
+}: PricingModalProps) {
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
+  const [error, setError] = useState('');
 
   const upgrade = async () => {
     setLoading(true);
@@ -56,7 +63,9 @@ export default function PricingModal({ reason = 'upgrade', generationsUsed, proj
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={e => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <motion.div
         className="pricing-card"
@@ -65,7 +74,9 @@ export default function PricingModal({ reason = 'upgrade', generationsUsed, proj
         exit={{ scale: 0.94, opacity: 0, y: 16 }}
         transition={{ type: 'spring', stiffness: 380, damping: 30 }}
       >
-        <button className="pricing-close" onClick={onClose}>✕</button>
+        <button className="pricing-close" onClick={onClose}>
+          ✕
+        </button>
 
         <div className="pricing-header">
           <div className="pricing-logo">B&gt;</div>
@@ -76,13 +87,23 @@ export default function PricingModal({ reason = 'upgrade', generationsUsed, proj
         <div className="pricing-tiers">
           <div className="pricing-tier pricing-tier--free">
             <div className="pricing-tier-name">Free</div>
-            <div className="pricing-tier-price">$0 <span>/mo</span></div>
+            <div className="pricing-tier-price">
+              $0 <span>/mo</span>
+            </div>
             <ul className="pricing-tier-list">
-              {FREE_LIMITS.map(f => <li key={f}><span className="pricing-check pricing-check--dim">✓</span>{f}</li>)}
+              {FREE_LIMITS.map(f => (
+                <li key={f}>
+                  <span className="pricing-check pricing-check--dim">✓</span>
+                  {f}
+                </li>
+              ))}
             </ul>
             {generationsUsed !== undefined && (
               <div className="pricing-usage-bar">
-                <div className="pricing-usage-fill" style={{ width: `${Math.min(100, (generationsUsed / 10) * 100)}%` }} />
+                <div
+                  className="pricing-usage-fill"
+                  style={{ width: `${Math.min(100, (generationsUsed / 10) * 100)}%` }}
+                />
                 <span>{generationsUsed}/10 generations used</span>
               </div>
             )}
@@ -91,9 +112,16 @@ export default function PricingModal({ reason = 'upgrade', generationsUsed, proj
           <div className="pricing-tier pricing-tier--pro">
             <div className="pricing-tier-badge">Most popular</div>
             <div className="pricing-tier-name">Pro</div>
-            <div className="pricing-tier-price">$12 <span>/mo</span></div>
+            <div className="pricing-tier-price">
+              $12 <span>/mo</span>
+            </div>
             <ul className="pricing-tier-list">
-              {PRO_FEATURES.map(f => <li key={f}><span className="pricing-check">✓</span>{f}</li>)}
+              {PRO_FEATURES.map(f => (
+                <li key={f}>
+                  <span className="pricing-check">✓</span>
+                  {f}
+                </li>
+              ))}
             </ul>
           </div>
         </div>

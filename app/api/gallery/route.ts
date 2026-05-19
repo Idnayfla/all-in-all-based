@@ -29,15 +29,19 @@ export async function POST(req: NextRequest) {
 
     if (!share) return NextResponse.json({ error: 'Share not found' }, { status: 404 });
 
-    await supabaseAdmin.from('shares').update({
-      in_gallery: true,
-      gallery_published_at: new Date().toISOString(),
-      author_name: authorName?.trim() || null,
-    }).eq('id', shareId);
+    await supabaseAdmin
+      .from('shares')
+      .update({
+        in_gallery: true,
+        gallery_published_at: new Date().toISOString(),
+        author_name: authorName?.trim() || null,
+      })
+      .eq('id', shareId);
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

@@ -10,7 +10,9 @@ interface Props {
 
 export default function ProactiveCheckin({ projectName, onContinue, onDismiss }: Props) {
   const dismissRef = useRef(onDismiss);
-  useEffect(() => { dismissRef.current = onDismiss; });
+  useEffect(() => {
+    dismissRef.current = onDismiss;
+  });
 
   useEffect(() => {
     const t = setTimeout(() => dismissRef.current(), 8000);
@@ -31,12 +33,16 @@ export default function ProactiveCheckin({ projectName, onContinue, onDismiss }:
       </div>
       <div className="checkin-body">
         You were working on{' '}
-        <strong className="checkin-project-name">&ldquo;{projectName}&rdquo;</strong>
-        {' '}— want to pick up where you left off?
+        <strong className="checkin-project-name">&ldquo;{projectName}&rdquo;</strong> — want to pick
+        up where you left off?
       </div>
       <div className="checkin-actions">
-        <button className="checkin-continue" onClick={onContinue}>Continue →</button>
-        <button className="checkin-dismiss" onClick={onDismiss}>Not now</button>
+        <button className="checkin-continue" onClick={onContinue}>
+          Continue →
+        </button>
+        <button className="checkin-dismiss" onClick={onDismiss}>
+          Not now
+        </button>
       </div>
       <div className="checkin-timer-bar">
         <div className="checkin-timer-progress" />

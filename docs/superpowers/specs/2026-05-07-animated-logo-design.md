@@ -13,24 +13,26 @@ Replace the static PNG logo in the app header with a Framer Motion–animated sh
 
 ## Decisions
 
-| Decision | Choice |
-|---|---|
-| Animation style | Shimmer Sweep (light sheen sweeps across icon + text) |
-| Animation engine | Framer Motion (added as npm dependency) |
+| Decision                | Choice                                                                 |
+| ----------------------- | ---------------------------------------------------------------------- |
+| Animation style         | Shimmer Sweep (light sheen sweeps across icon + text)                  |
+| Animation engine        | Framer Motion (added as npm dependency)                                |
 | Customizable properties | Text, icon shape, shimmer color, icon background, speed, shimmer width |
-| Settings trigger | Pencil button (✎) that fades in on logo hover → centered modal |
-| Persistence | `localStorage` key `logo_config` |
+| Settings trigger        | Pencil button (✎) that fades in on logo hover → centered modal         |
+| Persistence             | `localStorage` key `logo_config`                                       |
 
 ---
 
 ## Architecture
 
 **New files:**
+
 - `components/AnimatedLogo.tsx` — animated logo with hover edit trigger
 - `components/LogoEditorModal.tsx` — centered modal with all controls + live preview
 - `hooks/useLogoConfig.ts` — config state + localStorage read/write
 
 **Modified files:**
+
 - `app/page.tsx` — replace `<img class="logo-img">` + `<span class="logo-text">` with `<AnimatedLogo />`
 
 No other files touched. The rest of the header (hamburger, nav tabs, status, settings gear) is unchanged.
@@ -43,12 +45,12 @@ Stored in `localStorage` as `logo_config` (JSON). Default values:
 
 ```ts
 interface LogoConfig {
-  text: string;         // "BASED"
+  text: string; // "BASED"
   shimmerColor: string; // "#a89aff"
-  iconShape: "bolt" | "diamond" | "hex" | "circle"; // "bolt"
-  speed: number;        // 2.8  (seconds per sweep)
+  iconShape: 'bolt' | 'diamond' | 'hex' | 'circle'; // "bolt"
+  speed: number; // 2.8  (seconds per sweep)
   shimmerWidth: number; // 40   (% of element width)
-  iconBg: string;       // "#0a0a0f"
+  iconBg: string; // "#0a0a0f"
 }
 ```
 
@@ -61,6 +63,7 @@ interface LogoConfig {
 **Layout:** icon (40×40) + text — identical dimensions to the current logo so no header layout shifts.
 
 **Icon:** Inline SVG (no PNG). Four shapes drawn as SVG paths, all fitting a 40×40 viewBox:
+
 - `bolt` — lightning bolt (current icon)
 - `diamond` — rotated square
 - `hex` — hexagon
@@ -81,6 +84,7 @@ transition={{
 **Edit trigger:** On `onMouseEnter`, a pencil button (`✎`) fades in (Framer Motion `AnimatePresence` + opacity 0→1). Clicking it sets `modalOpen = true`. On `onMouseLeave` (and when modal is open), the button stays visible until the modal closes.
 
 **CSS variables** written on the component's root `div` via `style` prop:
+
 ```
 --logo-shimmer-color
 --logo-speed
@@ -101,14 +105,14 @@ transition={{
 
 **Controls:**
 
-| Control | Element | Notes |
-|---|---|---|
-| Logo text | `<input type="text">` | max 12 chars |
-| Icon shape | 4-button pill picker | shows SVG icon + label |
-| Shimmer color | 6 preset swatches + `<input type="color">` | swatches: purple, cyan, gold, red, white, green |
+| Control         | Element                                    | Notes                                             |
+| --------------- | ------------------------------------------ | ------------------------------------------------- |
+| Logo text       | `<input type="text">`                      | max 12 chars                                      |
+| Icon shape      | 4-button pill picker                       | shows SVG icon + label                            |
+| Shimmer color   | 6 preset swatches + `<input type="color">` | swatches: purple, cyan, gold, red, white, green   |
 | Icon background | 4 preset swatches + `<input type="color">` | swatches: near-black, dark purple, navy, charcoal |
-| Animation speed | Range slider, 0.8–4.0s, step 0.1 | labelled Slow ↔ Fast |
-| Shimmer width | Range slider, 15–70%, step 5 | labelled Narrow ↔ Wide |
+| Animation speed | Range slider, 0.8–4.0s, step 0.1           | labelled Slow ↔ Fast                              |
+| Shimmer width   | Range slider, 15–70%, step 5               | labelled Narrow ↔ Wide                            |
 
 **Footer:** `Save` button (primary) + `Reset to defaults` text link. Reset restores all fields in the preview without closing the modal; Save commits to `useLogoConfig` + closes.
 

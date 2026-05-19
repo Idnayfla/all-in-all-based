@@ -72,7 +72,17 @@ export async function POST(req: NextRequest) {
     if (!url) return NextResponse.json({ error: 'No image returned' }, { status: 500 });
     return NextResponse.json({ url, prompt });
   } catch (err: any) {
-    console.error('[image] FAL error — status:', err.status, '| body:', JSON.stringify(err.body), '| message:', err.message);
-    return NextResponse.json({ error: friendlyFalError(err, 'Image generation failed — please try again.') }, { status: 500 });
+    console.error(
+      '[image] FAL error — status:',
+      err.status,
+      '| body:',
+      JSON.stringify(err.body),
+      '| message:',
+      err.message
+    );
+    return NextResponse.json(
+      { error: friendlyFalError(err, 'Image generation failed — please try again.') },
+      { status: 500 }
+    );
   }
 }

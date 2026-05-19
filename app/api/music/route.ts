@@ -13,8 +13,14 @@ async function enhancePrompt(prompt: string): Promise<string> {
     const res = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 200,
-      system: 'You are a music prompt engineer. Expand a short music request into a rich, detailed prompt for an AI music generator. Include: mood/emotion, instruments, tempo (BPM range), key (major/minor), genre, dynamics, and atmosphere. Output only the enhanced prompt — no explanation, no quotes.',
-      messages: [{ role: 'user', content: `Music request: "${prompt}"\n\nExpand into a detailed music generation prompt.` }],
+      system:
+        'You are a music prompt engineer. Expand a short music request into a rich, detailed prompt for an AI music generator. Include: mood/emotion, instruments, tempo (BPM range), key (major/minor), genre, dynamics, and atmosphere. Output only the enhanced prompt — no explanation, no quotes.',
+      messages: [
+        {
+          role: 'user',
+          content: `Music request: "${prompt}"\n\nExpand into a detailed music generation prompt.`,
+        },
+      ],
     });
     const text = res.content[0].type === 'text' ? res.content[0].text.trim() : '';
     return text || prompt;
@@ -39,7 +45,7 @@ export async function POST(req: NextRequest) {
     const res = await fetch('https://fal.run/fal-ai/stable-audio', {
       method: 'POST',
       headers: {
-        'Authorization': `Key ${key}`,
+        Authorization: `Key ${key}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({

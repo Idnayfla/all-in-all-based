@@ -34,7 +34,15 @@ export default function GeneratedVideoCard({ url, prompt }: GeneratedVideoCardPr
       </div>
       <div className="generated-image-prompt">{prompt}</div>
       <div className="generated-image-actions">
-        <a className="generated-image-download" href={url} download target="_blank" rel="noreferrer">↓ Download</a>
+        <a
+          className="generated-image-download"
+          href={url}
+          download
+          target="_blank"
+          rel="noreferrer"
+        >
+          ↓ Download
+        </a>
       </div>
     </motion.div>
   );

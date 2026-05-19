@@ -1,29 +1,29 @@
-'use client'
+'use client';
 
-import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { playWelcomeAudio } from '@/lib/welcomeAudio'
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { playWelcomeAudio } from '@/lib/welcomeAudio';
 
-type SplashState = 'waiting' | 'exiting' | 'done'
+type SplashState = 'waiting' | 'exiting' | 'done';
 
 export default function LaunchSplash() {
-  const [state, setState] = useState<SplashState | null>(null)
+  const [state, setState] = useState<SplashState | null>(null);
 
   useEffect(() => {
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
-      (navigator as Navigator & { standalone?: boolean }).standalone === true
-    if (isStandalone) setState('waiting')
-  }, [])
+      (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    if (isStandalone) setState('waiting');
+  }, []);
 
   function handleTap() {
-    if (state !== 'waiting') return
-    setState('exiting')
-    playWelcomeAudio()
-    setTimeout(() => setState('done'), 450)
+    if (state !== 'waiting') return;
+    setState('exiting');
+    playWelcomeAudio();
+    setTimeout(() => setState('done'), 450);
   }
 
-  const visible = state === 'waiting' || state === 'exiting'
+  const visible = state === 'waiting' || state === 'exiting';
 
   return (
     <AnimatePresence>
@@ -52,5 +52,5 @@ export default function LaunchSplash() {
         </motion.div>
       )}
     </AnimatePresence>
-  )
+  );
 }

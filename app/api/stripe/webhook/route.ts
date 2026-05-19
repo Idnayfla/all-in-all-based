@@ -34,15 +34,20 @@ export async function POST(req: NextRequest) {
       const email = (customer as Stripe.Customer).email;
       if (!email) return null;
 
-      const { data: { users } } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+      const {
+        data: { users },
+      } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
       const user = users.find(u => u.email === email);
       if (!user) return null;
 
       // Cache the link for future webhook events
-      await supabaseAdmin.from('user_settings').upsert({
-        user_id: user.id,
-        stripe_customer_id: customerId,
-      }, { onConflict: 'user_id' });
+      await supabaseAdmin.from('user_settings').upsert(
+        {
+          user_id: user.id,
+          stripe_customer_id: customerId,
+        },
+        { onConflict: 'user_id' }
+      );
 
       return user.id;
     } catch {
@@ -50,15 +55,26 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  async function setTier(userId: string, tier: 'free' | 'pro', status: string, periodStart?: number, periodEnd?: number) {
-    await supabaseAdmin.from('user_settings').upsert({
-      user_id: userId,
-      subscription_tier: tier,
-      subscription_status: status,
-      ...(tier === 'free' ? { generations_used: 0 } : {}),
-      ...(periodStart ? { subscription_period_start: new Date(periodStart * 1000).toISOString() } : {}),
-      ...(periodEnd   ? { subscription_period_end:   new Date(periodEnd   * 1000).toISOString() } : {}),
-    }, { onConflict: 'user_id' });
+  async function setTier(
+    userId: string,
+    tier: 'free' | 'pro',
+    status: string,
+    periodStart?: number,
+    periodEnd?: number
+  ) {
+    await supabaseAdmin.from('user_settings').upsert(
+      {
+        user_id: userId,
+        subscription_tier: tier,
+        subscription_status: status,
+        ...(tier === 'free' ? { generations_used: 0 } : {}),
+        ...(periodStart
+          ? { subscription_period_start: new Date(periodStart * 1000).toISOString() }
+          : {}),
+        ...(periodEnd ? { subscription_period_end: new Date(periodEnd * 1000).toISOString() } : {}),
+      },
+      { onConflict: 'user_id' }
+    );
   }
 
   try {
@@ -66,14 +82,18 @@ export async function POST(req: NextRequest) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
         const userId = session.client_reference_id;
-        const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+        const customerId =
+          typeof session.customer === 'string' ? session.customer : session.customer?.id;
         if (!userId || !customerId) break;
-        await supabaseAdmin.from('user_settings').upsert({
-          user_id: userId,
-          stripe_customer_id: customerId,
-          subscription_tier: 'pro',
-          subscription_status: 'active',
-        }, { onConflict: 'user_id' });
+        await supabaseAdmin.from('user_settings').upsert(
+          {
+            user_id: userId,
+            stripe_customer_id: customerId,
+            subscription_tier: 'pro',
+            subscription_status: 'active',
+          },
+          { onConflict: 'user_id' }
+        );
 
         // Reward the referrer with 30 days free Pro
         try {
@@ -90,15 +110,26 @@ export async function POST(req: NextRequest) {
               .single();
             if (referrer) {
               const now = new Date();
-              const base = referrer.pro_bonus_expires_at && new Date(referrer.pro_bonus_expires_at) > now
-                ? new Date(referrer.pro_bonus_expires_at)
-                : now;
+              const base =
+                referrer.pro_bonus_expires_at && new Date(referrer.pro_bonus_expires_at) > now
+                  ? new Date(referrer.pro_bonus_expires_at)
+                  : now;
               base.setDate(base.getDate() + 7);
-              await supabaseAdmin.from('user_settings').upsert({
-                user_id: referrer.user_id,
-                pro_bonus_expires_at: base.toISOString(),
-                referral_count: ((await supabaseAdmin.from('user_settings').select('referral_count').eq('user_id', referrer.user_id).single()).data?.referral_count ?? 0) + 1,
-              }, { onConflict: 'user_id' });
+              await supabaseAdmin.from('user_settings').upsert(
+                {
+                  user_id: referrer.user_id,
+                  pro_bonus_expires_at: base.toISOString(),
+                  referral_count:
+                    ((
+                      await supabaseAdmin
+                        .from('user_settings')
+                        .select('referral_count')
+                        .eq('user_id', referrer.user_id)
+                        .single()
+                    ).data?.referral_count ?? 0) + 1,
+                },
+                { onConflict: 'user_id' }
+              );
             }
           }
         } catch {}
@@ -113,7 +144,13 @@ export async function POST(req: NextRequest) {
         if (!userId) break;
         const isActive = sub.status === 'active' || sub.status === 'trialing';
         const item = sub.items.data[0];
-        await setTier(userId, isActive ? 'pro' : 'free', sub.status, item?.current_period_start, item?.current_period_end);
+        await setTier(
+          userId,
+          isActive ? 'pro' : 'free',
+          sub.status,
+          item?.current_period_start,
+          item?.current_period_end
+        );
         break;
       }
 
@@ -128,14 +165,18 @@ export async function POST(req: NextRequest) {
 
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice;
-        const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
+        const customerId =
+          typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
         if (!customerId) break;
         const userId = await getUidByCustomer(customerId);
         if (!userId) break;
-        await supabaseAdmin.from('user_settings').upsert({
-          user_id: userId,
-          subscription_status: 'past_due',
-        }, { onConflict: 'user_id' });
+        await supabaseAdmin.from('user_settings').upsert(
+          {
+            user_id: userId,
+            subscription_status: 'past_due',
+          },
+          { onConflict: 'user_id' }
+        );
         break;
       }
     }

@@ -23,7 +23,10 @@ export async function POST(req: NextRequest) {
     );
   }
   if (mode === 'inpaint' && !maskDataUrl) {
-    return NextResponse.json({ error: 'maskDataUrl is required for inpaint mode' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'maskDataUrl is required for inpaint mode' },
+      { status: 400 }
+    );
   }
 
   fal.config({ credentials: process.env.FAL_KEY });
@@ -60,8 +63,8 @@ export async function POST(req: NextRequest) {
     // inpaint: upload mask, then call flux fill
     const maskBase64 = maskDataUrl!.split(',')[1];
     const maskBuffer = Buffer.from(maskBase64, 'base64');
-    const maskBlob   = new Blob([maskBuffer], { type: 'image/png' });
-    const maskUrl    = await fal.storage.upload(maskBlob);
+    const maskBlob = new Blob([maskBuffer], { type: 'image/png' });
+    const maskUrl = await fal.storage.upload(maskBlob);
 
     const result = await fal.subscribe('fal-ai/flux-pro/v1/fill', {
       input: {

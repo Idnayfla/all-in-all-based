@@ -38,20 +38,22 @@ const ICONS = { bolt: BoltIcon, diamond: DiamondIcon, hex: HexIcon, circle: Circ
 
 export default function LogoDisplay({ config }: { config: LogoConfig }) {
   const isTerminal = config.iconShape === 'terminal';
-  const IconComp = isTerminal ? null : ICONS[config.iconShape as keyof typeof ICONS] ?? null;
+  const IconComp = isTerminal ? null : (ICONS[config.iconShape as keyof typeof ICONS] ?? null);
   const totalDuration = config.speed + 1.2;
   const movePct = Math.round((config.speed / totalDuration) * 100);
 
   return (
     <div
       className="animated-logo-wrap"
-      style={{
-        '--logo-shimmer-color': config.shimmerColor,
-        '--logo-speed': `${totalDuration}s`,
-        '--logo-icon-bg': config.iconBg,
-        '--logo-shimmer-width': `${config.shimmerWidth}%`,
-        '--shimmer-move-pct': `${movePct}%`,
-      } as React.CSSProperties}
+      style={
+        {
+          '--logo-shimmer-color': config.shimmerColor,
+          '--logo-speed': `${totalDuration}s`,
+          '--logo-icon-bg': config.iconBg,
+          '--logo-shimmer-width': `${config.shimmerWidth}%`,
+          '--shimmer-move-pct': `${movePct}%`,
+        } as React.CSSProperties
+      }
     >
       {isTerminal ? (
         <div
@@ -75,7 +77,16 @@ export default function LogoDisplay({ config }: { config: LogoConfig }) {
       )}
       <span
         className="animated-logo-text"
-        style={isTerminal ? { fontFamily: 'var(--font-mono)', fontWeight: 700, fontSize: '13px', letterSpacing: '2px' } : undefined}
+        style={
+          isTerminal
+            ? {
+                fontFamily: 'var(--font-mono)',
+                fontWeight: 700,
+                fontSize: '13px',
+                letterSpacing: '2px',
+              }
+            : undefined
+        }
       >
         {config.text}
       </span>

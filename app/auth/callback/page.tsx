@@ -16,12 +16,19 @@ export default function AuthCallback() {
     }
 
     let done = false;
-    const go = (path: string) => { if (!done) { done = true; router.replace(path); } };
+    const go = (path: string) => {
+      if (!done) {
+        done = true;
+        router.replace(path);
+      }
+    };
 
     if (code) {
       let exchangeStarted = false;
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange(event => {
         if (!exchangeStarted) return;
         if (event === 'PASSWORD_RECOVERY') go('/auth/reset-password');
         else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') go('/');
@@ -33,7 +40,9 @@ export default function AuthCallback() {
       return () => subscription.unsubscribe();
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(event => {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') go('/');
     });
 
@@ -45,11 +54,18 @@ export default function AuthCallback() {
   }, [router]);
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      height: '100vh', background: '#0d0d0d', color: '#a0a0a0',
-      fontFamily: 'monospace', fontSize: '14px',
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: '100vh',
+        background: '#0d0d0d',
+        color: '#a0a0a0',
+        fontFamily: 'monospace',
+        fontSize: '14px',
+      }}
+    >
       Signing in...
     </div>
   );

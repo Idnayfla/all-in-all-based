@@ -14,7 +14,10 @@ export async function checkMediaRateLimit(
   const token = req.headers.get('Authorization')?.replace('Bearer ', '');
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+  const {
+    data: { user },
+    error,
+  } = await supabaseAdmin.auth.getUser(token);
   if (error || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { data: s } = await supabaseAdmin
@@ -28,7 +31,8 @@ export async function checkMediaRateLimit(
   }
 
   const now = new Date();
-  const needsReset = !s?.media_reset_at ||
+  const needsReset =
+    !s?.media_reset_at ||
     new Date(s.media_reset_at).getMonth() !== now.getMonth() ||
     new Date(s.media_reset_at).getFullYear() !== now.getFullYear();
 
@@ -36,9 +40,12 @@ export async function checkMediaRateLimit(
   const limit = LIMITS[type];
 
   if (count >= limit) {
-    return NextResponse.json({
-      error: `Monthly ${type} limit reached (${limit}/month). Resets next month.`,
-    }, { status: 429 });
+    return NextResponse.json(
+      {
+        error: `Monthly ${type} limit reached (${limit}/month). Resets next month.`,
+      },
+      { status: 429 }
+    );
   }
 
   const updates: Record<string, any> = { user_id: user.id };
@@ -51,9 +58,7 @@ export async function checkMediaRateLimit(
     updates[`${type}_count`] = count + 1;
   }
 
-  await supabaseAdmin
-    .from('user_settings')
-    .upsert(updates, { onConflict: 'user_id' });
+  await supabaseAdmin.from('user_settings').upsert(updates, { onConflict: 'user_id' });
 
   return { userId: user.id };
 }

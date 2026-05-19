@@ -10,7 +10,11 @@ interface ImageEditorModalProps {
 
 type Mode = 'transform' | 'inpaint';
 
-export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }: ImageEditorModalProps) {
+export default function ImageEditorModal({
+  sourceImageUrl,
+  onConfirm,
+  onClose,
+}: ImageEditorModalProps) {
   const [mode, setMode] = useState<Mode>('transform');
   const [prompt, setPrompt] = useState('');
   const [currentSourceUrl, setCurrentSourceUrl] = useState(sourceImageUrl);
@@ -72,7 +76,9 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
     return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY };
   };
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+  const startDrawing = (
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
+  ) => {
     e.preventDefault();
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext('2d')!;
@@ -104,7 +110,9 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
     ctx.stroke();
   };
 
-  const stopDrawing = () => { isDrawing.current = false; };
+  const stopDrawing = () => {
+    isDrawing.current = false;
+  };
 
   const undoStroke = () => {
     const canvas = canvasRef.current;
@@ -161,13 +169,19 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
           <button
             className={`image-editor-tab${mode === 'transform' ? ' active' : ''}`}
             onClick={() => setMode('transform')}
-          >Transform</button>
+          >
+            Transform
+          </button>
           <button
             className={`image-editor-tab${mode === 'inpaint' ? ' active' : ''}`}
             onClick={() => setMode('inpaint')}
-          >Inpaint</button>
+          >
+            Inpaint
+          </button>
         </div>
-        <button className="image-editor-close" onClick={onClose}>✕</button>
+        <button className="image-editor-close" onClick={onClose}>
+          ✕
+        </button>
       </div>
 
       <div className="image-editor-canvas-area">
@@ -179,7 +193,10 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
               src={currentSourceUrl}
               alt="source"
               className="image-editor-source"
-              onLoad={() => { setIsSourceLoading(false); positionCanvas(); }}
+              onLoad={() => {
+                setIsSourceLoading(false);
+                positionCanvas();
+              }}
               draggable={false}
             />
             {mode === 'inpaint' && (
@@ -198,12 +215,19 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
           </div>
           {mode === 'inpaint' && (
             <div className="image-editor-brush-tools">
-              <button className="image-editor-brush-btn" onClick={undoStroke}>↩ Undo</button>
-              <button className="image-editor-brush-btn" onClick={clearCanvas}>⬜ Clear</button>
+              <button className="image-editor-brush-btn" onClick={undoStroke}>
+                ↩ Undo
+              </button>
+              <button className="image-editor-brush-btn" onClick={clearCanvas}>
+                ⬜ Clear
+              </button>
               <div className="image-editor-brush-size">
                 <span>Size</span>
                 <input
-                  type="range" min={8} max={60} value={brushSize}
+                  type="range"
+                  min={8}
+                  max={60}
+                  value={brushSize}
                   onChange={e => setBrushSize(Number(e.target.value))}
                 />
                 <span>{brushSize}px</span>
@@ -216,7 +240,9 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
           <div className="image-editor-pane-label">Result</div>
           <div className="image-editor-image-wrap">
             {isGenerating ? (
-              <div className="image-editor-placeholder"><span className="spinner" /> Generating…</div>
+              <div className="image-editor-placeholder">
+                <span className="spinner" /> Generating…
+              </div>
             ) : resultUrl ? (
               <img src={resultUrl} alt="result" className="image-editor-result" />
             ) : (
@@ -231,8 +257,12 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
                 download
                 target="_blank"
                 rel="noreferrer"
-              >↓ Download</a>
-              <button className="image-editor-chain-btn" onClick={handleChain}>↺ Edit this</button>
+              >
+                ↓ Download
+              </a>
+              <button className="image-editor-chain-btn" onClick={handleChain}>
+                ↺ Edit this
+              </button>
             </div>
           )}
           {error && <div className="image-editor-error">✕ {error}</div>}
@@ -250,7 +280,10 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
               : 'Describe how to transform the image…'
           }
           onKeyDown={e => {
-            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleGenerate(); }
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault();
+              handleGenerate();
+            }
           }}
         />
         <button
@@ -264,7 +297,9 @@ export default function ImageEditorModal({ sourceImageUrl, onConfirm, onClose }:
           className="image-editor-confirm-btn"
           onClick={handleConfirm}
           disabled={!resultUrl || isGenerating}
-        >Confirm ✓</button>
+        >
+          Confirm ✓
+        </button>
       </div>
     </div>
   );

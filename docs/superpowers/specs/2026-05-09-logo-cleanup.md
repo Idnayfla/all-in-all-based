@@ -9,11 +9,11 @@ Remove the logo customisation system entirely. The `B>` Terminal Mark is the off
 
 ## What Gets Removed
 
-| File | Action |
-|------|--------|
-| `components/AnimatedLogo.tsx` | Delete |
-| `components/LogoEditorModal.tsx` | Delete |
-| `hooks/useLogoConfig.ts` | Simplify — remove hook + localStorage, keep `LOGO_DEFAULTS` export only |
+| File                             | Action                                                                  |
+| -------------------------------- | ----------------------------------------------------------------------- |
+| `components/AnimatedLogo.tsx`    | Delete                                                                  |
+| `components/LogoEditorModal.tsx` | Delete                                                                  |
+| `hooks/useLogoConfig.ts`         | Simplify — remove hook + localStorage, keep `LOGO_DEFAULTS` export only |
 
 ## What Gets Simplified
 
@@ -22,7 +22,9 @@ Remove the logo customisation system entirely. The `B>` Terminal Mark is the off
 Remove the `useLogoConfig` hook function and the `readStored` function entirely. Keep only:
 
 ```ts
-export interface LogoConfig { /* unchanged */ }
+export interface LogoConfig {
+  /* unchanged */
+}
 
 export const LOGO_DEFAULTS: LogoConfig = {
   text: 'BASED',

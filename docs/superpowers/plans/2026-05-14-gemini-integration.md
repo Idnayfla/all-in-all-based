@@ -6,7 +6,8 @@
 
 **Architecture:** Add `@google/generative-ai` SDK alongside Anthropic SDK. Wrap Claude calls in try-catch blocks in the generate route. On Claude error, retry with equivalent Gemini model. Notify user when fallback occurs via chat message.
 
-**Tech Stack:** 
+**Tech Stack:**
+
 - `@google/generative-ai` (Gemini API client)
 - Existing Next.js 16, TypeScript, Anthropic SDK
 - Environment variables for API key and provider switching
@@ -16,10 +17,12 @@
 ## File Structure
 
 **New files:**
+
 - `lib/gemini.ts` - Gemini API client initialization and helper functions
 - `lib/models.ts` - Model mapping logic (Claude → Gemini equivalents)
 
 **Modified files:**
+
 - `app/api/generate/route.ts` - Add fallback logic and integrate Gemini
 - `package.json` - Add @google/generative-ai dependency
 - `.env.local` - Add GEMINI_API_KEY
@@ -33,6 +36,7 @@
 ### Task 1: Add @google/generative-ai Dependency
 
 **Files:**
+
 - Modify: `package.json`
 
 - [ ] **Step 1: Add dependency to package.json**
@@ -77,6 +81,7 @@ git commit -m "chore: add @google/generative-ai dependency"
 ### Task 2: Create Model Mapping Module
 
 **Files:**
+
 - Create: `lib/models.ts`
 
 - [ ] **Step 1: Write model mapping logic**
@@ -102,9 +107,7 @@ export function mapClaudeToGeminiModel(claudeModel: string): string {
   }
 }
 
-export function getClaudeModel(
-  type: 'planner' | 'generator' | 'summary'
-): string {
+export function getClaudeModel(type: 'planner' | 'generator' | 'summary'): string {
   // Match existing generate route logic
   switch (type) {
     case 'planner':
@@ -116,9 +119,7 @@ export function getClaudeModel(
   }
 }
 
-export function getGeminiModel(
-  type: 'planner' | 'generator' | 'summary'
-): string {
+export function getGeminiModel(type: 'planner' | 'generator' | 'summary'): string {
   const claudeModel = getClaudeModel(type);
   return mapClaudeToGeminiModel(claudeModel);
 }
@@ -144,6 +145,7 @@ git commit -m "feat: add Claude-to-Gemini model mapping logic"
 ### Task 3: Create Gemini Client Module
 
 **Files:**
+
 - Create: `lib/gemini.ts`
 
 - [ ] **Step 1: Write Gemini client wrapper**
@@ -161,9 +163,7 @@ function initializeGeminiClient(): GoogleGenerativeAI {
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error(
-      'GEMINI_API_KEY environment variable is not set. Gemini fallback unavailable.'
-    );
+    throw new Error('GEMINI_API_KEY environment variable is not set. Gemini fallback unavailable.');
   }
 
   geminiClient = new GoogleGenerativeAI({ apiKey });
@@ -220,6 +220,7 @@ git commit -m "feat: add Gemini API client wrapper"
 ### Task 4: Add Fallback Logic to Generate Route
 
 **Files:**
+
 - Modify: `app/api/generate/route.ts`
 
 - [ ] **Step 1: Import Gemini utilities**
@@ -266,11 +267,7 @@ async function callModelWithFallback(
     // If Claude fails and Gemini is available, try Gemini
     if (canUseGemini()) {
       try {
-        const geminiText = await generateWithGemini(
-          prompt,
-          systemPrompt,
-          modelType
-        );
+        const geminiText = await generateWithGemini(prompt, systemPrompt, modelType);
         return { text: geminiText, usedFallback: true };
       } catch (geminiError) {
         throw new Error(
@@ -288,11 +285,7 @@ async function callModelWithFallback(
 Find the planner step in the `POST` handler (around line 380-420). Replace the Claude call with:
 
 ```typescript
-const plannerResult = await callModelWithFallback(
-  userMessage,
-  PLANNER_SYSTEM,
-  'planner'
-);
+const plannerResult = await callModelWithFallback(userMessage, PLANNER_SYSTEM, 'planner');
 
 if (plannerResult.usedFallback) {
   fallbackNotifications.push('[Based] Switched to Gemini (Claude unavailable)');
@@ -317,14 +310,12 @@ const fallbackNotifications: string[] = [];
 Find the file generation loop (around line 450-500). Replace the Claude call with:
 
 ```typescript
-const generatorResult = await callModelWithFallback(
-  filePrompt,
-  FILE_GENERATOR_SYSTEM,
-  'generator'
-);
+const generatorResult = await callModelWithFallback(filePrompt, FILE_GENERATOR_SYSTEM, 'generator');
 
 if (generatorResult.usedFallback) {
-  fallbackNotifications.push(`[Based] File "${file.name}" generated via Gemini (Claude unavailable)`);
+  fallbackNotifications.push(
+    `[Based] File "${file.name}" generated via Gemini (Claude unavailable)`
+  );
 }
 
 const fileContent = generatorResult.text;
@@ -335,11 +326,7 @@ const fileContent = generatorResult.text;
 Find the summary step (around line 520-540). Replace with:
 
 ```typescript
-const summaryResult = await callModelWithFallback(
-  summaryPrompt,
-  SYSTEM,
-  'summary'
-);
+const summaryResult = await callModelWithFallback(summaryPrompt, SYSTEM, 'summary');
 
 if (summaryResult.usedFallback) {
   fallbackNotifications.push('[Based] Summary generated via Gemini (Claude unavailable)');
@@ -382,6 +369,7 @@ git commit -m "feat: add fallback logic to generate route with Gemini support"
 ### Task 5: Update Environment Configuration
 
 **Files:**
+
 - Modify: `.env.local`
 
 - [ ] **Step 1: Add GEMINI_API_KEY to .env.local**
@@ -406,6 +394,7 @@ git commit -m "chore: add GEMINI_API_KEY to environment"
 ### Task 6: Update PowerShell Profile
 
 **Files:**
+
 - Modify: `Microsoft.PowerShell_profile.ps1` (in `$PROFILE` location)
 
 - [ ] **Step 1: Update use-gemini function**
@@ -446,29 +435,34 @@ Expected: GEMINI_API_KEY is set to your key
 ### Task 7: Update Documentation
 
 **Files:**
+
 - Modify: `CLAUDE.md`
 
 - [ ] **Step 1: Update provider section**
 
 In CLAUDE.md, find the "Environment Setup" section and update it:
 
-```markdown
+````markdown
 ## Environment Setup
 
 Claude Code defaults to your **Claude.ai Pro/Max subscription** (no API credits consumed).
 
 If starting a new terminal session, activate it with:
+
 ```powershell
 . $PROFILE
 ```
+````
 
 Provider options:
+
 - `use-subscription` — Claude.ai Pro/Max (default, no fallback)
 - `use-anthropic` — Anthropic API (pay as you go, no fallback)
 - `use-gemini` — Gemini (primary with Claude fallback for reliability)
 
 **Gemini Setup:** Gemini requires a free API key from [Google AI Studio](https://aistudio.google.com). Get your key and add it to your PowerShell profile as `$GEMINI_API_KEY`.
-```
+
+````
 
 - [ ] **Step 2: Add model equivalents table**
 
@@ -486,7 +480,7 @@ When Gemini fallback is used, Claude models map to Gemini equivalents:
 | claude-haiku-4-5 (planner/summary) | gemini-1.5-flash |
 
 Fallback is transparent — user sees a message in chat when Gemini is used.
-```
+````
 
 - [ ] **Step 3: Commit**
 
@@ -500,6 +494,7 @@ git commit -m "docs: add Gemini setup and model equivalents documentation"
 ### Task 8: Manual Integration Test
 
 **Files:**
+
 - Test: `app/api/generate/route.ts` (manual, no automated tests yet)
 
 - [ ] **Step 1: Start dev server**
@@ -513,6 +508,7 @@ Expected: Server starts on `localhost:3000`
 - [ ] **Step 2: Test Claude-only flow (normal path)**
 
 In the app:
+
 1. Type a simple request: "Create a button that says 'Hello'"
 2. Verify it generates code successfully via Claude
 3. Check console for no fallback messages
@@ -546,6 +542,7 @@ Expected: All providers switch without breaking the app
 ## Self-Review Against Spec
 
 **Spec coverage:**
+
 - ✅ Add `@google/generative-ai` SDK (Task 1)
 - ✅ Model mapping logic (Task 2)
 - ✅ Gemini client wrapper (Task 3)
@@ -558,11 +555,13 @@ Expected: All providers switch without breaking the app
 - ✅ Testing strategy (Task 8)
 
 **Placeholder check:**
+
 - No TBDs, TODOs, or vague instructions
 - All code is complete and exact
 - All commands are exact with expected output
 
 **Type consistency:**
+
 - `callModelWithFallback` returns `GenerationResult` consistently
 - `getGeminiModel()` and `getClaudeModel()` use same parameter type `'planner' | 'generator' | 'summary'`
 - Model type matches across Tasks 2, 3, 4

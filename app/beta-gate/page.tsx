@@ -40,7 +40,10 @@ function BetaGateForm() {
           className={`gate-input${error ? ' gate-input--error' : ''}`}
           type={peeking ? 'text' : 'password'}
           value={code}
-          onChange={e => { setCode(e.target.value); setError(''); }}
+          onChange={e => {
+            setCode(e.target.value);
+            setError('');
+          }}
           placeholder="Access code"
           autoFocus
           autoComplete="off"

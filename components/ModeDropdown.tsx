@@ -5,11 +5,11 @@ import { AnimatePresence, motion } from 'framer-motion';
 export type GenerationMode = 'chat' | 'flux' | 'nano-banana' | 'seedance' | 'music';
 
 const MODES: { value: GenerationMode; icon: string; label: string; pro?: boolean }[] = [
-  { value: 'chat',        icon: 'B>', label: 'Chat' },
-  { value: 'flux',        icon: '◈',  label: 'Image · FLUX',           pro: true },
-  { value: 'nano-banana', icon: '◈',  label: 'Image · Nano Banana 2',  pro: true },
-  { value: 'seedance',    icon: '▸',  label: 'Video · Seedance 2.0',   pro: true },
-  { value: 'music',       icon: '♪',  label: 'Music · Stable Audio',   pro: true },
+  { value: 'chat', icon: 'B>', label: 'Chat' },
+  { value: 'flux', icon: '◈', label: 'Image · FLUX', pro: true },
+  { value: 'nano-banana', icon: '◈', label: 'Image · Nano Banana 2', pro: true },
+  { value: 'seedance', icon: '▸', label: 'Video · Seedance 2.0', pro: true },
+  { value: 'music', icon: '♪', label: 'Music · Stable Audio', pro: true },
 ];
 
 interface ModeDropdownProps {
@@ -20,7 +20,13 @@ interface ModeDropdownProps {
   onProRequired?: () => void;
 }
 
-export default function ModeDropdown({ mode, onChange, disabled, subscriptionTier, onProRequired }: ModeDropdownProps) {
+export default function ModeDropdown({
+  mode,
+  onChange,
+  disabled,
+  subscriptionTier,
+  onProRequired,
+}: ModeDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -48,7 +54,9 @@ export default function ModeDropdown({ mode, onChange, disabled, subscriptionTie
           className="mode-dropdown-arrow"
           animate={{ rotate: open ? 180 : 0 }}
           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-        >▼</motion.span>
+        >
+          ▼
+        </motion.span>
       </motion.button>
 
       <AnimatePresence>
@@ -67,17 +75,22 @@ export default function ModeDropdown({ mode, onChange, disabled, subscriptionTie
                   key={m.value}
                   className={`mode-dropdown-option${mode === m.value ? ' selected' : ''}${locked ? ' mode-dropdown-option--locked' : ''}`}
                   onClick={() => {
-                    if (locked) { onProRequired?.(); setOpen(false); return; }
+                    if (locked) {
+                      onProRequired?.();
+                      setOpen(false);
+                      return;
+                    }
                     onChange(m.value);
                     setOpen(false);
                   }}
                 >
                   <span>{m.icon}</span>
                   <span className="mode-dropdown-label">{m.label}</span>
-                  {locked
-                    ? <span className="mode-dropdown-pro-badge">⬡ Pro</span>
-                    : mode === m.value && <span className="mode-dropdown-check">✓</span>
-                  }
+                  {locked ? (
+                    <span className="mode-dropdown-pro-badge">⬡ Pro</span>
+                  ) : (
+                    mode === m.value && <span className="mode-dropdown-check">✓</span>
+                  )}
                 </button>
               );
             })}

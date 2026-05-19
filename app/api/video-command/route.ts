@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     });
     const text = (msg.content[0] as any).text ?? '{}';
     const jsonStart = text.indexOf('{');
-    const jsonEnd   = text.lastIndexOf('}');
+    const jsonEnd = text.lastIndexOf('}');
     const parsed = JSON.parse(text.slice(jsonStart, jsonEnd + 1));
     return NextResponse.json(parsed);
   } catch (err: any) {

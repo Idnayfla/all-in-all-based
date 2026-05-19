@@ -13,22 +13,23 @@ Add vision/image support to the chat input. Users can attach a JPG, PNG, WebP, o
 
 ## Decisions
 
-| Decision | Choice |
-|---|---|
-| Content model | Union type: `string \| ContentBlock[]` on `Message.content` |
-| Image encoding | `FileReader.readAsDataURL` → extract base64 + mediaType client-side |
-| Upload trigger | Paperclip button left of textarea → hidden `<input type="file">` |
-| Preview | 64×64 thumbnail strip above input, ✕ to clear, disappears after send |
-| History display | Inline `<img>` rendered from `data:` URL inside message bubble |
-| API format | `{ type: 'image', source: { type: 'base64', media_type, data } }` (Anthropic SDK native) |
-| Model change | None — `claude-opus-4-6` already supports vision |
-| New files | None — all changes to existing files |
+| Decision        | Choice                                                                                   |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| Content model   | Union type: `string \| ContentBlock[]` on `Message.content`                              |
+| Image encoding  | `FileReader.readAsDataURL` → extract base64 + mediaType client-side                      |
+| Upload trigger  | Paperclip button left of textarea → hidden `<input type="file">`                         |
+| Preview         | 64×64 thumbnail strip above input, ✕ to clear, disappears after send                     |
+| History display | Inline `<img>` rendered from `data:` URL inside message bubble                           |
+| API format      | `{ type: 'image', source: { type: 'base64', media_type, data } }` (Anthropic SDK native) |
+| Model change    | None — `claude-opus-4-6` already supports vision                                         |
+| New files       | None — all changes to existing files                                                     |
 
 ---
 
 ## Architecture
 
 **Modified files:**
+
 - `app/page.tsx` — `ContentBlock` type, updated `Message` interface, `contentToString` helper
 - `components/ChatPanel.tsx` — upload button, `pendingImage` state, preview strip, content block rendering
 - `app/api/generate/route.ts` — `toClaudeContent()` mapper, `contentToString` usage for memory
@@ -45,7 +46,11 @@ No new files. No new npm dependencies.
 
 export type ContentBlock =
   | { type: 'text'; text: string }
-  | { type: 'image'; mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'; data: string };
+  | {
+      type: 'image';
+      mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+      data: string;
+    };
 
 export interface Message {
   role: 'user' | 'assistant';
@@ -122,9 +127,16 @@ function renderContent(content: string | ContentBlock[]) {
   return (
     <>
       {content.map((block, i) =>
-        block.type === 'image'
-          ? <img key={i} className="chat-img-thumb" src={`data:${block.mediaType};base64,${block.data}`} alt="uploaded image" />
-          : <span key={i}>{block.text}</span>
+        block.type === 'image' ? (
+          <img
+            key={i}
+            className="chat-img-thumb"
+            src={`data:${block.mediaType};base64,${block.data}`}
+            alt="uploaded image"
+          />
+        ) : (
+          <span key={i}>{block.text}</span>
+        )
       )}
     </>
   );
@@ -156,7 +168,7 @@ function toClaudeContent(content: string | ContentBlock[]) {
 When building the `messages` array for `anthropic.messages.stream()` / `anthropic.messages.create()`:
 
 ```ts
-messages: msgs.map(m => ({ role: m.role, content: toClaudeContent(m.content) }))
+messages: msgs.map(m => ({ role: m.role, content: toClaudeContent(m.content) }));
 ```
 
 ### Memory extraction
