@@ -1541,7 +1541,7 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
                 : null;
 
             for (const f of filesToAdd) {
-              let content = imageDataUrl
+              const content = imageDataUrl
                 ? f.content.replaceAll(IMAGE_SRC_PLACEHOLDER, imageDataUrl)
                 : f.content;
               generatedFiles.push(
