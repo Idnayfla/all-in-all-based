@@ -1,5 +1,6 @@
 'use client';
 import { useRef, useState, useCallback, useEffect, type ReactElement } from 'react';
+import GeneratedMusicCard from './GeneratedMusicCard';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Track {
@@ -59,6 +60,19 @@ const INSTRUMENTS = [
 const WHITE_NOTES = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 const HAS_BLACK = { C: 'C#', D: 'D#', F: 'F#', G: 'G#', A: 'A#' } as Record<string, string>;
 
+const MUSIC_GENRES = [
+  'Cinematic',
+  'Lo-fi',
+  'Electronic',
+  'Ambient',
+  'Jazz',
+  'Rock',
+  'Orchestral',
+  'Chill',
+  'Epic',
+  'Dark',
+];
+
 const DEFAULT_EFFECTS = { reverb: 0, delay: 0, distortion: 0, pitchShift: 0 };
 
 function makeTrack(type: Track['type'], idx: number): Track {
@@ -83,14 +97,28 @@ function makeTrack(type: Track['type'], idx: number): Track {
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
-export default function StudioPanel() {
+export default function StudioPanel({
+  authToken,
+  subscriptionTier,
+}: {
+  authToken?: string;
+  subscriptionTier?: 'free' | 'pro';
+}) {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [bpm, setBpm] = useState(120);
   const [playing, setPlaying] = useState(false);
   const [recording, setRecording] = useState(false);
   const [currentStep, setCurrentStep] = useState(-1);
   const [selTrack, setSelTrack] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'piano' | 'drums' | 'effects' | 'mixer'>('piano');
+  const [activeTab, setActiveTab] = useState<'piano' | 'drums' | 'effects' | 'mixer' | 'ai'>(
+    'piano'
+  );
+  const [musicPrompt, setMusicPrompt] = useState('');
+  const [musicGenre, setMusicGenre] = useState('');
+  const [musicDuration, setMusicDuration] = useState(30);
+  const [musicGenerating, setMusicGenerating] = useState(false);
+  const [musicError, setMusicError] = useState('');
+  const [generatedTracks, setGeneratedTracks] = useState<{ url: string; prompt: string }[]>([]);
   const [octave, setOctave] = useState(4);
   const [litKeys, setLitKeys] = useState<Set<string>>(new Set());
   const [micLevel, setMicLevel] = useState(0);
@@ -591,6 +619,33 @@ export default function StudioPanel() {
     return () => window.removeEventListener('keydown', onKey);
   }, [octave, activeTab, playNote]);
 
+  // ── AI music generation ──────────────────────────────────────────────────
+  const generateAiMusic = async () => {
+    if (!authToken || !musicPrompt.trim()) return;
+    setMusicGenerating(true);
+    setMusicError('');
+    try {
+      const fullPrompt = musicGenre ? `${musicGenre}: ${musicPrompt}` : musicPrompt;
+      const res = await fetch('/api/music', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ prompt: fullPrompt, duration: musicDuration }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Generation failed');
+      const displayPrompt = data.enhanced || fullPrompt;
+      setGeneratedTracks(prev => [{ url: data.url, prompt: displayPrompt }, ...prev]);
+      setMusicPrompt('');
+    } catch (e: any) {
+      setMusicError(e.message);
+    } finally {
+      setMusicGenerating(false);
+    }
+  };
+
   // ── AI commands ─────────────────────────────────────────────────────────
   const applyAI = async () => {
     const s = aiInput.toLowerCase().trim();
@@ -971,7 +1026,7 @@ export default function StudioPanel() {
         <div className="studio-editor">
           {/* Panel tabs */}
           <div className="studio-tabs">
-            {(['piano', 'drums', 'effects', 'mixer'] as const).map(tab => (
+            {(['piano', 'drums', 'effects', 'mixer', 'ai'] as const).map(tab => (
               <button
                 key={tab}
                 className={`studio-tab${activeTab === tab ? ' active' : ''}`}
@@ -983,7 +1038,9 @@ export default function StudioPanel() {
                     ? '◈ Drums'
                     : tab === 'effects'
                       ? '◉ FX'
-                      : '⊙ Mixer'}
+                      : tab === 'mixer'
+                        ? '⊙ Mixer'
+                        : '◈ AI Gen'}
               </button>
             ))}
           </div>
@@ -1113,6 +1170,72 @@ export default function StudioPanel() {
                       </span>
                     </div>
                   ))}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* AI Music Generation */}
+          {activeTab === 'ai' && (
+            <div className="studio-ai-gen">
+              {subscriptionTier !== 'pro' ? (
+                <div className="studio-ai-gen-locked">
+                  <div className="studio-ai-gen-lock-icon">◈</div>
+                  <p>AI Music Generation is a Pro feature.</p>
+                  <p className="studio-ai-gen-lock-sub">
+                    Upgrade to generate full tracks from a description.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <textarea
+                    className="studio-ai-gen-prompt"
+                    placeholder="Lo-fi hip hop for late night coding, 80 BPM, piano and drums..."
+                    value={musicPrompt}
+                    onChange={e => setMusicPrompt(e.target.value)}
+                    rows={3}
+                  />
+                  <div className="studio-ai-gen-genres">
+                    {MUSIC_GENRES.map(g => (
+                      <button
+                        key={g}
+                        className={`studio-genre-chip${musicGenre === g ? ' active' : ''}`}
+                        onClick={() => setMusicGenre(musicGenre === g ? '' : g)}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="studio-ai-gen-controls">
+                    <span className="studio-ai-gen-dur-label">Duration</span>
+                    {[15, 30, 45].map(s => (
+                      <button
+                        key={s}
+                        className={`studio-dur-btn${musicDuration === s ? ' active' : ''}`}
+                        onClick={() => setMusicDuration(s)}
+                      >
+                        {s}s
+                      </button>
+                    ))}
+                    <button
+                      className="studio-btn studio-btn-primary"
+                      onClick={generateAiMusic}
+                      disabled={musicGenerating || !musicPrompt.trim()}
+                    >
+                      {musicGenerating ? '◈ Generating...' : '◈ Generate'}
+                    </button>
+                  </div>
+                  {musicError && <div className="studio-ai-gen-error">{musicError}</div>}
+                  <div className="studio-ai-gen-tracks">
+                    {generatedTracks.map((t, i) => (
+                      <GeneratedMusicCard key={i} url={t.url} prompt={t.prompt} />
+                    ))}
+                    {generatedTracks.length === 0 && !musicGenerating && (
+                      <div className="studio-ai-gen-empty">
+                        Describe a mood, genre, or scene — Based generates the track.
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
             </div>

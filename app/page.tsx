@@ -1415,7 +1415,7 @@ export default function Home() {
             <VideoEditorPanel />
           </div>
           <div className={`panel ${activePanel === 'studio' ? 'panel-active' : ''}`}>
-            <StudioPanel />
+            <StudioPanel authToken={authToken} subscriptionTier={subscription.tier} />
           </div>
           <div className={`panel ${activePanel === 'image' ? 'panel-active' : ''}`}>
             <ImageStudioPanel />

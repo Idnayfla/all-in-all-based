@@ -9664,6 +9664,134 @@ body:has(.beta-banner) .app-root {
   border-bottom-color: var(--accent);
 }
 
+/* AI Music Generation */
+.studio-ai-gen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  overflow-y: auto;
+}
+.studio-ai-gen-prompt {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  padding: 10px 12px;
+  resize: none;
+  transition: border-color 0.15s;
+}
+.studio-ai-gen-prompt:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.studio-ai-gen-genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.studio-genre-chip {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: none;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.studio-genre-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.studio-genre-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.studio-ai-gen-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.studio-ai-gen-dur-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text2);
+  margin-right: 2px;
+}
+.studio-dur-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  background: none;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.studio-dur-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.studio-dur-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.studio-ai-gen-error {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--error, #f87171);
+  padding: 6px 10px;
+  background: rgba(248, 113, 113, 0.08);
+  border-radius: var(--r-sm);
+  border: 1px solid rgba(248, 113, 113, 0.2);
+}
+.studio-ai-gen-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.studio-ai-gen-empty {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text3, var(--text2));
+  opacity: 0.5;
+  text-align: center;
+  padding: 24px 0;
+}
+.studio-ai-gen-locked {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 100%;
+  min-height: 200px;
+  text-align: center;
+  color: var(--text2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.studio-ai-gen-lock-icon {
+  font-size: 28px;
+  opacity: 0.3;
+}
+.studio-ai-gen-lock-sub {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
 /* Piano */
 .studio-piano-wrap {
   flex: 1;
