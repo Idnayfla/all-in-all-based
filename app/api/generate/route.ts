@@ -361,20 +361,22 @@ RULE 2 — NEVER create audio Blob files for download with .mp3 or .wav extensio
 RULE 3 — ALWAYS use real audio from absolute HTTPS CDN URLs for any sound effect, music, or atmosphere. OscillatorNode is a LAST RESORT for simple electronic beeps only — never use it for jumpscare stings, explosions, nature sounds, voices, or anything that should feel real.
 
 AUDIO — HOW TO DO IT RIGHT:
-- Load real audio from Mixkit (CORS-enabled, free, reliable):
-  const ctx = new AudioContext();
-  const res = await fetch('https://assets.mixkit.co/sfx/preview/SLUG.mp3');
-  const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
-  const src = ctx.createBufferSource(); src.buffer = buffer; src.connect(ctx.destination); src.start();
-- Mixkit SFX by category — URL = https://assets.mixkit.co/sfx/preview/{slug}.mp3:
+- PRIMARY METHOD — use <audio> element (no CORS needed, works in sandboxed iframes):
+  <audio id="snd" src="https://assets.mixkit.co/sfx/preview/SLUG.mp3" preload="auto"></audio>
+  document.getElementById('snd').play();
+  — No fetch(), no AudioContext needed for basic playback. This is the most reliable approach.
+- Mixkit SFX by category — full URL = https://assets.mixkit.co/sfx/preview/{slug}.mp3:
   Horror / jumpscare: mixkit-horror-lose-2011 · mixkit-scary-cinematic-hit-2210 · mixkit-cinematic-horror-sting-581
   Explosions / impact: mixkit-explosion-impact-1682 · mixkit-cinematic-impact-stamp-1283
   Game / arcade: mixkit-arcade-game-jump-coin-216 · mixkit-winning-chime-2015 · mixkit-player-losing-or-failing-2042
   UI / notification: mixkit-correct-answer-tone-2870 · mixkit-software-interface-start-2574 · mixkit-message-pop-alert-2354
   Nature / ambient: mixkit-light-rain-loop-2393 · mixkit-forest-birds-ambience-1210
   Music stinger: mixkit-suspense-mystery-piano-565
-- Alternative CORS CDN: https://cdn.pixabay.com/audio/ (search pixabay.com/sound-effects/ for slug)
-- Always use <audio> tag fallback too: <audio id="snd" src="https://assets.mixkit.co/sfx/preview/SLUG.mp3" preload="auto"></audio> then snd.play()
+- SECONDARY METHOD — use fetch + decodeAudioData ONLY when you need Web Audio effects (reverb, distortion etc.):
+  const ctx = new AudioContext();
+  const res = await fetch('https://assets.mixkit.co/sfx/preview/SLUG.mp3');
+  const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
+  const src = ctx.createBufferSource(); src.buffer = buffer; src.connect(ctx.destination); src.start();
 - Chain effects on real samples: ctx.createWaveShaper() distortion · ctx.createBiquadFilter() EQ · ctx.createDelay() echo · ctx.createConvolver() reverb · ctx.createDynamicsCompressor() · ctx.createStereoPanner() · ctx.createAnalyser() for visualiser
 - Always gate autoplay behind a user gesture — resume AudioContext on click/tap
 - For music apps or audio visualisers: use AnalyserNode + requestAnimationFrame to draw waveform/frequency bars on Canvas
@@ -680,6 +682,7 @@ BUG FIXES AND CORRECTIONS:
 - Do NOT include files that are already working correctly — leave them untouched
 - A button fix is never a reason to regenerate a working game engine or style file
 - Only include a file if you are genuinely changing something in it
+- "Add a button", "bring me back to start", "add a try again" → look at the file snippets above, find which file has the relevant logic, include ONLY that file (or those files if 2 are genuinely needed)
 
 ELEMENT-LEVEL CHANGES (most important rule for modifications):
 - "Change the icon", "swap the logo", "replace the image", "make the button X", "change the color of Y" → output ONLY the file containing that element, change ONLY that element
@@ -687,6 +690,7 @@ ELEMENT-LEVEL CHANGES (most important rule for modifications):
 - "Change the icon to a star" = find the icon in the existing files, replace just that shape/SVG/element, keep everything else identical
 - "Change it to X" with existing files = surgical swap of the mentioned thing, all surrounding code stays
 - If the user says "change to [thing]" without specifying what to change, ask which element they mean — do NOT regenerate the whole project
+- CRITICAL: adding a single button or small feature = 1 file max. Changing game logic = at most 2 files. NEVER return all 3+ files for a small change.
 
 FEEDBACK FOR IMPROVEMENT:
 - If the user gives subjective feedback ("looks bad", "make it prettier", "feels slow", "boring", "too basic", "needs polish", "ugly", "improve the design", "doesn't feel right", "make it better"):
@@ -1304,23 +1308,20 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
           }
 
           // Step 1: Planner classifies intent and plans files
+          const existingFilesContext = existingFiles?.length
+            ? `\n\nExisting files (read before deciding which files to include):\n${existingFiles.map((f: any) => `--- ${f.name} ---\n${(f.content as string).slice(0, 200).replace(/\n/g, ' ')}`).join('\n')}`
+            : '';
+
           const plannerPromptContent =
             imageBlocks.length > 0
               ? [
                   ...imageBlocks,
                   {
                     type: 'text' as const,
-                    text:
-                      lastUserMessage +
-                      (existingFiles?.length
-                        ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}`
-                        : ''),
+                    text: lastUserMessage + existingFilesContext,
                   },
                 ]
-              : lastUserMessage +
-                (existingFiles?.length
-                  ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}`
-                  : '');
+              : lastUserMessage + existingFilesContext;
 
           const planSpan = trace?.span({ name: 'planner', input: { prompt: lastUserMessage } });
           const planText = await callModel(
