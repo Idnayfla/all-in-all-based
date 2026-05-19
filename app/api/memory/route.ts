@@ -30,7 +30,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const anthropic = new Anthropic({ apiKey: process.env.APP_ANTHROPIC_API_KEY });
+  const anthropic = new Anthropic({
+    apiKey: process.env.APP_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY,
+  });
   try {
     const userId = await getUserId(req);
     const { messages } = await req.json();

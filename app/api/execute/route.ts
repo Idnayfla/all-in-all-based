@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Sandbox } from 'e2b';
+import { getUserId } from '../_auth';
+
+export const maxDuration = 120;
 
 async function run(sandbox: Sandbox, cmd: string, cwd?: string) {
   const result = await sandbox.commands.run(cmd, { cwd });
@@ -8,9 +11,16 @@ async function run(sandbox: Sandbox, cmd: string, cwd?: string) {
 
 export async function POST(req: NextRequest) {
   try {
+    await getUserId(req);
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  let sandbox: Sandbox | null = null;
+  try {
     const { files, projectType } = await req.json();
 
-    const sandbox = await Sandbox.create({ apiKey: process.env.E2B_API_KEY });
+    sandbox = await Sandbox.create({ apiKey: process.env.E2B_API_KEY });
     const workdir = '/home/user/project';
     await sandbox.commands.run(`mkdir -p ${workdir}`);
 
@@ -112,10 +122,15 @@ export async function POST(req: NextRequest) {
       stdout = 'HTML/CSS/JS projects run in the Preview tab — no server execution needed.';
     }
 
-    await sandbox.kill();
     return NextResponse.json({ output: stdout, stderr });
   } catch (err: any) {
     console.error(err);
     return NextResponse.json({ output: `Error: ${err.message}`, stderr: '' }, { status: 500 });
+  } finally {
+    if (sandbox) {
+      try {
+        await sandbox.kill();
+      } catch {}
+    }
   }
 }

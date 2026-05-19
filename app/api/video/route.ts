@@ -3,6 +3,8 @@ import { fal } from '@fal-ai/client';
 import { friendlyFalError } from '../_falError';
 import { checkMediaRateLimit } from '../_mediaRateLimit';
 
+export const maxDuration = 180;
+
 if (process.env.FAL_KEY) fal.config({ credentials: process.env.FAL_KEY });
 
 export async function POST(req: NextRequest) {

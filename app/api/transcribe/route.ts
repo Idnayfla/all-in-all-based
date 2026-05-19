@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getUserId } from '../_auth';
 
 export async function POST(req: NextRequest) {
+  try {
+    await getUserId(req);
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const formData = await req.formData();
     const audio = formData.get('audio') as Blob | null;

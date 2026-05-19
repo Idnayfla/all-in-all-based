@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { getUserId } from '../_auth';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -22,6 +23,12 @@ If the command is unclear or impossible, respond with:
 { "actions": [], "message": "Could not understand: briefly explain why" }`;
 
 export async function POST(req: NextRequest) {
+  try {
+    await getUserId(req);
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   try {
     const { command, duration } = await req.json();
     const msg = await client.messages.create({

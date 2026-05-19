@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { getUserId } from '../_auth';
 
 export const maxDuration = 60;
 
@@ -8,6 +9,12 @@ const client = new Anthropic({
 });
 
 export async function POST(req: NextRequest) {
+  try {
+    await getUserId(req);
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { messages, memory, screenshot, previewSource, projectName, fileNames } = await req.json();
 
   if (!Array.isArray(messages) || messages.length === 0) {

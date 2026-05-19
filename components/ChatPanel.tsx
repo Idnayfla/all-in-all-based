@@ -171,6 +171,7 @@ export default function ChatPanel({
   onProRequired,
   onReportBug,
   aiModel,
+  onGenerationComplete,
 }: {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -189,6 +190,7 @@ export default function ChatPanel({
   onProRequired?: () => void;
   onReportBug?: () => void;
   aiModel?: 'based' | 'free';
+  onGenerationComplete?: () => void;
 }) {
   const [input, setInput] = useState(prefillMessage ?? '');
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
@@ -782,6 +784,7 @@ export default function ChatPanel({
               ]);
               if (resolvedFiles.length) {
                 onFilesUpdate(resolvedFiles, data.projectType);
+                onGenerationComplete?.();
                 const count = parseInt(localStorage.getItem('based_build_count') || '0', 10) + 1;
                 localStorage.setItem('based_build_count', String(count));
                 if (

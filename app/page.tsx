@@ -1532,6 +1532,7 @@ export default function Home() {
                     }}
                     onReportBug={() => setShowFeedback(true)}
                     aiModel={aiModel}
+                    onGenerationComplete={() => setActivePanel('preview')}
                   />
                 </div>
                 <div className={`panel ${activePanel === 'editor' ? 'panel-active' : ''}`}>

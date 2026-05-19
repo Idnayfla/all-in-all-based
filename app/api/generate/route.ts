@@ -1336,14 +1336,24 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                 ]
               : lastUserMessage + existingFilesContext;
 
-          const planSpan = trace?.span({ name: 'planner', input: { prompt: lastUserMessage } });
+          const planGeneration = trace?.generation({
+            name: 'planner',
+            model: 'claude-haiku-4-5-20251001',
+            input: lastUserMessage,
+          });
           const planText = await callModel(
             plannerPromptContent,
             PLANNER_SYSTEM_BLOCKS,
             'planner',
             usingFreeModel ? 'free' : 'based'
           );
-          planSpan?.end({ output: { plan: planText.slice(0, 500) } });
+          planGeneration?.end({
+            output: planText.slice(0, 500),
+            usage: {
+              input: Math.ceil(lastUserMessage.length / 4),
+              output: Math.ceil(planText.length / 4),
+            },
+          });
 
           let filePlan: { name: string; language: string; description: string }[] = [];
           let routeToChat = false;
@@ -1520,9 +1530,10 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
                 `data: ${JSON.stringify({ status: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`
               )
             );
-            const fileSpan = trace?.span({
+            const fileGeneration = trace?.generation({
               name: `generate-file:${fileSpec.name}`,
-              input: { file: fileSpec.name, purpose: fileSpec.description },
+              model: 'claude-opus-4-7',
+              input: filePrompt,
             });
 
             const filePromptContent =
@@ -1612,7 +1623,13 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
               );
             }
 
-            fileSpan?.end({ output: { lines: fileText.split('\n').length } });
+            fileGeneration?.end({
+              output: fileText.slice(0, 200),
+              usage: {
+                input: Math.ceil(filePrompt.length / 4),
+                output: Math.ceil(fileText.length / 4),
+              },
+            });
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({ progress: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`
