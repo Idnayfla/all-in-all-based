@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getUserId } from '../_auth';
 
 export async function POST(req: NextRequest) {
   try {
+    await getUserId(req);
     const { files, projectName } = await req.json();
 
     // Create a new site
@@ -69,6 +71,8 @@ export async function POST(req: NextRequest) {
       url: site.ssl_url || site.url || `https://${site.subdomain}.netlify.app`,
     });
   } catch (err: any) {
+    if (err.message === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     console.error(err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
