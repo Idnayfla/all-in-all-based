@@ -55,3 +55,129 @@ Significant product, technical, and business decisions. Rationale preserved so f
 **Rationale**: Browser print dialog is not a download. Users expect a file. pdf-lib gives a real PDF with no browser chrome.
 **Rejected alternatives**: `window.print()`. Rejected — poor UX, not a real export.
 **Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — Audio: OscillatorNode banned for horror/jumpscare apps
+
+**Decision**: Switch to Mixkit CDN `<audio>` elements as the primary audio approach. OscillatorNode now forbidden except for simple UI beeps.
+**Rationale**: Generated audio using OscillatorNode was producing corrupted output — raw PCM blobs with a `.mp3` extension — or was completely silent. CDN-hosted audio files are reliable and require no client-side synthesis.
+**Rejected alternatives**: Keep OscillatorNode with better prompting. Rejected — structural guarantee requires server-side post-processing, not prompt rules.
+**Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — Button safety net: exact-word match only + known-ID guard
+
+**Decision**: The injected button safety net now uses exact-word matching (not prefix) and `showGame()` only fires if it recognises at least one of its known screen IDs in the DOM.
+**Rationale**: The previous prefix-matching logic was treating `.screen.active` on app-defined screens as a match and removing it, breaking multi-screen apps after a few edits. Exact-word matching and a known-ID guard prevent the safety net from touching DOM it doesn't own.
+**Rejected alternatives**: Remove the safety net entirely. Rejected — it prevents too many legitimate button failures in generated apps.
+**Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — Planner receives 200-char file snippets
+
+**Decision**: The planner now receives the first 200 characters of each existing file when deciding which files to regenerate on a modification request.
+**Rationale**: With filenames only, the planner could not distinguish which file contained the relevant code and defaulted to regenerating all files. File snippets allow targeted decisions ("add a button" → only index.html) and reduce unnecessary regeneration.
+**Rejected alternatives**: Send full file contents to the planner. Rejected — token cost and latency; 200 chars is sufficient signal for targeting.
+**Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — Anthropic → Pantheon auto-fallback on errors
+
+**Decision**: Added try-catch around the direct Anthropic path in both `callModel` and `streamText`. Any error (400 out of credits, 429 rate limit, network failure) triggers a silent fallback to Pantheon.
+**Rationale**: A 400 or 429 from Anthropic was hard-crashing the entire request. Users saw a broken generation with no recovery. Silent fallback keeps the product working without exposing provider details to users.
+**Rejected alternatives**: Surface the error to the user. Rejected — provider failures are infrastructure concerns, not user concerns.
+**Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — Jumpscare/audio-heavy apps classified as MEDIUM complexity
+
+**Decision**: The planner now explicitly classifies jumpscare and audio-heavy apps as MEDIUM (3 files: index.html + style.css + app.js), not SIMPLE.
+**Rationale**: SIMPLE generates a single file. Audio and jumpscare logic requires separation of concerns across HTML, CSS, and JS — collapsing into one file produces unmaintainable output and breaks the audio CDN approach.
+**Rejected alternatives**: Keep SIMPLE classification, rely on prompting to split output. Rejected — structural guarantee requires planner-level classification.
+**Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — Free-user loading messages with animated dots
+
+**Decision**: Add 14 rotating loading messages for free users (cycling every 3200ms), including 3 pro upsell nudges. Animated dots (. .. ...) cycle independently at 450ms.
+**Rationale**: Free users face longer wait times. Rotating messages reduce perceived wait and create organic moments to surface the Pro value proposition without a hard paywall interruption.
+**Rejected alternatives**: Static "Generating..." spinner. Rejected — misses engagement and upsell opportunity during the highest-attention moment (waiting for output).
+**Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — E2B execute route hardened: auth + maxDuration + finally-kill
+
+**Decision**: `/api/execute` now requires authentication, sets `maxDuration=120`, and kills the sandbox in a `finally` block regardless of outcome.
+**Rationale**: Without auth, any anonymous caller could spin up E2B sandboxes (billing attack). Without a finally-kill, any exception left the sandbox running and leaking cost. The 120s timeout prevents hanging executions from consuming the Vercel function slot.
+**Rejected alternatives**: Only fix the auth. Rejected — a partial fix leaves sandbox leaks open on error paths.
+**Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — Auth guard added to companion, transcribe, video-command
+
+**Decision**: Three previously unauthenticated API routes now require a valid session token.
+**Rationale**: Open inference endpoints expose Anthropic and Groq API credits to anonymous consumption. Any unauthenticated caller could hammer these routes indefinitely.
+**Rejected alternatives**: Rate limit only. Rejected — rate limits without auth can be bypassed; auth is the correct first gate.
+**Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — debug route gated to non-production
+
+**Decision**: `/api/debug` returns 404 in production (`NODE_ENV === 'production'`).
+**Rationale**: The route exposes DB table structure, insert test results, and environment variable presence — all useful for development, all harmful in production.
+**Rejected alternatives**: Delete the route. Rejected — still useful locally and in staging.
+**Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — LangFuse: span → generation with model + token usage
+
+**Decision**: LangFuse tracing changed from `trace.span()` to `trace.generation()` with `model` name and approximate `input`/`output` token counts (chars / 4).
+**Rationale**: `span()` records timing only; `generation()` records model + tokens, enabling LangFuse to calculate per-call cost and show it in the dashboard. Without this, the cost column is always empty.
+**Rejected alternatives**: Keep span, add cost tracking externally. Rejected — generation() is the designed API for this; manual workarounds add complexity.
+**Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — Auto-switch to Preview tab on generation complete
+
+**Decision**: When generation completes with files, the app automatically switches to the Preview tab.
+**Rationale**: Users had to manually click Preview after every build. The generated output is the primary result — showing it immediately reduces friction and is the expected behaviour in any IDE-style tool.
+**Rejected alternatives**: Leave tab management to the user. Rejected — every single build requires an extra click for no reason.
+**Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — sanitizeHTML injects parent-frame override
+
+**Decision**: All generated HTML has a `<script>` injected at the top that overrides `window.parent` and `window.top` to return `window` itself, preventing access to the host frame.
+**Rationale**: The preview iframe uses `allow-same-origin` (required for localStorage). With `allow-scripts + allow-same-origin`, a generated app could call `window.parent.document` and read auth tokens from the host. The override neutralises this at the HTML level regardless of sandbox flags.
+**Rejected alternatives**: Remove `allow-same-origin`. Rejected — breaks localStorage for generated apps (games with high scores, apps with settings).
+**Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — Memory extraction now includes assistant reply
+
+**Decision**: The memory extraction call after each generation now includes the assistant's response in the message array, not just the user messages.
+**Rationale**: Memory extraction was operating on a stale closure that excluded the assistant reply. The model had no signal to extract from — it was summarising a half-conversation and often produced no update.
+**Rejected alternatives**: Send only user messages. Rejected — the assistant reply contains the key facts worth remembering.
+**Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — Support nudge fires at build 5/10/15, not build 1
+
+**Decision**: The support/donation nudge now triggers at build count 5, 10, 15... (every 5th build from 5 onwards) instead of triggering on the very first build.
+**Rationale**: Showing a donation prompt on build #1 — before the user has experienced any value — is tone-deaf and damages first impressions. By build 5 the user has seen real output and is far more likely to consider supporting.
+**Rejected alternatives**: Build #3. Rejected — still too early; #5 is a natural milestone.
+**Owner**: Hus Alfyandi

@@ -4,6 +4,21 @@ User-facing record of what shipped on beta.getbased.dev.
 
 ---
 
+## [Beta] 2026-05-19 — Generation Engine Reliability
+
+### Added
+
+- **Rotating loading messages** for free users — 14 messages cycle every 3.2s with animated dots, including Pro upsell nudges during the wait
+- **Real audio from Mixkit CDN** — horror, jumpscare, and audio-heavy apps now use hosted audio files instead of synthesized browser beeps; audio is reliable across all browsers
+
+### Fixed
+
+- **Small edits no longer regenerate the whole project** — the planner now reads the first 200 characters of each file and targets only the file that needs changing (e.g. "add a button" touches index.html only)
+- **App buttons no longer break after a few edits** — the button safety net now uses exact-word matching and only activates when it recognises its own screen IDs, so it cannot remove `.active` from screens it doesn't own
+- **Seamless AI provider fallback** — if the primary AI provider returns a credit or rate-limit error, generation automatically retries via the secondary provider with no interruption to the user
+
+---
+
 ## [Beta] 2026-05-19 — All Panels Upgrade
 
 ### Added
