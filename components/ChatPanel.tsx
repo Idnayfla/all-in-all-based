@@ -553,6 +553,7 @@ export default function ChatPanel({
     setIsGenerating(true);
 
     let doneHandled = false;
+    let assistantMsg = '';
     const abort = new AbortController();
     abortRef.current = abort;
 
@@ -599,7 +600,7 @@ export default function ChatPanel({
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let assistantMsg = '';
+      assistantMsg = '';
       let buffer = '';
       let planReceived = false;
 
@@ -788,7 +789,8 @@ export default function ChatPanel({
                 const count = parseInt(localStorage.getItem('based_build_count') || '0', 10) + 1;
                 localStorage.setItem('based_build_count', String(count));
                 if (
-                  (count === 1 || count % 5 === 0) &&
+                  count >= 3 &&
+                  count % 5 === 0 &&
                   !localStorage.getItem('based_nudge_dismissed')
                 ) {
                   setShowSupportNudge(true);
@@ -834,7 +836,13 @@ export default function ChatPanel({
         setGenProgress(null);
         setMessages(prev => {
           const last = prev[prev.length - 1];
-          if (last?.content === '◈ Working...') {
+          if (
+            typeof last?.content === 'string' &&
+            (last.content === '◈ Working...' ||
+              last.content.startsWith('◈ Searching') ||
+              last.content.startsWith('⟳') ||
+              last.content.startsWith('◈ Retrying'))
+          ) {
             return [
               ...prev.slice(0, -1),
               {
@@ -851,7 +859,11 @@ export default function ChatPanel({
       setIsGenerating(false);
       if (!incognito) {
         try {
-          const finalMessages = [...messages, userMsg];
+          const finalMessages = [
+            ...messages,
+            userMsg,
+            ...(assistantMsg ? [{ role: 'assistant' as const, content: assistantMsg }] : []),
+          ];
           const memMessages = finalMessages.map(m => ({
             role: m.role,
             content: Array.isArray(m.content)

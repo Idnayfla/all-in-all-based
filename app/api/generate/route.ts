@@ -818,6 +818,12 @@ function sanitizeHTML(html: string): string {
     return `<script${attrs}defer src=`;
   });
 
+  // Freeze window.parent and window.top so generated apps cannot reach the host frame
+  const parentOverride = `<script>(function(){try{Object.defineProperty(window,'parent',{get:function(){return window;},configurable:false});Object.defineProperty(window,'top',{get:function(){return window;},configurable:false});}catch(e){}})();</script>`;
+  html = html.includes('<head>')
+    ? html.replace('<head>', '<head>' + parentOverride)
+    : parentOverride + html;
+
   // Inject a safety net that guarantees Start/Begin/Play buttons work
   // regardless of what the AI generated — finds buttons by text content,
   // shows the game screen, and calls whichever start function exists on window

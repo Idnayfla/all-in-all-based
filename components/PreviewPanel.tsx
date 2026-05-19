@@ -442,7 +442,7 @@ export default function PreviewPanel({
       <iframe
         ref={iframeRef}
         className="preview-frame"
-        sandbox="allow-scripts allow-same-origin allow-modals allow-downloads"
+        sandbox="allow-scripts allow-same-origin allow-modals allow-forms"
         title="Preview"
         onClick={() => setShowExportMenu(false)}
       />
