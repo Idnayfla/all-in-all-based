@@ -1221,6 +1221,8 @@ export async function POST(req: NextRequest) {
     });
     if (trace) console.log('[LangFuse] trace:', trace.id);
 
+    const startMs = Date.now();
+
     const readable = new ReadableStream({
       async start(controller) {
         try {
@@ -1677,6 +1679,29 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
               `data: ${JSON.stringify({ done: true, reply, files: generatedFiles, projectType, suggestions })}\n\n`
             )
           );
+
+          void (async () => {
+            try {
+              await supabaseAdmin.from('inference_logs').insert({
+                user_id: supabaseUserId ?? null,
+                model: usingFreeModel ? GROQ_MODEL : 'claude-opus-4-7',
+                project_type: projectType,
+                prompt: lastUserMessage.slice(0, 2000),
+                response: reply.slice(0, 1000),
+                input_tokens: Math.ceil(lastUserMessage.length / 4),
+                output_tokens: generatedFiles.reduce(
+                  (acc, f) => acc + Math.ceil(f.content.length / 4),
+                  0
+                ),
+                latency_ms: Date.now() - startMs,
+                provider: usingFreeModel
+                  ? 'groq'
+                  : process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'placeholder'
+                    ? 'anthropic'
+                    : 'pantheon',
+              });
+            } catch {}
+          })();
         } catch (e: any) {
           const friendly = friendlyError(e);
           Sentry.captureException(e, { extra: { message: lastUserMessage, aiModel } });
