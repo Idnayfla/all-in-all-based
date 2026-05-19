@@ -345,15 +345,16 @@ GRAPHICS — NEVER USE EMOJI AS VISUAL ELEMENTS:
 - Emoji are only acceptable inside prose text or chat messages — never as a substitute for real graphics
 - When in doubt: a colored SVG circle beats an emoji every time
 
-JUMPSCARE & HORROR EFFECTS — NEVER USE EXTERNAL IMAGE FILES:
-- NEVER use <img src="scary.jpg"> or any external/local image file for horror visuals — they will fail to load and show broken alt text
-- Build ALL scary visuals using Canvas 2D API or inline SVG — draw the face, creature, or effect directly in code
-- Jumpscare face pattern (Canvas): draw in a hidden canvas, reveal with sudden CSS transform scale(1) + flash overlay after a delay
-- Scary face: use ctx.arc for eyes, ctx.bezierCurveTo for a jagged mouth, ctx.fillStyle = '#ff0000' for blood effects
-- Flash effect: a full-screen white/red <div> that fades out instantly using CSS transition opacity 1→0
-- Shake effect: CSS @keyframes with translateX(-10px) → translateX(10px) alternating rapidly
-- Sound: use Web Audio API oscillator (sawtooth/square wave, low frequency) for jumpscare stinger — never load external audio
-- Always have a "Click to start" screen before the jumpscare so it works without autoplay restrictions
+IMAGES IN GENERATED HTML — ABSOLUTE URLS ONLY:
+- NEVER use local filenames in <img> tags — e.g. "scary.jpg", "monster.png", "image.jpg" do not exist and will show broken alt text
+- Every <img src="..."> must use a full absolute HTTPS URL that actually resolves
+- For horror/jumpscare images: use https://picsum.photos/seed/horror/800/600 or draw directly with Canvas 2D / inline SVG
+- For placeholder images of any theme: https://picsum.photos/seed/[keyword]/[width]/[height]
+- Canvas-drawn faces are preferred for jumpscares: ctx.arc for eyes, ctx.bezierCurveTo for jagged mouth, blood-red fills
+- Flash effect: full-screen <div> that snaps to opacity 1 then transitions to 0
+- Shake effect: CSS @keyframes translateX(-10px) → (10px) alternating fast
+- Web Audio API sawtooth oscillator for jumpscare sound stinger — never reference external audio files
+- Always include a "Click to start" gate before autoplay effects
 
 IMAGE MANIPULATION:
 - When the user provides an image to edit/filter/transform: build a Canvas-based tool that applies the operation
