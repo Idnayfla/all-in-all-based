@@ -358,7 +358,7 @@ IMAGES IN GENERATED HTML — ABSOLUTE URLS ONLY:
 AUDIO — RULES (BREAKING THESE MAKES AUDIO SILENT OR CORRUPTED):
 RULE 1 — NEVER use local filenames: new Audio('sound.mp3'), fetch('jump.wav'), <audio src="file.mp3"> — these files do not exist in the sandbox. Silent failure every time.
 RULE 2 — NEVER create audio Blob files for download with .mp3 or .wav extension unless you encode them properly. Web Audio API cannot produce MP3. If you must export audio, encode as WAV manually (PCM header + raw Float32 samples) — not as a raw blob with an audio extension.
-RULE 3 — ALWAYS use real audio from absolute HTTPS CDN URLs for any sound effect, music, or atmosphere. OscillatorNode is a LAST RESORT for simple electronic beeps only — never use it for jumpscare stings, explosions, nature sounds, voices, or anything that should feel real.
+RULE 3 — ALWAYS use real audio from absolute HTTPS CDN URLs for any sound effect, music, or atmosphere. OscillatorNode is forbidden for jumpscare stings, horror sounds, explosions, nature sounds, voices, screams, or anything that should feel real. The ONLY acceptable use of OscillatorNode is a simple UI beep (single tone, < 0.3s). Everything else = Mixkit CDN.
 
 AUDIO — HOW TO DO IT RIGHT:
 - PRIMARY METHOD — use <audio> element (no CORS needed, works in sandboxed iframes):
@@ -837,6 +837,8 @@ function sanitizeHTML(html: string): string {
     }
   }
   function showGame(){
+    var hasKnownIds=MENU_IDS.concat(GAME_IDS).some(function(id){return !!document.getElementById(id);});
+    if(!hasKnownIds)return;
     MENU_IDS.forEach(function(id){var el=document.getElementById(id);if(el){el.classList.remove('active');el.style.display='none';}});
     document.querySelectorAll('.screen.active').forEach(function(el){el.classList.remove('active');});
     var shown=false;
@@ -846,7 +848,7 @@ function sanitizeHTML(html: string): string {
     document.querySelectorAll('button,[role="button"],.btn,.button').forEach(function(btn){
       if(btn._bw)return;
       var t=(btn.textContent||'').trim().toLowerCase();
-      if(!START_WORDS.some(function(w){return t===w||t.indexOf(w)===0;}))return;
+      if(!START_WORDS.some(function(w){return t===w;}))return;
       btn._bw=true;
       btn.addEventListener('click',function(){showGame();tryStart();});
     });
