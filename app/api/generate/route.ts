@@ -960,6 +960,25 @@ async function callModel(
       { role: 'user', content: userText },
     ];
     const maxTokens = modelType === 'generator' ? 8000 : modelType === 'planner' ? 300 : 800;
+
+    // Direct Anthropic — fastest path when key is present
+    const hasOwnKey =
+      process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'placeholder';
+    if (hasOwnKey) {
+      const directModel =
+        modelType === 'planner' || modelType === 'summary'
+          ? 'claude-haiku-4-5-20251001'
+          : 'claude-sonnet-4-6';
+      const res = await client.messages.create({
+        model: directModel,
+        max_tokens: maxTokens,
+        system: systemText,
+        messages: [{ role: 'user', content: userText }],
+      });
+      const c = res.content[0];
+      return c.type === 'text' ? c.text : '';
+    }
+
     if (aiModel === 'free' && process.env.GROQ_API_KEY) {
       try {
         return await callGroq(msgs, maxTokens);
@@ -989,6 +1008,28 @@ async function streamText(
   aiModel?: 'based' | 'free',
   taskType: 'fast_chat' | 'chat' = 'chat'
 ): Promise<string> {
+  // Direct Anthropic streaming — fastest path when key is present
+  const hasOwnKey =
+    process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'placeholder';
+  if (hasOwnKey) {
+    const systemMsg = messages.find(m => m.role === 'system');
+    const userMsg = messages.find(m => m.role === 'user');
+    let accumulated = '';
+    const stream = client.messages.stream({
+      model: 'claude-opus-4-7',
+      max_tokens: maxTokens,
+      system: systemMsg?.content ?? '',
+      messages: [{ role: 'user', content: userMsg?.content ?? '' }],
+    });
+    for await (const chunk of stream) {
+      if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+        accumulated += chunk.delta.text;
+        onChunk(chunk.delta.text);
+      }
+    }
+    return accumulated;
+  }
+
   if (aiModel === 'free' && process.env.GROQ_API_KEY) {
     try {
       return await streamGroqCollecting(messages, maxTokens, onChunk);
@@ -1597,9 +1638,12 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: friendly })}\n\n`));
         } finally {
           try {
-            await lf?.shutdownAsync();
+            await Promise.race([
+              lf?.flushAsync(),
+              new Promise(resolve => setTimeout(resolve, 4000)),
+            ]);
           } catch (lfErr) {
-            console.error('[LangFuse] shutdownAsync failed:', lfErr);
+            console.error('[LangFuse] flush failed:', lfErr);
           }
           controller.close();
         }
