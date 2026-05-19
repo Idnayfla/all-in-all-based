@@ -18,10 +18,16 @@ const REASON_MSG: Record<string, string> = {
 };
 
 const PRO_FEATURES = [
-  'Unlimited generations — no monthly cap',
-  'Unlimited projects',
-  'Voice activation',
-  'Priority generation speed',
+  'Unlimited builds — no monthly cap, no anxiety',
+  'Unlimited projects — save everything, lose nothing',
+  'Based AI — Claude Sonnet, not free-tier Groq',
+  'Priority speed — seconds, not minutes',
+  'All media generation — images, video, and music',
+  'Voice activation — talk to Based, it listens',
+  'Windows companion — floating AI on your desktop',
+  'AI memory — remembers your style across every session',
+  'Gallery + sharing — publish builds, remix the community',
+  'You make this possible — every subscription funds the next feature',
 ];
 
 const FREE_LIMITS = [

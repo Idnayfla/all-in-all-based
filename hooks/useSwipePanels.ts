@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 type Panel = 'chat' | 'editor' | 'preview' | 'debug' | 'video' | 'studio' | 'image' | 'notes';
-const ORDER: Panel[] = ['chat', 'editor', 'preview'];
+const ORDER: Panel[] = ['chat', 'editor', 'preview', 'video', 'studio', 'image', 'notes'];
 
 export function useSwipePanels(active: Panel, setActive: (p: Panel) => void, enabled: boolean) {
   const startX = useRef(0);

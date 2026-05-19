@@ -446,7 +446,6 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  animation: donateFloat 3s ease-in-out infinite;
 }
 @keyframes donateFloat {
   0%,
@@ -479,7 +478,6 @@ body {
   font-weight: 600;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   font-family: var(--font-mono);
-  animation: glowPulse 2.5s ease-in-out infinite;
 }
 .share-btn:hover {
   opacity: 0.9;

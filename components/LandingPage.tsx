@@ -82,10 +82,10 @@ const SHIPPED_RECENT = [
 ];
 
 const COMING_NEXT = [
-  { label: 'Image Studio', desc: 'Canvas, layers, AI-assisted edits' },
   { label: '3D / Blueprint', desc: 'Describe a scene — Based renders it' },
   { label: 'Mobile App', desc: 'iOS + Android, feels native' },
-  { label: 'Proactive AI', desc: '"You were working on X — continue?"' },
+  { label: 'Team Workspaces', desc: 'Share projects, collaborate in real time' },
+  { label: 'Based Model', desc: 'Our own fine-tuned model, trained on your builds' },
 ];
 
 const COMPARISONS = [
