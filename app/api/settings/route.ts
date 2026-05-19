@@ -26,10 +26,13 @@ export async function GET(req: NextRequest) {
     }
 
     const paidTier = (data?.subscription_tier ?? 'free') as 'free' | 'pro';
+    const subStatus = data?.subscription_status ?? 'active';
+    // Treat explicitly cancelled subscriptions as free regardless of tier column
+    const isCanceled = subStatus === 'canceled' || subStatus === 'cancelled';
     const bonusExpiresAt = data?.pro_bonus_expires_at as string | null;
     const hasBonusPro = !!bonusExpiresAt && new Date(bonusExpiresAt) > new Date();
     const alwaysPro = process.env.ALWAYS_PRO === 'true';
-    const effectiveTier: 'free' | 'pro' = alwaysPro || paidTier === 'pro' || hasBonusPro ? 'pro' : 'free';
+    const effectiveTier: 'free' | 'pro' = alwaysPro || (paidTier === 'pro' && !isCanceled) || hasBonusPro ? 'pro' : 'free';
     const bonusDaysLeft = hasBonusPro
       ? Math.max(0, Math.ceil((new Date(bonusExpiresAt!).getTime() - Date.now()) / 86400000))
       : 0;

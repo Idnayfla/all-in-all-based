@@ -24,6 +24,7 @@ import ReferralPanel from '@/components/ReferralPanel';
 import VideoEditorPanel from '@/components/VideoEditorPanel';
 import StudioPanel from '@/components/StudioPanel';
 import ImageStudioPanel from '@/components/ImageStudioPanel';
+import NotesPanel from '@/components/NotesPanel';
 import ProactiveCheckin from '@/components/ProactiveCheckin';
 
 export interface FileNode {
@@ -39,7 +40,7 @@ export type ContentBlock =
   | { type: 'generated-video'; url: string; prompt: string }
   | { type: 'generated-music'; url: string; prompt: string }
   | { type: 'clarify'; question: string; options: string[] }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string; prompt?: string; actualError?: string };
 
 export interface Message {
   role: 'user' | 'assistant';
@@ -77,7 +78,7 @@ export default function Home() {
   const [globalMemory, setGlobalMemory] = useState('');
   const [incognito, setIncognito]     = useState(false);
   const [incognitoMessages, setIncognitoMessages] = useState<Message[]>([]);
-  const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview' | 'debug' | 'video' | 'studio' | 'image'>('chat');
+  const [activePanel, setActivePanel] = useState<'chat' | 'editor' | 'preview' | 'debug' | 'video' | 'studio' | 'image' | 'notes'>('chat');
   const [projects, setProjects]       = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   useSwipePanels(activePanel, setActivePanel, !incognito && !!currentProject);
@@ -134,9 +135,11 @@ export default function Home() {
     if (cached.length > 0) setProjects(cached);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Restore subscription tier instantly from cache so Pro never flashes away ──
+  // ── Restore subscription tier from cache (server response always wins) ──
   useEffect(() => {
     const cached = localStorage.getItem('based_sub_tier');
+    // Only pre-fill 'pro' from cache; 'free' is already the default state.
+    // Server response at loadCloudData will overwrite this with authoritative data.
     if (cached === 'pro') setSubscription(s => ({ ...s, tier: 'pro' }));
   }, []);
 
@@ -352,28 +355,9 @@ export default function Home() {
       setSubscription({ tier, status: subscriptionStatus ?? 'active', generationsUsed: generationsUsed ?? 0, periodStart: subscriptionPeriodStart ?? null, periodEnd: subscriptionPeriodEnd ?? null });
       localStorage.setItem('based_sub_tier', tier);
 
-      // If DB shows free, silently re-check Stripe — catches missed webhooks so paying users
-      // never have to manually click Re-sync
-      if (tier === 'free') {
-        void (async () => {
-          try {
-            const h = await getHeaders();
-            const syncRes = await fetch('/api/stripe/sync', { method: 'POST', headers: h });
-            if (syncRes.ok) {
-              const syncData = await syncRes.json();
-              if (syncData.tier === 'pro') {
-                const s2 = await fetch('/api/settings', { headers: h });
-                if (s2.ok) {
-                  const { subscriptionTier: t2, subscriptionStatus: st2, generationsUsed: g2, subscriptionPeriodStart: ps2, subscriptionPeriodEnd: pe2 } = await s2.json();
-                  const tier2 = t2 ?? 'free';
-                  setSubscription({ tier: tier2, status: st2 ?? 'active', generationsUsed: g2 ?? 0, periodStart: ps2 ?? null, periodEnd: pe2 ?? null });
-                  localStorage.setItem('based_sub_tier', tier2);
-                }
-              }
-            }
-          } catch {}
-        })();
-      }
+      // Stripe sync is intentionally NOT run automatically on load.
+      // Webhooks keep the DB in sync; the manual Re-sync button handles edge cases.
+      // Auto-sync was causing the DB to be overwritten when manually testing free tier.
 
       if (p) {
         try {
@@ -766,6 +750,7 @@ export default function Home() {
             <button className={`tab-btn ${activePanel === 'video' ? 'active' : ''}`} onClick={() => { setActivePanel('video'); setShowSettings(false); }}>Video</button>
             <button className={`tab-btn ${activePanel === 'studio' ? 'active' : ''}`} onClick={() => { setActivePanel('studio'); setShowSettings(false); }}>Studio</button>
             <button className={`tab-btn ${activePanel === 'image' ? 'active' : ''}`} onClick={() => { setActivePanel('image'); setShowSettings(false); }}>Image</button>
+            <button className={`tab-btn ${activePanel === 'notes' ? 'active' : ''}`} onClick={() => { setActivePanel('notes'); setShowSettings(false); }}>Notes</button>
             <button className={`tab-btn tab-btn-debug ${activePanel === 'debug' ? 'active' : ''}`} onClick={() => { setActivePanel('debug'); setShowSettings(false); }} title="Debug stream">◈</button>
           </div>
           <div className="header-controls">
@@ -1081,7 +1066,21 @@ export default function Home() {
           )}
           </AnimatePresence>
 
-          {incognito ? (
+          {/* Creative studio panels — always accessible, no project required */}
+          <div className={`panel ${activePanel === 'video' ? 'panel-active' : ''}`}>
+            <VideoEditorPanel />
+          </div>
+          <div className={`panel ${activePanel === 'studio' ? 'panel-active' : ''}`}>
+            <StudioPanel />
+          </div>
+          <div className={`panel ${activePanel === 'image' ? 'panel-active' : ''}`}>
+            <ImageStudioPanel />
+          </div>
+          <div className={`panel ${activePanel === 'notes' ? 'panel-active' : ''}`}>
+            <NotesPanel authToken={authToken} />
+          </div>
+
+          {activePanel !== 'video' && activePanel !== 'studio' && activePanel !== 'image' && activePanel !== 'notes' && (incognito ? (
             <div className="panel panel-active">
               <div className="incognito-banner">◉ Incognito Mode — chat will be wiped when you exit</div>
               <ChatPanel
@@ -1172,17 +1171,8 @@ export default function Home() {
               <div className={`panel ${activePanel === 'debug' ? 'panel-active' : ''}`}>
                 <DebugPanel />
               </div>
-              <div className={`panel ${activePanel === 'video' ? 'panel-active' : ''}`}>
-                <VideoEditorPanel />
-              </div>
-              <div className={`panel ${activePanel === 'studio' ? 'panel-active' : ''}`}>
-                <StudioPanel />
-              </div>
-              <div className={`panel ${activePanel === 'image' ? 'panel-active' : ''}`}>
-                <ImageStudioPanel />
-              </div>
             </>
-          )}
+          ))}
         </main>
       </div>
 

@@ -88,6 +88,8 @@ export default function StudioPanel() {
   const seqRef = useRef<any>(null);
   const mrRef  = useRef<MediaRecorder | null>(null);
   const micRafRef = useRef(0);
+  const audioElRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
+  const connectedSourcesRef = useRef<Map<string, MediaElementAudioSourceNode>>(new Map());
 
   // ── Tone.js lazy init ───────────────────────────────────────────────────
   const initTone = useCallback(async () => {
@@ -259,8 +261,12 @@ export default function StudioPanel() {
     Tone.Transport.bpm.value = bpm;
     if (seqRef.current) { seqRef.current.dispose(); seqRef.current = null; }
 
-    // Collect all drum patterns from all non-muted tracks
-    const drumTracks = tracks.filter(tr => !tr.muted && tr.drumPattern.some(row => row.some(Boolean)));
+    // Collect all drum patterns, respecting solo > mute priority
+    const anySoloed = tracks.some(t => t.soloed);
+    const drumTracks = tracks.filter(tr => {
+      const audible = anySoloed ? tr.soloed : !tr.muted;
+      return audible && tr.drumPattern.some(row => row.some(Boolean));
+    });
 
     seqRef.current = new Tone.Sequence((time: number, step: number) => {
       Tone.getDraw().schedule(() => setCurrentStep(step), time);
@@ -299,7 +305,28 @@ export default function StudioPanel() {
   };
 
   const startExport = async () => {
-    const { recorder } = await initTone();
+    const { recorder, masterGain, Tone } = await initTone();
+
+    // Connect vocal/audio elements into the Tone audio graph so they get captured
+    const anySoloed = tracks.some(tr => tr.soloed);
+    const ctx = Tone.getContext().rawContext as AudioContext;
+    tracks.forEach(track => {
+      if ((track.type !== 'vocal' && track.type !== 'audio') || !track.audioUrl) return;
+      const audible = anySoloed ? track.soloed : !track.muted;
+      if (!audible) return;
+      const el = audioElRefs.current.get(track.id);
+      if (!el || connectedSourcesRef.current.has(track.id)) return;
+      try {
+        const src = ctx.createMediaElementSource(el);
+        src.connect(masterGain.input); // into the recorded mix
+        src.connect(ctx.destination);  // also to speakers
+        connectedSourcesRef.current.set(track.id, src);
+      } catch {}
+      el.currentTime = 0;
+      el.volume = Math.min(1, track.volume);
+      el.play().catch(() => {});
+    });
+
     recorder.start();
     setExporting(true);
     setExportUrl('');
@@ -312,6 +339,7 @@ export default function StudioPanel() {
     setExportUrl(URL.createObjectURL(blob));
     setExporting(false);
     stopPlayback();
+    audioElRefs.current.forEach(el => { el.pause(); el.currentTime = 0; });
   };
 
   useEffect(() => {
@@ -659,7 +687,15 @@ export default function StudioPanel() {
                 </select>
               )}
               {(track.type === 'vocal' || track.type === 'audio') && track.audioUrl && (
-                <audio src={track.audioUrl} controls className="studio-track-audio" />
+                <audio
+                  src={track.audioUrl}
+                  controls
+                  className="studio-track-audio"
+                  ref={(el) => {
+                    if (el) audioElRefs.current.set(track.id, el);
+                    else audioElRefs.current.delete(track.id);
+                  }}
+                />
               )}
             </div>
           ))}

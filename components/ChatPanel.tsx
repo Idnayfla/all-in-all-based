@@ -10,7 +10,6 @@ import ModeDropdown, { GenerationMode } from './ModeDropdown';
 import GeneratedVideoCard from './GeneratedVideoCard';
 import GeneratedMusicCard from './GeneratedMusicCard';
 import GeneratingCard from './GeneratingCard';
-import { useVoiceActivation } from '@/hooks/useVoiceActivation';
 
 const SUGGESTION_POOL = [
   'Build a todo app with drag & drop',
@@ -158,6 +157,11 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
   const [flagReason, setFlagReason]   = useState('');
   const [flagText, setFlagText]       = useState('');
   const [flagSending, setFlagSending] = useState(false);
+  const [reportedErrors, setReportedErrors] = useState<Set<string>>(new Set());
+  const reportingInFlight = useRef<Set<string>>(new Set());
+  const [micState, setMicState] = useState<'idle' | 'recording' | 'transcribing'>('idle');
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
   const FLAG_REASONS = ['Wrong type of response', 'Misunderstood my request', 'Too much / too little', 'Broke existing code'];
 
@@ -181,15 +185,43 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     }
   };
 
-  const { state: voiceState, transcript: voiceTranscript, error: voiceError, toggle: toggleVoice } =
-    useVoiceActivation((command) => {
-      // Show the recognized text in the textarea so the user can see it was heard,
-      // then auto-send after a brief pause
-      setInput(command);
-      setTimeout(() => {
-        if (!isGenerating) send(command);
-      }, 400);
-    });
+  const toggleMic = async () => {
+    if (micState === 'recording') {
+      mediaRecorderRef.current?.stop();
+      return;
+    }
+    if (micState !== 'idle') return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      const recorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg' });
+      recorder.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      recorder.onstop = async () => {
+        stream.getTracks().forEach(t => t.stop());
+        setMicState('transcribing');
+        try {
+          const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const form = new FormData();
+          form.append('audio', blob, 'recording.webm');
+          const res = await fetch('/api/transcribe', { method: 'POST', body: form });
+          const { text } = await res.json();
+          if (text?.trim()) {
+            setInput(text.trim());
+            setTimeout(() => { if (!isGenerating) send(text.trim()); }, 200);
+          }
+        } catch {
+          // silently fail — user can type manually
+        } finally {
+          setMicState('idle');
+        }
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setMicState('recording');
+    } catch {
+      // mic not available or denied — silently ignore
+    }
+  };
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
@@ -254,10 +286,16 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     try {
       const res = await fetch('/api/image', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify(body),
       });
       const data = await res.json();
+      if (res.status === 401 || res.status === 403) {
+        if (onProRequired) { onProRequired(); return; }
+      }
       if (data.error) throw new Error(data.error);
       setMessages(prev => [
         ...prev.slice(0, -1),
@@ -266,7 +304,15 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     } catch (err: any) {
       setMessages(prev => [
         ...prev.slice(0, -1),
-        { role: 'assistant', content: [{ type: 'error' as const, message: `Image generation failed. Try rephrasing your prompt — if it keeps happening, tap Report.` }] },
+        {
+          role: 'assistant',
+          content: [{
+            type: 'error' as const,
+            message: 'Image generation failed. Try rephrasing your prompt — if it keeps happening, tap Report.',
+            prompt,
+            actualError: err?.message ?? String(err),
+          }],
+        },
       ]);
     } finally {
       setIsGeneratingMedia(false);
@@ -286,10 +332,14 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     try {
       const res = await fetch('/api/music', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify({ prompt }),
       });
       const data = await res.json();
+      if ((res.status === 401 || res.status === 403) && onProRequired) { onProRequired(); return; }
       if (data.error) throw new Error(data.error);
       setMessages(prev => [
         ...prev.slice(0, -1),
@@ -325,10 +375,14 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     try {
       const res = await fetch('/api/video', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify(body),
       });
       const data = await res.json();
+      if ((res.status === 401 || res.status === 403) && onProRequired) { onProRequired(); return; }
       if (data.error) throw new Error(data.error);
       setMessages(prev => [
         ...prev.slice(0, -1),
@@ -630,7 +684,7 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
     }
   };
 
-  function renderContent(content: string | ContentBlock[]) {
+  function renderContent(content: string | ContentBlock[], msgIdx = 0) {
     if (typeof content === 'string') return <ReactMarkdown>{content}</ReactMarkdown>;
     return (
       <>
@@ -673,14 +727,33 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             return <GeneratingCard key={i} type="music" />;
           }
           if (block.type === 'error') {
+            const reportKey = `${msgIdx}-${i}`;
+            const alreadyReported = reportedErrors.has(reportKey);
             return (
               <div key={i} className="chat-error-block">
                 <span className="chat-error-icon">!</span>
                 <div className="chat-error-body">
                   <div className="chat-error-msg">{block.message}</div>
-                  {onReportBug && (
-                    <button className="chat-error-report" onClick={onReportBug}>⬡ Report</button>
-                  )}
+                  <button
+                    className="chat-error-report"
+                    disabled={alreadyReported}
+                    onClick={async () => {
+                      // Ref guard fires synchronously — prevents duplicate submissions
+                      // even if the user clicks faster than React re-renders
+                      if (reportingInFlight.current.has(reportKey)) return;
+                      reportingInFlight.current.add(reportKey);
+                      setReportedErrors(prev => new Set(prev).add(reportKey));
+                      const context = [
+                        block.prompt      ? `PROMPT: ${block.prompt}` : null,
+                        block.actualError ? `ACTUAL ERROR: ${block.actualError}` : null,
+                      ].filter(Boolean).join('\n') || block.message;
+                      await fetch('/api/feedback', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: block.message, type: 'image_error', context }),
+                      });
+                    }}
+                  >{alreadyReported ? '◉ Reported' : '⬡ Report'}</button>
                 </div>
               </div>
             );
@@ -749,10 +822,11 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
                 <div className="message-content">
                   {m.role === 'assistant' && isGenerating && i === messages.length - 1
                     ? <ProgressBar progress={genProgress ?? { files: [], completed: 0, total: 0, file: '', chunks: 0 }} />
-                    : renderContent(m.content)
+                    : renderContent(m.content, i)
                   }
                 </div>
-                {m.role === 'assistant' && !(isGenerating && i === messages.length - 1) && (
+                {m.role === 'assistant' && !(isGenerating && i === messages.length - 1) &&
+                  !(Array.isArray(m.content) && m.content.every((b: any) => b.type === 'error')) && (
                   <div className="msg-flag-area">
                     {flaggedSet.has(i) ? (
                       <span className="msg-flag-noted">◈ Noted — thanks</span>
@@ -902,17 +976,16 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
           />
           <button
             type="button"
-            className={`voice-btn voice-btn--${voiceState}`}
-            onClick={toggleVoice}
+            className={`voice-btn voice-btn--${micState === 'recording' ? 'listening' : micState === 'transcribing' ? 'activated' : 'idle'}`}
+            onClick={toggleMic}
             title={
-              voiceState === 'idle' ? 'Enable voice — say "Based, ..." to send' :
-              voiceState === 'listening' ? 'Listening for "Based, ..." — click to stop' :
-              voiceState === 'activated' ? `Got it: "${voiceTranscript}"` :
-              'Voice not supported in this browser'
+              micState === 'idle' ? 'Press to record — speak, then press again to send' :
+              micState === 'recording' ? 'Recording… press to stop and send' :
+              'Transcribing…'
             }
-            disabled={voiceState === 'unsupported' || isGenerating || isGeneratingMedia}
+            disabled={isGenerating || isGeneratingMedia || micState === 'transcribing'}
           >
-            {voiceState === 'activated' ? '◉' : '⬡'}
+            {micState === 'transcribing' ? '◉' : '⬡'}
           </button>
           <AnimatePresence>
             {generationMode === 'seedance' && (
@@ -939,8 +1012,8 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             onChange={e => { setInput(e.target.value); autoResize(); }}
             onKeyDown={handleKey}
             placeholder={
-              voiceState === 'listening' ? 'Listening… say "Based, build me a game"' :
-              voiceState === 'activated' ? `"${voiceTranscript}"` :
+              micState === 'recording' ? 'Recording — press mic again to send…' :
+              micState === 'transcribing' ? 'Transcribing…' :
               generationMode === 'seedance' ? 'Describe a video to generate...' :
               generationMode === 'music' ? 'Describe the music to generate...' :
               generationMode !== 'chat' ? 'Describe an image to generate...' :
@@ -963,11 +1036,11 @@ export default function ChatPanel({ messages, setMessages, files, onFilesUpdate,
             {isGeneratingMedia ? <span className="spinner" /> : generationMode !== 'chat' ? 'Generate' : 'Send'}
           </motion.button>
         </div>
-        {voiceError && (
-          <div className="voice-error">{voiceError}</div>
+        {micState === 'recording' && (
+          <div className="voice-hint">Recording — press mic again to stop and send</div>
         )}
-        {voiceState === 'listening' && !voiceError && (
-          <div className="voice-hint">Say "Based, build me a calculator" — listening…</div>
+        {micState === 'transcribing' && (
+          <div className="voice-hint">Transcribing your voice…</div>
         )}
       </div>
       {editingImageUrl && (

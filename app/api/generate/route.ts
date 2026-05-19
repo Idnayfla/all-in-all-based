@@ -146,14 +146,15 @@ async function callGroq(
   maxTokens = GROQ_MAX_TOKENS
 ): Promise<string> {
   const capped = Math.min(maxTokens, GROQ_MAX_TOKENS);
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 2; attempt++) {
     const res = await fetch(GROQ_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
       body: JSON.stringify({ model: GROQ_MODEL, messages, stream: false, max_tokens: capped }),
     });
     if (res.status === 429) {
-      const retryAfter = parseInt(res.headers.get('retry-after') ?? '10', 10);
+      // Cap retry wait at 15s — long retry-after means daily limit is hit, not worth waiting
+      const retryAfter = Math.min(parseInt(res.headers.get('retry-after') ?? '5', 10), 15);
       await new Promise(r => setTimeout(r, retryAfter * 1000));
       continue;
     }
@@ -161,7 +162,7 @@ async function callGroq(
     const data = await res.json();
     return data.choices?.[0]?.message?.content ?? '';
   }
-  throw new Error('Groq rate limit — try again in a moment.');
+  throw new Error('Free AI daily limit reached — switch to Based AI or try again tomorrow.');
 }
 
 async function streamGroqCollecting(
@@ -170,14 +171,14 @@ async function streamGroqCollecting(
   onChunk: (text: string) => void
 ): Promise<string> {
   const capped = Math.min(maxTokens, GROQ_MAX_TOKENS);
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 2; attempt++) {
     const res = await fetch(GROQ_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.GROQ_API_KEY}` },
       body: JSON.stringify({ model: GROQ_MODEL, messages, stream: true, max_tokens: capped }),
     });
     if (res.status === 429) {
-      const retryAfter = parseInt(res.headers.get('retry-after') ?? '10', 10);
+      const retryAfter = Math.min(parseInt(res.headers.get('retry-after') ?? '5', 10), 15);
       await new Promise(r => setTimeout(r, retryAfter * 1000));
       continue;
     }
@@ -226,7 +227,7 @@ RESPONSE RULES:
 - NEVER convert a data question into an app. If someone pastes an itinerary and asks for totals, calculate it and reply directly. Same for any maths, budgets, lists, or data analysis.
 
 STRICT OUTPUT FORMAT:
-<forge_type>html|python|node</forge_type>
+<forge_type>html|python|node|java|cpp|go|rust|bash</forge_type>
 <forge_file name="filename.ext" language="html|css|javascript|typescript|python|json">
 ...complete file content...
 </forge_file>
@@ -655,9 +656,16 @@ COMPLEX (RPG, multiplayer game, large data app, distinct subsystems like rooms/e
 - Only add rooms.js, entities.js, audio.js etc. if those systems actually exist in the project.
 
 For Python: main.py and supporting modules only as needed.
+For Java: Main.java (public class must be named Main) + supporting .java files as needed.
+For C++: main.cpp + supporting .h/.cpp files. Keep it compilable with g++ main.cpp -o program.
+For Go: main.go in a main package. go run main.go must work.
+For Rust: main.rs only (single-file programs that compile with rustc main.rs).
+For Bash: script.sh. Must be self-contained and runnable with bash script.sh.
+
+NON-BROWSER LANGUAGE RULE: For Java/C++/Go/Rust/Bash requests, output ONLY runnable source files. No HTML wrapper. The output will appear in a Debug/Console panel, not a web preview. Design programs that produce meaningful console output — interactive CLI apps, data processing, algorithms, simulations.
 
 Output format:
-[{"name":"filename.ext","language":"html|css|javascript|python","description":"..."}]`;
+[{"name":"filename.ext","language":"html|css|javascript|python|java|cpp|go|rust|bash","description":"..."}]`;
 
 const FILE_GENERATOR_SYSTEM = `You are Based, an elite coding assistant. Generate ONE file as part of a larger project.
 
@@ -714,7 +722,15 @@ SCREEN TRANSITION — USE THIS EXACT PATTERN, NO VARIATIONS:
   });
 
 - startGame() must call requestAnimationFrame to actually start the loop
-- Every ID in JS must exactly match the ID in the HTML — copy-paste, do not retype`;
+- Every ID in JS must exactly match the ID in the HTML — copy-paste, do not retype
+
+NON-BROWSER LANGUAGES (Java / C++ / Go / Rust / Bash):
+- Java: class name must match the filename (e.g., Main.java has public class Main). Use standard library only unless the plan specifies dependencies.
+- C++: single main.cpp compilable with g++ -std=c++17. Include all necessary headers. No external libraries unless in plan.
+- Go: package main with import blocks. go run main.go must work standalone.
+- Rust: single main.rs compilable with rustc. Use std only.
+- Bash: bash-compatible script, shebang #!/bin/bash, POSIX-safe.
+- All non-browser programs must produce meaningful stdout output — that output is the entire user experience.`;
 
 const PLANNER_SYSTEM_BLOCKS = [
   { type: 'text' as const, text: PLANNER_SYSTEM, cache_control: { type: 'ephemeral' as const } },
@@ -872,8 +888,10 @@ async function callModel(
       ? prompt.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n')
       : (prompt as string);
     const msgs = [{ role: 'system', content: systemText }, { role: 'user', content: userText }];
-    const maxTokens = modelType === 'generator' ? 16000 : 8000;
-    if (aiModel === 'free' && process.env.GROQ_API_KEY) return callGroq(msgs, maxTokens);
+    const maxTokens = modelType === 'generator' ? 8000 : modelType === 'planner' ? 300 : 800;
+    if (aiModel === 'free' && process.env.GROQ_API_KEY) {
+      try { return await callGroq(msgs, maxTokens); } catch { /* fall through to Pantheon */ }
+    }
     return callPantheon(msgs, modelType === 'generator' ? 'chat' : 'fast_chat', maxTokens);
   }
 
@@ -897,7 +915,7 @@ async function streamText(
   taskType: 'fast_chat' | 'chat' = 'chat'
 ): Promise<string> {
   if (aiModel === 'free' && process.env.GROQ_API_KEY) {
-    return streamGroqCollecting(messages, maxTokens, onChunk);
+    try { return await streamGroqCollecting(messages, maxTokens, onChunk); } catch { /* fall through */ }
   }
   return streamPantheonCollecting(messages, taskType, maxTokens, onChunk, onRetry);
 }
@@ -1037,17 +1055,23 @@ export async function POST(req: NextRequest) {
           // ── Intent clarity check (Akinator-style) ──────────────────────
           // Fast check before planning — if the request is too vague, ask one
           // clarifying question with chip options instead of guessing wrong.
-          if (imageBlocks.length === 0 && typeof lastUserMessage === 'string' && lastUserMessage.trim().length > 0) {
+          const msgWords = typeof lastUserMessage === 'string' ? lastUserMessage.trim().split(/\s+/).length : 0;
+          const skipClarity = imageBlocks.length > 0
+            || msgWords < 4  // "Hi", "Hello", "Thanks", "ok cool" — skip entirely
+            || /^(hi|hey|hello|thanks|thank you|ok|okay|sure|lol|nice|cool|great|good|sounds good|got it|understood|yep|yup|nope|yes|no|what|why|how|hmm)\b/i.test(typeof lastUserMessage === 'string' ? lastUserMessage.trim() : '');
+
+          if (!skipClarity && typeof lastUserMessage === 'string' && lastUserMessage.trim().length > 0) {
             try {
               const clarityRaw = await callPantheon(
                 [
                   { role: 'system', content: `Analyze this request. Return ONLY raw JSON, no markdown or explanation.
 If it is a question, calculation, analysis, or data task (not a build request) — always: {"clear":true}
+If it is a greeting, casual conversation, feedback, or anything that is not a build request — always: {"clear":true}
 If it is a build request specific enough to build directly: {"clear":true}
-If it is a genuinely vague BUILD request and one question would significantly improve the result: {"clear":false,"question":"short question?","options":["Option A","Option B","Option C"]}
-Options must be 2-5 words. Be very generous with "clear".
-CLEAR examples: "snake game", "todo list with drag and drop", "calculate my trip expenses [data]", "what is 20% of 500", "translate this text", "write a cover letter"
-VAGUE examples (only these should ever be false): "make an app", "build something cool", "a game", "a tool", "make something nice"` },
+If it is a genuinely vague BUILD request (only "build"/"make"/"create"/"make me" with NO subject) and one question would significantly improve the result: {"clear":false,"question":"short question?","options":["Option A","Option B","Option C"]}
+Options must be 2-5 words. Be extremely generous with "clear" — only fire for pure "make me something" with zero details.
+CLEAR examples: "snake game", "todo list with drag and drop", "what is 20% of 500", "translate this text", "write a cover letter", "hi", "hello", "how are you"
+VAGUE examples (ONLY these should ever be false): "make an app", "build something", "a game" (with NO other details), "make something nice"` },
                   { role: 'user', content: lastUserMessage.trim() },
                 ],
                 'fast_chat',
@@ -1104,7 +1128,9 @@ VAGUE examples (only these should ever be false): "make an app", "build somethin
                   }
                 }
               } else {
-                const sysText = systemBlocks.map(b => b.text).join('\n');
+                const sysText = usingFreeModel
+                  ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally.'
+                  : systemBlocks.map(b => b.text).join('\n');
                 const msgs = [{ role: 'system', content: sysText }, ...anthropicMessages.map((m: { role: string; content: unknown }) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : lastUserMessage }))];
                 fullText = await streamText(msgs, 16000,
                   t => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
@@ -1136,7 +1162,9 @@ VAGUE examples (only these should ever be false): "make an app", "build somethin
                 }
               }
             } else {
-              const sysText = systemBlocks.map(b => b.text).join('\n');
+              const sysText = usingFreeModel
+                ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally.'
+                : systemBlocks.map(b => b.text).join('\n');
               const msgs = [{ role: 'system', content: sysText }, ...anthropicMessages.map((m: { role: string; content: unknown }) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : lastUserMessage }))];
               fullText = await streamText(msgs, 4096,
                 t => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
@@ -1151,7 +1179,16 @@ VAGUE examples (only these should ever be false): "make an app", "build somethin
             return;
           }
 
-          const projectType = filePlan.some(f => f.language === 'python') ? 'python' : 'html';
+          const projectType = (() => {
+            const langs = filePlan.map((f: { language: string }) => f.language);
+            if (langs.some(l => l === 'java')) return 'java';
+            if (langs.some(l => l === 'cpp'))  return 'cpp';
+            if (langs.some(l => l === 'go'))   return 'go';
+            if (langs.some(l => l === 'rust'))  return 'rust';
+            if (langs.some(l => l === 'bash'))  return 'bash';
+            if (langs.some(l => l === 'python')) return 'python';
+            return 'html';
+          })();
           const generatedFiles: { name: string; language: string; content: string }[] = [];
 
           // Step 2: Generate each file individually

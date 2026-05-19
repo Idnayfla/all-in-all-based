@@ -241,11 +241,15 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
     } finally { setIsExporting(false); }
   };
 
-  if (projectType === 'python' || projectType === 'node') {
+  const COMPILED_TYPES = ['python', 'node', 'java', 'cpp', 'go', 'rust', 'bash'];
+  const LANG_LABELS: Record<string, string> = {
+    python: 'Python', node: 'Node.js', java: 'Java', cpp: 'C++', go: 'Go', rust: 'Rust', bash: 'Bash',
+  };
+  if (COMPILED_TYPES.includes(projectType)) {
     return (
       <div className="preview-panel">
         <div className="preview-header">
-          <span>⬡ Terminal Output</span>
+          <span>⬡ {LANG_LABELS[projectType] ?? projectType} — Terminal</span>
           <button className="run-btn" onClick={runCode} disabled={isRunning || files.length === 0}>
             {isRunning ? '◈ Running...' : '▶ Run'}
           </button>
@@ -254,7 +258,11 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
           {output ? (
             <pre className="terminal-text">{output}</pre>
           ) : (
-            <div className="terminal-empty">Click Run to execute your code in a live sandbox.</div>
+            <div className="terminal-empty">
+            {['java', 'go', 'rust'].includes(projectType)
+              ? `Click Run — Based will compile and execute your ${LANG_LABELS[projectType]} code in a sandbox.`
+              : 'Click Run to execute your code in a live sandbox.'}
+          </div>
           )}
         </div>
       </div>
