@@ -353,8 +353,29 @@ IMAGES IN GENERATED HTML — ABSOLUTE URLS ONLY:
 - Canvas-drawn faces are preferred for jumpscares: ctx.arc for eyes, ctx.bezierCurveTo for jagged mouth, blood-red fills
 - Flash effect: full-screen <div> that snaps to opacity 1 then transitions to 0
 - Shake effect: CSS @keyframes translateX(-10px) → (10px) alternating fast
-- Web Audio API sawtooth oscillator for jumpscare sound stinger — never reference external audio files
 - Always include a "Click to start" gate before autoplay effects
+
+AUDIO — USE REAL SOURCES AND THE FULL WEB AUDIO API:
+- You can and should load real audio from external HTTPS URLs — always use absolute URLs, never local filenames like "sound.mp3"
+- Reliable free audio CDNs (CORS-enabled): https://assets.mixkit.co/active_storage/sfx/ · https://www.soundjay.com/misc/ · raw GitHub-hosted audio
+- Load external audio through Web Audio API for full processing control:
+  const ctx = new AudioContext();
+  const res = await fetch('https://cdn-url/sound.mp3');
+  const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+- Chain any effects between source and destination:
+  · Distortion: ctx.createWaveShaper() — shape curve for overdrive/horror crunch
+  · Filter: ctx.createBiquadFilter() — lowpass for muffled, highpass for thin, bandpass for telephone
+  · Reverb: ctx.createConvolver() with an impulse response buffer
+  · Delay: ctx.createDelay(maxDelay) + ctx.createGain() feedback loop
+  · Compressor: ctx.createDynamicsCompressor() for loudness control
+  · Panner: ctx.createStereoPanner() or ctx.createPanner() for 3D spatial audio
+  · Analyser: ctx.createAnalyser() for visualising audio in real time (waveform, frequency bars)
+- For generated tones (beeps, stingers, retro sounds): use OscillatorNode — type: 'sine'|'square'|'sawtooth'|'triangle'
+- Combine both: load a real sample, pitch-shift it, add distortion and reverb for horror; or layer an oscillator over a real beat
+- Always gate autoplay behind a user gesture (click/tap) — AudioContext must be resumed after user interaction
+- For music apps, rhythm games, or audio visualisers: use AnalyserNode + requestAnimationFrame to draw live waveform or frequency bars on Canvas
 
 IMAGE MANIPULATION:
 - When the user provides an image to edit/filter/transform: build a Canvas-based tool that applies the operation
