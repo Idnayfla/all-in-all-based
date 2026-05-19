@@ -978,18 +978,25 @@ async function callModel(
     const hasOwnKey =
       process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'placeholder';
     if (hasOwnKey) {
-      const directModel =
-        modelType === 'planner' || modelType === 'summary'
-          ? 'claude-haiku-4-5-20251001'
-          : 'claude-sonnet-4-6';
-      const res = await client.messages.create({
-        model: directModel,
-        max_tokens: maxTokens,
-        system: systemText,
-        messages: [{ role: 'user', content: userText }],
-      });
-      const c = res.content[0];
-      return c.type === 'text' ? c.text : '';
+      try {
+        const directModel =
+          modelType === 'planner' || modelType === 'summary'
+            ? 'claude-haiku-4-5-20251001'
+            : 'claude-sonnet-4-6';
+        const res = await client.messages.create({
+          model: directModel,
+          max_tokens: maxTokens,
+          system: systemText,
+          messages: [{ role: 'user', content: userText }],
+        });
+        const c = res.content[0];
+        return c.type === 'text' ? c.text : '';
+      } catch (err: any) {
+        console.warn(
+          '[callModel] Direct Anthropic failed, falling back to Pantheon:',
+          err?.message
+        );
+      }
     }
 
     if (aiModel === 'free' && process.env.GROQ_API_KEY) {
@@ -1025,22 +1032,26 @@ async function streamText(
   const hasOwnKey =
     process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'placeholder';
   if (hasOwnKey) {
-    const systemMsg = messages.find(m => m.role === 'system');
-    const userMsg = messages.find(m => m.role === 'user');
-    let accumulated = '';
-    const stream = client.messages.stream({
-      model: 'claude-opus-4-7',
-      max_tokens: maxTokens,
-      system: systemMsg?.content ?? '',
-      messages: [{ role: 'user', content: userMsg?.content ?? '' }],
-    });
-    for await (const chunk of stream) {
-      if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-        accumulated += chunk.delta.text;
-        onChunk(chunk.delta.text);
+    try {
+      const systemMsg = messages.find(m => m.role === 'system');
+      const userMsg = messages.find(m => m.role === 'user');
+      let accumulated = '';
+      const stream = client.messages.stream({
+        model: 'claude-opus-4-7',
+        max_tokens: maxTokens,
+        system: systemMsg?.content ?? '',
+        messages: [{ role: 'user', content: userMsg?.content ?? '' }],
+      });
+      for await (const chunk of stream) {
+        if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+          accumulated += chunk.delta.text;
+          onChunk(chunk.delta.text);
+        }
       }
+      return accumulated;
+    } catch (err: any) {
+      console.warn('[streamText] Direct Anthropic failed, falling back to Pantheon:', err?.message);
     }
-    return accumulated;
   }
 
   if (aiModel === 'free' && process.env.GROQ_API_KEY) {
