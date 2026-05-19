@@ -4,7 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '../_auth';
 import { searchWeb } from '@/lib/tavily';
 import { getWeather } from '@/lib/weather';
-import { getLangfuse } from '@/lib/langfuse';
+import { createLangfuseClient } from '@/lib/langfuse';
 
 export const maxDuration = 300;
 
@@ -344,6 +344,16 @@ GRAPHICS — NEVER USE EMOJI AS VISUAL ELEMENTS:
 - For game sprites: always use Phaser graphics.generateTexture() or draw directly on Canvas — never emoji
 - Emoji are only acceptable inside prose text or chat messages — never as a substitute for real graphics
 - When in doubt: a colored SVG circle beats an emoji every time
+
+JUMPSCARE & HORROR EFFECTS — NEVER USE EXTERNAL IMAGE FILES:
+- NEVER use <img src="scary.jpg"> or any external/local image file for horror visuals — they will fail to load and show broken alt text
+- Build ALL scary visuals using Canvas 2D API or inline SVG — draw the face, creature, or effect directly in code
+- Jumpscare face pattern (Canvas): draw in a hidden canvas, reveal with sudden CSS transform scale(1) + flash overlay after a delay
+- Scary face: use ctx.arc for eyes, ctx.bezierCurveTo for a jagged mouth, ctx.fillStyle = '#ff0000' for blood effects
+- Flash effect: a full-screen white/red <div> that fades out instantly using CSS transition opacity 1→0
+- Shake effect: CSS @keyframes with translateX(-10px) → translateX(10px) alternating rapidly
+- Sound: use Web Audio API oscillator (sawtooth/square wave, low frequency) for jumpscare stinger — never load external audio
+- Always have a "Click to start" screen before the jumpscare so it works without autoplay restrictions
 
 IMAGE MANIPULATION:
 - When the user provides an image to edit/filter/transform: build a Canvas-based tool that applies the operation
@@ -1110,7 +1120,7 @@ export async function POST(req: NextRequest) {
 
     const encoder = new TextEncoder();
 
-    const lf = getLangfuse();
+    const lf = createLangfuseClient();
     const trace = lf?.trace({
       name: 'generate',
       input: { message: lastUserMessage, aiModel, hasImage },
@@ -1565,7 +1575,7 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
           trace?.update({ output: { error: friendly } });
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: friendly })}\n\n`));
         } finally {
-          await lf?.flushAsync();
+          await lf?.shutdownAsync();
           controller.close();
         }
       },
