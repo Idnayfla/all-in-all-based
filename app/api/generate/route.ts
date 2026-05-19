@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '../_auth';
 import { searchWeb } from '@/lib/tavily';
 import { getWeather } from '@/lib/weather';
+import { getLangfuse } from '@/lib/langfuse';
 
 export const maxDuration = 300;
 
@@ -1108,6 +1110,13 @@ export async function POST(req: NextRequest) {
 
     const encoder = new TextEncoder();
 
+    const lf = getLangfuse();
+    const trace = lf?.trace({
+      name: 'generate',
+      input: { message: lastUserMessage, aiModel, hasImage },
+      userId: authToken ?? undefined,
+    });
+
     const readable = new ReadableStream({
       async start(controller) {
         try {
@@ -1232,12 +1241,14 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                   ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}`
                   : '');
 
+          const planSpan = trace?.span({ name: 'planner', input: { prompt: lastUserMessage } });
           const planText = await callModel(
             plannerPromptContent,
             PLANNER_SYSTEM_BLOCKS,
             'planner',
             usingFreeModel ? 'free' : 'based'
           );
+          planSpan?.end({ output: { plan: planText.slice(0, 500) } });
 
           let filePlan: { name: string; language: string; description: string }[] = [];
           let routeToChat = false;
@@ -1414,6 +1425,10 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
                 `data: ${JSON.stringify({ status: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`
               )
             );
+            const fileSpan = trace?.span({
+              name: `generate-file:${fileSpec.name}`,
+              input: { file: fileSpec.name, purpose: fileSpec.description },
+            });
 
             const filePromptContent =
               imageBlocks.length > 0
@@ -1502,6 +1517,7 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
               );
             }
 
+            fileSpan?.end({ output: { lines: fileText.split('\n').length } });
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({ progress: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`
@@ -1537,6 +1553,7 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
                 .slice(0, 3);
           } catch {}
 
+          trace?.update({ output: { files: generatedFiles.map(f => f.name), reply } });
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({ done: true, reply, files: generatedFiles, projectType, suggestions })}\n\n`
@@ -1544,8 +1561,11 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
           );
         } catch (e: any) {
           const friendly = friendlyError(e);
+          Sentry.captureException(e, { extra: { message: lastUserMessage, aiModel } });
+          trace?.update({ output: { error: friendly } });
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: friendly })}\n\n`));
         } finally {
+          await lf?.flushAsync();
           controller.close();
         }
       },
