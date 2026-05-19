@@ -63,24 +63,27 @@ interface GenerationProgress {
 }
 
 const FREE_LOADING_MSGS = [
-  '... Thinking',
-  '... Analyzing your request',
-  '... Planning the build',
-  '... Crafting something good',
-  '... Cooking it up',
-  '... On it',
-  '... Working through it',
+  'Thinking',
+  'Analyzing your request',
+  'Planning the build',
+  'Crafting something good',
+  'Cooking it up',
+  'On it',
+  'Working through it',
   '· Go Pro for instant responses',
-  '... Almost there',
-  '... Putting it together',
+  'Almost there',
+  'Putting it together',
   '· Pro tier responds way faster — just saying',
-  '... Mapping it out',
-  '... Sketching the structure',
+  'Mapping it out',
+  'Sketching the structure',
   '· Upgrade to Pro and skip the wait',
 ];
 
+const DOTS = ['.', '..', '...'];
+
 function ProgressBar({ progress, isFree }: { progress: GenerationProgress; isFree?: boolean }) {
   const [msgIdx, setMsgIdx] = useState(0);
+  const [dotsIdx, setDotsIdx] = useState(0);
   const isIndeterminate = progress.total === 0;
 
   useEffect(() => {
@@ -89,13 +92,20 @@ function ProgressBar({ progress, isFree }: { progress: GenerationProgress; isFre
     return () => clearInterval(id);
   }, [isIndeterminate, isFree]);
 
+  useEffect(() => {
+    if (!isIndeterminate) return;
+    const id = setInterval(() => setDotsIdx(i => (i + 1) % DOTS.length), 450);
+    return () => clearInterval(id);
+  }, [isIndeterminate]);
+
   const withinFile = progress.file ? Math.min(1 - Math.exp(-progress.chunks / 50), 0.92) : 0;
   const pct =
     progress.total === 0
       ? 0
       : Math.round(((progress.completed + withinFile) / progress.total) * 100);
 
-  const preparingLabel = isFree ? FREE_LOADING_MSGS[msgIdx] : '... Preparing';
+  const rawMsg = isFree ? FREE_LOADING_MSGS[msgIdx] : 'Preparing';
+  const preparingLabel = rawMsg.startsWith('·') ? rawMsg : `${DOTS[dotsIdx]} ${rawMsg}`;
 
   return (
     <div className="generation-progress">
