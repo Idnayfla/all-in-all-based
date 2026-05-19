@@ -1183,11 +1183,13 @@ export async function POST(req: NextRequest) {
 
     const lf = createLangfuseClient();
     if (!lf) console.warn('[LangFuse] client is null — keys missing');
+    else console.log('[LangFuse] client ready');
     const trace = lf?.trace({
       name: 'generate',
       input: { message: lastUserMessage.slice(0, 500), aiModel, hasImage },
       userId: supabaseUserId,
     });
+    if (trace) console.log('[LangFuse] trace:', trace.id);
 
     const readable = new ReadableStream({
       async start(controller) {
@@ -1638,9 +1640,13 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: friendly })}\n\n`));
         } finally {
           try {
-            if (lf) await lf.flushAsync();
+            if (lf) {
+              console.log('[LangFuse] shutting down...');
+              await lf.shutdownAsync();
+              console.log('[LangFuse] done');
+            }
           } catch (lfErr) {
-            console.error('[LangFuse] flush failed:', lfErr);
+            console.error('[LangFuse] shutdown failed:', lfErr);
           }
           controller.close();
         }

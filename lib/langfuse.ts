@@ -6,7 +6,5 @@ export function createLangfuseClient() {
     secretKey: process.env.LANGFUSE_SECRET_KEY,
     publicKey: process.env.LANGFUSE_PUBLIC_KEY,
     baseUrl: process.env.LANGFUSE_HOST ?? 'https://cloud.langfuse.com',
-    flushAt: 1,
-    flushInterval: 0, // disable timer-based flushing — we call shutdownAsync manually
   });
 }
