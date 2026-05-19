@@ -346,36 +346,32 @@ GRAPHICS — NEVER USE EMOJI AS VISUAL ELEMENTS:
 - When in doubt: a colored SVG circle beats an emoji every time
 
 IMAGES IN GENERATED HTML — ABSOLUTE URLS ONLY:
-- NEVER use local filenames in <img> tags — e.g. "scary.jpg", "monster.png", "image.jpg" do not exist and will show broken alt text
-- Every <img src="..."> must use a full absolute HTTPS URL that actually resolves
-- For horror/jumpscare images: use https://picsum.photos/seed/horror/800/600 or draw directly with Canvas 2D / inline SVG
+- NEVER use local filenames in <img src>, CSS url(), or fetch() calls — "scary.jpg", "monster.png", "image.jpg" do not exist in the sandbox and will silently fail
+- Every image must use a full absolute HTTPS URL that actually resolves, OR be drawn with Canvas 2D / inline SVG
+- For horror/jumpscare images: https://picsum.photos/seed/horror/800/600 (or any seed word) — or draw directly on canvas
 - For placeholder images of any theme: https://picsum.photos/seed/[keyword]/[width]/[height]
 - Canvas-drawn faces are preferred for jumpscares: ctx.arc for eyes, ctx.bezierCurveTo for jagged mouth, blood-red fills
 - Flash effect: full-screen <div> that snaps to opacity 1 then transitions to 0
 - Shake effect: CSS @keyframes translateX(-10px) → (10px) alternating fast
 - Always include a "Click to start" gate before autoplay effects
 
-AUDIO — USE REAL SOURCES AND THE FULL WEB AUDIO API:
-- You can and should load real audio from external HTTPS URLs — always use absolute URLs, never local filenames like "sound.mp3"
-- Reliable free audio CDNs (CORS-enabled): https://assets.mixkit.co/active_storage/sfx/ · https://www.soundjay.com/misc/ · raw GitHub-hosted audio
-- Load external audio through Web Audio API for full processing control:
+AUDIO — RULES (BREAKING THESE MAKES AUDIO SILENT OR CORRUPTED):
+RULE 1 — NEVER use local filenames: new Audio('sound.mp3'), fetch('jump.wav'), <audio src="file.mp3"> — these files do not exist in the sandbox. Silent failure every time.
+RULE 2 — NEVER create audio Blob files for download with .mp3 or .wav extension unless you encode them properly. Web Audio API cannot produce MP3. If you must export audio, encode as WAV manually (PCM header + raw Float32 samples) — not as a raw blob with an audio extension.
+RULE 3 — For sound effects and music: use OscillatorNode, AudioBufferSourceNode, or load from a real external HTTPS URL. No exceptions.
+
+AUDIO — HOW TO DO IT RIGHT:
+- Load real audio from external HTTPS URLs with fetch + decodeAudioData:
   const ctx = new AudioContext();
-  const res = await fetch('https://cdn-url/sound.mp3');
+  const res = await fetch('https://cdn-url/sound.mp3');  // ← absolute URL, never local
   const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
-  const src = ctx.createBufferSource();
-  src.buffer = buffer;
-- Chain any effects between source and destination:
-  · Distortion: ctx.createWaveShaper() — shape curve for overdrive/horror crunch
-  · Filter: ctx.createBiquadFilter() — lowpass for muffled, highpass for thin, bandpass for telephone
-  · Reverb: ctx.createConvolver() with an impulse response buffer
-  · Delay: ctx.createDelay(maxDelay) + ctx.createGain() feedback loop
-  · Compressor: ctx.createDynamicsCompressor() for loudness control
-  · Panner: ctx.createStereoPanner() or ctx.createPanner() for 3D spatial audio
-  · Analyser: ctx.createAnalyser() for visualising audio in real time (waveform, frequency bars)
-- For generated tones (beeps, stingers, retro sounds): use OscillatorNode — type: 'sine'|'square'|'sawtooth'|'triangle'
-- Combine both: load a real sample, pitch-shift it, add distortion and reverb for horror; or layer an oscillator over a real beat
-- Always gate autoplay behind a user gesture (click/tap) — AudioContext must be resumed after user interaction
-- For music apps, rhythm games, or audio visualisers: use AnalyserNode + requestAnimationFrame to draw live waveform or frequency bars on Canvas
+  const src = ctx.createBufferSource(); src.buffer = buffer; src.connect(ctx.destination); src.start();
+- Reliable free audio CDNs (CORS-enabled): https://assets.mixkit.co/active_storage/sfx/ · https://cdn.pixabay.com/audio/ · raw GitHub-hosted .mp3 · https://www.soundjay.com/misc/
+- Generate tones synthetically with OscillatorNode for beeps, stingers, horror drones, retro chiptune
+- Chain effects: ctx.createWaveShaper() distortion · ctx.createBiquadFilter() EQ · ctx.createDelay() echo · ctx.createConvolver() reverb · ctx.createDynamicsCompressor() · ctx.createStereoPanner() · ctx.createAnalyser() for visualiser
+- Combine: load a real sample from CDN, add distortion + reverb for horror; layer an oscillator over a real beat
+- Always gate autoplay behind a user gesture — resume AudioContext on click/tap
+- For music apps or audio visualisers: use AnalyserNode + requestAnimationFrame to draw waveform/frequency bars on Canvas
 
 IMAGE MANIPULATION:
 - When the user provides an image to edit/filter/transform: build a Canvas-based tool that applies the operation
@@ -1021,12 +1017,14 @@ export async function POST(req: NextRequest) {
     // Free AI model bypasses limits entirely (uses Groq, not our Anthropic credits)
     const alwaysPro = process.env.ALWAYS_PRO === 'true';
     const authToken = req.headers.get('Authorization')?.replace('Bearer ', '');
+    let supabaseUserId: string | undefined;
     if (!alwaysPro && !usingFreeModel && authToken) {
       try {
         const {
           data: { user },
         } = await supabaseAdmin.auth.getUser(authToken);
         if (user) {
+          supabaseUserId = user.id;
           const { data: s } = await supabaseAdmin
             .from('user_settings')
             .select(
@@ -1143,10 +1141,11 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder();
 
     const lf = createLangfuseClient();
+    if (!lf) console.warn('[LangFuse] client is null — keys missing');
     const trace = lf?.trace({
       name: 'generate',
-      input: { message: lastUserMessage, aiModel, hasImage },
-      userId: authToken ?? undefined,
+      input: { message: lastUserMessage.slice(0, 500), aiModel, hasImage },
+      userId: supabaseUserId,
     });
 
     const readable = new ReadableStream({
@@ -1597,7 +1596,11 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
           trace?.update({ output: { error: friendly } });
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: friendly })}\n\n`));
         } finally {
-          await lf?.shutdownAsync();
+          try {
+            await lf?.shutdownAsync();
+          } catch (lfErr) {
+            console.error('[LangFuse] shutdownAsync failed:', lfErr);
+          }
           controller.close();
         }
       },
