@@ -181,3 +181,30 @@ Significant product, technical, and business decisions. Rationale preserved so f
 **Rationale**: Showing a donation prompt on build #1 — before the user has experienced any value — is tone-deaf and damages first impressions. By build 5 the user has seen real output and is far more likely to consider supporting.
 **Rejected alternatives**: Build #3. Rejected — still too early; #5 is a natural milestone.
 **Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — Phase 9: Music AI via FAL stable-audio in Studio AI Gen tab
+
+**Decision**: Add an "AI Gen" tab to StudioPanel wired to `/api/music` (Haiku prompt enhancer + `fal-ai/stable-audio`). Gated to Pro tier. Genres, duration picker, `GeneratedMusicCard` list.
+**Rationale**: Based is positioned as an "all-in-all" studio — not having AI audio generation while the endpoint already existed was a product gap. The infrastructure was ready; only the UI was missing.
+**Rejected alternatives**: New endpoint with a different model. Rejected — `/api/music` already has Haiku enhancer + FAL wired; reusing avoids duplication.
+**Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — PostHog analytics: generation, panel, upgrade, identity
+
+**Decision**: Add PostHog via `lib/posthog.ts` singleton + `PostHogProvider` in layout. Track `generation_complete`, `panel_switched`, `pro_upgrade_clicked`, `signed_in`. Requires `NEXT_PUBLIC_POSTHOG_KEY` env var.
+**Rationale**: Vercel Analytics shows page views only. To understand which panels users visit, where they drop off, and upgrade conversion, we need event-level analytics. PostHog is open-source compatible and has a generous free tier.
+**Rejected alternatives**: Mixpanel, Amplitude. Rejected — PostHog is self-hostable, GDPR-friendly, and has the best free tier for a bootstrapped product.
+**Owner**: Hus Alfyandi
+
+---
+
+## 2026-05-19 — Playwright E2E smoke tests, local/staging only
+
+**Decision**: Add Playwright with a 6-test smoke suite covering landing, auth modal, chat input, nav tabs, and error boundary. CI runs quality+build only; E2E runs locally (dev server auto-started) or against staging via `TEST_BASE_URL`.
+**Rationale**: End-to-end tests that need real Supabase/Stripe/Anthropic credentials cannot safely run in the public CI environment. Local runner gives the same signal without exposing secrets.
+**Rejected alternatives**: Mock all external deps in CI. Rejected — mocked E2E tests don't catch the class of bugs that integration tests exist to find.
+**Owner**: Hus Alfyandi

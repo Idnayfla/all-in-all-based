@@ -39,6 +39,17 @@ User-facing record of what shipped on beta.getbased.dev.
 
 ---
 
+## [Beta] 2026-05-19 — Phase 9: AI Music Generation
+
+### Added
+
+- **AI Gen tab in Studio** — describe a track, pick a genre and duration, get a real audio file. Powered by FAL stable-audio with Haiku prompt enhancement
+- **10 genre chips** — Cinematic, Lo-fi, Electronic, Ambient, Jazz, Rock, Orchestral, Chill, Epic, Dark
+- **Duration presets** — 15s, 30s (default), 45s, 60s
+- Tracks appear in a card list with playback — Pro tier only
+
+---
+
 ## [Beta] 2026-05-xx — Personal Notes (Phase 12)
 
 ### Added
