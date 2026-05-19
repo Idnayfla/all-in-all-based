@@ -363,10 +363,10 @@ RULE 3 — ALWAYS use real audio from absolute HTTPS CDN URLs for any sound effe
 AUDIO — HOW TO DO IT RIGHT:
 - Load real audio from Mixkit (CORS-enabled, free, reliable):
   const ctx = new AudioContext();
-  const res = await fetch('https://assets.mixkit.co/active_storage/sfx/SLUG.mp3');
+  const res = await fetch('https://assets.mixkit.co/sfx/preview/SLUG.mp3');
   const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
   const src = ctx.createBufferSource(); src.buffer = buffer; src.connect(ctx.destination); src.start();
-- Mixkit SFX by category (pick the most fitting slug from mixkit.co/free-sound-effects/):
+- Mixkit SFX by category — URL = https://assets.mixkit.co/sfx/preview/{slug}.mp3:
   Horror / jumpscare: mixkit-horror-lose-2011 · mixkit-scary-cinematic-hit-2210 · mixkit-cinematic-horror-sting-581
   Explosions / impact: mixkit-explosion-impact-1682 · mixkit-cinematic-impact-stamp-1283
   Game / arcade: mixkit-arcade-game-jump-coin-216 · mixkit-winning-chime-2015 · mixkit-player-losing-or-failing-2042
@@ -374,6 +374,7 @@ AUDIO — HOW TO DO IT RIGHT:
   Nature / ambient: mixkit-light-rain-loop-2393 · mixkit-forest-birds-ambience-1210
   Music stinger: mixkit-suspense-mystery-piano-565
 - Alternative CORS CDN: https://cdn.pixabay.com/audio/ (search pixabay.com/sound-effects/ for slug)
+- Always use <audio> tag fallback too: <audio id="snd" src="https://assets.mixkit.co/sfx/preview/SLUG.mp3" preload="auto"></audio> then snd.play()
 - Chain effects on real samples: ctx.createWaveShaper() distortion · ctx.createBiquadFilter() EQ · ctx.createDelay() echo · ctx.createConvolver() reverb · ctx.createDynamicsCompressor() · ctx.createStereoPanner() · ctx.createAnalyser() for visualiser
 - Always gate autoplay behind a user gesture — resume AudioContext on click/tap
 - For music apps or audio visualisers: use AnalyserNode + requestAnimationFrame to draw waveform/frequency bars on Canvas
@@ -707,8 +708,9 @@ PHASER 3 GAMES (any 2D game with physics, enemies, collectibles, or multiple sce
 3D GAMES (Three.js + Cannon.js, FPS, platformer, racing):
 - 1-2 files. index.html with inline JS is fine for most 3D games.
 
-MEDIUM (multi-page apps, dashboards, chat UI, large Phaser game with 4+ scenes):
-- 3-5 files. index.html + style.css + 1-3 JS modules split by responsibility.
+MEDIUM (multi-page apps, dashboards, chat UI, large Phaser game with 4+ scenes, jumpscare / horror experience, interactive story, animation-heavy app, any app that loads external audio):
+- 3-5 files. index.html + style.css + app.js (or named modules split by responsibility).
+- Rule: if the app loads external audio AND has CSS animations AND timed JS events → always MEDIUM minimum.
 
 COMPLEX (RPG, multiplayer game, large data app, distinct subsystems like rooms/entities/audio/UI):
 - Up to 8 files. Split by subsystem — one clear concern per file.
