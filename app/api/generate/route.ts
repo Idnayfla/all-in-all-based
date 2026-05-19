@@ -1638,10 +1638,7 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: friendly })}\n\n`));
         } finally {
           try {
-            await Promise.race([
-              lf?.flushAsync(),
-              new Promise(resolve => setTimeout(resolve, 4000)),
-            ]);
+            if (lf) await lf.flushAsync();
           } catch (lfErr) {
             console.error('[LangFuse] flush failed:', lfErr);
           }
