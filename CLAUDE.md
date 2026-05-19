@@ -44,6 +44,27 @@ Non-code chat uses `sonnet`. `sanitizeHTML()` post-processes all HTML before sen
 - Prompt rules are unreliable for structural guarantees — use server-side post-processing (`sanitizeHTML`) instead
 - Always state root cause before fixing, state what changed after
 
+## Agent System
+
+Eight senior specialist agents are defined in `.claude/agents/`. Invoke one by prefixing your message:
+
+```
+[Agent: Architect] Should we add a CDN for user-uploaded assets?
+[Agent: Product] What should Phase 10 be?
+[Agent: Designer] Review the Notes panel layout
+[Agent: Growth] Write the beta launch announcement
+[Agent: QA] Run the stable release gate checklist
+[Agent: DevOps] What's our Vercel spend per active user?
+[Agent: Security] Audit the Supabase RLS policies
+[Agent: Chief of Staff] Log today's decisions
+```
+
+Without a prefix, default behaviour is **Full-Stack Engineer** (code, bugs, features).
+
+Tracking documents:
+- `DECISIONS.md` — all significant product/tech decisions with rationale
+- `CHANGELOG.md` — user-facing record of what shipped
+
 ## Model Guide
 
 | Task | Model |
