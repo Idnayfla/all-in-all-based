@@ -62,23 +62,50 @@ interface GenerationProgress {
   chunks: number; // chunks received for the current file
 }
 
-function ProgressBar({ progress }: { progress: GenerationProgress }) {
+const FREE_LOADING_MSGS = [
+  '... Thinking',
+  '... Analyzing your request',
+  '... Planning the build',
+  '... Crafting something good',
+  '... Cooking it up',
+  '... On it',
+  '... Working through it',
+  '· Go Pro for instant responses',
+  '... Almost there',
+  '... Putting it together',
+  '· Pro tier responds way faster — just saying',
+  '... Mapping it out',
+  '... Sketching the structure',
+  '· Upgrade to Pro and skip the wait',
+];
+
+function ProgressBar({ progress, isFree }: { progress: GenerationProgress; isFree?: boolean }) {
+  const [msgIdx, setMsgIdx] = useState(0);
+  const isIndeterminate = progress.total === 0;
+
+  useEffect(() => {
+    if (!isIndeterminate || !isFree) return;
+    const id = setInterval(() => setMsgIdx(i => (i + 1) % FREE_LOADING_MSGS.length), 3200);
+    return () => clearInterval(id);
+  }, [isIndeterminate, isFree]);
+
   const withinFile = progress.file ? Math.min(1 - Math.exp(-progress.chunks / 50), 0.92) : 0;
   const pct =
     progress.total === 0
       ? 0
       : Math.round(((progress.completed + withinFile) / progress.total) * 100);
-  const isIndeterminate = progress.total === 0;
+
+  const preparingLabel = isFree ? FREE_LOADING_MSGS[msgIdx] : '... Preparing';
 
   return (
     <div className="generation-progress">
       <div className="gen-progress-header">
         <span className="gen-progress-file">
           {isIndeterminate
-            ? progress.file || '... Preparing'
+            ? progress.file || preparingLabel
             : progress.file
               ? `◈ ${progress.file}`
-              : '... Preparing'}
+              : preparingLabel}
         </span>
         {!isIndeterminate && (
           <span className="gen-progress-count">
@@ -1022,6 +1049,7 @@ export default function ChatPanel({
                       progress={
                         genProgress ?? { files: [], completed: 0, total: 0, file: '', chunks: 0 }
                       }
+                      isFree={aiModel === 'free'}
                     />
                   ) : (
                     renderContent(m.content, i)
