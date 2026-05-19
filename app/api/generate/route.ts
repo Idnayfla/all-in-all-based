@@ -358,18 +358,23 @@ IMAGES IN GENERATED HTML — ABSOLUTE URLS ONLY:
 AUDIO — RULES (BREAKING THESE MAKES AUDIO SILENT OR CORRUPTED):
 RULE 1 — NEVER use local filenames: new Audio('sound.mp3'), fetch('jump.wav'), <audio src="file.mp3"> — these files do not exist in the sandbox. Silent failure every time.
 RULE 2 — NEVER create audio Blob files for download with .mp3 or .wav extension unless you encode them properly. Web Audio API cannot produce MP3. If you must export audio, encode as WAV manually (PCM header + raw Float32 samples) — not as a raw blob with an audio extension.
-RULE 3 — For sound effects and music: use OscillatorNode, AudioBufferSourceNode, or load from a real external HTTPS URL. No exceptions.
+RULE 3 — ALWAYS use real audio from absolute HTTPS CDN URLs for any sound effect, music, or atmosphere. OscillatorNode is a LAST RESORT for simple electronic beeps only — never use it for jumpscare stings, explosions, nature sounds, voices, or anything that should feel real.
 
 AUDIO — HOW TO DO IT RIGHT:
-- Load real audio from external HTTPS URLs with fetch + decodeAudioData:
+- Load real audio from Mixkit (CORS-enabled, free, reliable):
   const ctx = new AudioContext();
-  const res = await fetch('https://cdn-url/sound.mp3');  // ← absolute URL, never local
+  const res = await fetch('https://assets.mixkit.co/active_storage/sfx/SLUG.mp3');
   const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
   const src = ctx.createBufferSource(); src.buffer = buffer; src.connect(ctx.destination); src.start();
-- Reliable free audio CDNs (CORS-enabled): https://assets.mixkit.co/active_storage/sfx/ · https://cdn.pixabay.com/audio/ · raw GitHub-hosted .mp3 · https://www.soundjay.com/misc/
-- Generate tones synthetically with OscillatorNode for beeps, stingers, horror drones, retro chiptune
-- Chain effects: ctx.createWaveShaper() distortion · ctx.createBiquadFilter() EQ · ctx.createDelay() echo · ctx.createConvolver() reverb · ctx.createDynamicsCompressor() · ctx.createStereoPanner() · ctx.createAnalyser() for visualiser
-- Combine: load a real sample from CDN, add distortion + reverb for horror; layer an oscillator over a real beat
+- Mixkit SFX by category (pick the most fitting slug from mixkit.co/free-sound-effects/):
+  Horror / jumpscare: mixkit-horror-lose-2011 · mixkit-scary-cinematic-hit-2210 · mixkit-cinematic-horror-sting-581
+  Explosions / impact: mixkit-explosion-impact-1682 · mixkit-cinematic-impact-stamp-1283
+  Game / arcade: mixkit-arcade-game-jump-coin-216 · mixkit-winning-chime-2015 · mixkit-player-losing-or-failing-2042
+  UI / notification: mixkit-correct-answer-tone-2870 · mixkit-software-interface-start-2574 · mixkit-message-pop-alert-2354
+  Nature / ambient: mixkit-light-rain-loop-2393 · mixkit-forest-birds-ambience-1210
+  Music stinger: mixkit-suspense-mystery-piano-565
+- Alternative CORS CDN: https://cdn.pixabay.com/audio/ (search pixabay.com/sound-effects/ for slug)
+- Chain effects on real samples: ctx.createWaveShaper() distortion · ctx.createBiquadFilter() EQ · ctx.createDelay() echo · ctx.createConvolver() reverb · ctx.createDynamicsCompressor() · ctx.createStereoPanner() · ctx.createAnalyser() for visualiser
 - Always gate autoplay behind a user gesture — resume AudioContext on click/tap
 - For music apps or audio visualisers: use AnalyserNode + requestAnimationFrame to draw waveform/frequency bars on Canvas
 
@@ -474,7 +479,7 @@ PHASER RULES:
 - Timers: this.time.addEvent({ delay: 2000, callback: fn, callbackScope: this, loop: true })
 - Tweens: this.tweens.add({ targets: obj, alpha: 0, duration: 300, onComplete: () => {...} })
 - Pass data between scenes: this.scene.start('GameOverScene', { score: this.score })
-- Sound: use Web Audio API beeps via AudioContext — never load external audio files
+- Sound: load real audio from Mixkit CDN URLs via AudioContext + decodeAudioData (same rules as AUDIO section above)
 - Mobile: always add this.input.addPointer(1) and on-screen buttons for mobile touch
 
 GAME ENGINE — 3D GAMES (THREE.JS + CANNON.JS PHYSICS):
