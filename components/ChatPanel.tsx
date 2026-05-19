@@ -10,6 +10,7 @@ import ModeDropdown, { GenerationMode } from './ModeDropdown';
 import GeneratedVideoCard from './GeneratedVideoCard';
 import GeneratedMusicCard from './GeneratedMusicCard';
 import GeneratingCard from './GeneratingCard';
+import { track } from '@/lib/posthog';
 
 const SUGGESTION_POOL = [
   'Build a todo app with drag & drop',
@@ -786,6 +787,11 @@ export default function ChatPanel({
               if (resolvedFiles.length) {
                 onFilesUpdate(resolvedFiles, data.projectType);
                 onGenerationComplete?.();
+                track('generation_complete', {
+                  file_count: resolvedFiles.length,
+                  project_type: data.projectType,
+                  model: data.model,
+                });
                 const count = parseInt(localStorage.getItem('based_build_count') || '0', 10) + 1;
                 localStorage.setItem('based_build_count', String(count));
                 if (

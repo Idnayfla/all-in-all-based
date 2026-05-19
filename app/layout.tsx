@@ -8,6 +8,7 @@ import InstallPrompt from '@/components/InstallPrompt';
 import Script from 'next/script';
 import { Analytics } from '@vercel/analytics/react';
 import BetaBanner from '@/components/BetaBanner';
+import PostHogProvider from '@/components/PostHogProvider';
 
 export const metadata: Metadata = {
   title: 'Based — AI Dev Studio',
@@ -90,7 +91,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <InstallPrompt />
         <ServiceWorkerInit />
         <ClientOnly>
-          <ErrorBoundary>{children}</ErrorBoundary>
+          <PostHogProvider>
+            <ErrorBoundary>{children}</ErrorBoundary>
+          </PostHogProvider>
         </ClientOnly>
         <Analytics />
       </body>

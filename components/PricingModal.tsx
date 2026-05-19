@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { track } from '@/lib/posthog';
 
 interface PricingModalProps {
   reason?: 'generations' | 'projects' | 'upgrade';
@@ -49,6 +50,7 @@ export default function PricingModal({
   const [error, setError] = useState('');
 
   const upgrade = async () => {
+    track('pro_upgrade_clicked', { reason });
     setLoading(true);
     setError('');
     try {

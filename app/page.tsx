@@ -32,6 +32,7 @@ import StudioPanel from '@/components/StudioPanel';
 import ImageStudioPanel from '@/components/ImageStudioPanel';
 import NotesPanel from '@/components/NotesPanel';
 import ProactiveCheckin from '@/components/ProactiveCheckin';
+import { track, identifyUser } from '@/lib/posthog';
 
 export interface FileNode {
   name: string;
@@ -113,6 +114,10 @@ export default function Home() {
   useEffect(() => {
     currentProjectRef.current = currentProject;
   }, [currentProject]);
+
+  useEffect(() => {
+    track('panel_switched', { panel: activePanel });
+  }, [activePanel]);
   const [showSplash, setShowSplash] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
   const [authTab, setAuthTab] = useState<'signin' | 'signup'>('signin');
@@ -529,6 +534,8 @@ export default function Home() {
       setUser(currentUser);
       setAuthToken(session?.access_token ?? '');
       if (event === 'SIGNED_IN' && currentUser) {
+        identifyUser(currentUser.id, { email: currentUser.email });
+        track('signed_in');
         const headers = await getHeaders();
         const res = await fetch('/api/projects', { headers });
         if (res.ok) {
