@@ -29,6 +29,15 @@ export default function PreviewPanel({
   const previewHtml = useMemo(() => {
     if (!htmlFile) return null;
     let html = htmlFile.content;
+    // srcdoc iframes always have a null/opaque origin (MDN spec) — even with
+    // allow-same-origin. Without <base>, relative URLs like /api/sfx?slug=...
+    // resolve to null:///api/sfx?slug=... and never reach the server.
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    if (origin) {
+      html = html.includes('<head>')
+        ? html.replace('<head>', `<head><base href="${origin}">`)
+        : `<base href="${origin}">${html}`;
+    }
     if (cssFile) html = html.replace('</head>', `<style>${cssFile.content}</style></head>`);
     if (jsFile) html = html.replace('</body>', `<script>${jsFile.content}</script></body>`);
     if (!html.includes('name="viewport"') && !html.includes("name='viewport'")) {
@@ -39,10 +48,6 @@ export default function PreviewPanel({
     }
     return html;
   }, [htmlFile, cssFile, jsFile]);
-
-  // srcdoc inherits the parent page's base URL so relative paths like
-  // /api/sfx?slug=... resolve correctly. contentDocument.write() set the
-  // base to about:blank, breaking all relative URL audio/fetch requests.
 
   const runCode = async () => {
     abortRef.current?.abort();
