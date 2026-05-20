@@ -9,10 +9,10 @@ Owner: Hus Alfyandi · Updated: 2026-05-20
 
 ### CI
 
-- [ ] TypeScript check passes (`npm run typecheck`)
-- [ ] ESLint passes (`npm run lint`)
-- [ ] Prettier clean (`npm run format:check`)
-- [ ] Build succeeds (`npm run build`)
+- [x] TypeScript check passes (`npm run typecheck`)
+- [x] ESLint passes (`npm run lint`)
+- [x] Prettier clean (`npm run format:check`)
+- [x] Build succeeds (`npm run build`)
 
 ### E2E Smoke (run locally or against beta URL)
 
