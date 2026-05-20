@@ -443,6 +443,7 @@ export default function PreviewPanel({
         ref={iframeRef}
         className="preview-frame"
         sandbox="allow-scripts allow-same-origin allow-modals allow-forms"
+        allow="autoplay"
         title="Preview"
         srcDoc={previewHtml ?? ''}
         onClick={() => setShowExportMenu(false)}

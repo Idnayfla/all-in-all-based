@@ -973,7 +973,8 @@ function sanitizeHTML(html: string): string {
     // Targeting only [data-autoplay] missed all AI-generated elements — fix: select all.
     document.querySelectorAll('audio').forEach(function(a){
       var p=a.play();
-      if(p&&typeof p.then==='function')p.then(function(){a.pause();a.currentTime=0;}).catch(function(){});
+      // pause only — don't reset currentTime so buffered position is preserved
+      if(p&&typeof p.then==='function')p.then(function(){a.pause();}).catch(function(){});
     });
   }
   ['click','touchstart','keydown','pointerdown'].forEach(function(e){
