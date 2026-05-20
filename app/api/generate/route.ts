@@ -379,28 +379,31 @@ IMAGES IN GENERATED HTML — ABSOLUTE URLS ONLY:
 AUDIO — RULES (BREAKING THESE MAKES AUDIO SILENT OR CORRUPTED):
 RULE 1 — NEVER use local filenames: new Audio('sound.mp3'), fetch('jump.wav'), <audio src="file.mp3"> — these files do not exist in the sandbox. Silent failure every time.
 RULE 2 — NEVER create audio Blob files for download with .mp3 or .wav extension unless you encode them properly. Web Audio API cannot produce MP3. If you must export audio, encode as WAV manually (PCM header + raw Float32 samples) — not as a raw blob with an audio extension.
-RULE 3 — ALWAYS use real audio from absolute HTTPS CDN URLs for any sound effect, music, or atmosphere. OscillatorNode is forbidden for jumpscare stings, horror sounds, explosions, nature sounds, voices, screams, or anything that should feel real. The ONLY acceptable use of OscillatorNode is a simple UI beep (single tone, < 0.3s). Everything else = Mixkit CDN.
+RULE 3 — OscillatorNode is forbidden for jumpscare stings, horror sounds, explosions, nature sounds, voices, screams, or anything that should feel real. The ONLY acceptable use of OscillatorNode is a simple UI beep (single tone, < 0.3s). Everything else = Mixkit CDN.
+RULE 4 — NEVER use fetch() to load audio. fetch() requires CORS headers that CDNs do not provide in sandboxed iframes — it silently fails every time. Use <audio> elements only.
 
-AUDIO — HOW TO DO IT RIGHT:
-- PRIMARY METHOD — use <audio> element (no CORS needed, works in sandboxed iframes):
-  <audio id="snd" src="https://assets.mixkit.co/sfx/preview/SLUG.mp3" preload="auto"></audio>
-  document.getElementById('snd').play();
-  — No fetch(), no AudioContext needed for basic playback. This is the most reliable approach.
-- Mixkit SFX by category — full URL = https://assets.mixkit.co/sfx/preview/{slug}.mp3:
+AUDIO — THE ONE METHOD THAT WORKS IN THE SANDBOX:
+Use <audio> elements with Mixkit CDN. This bypasses CORS entirely and always works:
+
+  <!-- In HTML — add ALL sounds you need upfront -->
+  <audio id="snd-scream" src="https://assets.mixkit.co/sfx/preview/mixkit-horror-lose-2011.mp3" preload="auto"></audio>
+  <audio id="snd-sting"  src="https://assets.mixkit.co/sfx/preview/mixkit-cinematic-horror-sting-581.mp3" preload="auto"></audio>
+
+  // In JS — play on user gesture (click, keydown, etc.)
+  function playScream() { const a = document.getElementById('snd-scream'); a.currentTime = 0; a.play(); }
+
+- DO NOT use: fetch(), AudioContext.decodeAudioData(), new Audio() with a CDN URL via fetch, or any network-fetch-based audio
+- DO NOT use: AudioContext with OscillatorNode for realistic sounds
+- The platform injects an AudioContext unlock automatically — you do not need to handle resume() yourself
+
+Mixkit SFX slugs — full URL = https://assets.mixkit.co/sfx/preview/{slug}.mp3:
   Horror / jumpscare: mixkit-horror-lose-2011 · mixkit-scary-cinematic-hit-2210 · mixkit-cinematic-horror-sting-581
   Explosions / impact: mixkit-explosion-impact-1682 · mixkit-cinematic-impact-stamp-1283
   Game / arcade: mixkit-arcade-game-jump-coin-216 · mixkit-winning-chime-2015 · mixkit-player-losing-or-failing-2042
   UI / notification: mixkit-correct-answer-tone-2870 · mixkit-software-interface-start-2574 · mixkit-message-pop-alert-2354
   Nature / ambient: mixkit-light-rain-loop-2393 · mixkit-forest-birds-ambience-1210
   Music stinger: mixkit-suspense-mystery-piano-565
-- SECONDARY METHOD — use fetch + decodeAudioData ONLY when you need Web Audio effects (reverb, distortion etc.):
-  const ctx = new AudioContext();
-  const res = await fetch('https://assets.mixkit.co/sfx/preview/SLUG.mp3');
-  const buffer = await ctx.decodeAudioData(await res.arrayBuffer());
-  const src = ctx.createBufferSource(); src.buffer = buffer; src.connect(ctx.destination); src.start();
-- Chain effects on real samples: ctx.createWaveShaper() distortion · ctx.createBiquadFilter() EQ · ctx.createDelay() echo · ctx.createConvolver() reverb · ctx.createDynamicsCompressor() · ctx.createStereoPanner() · ctx.createAnalyser() for visualiser
-- Always gate autoplay behind a user gesture — resume AudioContext on click/tap
-- For music apps or audio visualisers: use AnalyserNode + requestAnimationFrame to draw waveform/frequency bars on Canvas
+- For music apps or audio visualisers that need AnalyserNode: create AudioContext, create MediaElementSource FROM the <audio> element, connect to AnalyserNode — never fetch the audio
 
 IMAGE MANIPULATION:
 - When the user provides an image to edit/filter/transform: build a Canvas-based tool that applies the operation
@@ -829,14 +832,22 @@ NON-BROWSER LANGUAGES (Java / C++ / Go / Rust / Bash):
 - Bash: bash-compatible script, shebang #!/bin/bash, POSIX-safe.
 - All non-browser programs must produce meaningful stdout output — that output is the entire user experience.
 
-AUDIO RULES — NO EXCEPTIONS:
-- NEVER use AudioContext OscillatorNode for horror sounds, jumpscares, explosions, screams, or anything realistic — oscillators sound fake and ruin the experience
-- The ONLY acceptable oscillator use: a single-tone UI beep under 0.3s
-- For ALL other audio: use <audio> elements with Mixkit CDN
-  <audio id="snd" src="https://assets.mixkit.co/sfx/preview/SLUG.mp3" preload="auto"></audio>
-  document.getElementById('snd').play();
-- Horror/jumpscare slugs: mixkit-horror-lose-2011 · mixkit-scary-cinematic-hit-2210 · mixkit-cinematic-horror-sting-581
+AUDIO RULES — THE ONLY METHOD THAT WORKS IN THE SANDBOX:
+- NEVER use fetch() to load audio — CORS blocks it silently in sandboxed iframes. Audio will be completely muted.
+- NEVER use OscillatorNode for horror, jumpscare, explosion, scream, or any realistic sound — only for a UI beep under 0.3s
 - NEVER reference local audio filenames — they don't exist in the sandbox
+- ONLY USE: <audio> elements with Mixkit CDN URLs — this bypasses CORS and always works
+
+  <!-- Declare all sounds in HTML -->
+  <audio id="snd-scream" src="https://assets.mixkit.co/sfx/preview/mixkit-horror-lose-2011.mp3" preload="auto"></audio>
+  <audio id="snd-sting"  src="https://assets.mixkit.co/sfx/preview/mixkit-cinematic-horror-sting-581.mp3" preload="auto"></audio>
+
+  // Play in JS on user gesture
+  function playScream() { const a = document.getElementById('snd-scream'); a.currentTime = 0; a.play(); }
+
+- The platform auto-injects an AudioContext unlock — do NOT write your own resume() logic
+- Mixkit horror slugs: mixkit-horror-lose-2011 · mixkit-scary-cinematic-hit-2210 · mixkit-cinematic-horror-sting-581
+- Game slugs: mixkit-arcade-game-jump-coin-216 · mixkit-winning-chime-2015 · mixkit-player-losing-or-failing-2042
 
 PROMPT FAITHFULNESS — HIGHEST PRIORITY:
 - Implement EXACTLY what the user described — do not reinterpret, simplify, or substitute
@@ -941,6 +952,32 @@ function sanitizeHTML(html: string): string {
   html = html.includes('<head>')
     ? html.replace('<head>', '<head>' + errorCatcher)
     : errorCatcher + html;
+
+  // Universal audio unlock — first user gesture unblocks all audio in the sandbox.
+  // Without this, AudioContext stays suspended and audio.play() is silently rejected
+  // because the iframe counts as a cross-origin context for autoplay policy purposes.
+  const audioUnlock = `<script>(function(){
+  var _unlocked=false;
+  function _unlock(){
+    if(_unlocked)return; _unlocked=true;
+    // Resume any AudioContext the app created
+    ['__audioCtx','audioCtx','ctx','context','audioContext'].forEach(function(k){
+      var c=window[k];
+      if(c&&c.state==='suspended'&&typeof c.resume==='function')c.resume();
+    });
+    // Unmute and unpause any <audio> elements marked for autoplay
+    document.querySelectorAll('audio[data-autoplay],audio.autoplay').forEach(function(a){
+      a.muted=false; a.play().catch(function(){});
+    });
+  }
+  ['click','touchstart','keydown','pointerdown'].forEach(function(e){
+    document.addEventListener(e,_unlock,{once:true,capture:true});
+  });
+})();</script>`;
+
+  html = html.includes('<head>')
+    ? html.replace('<head>', '<head>' + audioUnlock)
+    : audioUnlock + html;
 
   return html.includes('</body>')
     ? html.replace('</body>', safetyNet + '\n</body>')
