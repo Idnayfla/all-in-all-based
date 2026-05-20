@@ -32,6 +32,7 @@ import StudioPanel from '@/components/StudioPanel';
 import ImageStudioPanel from '@/components/ImageStudioPanel';
 import NotesPanel from '@/components/NotesPanel';
 import ProactiveCheckin from '@/components/ProactiveCheckin';
+import WallpaperCropper from '@/components/WallpaperCropper';
 import { track, identifyUser } from '@/lib/posthog';
 
 export interface FileNode {
@@ -148,7 +149,11 @@ export default function Home() {
     'upgrade'
   );
   const [showFeedback, setShowFeedback] = useState(false);
-  const [checkin, setCheckin] = useState<{ id: string; name: string; fromDevice?: 'mobile' | 'tablet' | 'desktop' } | null>(null);
+  const [checkin, setCheckin] = useState<{
+    id: string;
+    name: string;
+    fromDevice?: 'mobile' | 'tablet' | 'desktop';
+  } | null>(null);
   const [aiModel, setAiModelState] = useState<'based' | 'free'>('based');
   const setAiModel = (m: 'based' | 'free') => {
     setAiModelState(m);
@@ -158,6 +163,7 @@ export default function Home() {
   };
   const [wallpaper, setWallpaper] = useState<string | null>(null);
   const [wallpaperBlur, setWallpaperBlur] = useState(0);
+  const [cropperSrc, setCropperSrc] = useState<string | null>(null);
   const wallpaperInputRef = useRef<HTMLInputElement>(null);
 
   // ── Project cache helpers (localStorage) ────────────────────────────────
@@ -187,7 +193,6 @@ export default function Home() {
     const cached = loadProjectsCache();
     if (cached.length > 0) setProjects(cached);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
 
   // ── Restore AI model preference ──────────────────────────────────────────
   useEffect(() => {
@@ -222,27 +227,33 @@ export default function Home() {
     }
   }
 
+  /** Resize + compress a raw dataUrl then save as wallpaper. */
+  function saveWallpaperFromDataUrl(rawDataUrl: string) {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 1920;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      setWallpaper(dataUrl);
+      applyWallpaper(dataUrl);
+      try {
+        localStorage.setItem('based_wallpaper', dataUrl);
+      } catch {}
+    };
+    img.src = rawDataUrl;
+  }
+
   function handleWallpaperUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const img = new Image();
     const reader = new FileReader();
     reader.onload = ev => {
-      img.onload = () => {
-        const MAX = 1920;
-        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-        setWallpaper(dataUrl);
-        applyWallpaper(dataUrl);
-        try {
-          localStorage.setItem('based_wallpaper', dataUrl);
-        } catch {}
-      };
-      img.src = ev.target?.result as string;
+      const dataUrl = ev.target?.result as string;
+      setCropperSrc(dataUrl);
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -458,14 +469,22 @@ export default function Home() {
     (async () => {
       try {
         const h = await getHeaders();
-        const res = await fetch(`/api/heartbeat?current=${getDeviceType()}`, { headers: h as HeadersInit });
+        const res = await fetch(`/api/heartbeat?current=${getDeviceType()}`, {
+          headers: h as HeadersInit,
+        });
         if (!res.ok || cancelled) return;
         const { heartbeat } = await res.json();
         if (!heartbeat?.project_id || cancelled) return;
-        setCheckin({ id: heartbeat.project_id, name: heartbeat.project_name, fromDevice: heartbeat.device_type });
+        setCheckin({
+          id: heartbeat.project_id,
+          name: heartbeat.project_name,
+          fromDevice: heartbeat.device_type,
+        });
       } catch {}
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [user, authReady, currentProject]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load user data from cloud ────────────────────────────────────────────
@@ -648,9 +667,13 @@ export default function Home() {
 
   // ── Refresh cloud data when window regains focus or Android app resumes ──
   useEffect(() => {
-    const onFocus = () => { if (user) loadCloudData(); };
+    const onFocus = () => {
+      if (user) loadCloudData();
+    };
     // visibilitychange catches Android resume (window.focus is unreliable there)
-    const onVisible = () => { if (document.visibilityState === 'visible' && user) loadCloudData(); };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && user) loadCloudData();
+    };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisible);
     return () => {
@@ -1800,6 +1823,21 @@ export default function Home() {
           <FeedbackModal userEmail={user?.email} onClose={() => setShowFeedback(false)} />
         )}
       </AnimatePresence>
+
+      {cropperSrc && (
+        <WallpaperCropper
+          src={cropperSrc}
+          onCrop={dataUrl => {
+            setCropperSrc(null);
+            saveWallpaperFromDataUrl(dataUrl);
+          }}
+          onSkip={() => {
+            const src = cropperSrc;
+            setCropperSrc(null);
+            saveWallpaperFromDataUrl(src);
+          }}
+        />
+      )}
 
       <AnimatePresence>
         {showGalleryPublish && (
