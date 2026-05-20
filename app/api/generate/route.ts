@@ -963,14 +963,17 @@ function sanitizeHTML(html: string): string {
   var _unlocked=false;
   function _unlock(){
     if(_unlocked)return; _unlocked=true;
-    // Resume any AudioContext the app created
+    // Resume any AudioContext the app created (checks window.* names)
     ['__audioCtx','audioCtx','ctx','context','audioContext'].forEach(function(k){
       var c=window[k];
       if(c&&c.state==='suspended'&&typeof c.resume==='function')c.resume();
     });
-    // Unmute and unpause any <audio> elements marked for autoplay
-    document.querySelectorAll('audio[data-autoplay],audio.autoplay').forEach(function(a){
-      a.muted=false; a.play().catch(function(){});
+    // iOS Safari warm-up: every <audio> must be play()-then-paused synchronously
+    // inside a gesture handler before iOS grants future .play() rights.
+    // Targeting only [data-autoplay] missed all AI-generated elements — fix: select all.
+    document.querySelectorAll('audio').forEach(function(a){
+      var p=a.play();
+      if(p&&typeof p.then==='function')p.then(function(){a.pause();a.currentTime=0;}).catch(function(){});
     });
   }
   ['click','touchstart','keydown','pointerdown'].forEach(function(e){
