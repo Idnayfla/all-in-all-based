@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
           enable_safety_checker: true,
         },
       });
-      const url = (result.data as any).images?.[0]?.url;
+      const url = (result.data as { images?: { url: string }[] }).images?.[0]?.url;
       if (!url) return NextResponse.json({ error: 'No image returned' }, { status: 500 });
       return NextResponse.json({ url });
     }
@@ -75,10 +75,13 @@ export async function POST(req: NextRequest) {
         safety_tolerance: '2',
       },
     });
-    const url = (result.data as any).images?.[0]?.url;
+    const url = (result.data as { images?: { url: string }[] }).images?.[0]?.url;
     if (!url) return NextResponse.json({ error: 'No image returned' }, { status: 500 });
     return NextResponse.json({ url });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message ?? 'Edit failed' }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : 'Edit failed' },
+      { status: 500 }
+    );
   }
 }

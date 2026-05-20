@@ -1317,7 +1317,7 @@ export async function POST(req: NextRequest) {
         await redis.connect();
         globalMemory = (await redis.get('based_memory')) ?? '';
         await redis.disconnect();
-      } catch (e) {}
+      } catch {}
     }
 
     const recentMessages: ApiMessage[] = (messages as ApiMessage[]).slice(-10);
@@ -1558,7 +1558,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             } else {
               throw new Error('empty plan');
             }
-          } catch (e) {
+          } catch {
             if (!routeToChat) {
               // Planner parse failed — stream via Pantheon (Anthropic fallback for images)
               let fullText = '';

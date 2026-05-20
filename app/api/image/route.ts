@@ -35,12 +35,12 @@ export async function POST(req: NextRequest) {
         const result = await fal.subscribe('fal-ai/nano-banana-2/edit', {
           input: { image_urls: [imageUrl], prompt },
         });
-        url = (result.data as any).images?.[0]?.url;
+        url = (result.data as { images?: { url: string }[] }).images?.[0]?.url;
       } else {
         const result = await fal.subscribe('fal-ai/nano-banana-2', {
           input: { prompt, num_images: 1 },
         });
-        url = (result.data as any).images?.[0]?.url;
+        url = (result.data as { images?: { url: string }[] }).images?.[0]?.url;
       }
     } else {
       if (imageUrl) {
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
             enable_safety_checker: true,
           },
         });
-        url = (result.data as any).images?.[0]?.url;
+        url = (result.data as { images?: { url: string }[] }).images?.[0]?.url;
       } else {
         const result = await fal.subscribe('fal-ai/flux/dev', {
           input: {
