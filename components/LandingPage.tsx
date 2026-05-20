@@ -422,8 +422,10 @@ export default function LandingPage({ onSignIn }: Props) {
             <div className="landing-tier-pro-badge">PRO</div>
             <div className="landing-tier-label">Pro</div>
             <div className="landing-tier-price">
+              <span className="pricing-original-price">$20</span>
               $12<span>/mo</span>
             </div>
+            <div className="pricing-founding-label">Founding member price</div>
             <ul className="landing-tier-features">
               <li>Unlimited generations</li>
               <li>Unlimited projects</li>

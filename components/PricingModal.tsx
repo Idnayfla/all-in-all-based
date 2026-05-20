@@ -121,8 +121,10 @@ export default function PricingModal({
             <div className="pricing-tier-badge">Most popular</div>
             <div className="pricing-tier-name">Pro</div>
             <div className="pricing-tier-price">
+              <span className="pricing-original-price">$20</span>
               $12 <span>/mo</span>
             </div>
+            <div className="pricing-founding-label">Founding member price</div>
             <ul className="pricing-tier-list">
               {PRO_FEATURES.map(f => (
                 <li key={f}>
@@ -137,7 +139,7 @@ export default function PricingModal({
         {error && <div className="pricing-error">{error}</div>}
 
         <button className="pricing-upgrade-btn" onClick={upgrade} disabled={loading}>
-          {loading ? 'Redirecting to Stripe...' : 'Upgrade to Pro — $12/month'}
+          {loading ? 'Redirecting to Stripe...' : 'Upgrade to Pro — $12/month  ·  was $20'}
         </button>
         {onSwitchToFreeAI && (
           <button className="pricing-free-ai-btn" onClick={onSwitchToFreeAI}>

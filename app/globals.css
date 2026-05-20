@@ -7379,6 +7379,21 @@ html.has-wallpaper .editor-panel {
   font-weight: 400;
   color: var(--text2);
 }
+.pricing-original-price {
+  font-size: var(--fs-sm);
+  color: var(--text2);
+  text-decoration: line-through;
+  margin-right: 6px;
+  font-family: var(--font-mono);
+}
+.pricing-founding-label {
+  font-size: var(--fs-xs);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  margin-top: 2px;
+  text-transform: uppercase;
+}
 .pricing-tier-list {
   list-style: none;
   padding: 0;
