@@ -1383,17 +1383,28 @@ export default function ChatPanel({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+            transition={{ duration: 0.18 }}
             onClick={() => setMobileInputOpen(false)}
           >
             <motion.div
               className="mobile-input-sheet"
-              initial={{ y: -20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -20, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              initial={{ y: -32, opacity: 0, scale: 0.97 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: -24, opacity: 0, scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 460, damping: 36 }}
               onClick={e => e.stopPropagation()}
             >
+              <div className="mobile-input-header">
+                <span className="mobile-input-mark">B&gt;</span>
+                <span className="mobile-input-label">Ask Based anything</span>
+                <button
+                  className="mobile-input-close"
+                  onClick={() => setMobileInputOpen(false)}
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
               <textarea
                 ref={mobileTextareaRef}
                 className="mobile-input-textarea"
@@ -1403,18 +1414,26 @@ export default function ChatPanel({
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     setMobileInputOpen(false);
-                    send();
+                    if (generationMode === 'seedance') sendVideo();
+                    else if (generationMode === 'music') sendMusic();
+                    else if (generationMode !== 'chat') sendImage();
+                    else send();
                   }
                 }}
-                placeholder="Ask Based anything..."
-                rows={4}
+                placeholder={
+                  generationMode === 'seedance'
+                    ? 'Describe a video to generate...'
+                    : generationMode === 'music'
+                      ? 'Describe the music to generate...'
+                      : generationMode !== 'chat'
+                        ? 'Describe an image to generate...'
+                        : 'Ask Based anything...'
+                }
+                rows={5}
                 autoFocus
               />
               <div className="mobile-input-actions">
-                <button
-                  className="mobile-input-cancel"
-                  onClick={() => setMobileInputOpen(false)}
-                >
+                <button className="mobile-input-cancel" onClick={() => setMobileInputOpen(false)}>
                   Cancel
                 </button>
                 <button
@@ -1422,10 +1441,13 @@ export default function ChatPanel({
                   disabled={!input.trim() && !pendingImage}
                   onClick={() => {
                     setMobileInputOpen(false);
-                    send();
+                    if (generationMode === 'seedance') sendVideo();
+                    else if (generationMode === 'music') sendMusic();
+                    else if (generationMode !== 'chat') sendImage();
+                    else send();
                   }}
                 >
-                  Send
+                  → Send
                 </button>
               </div>
             </motion.div>

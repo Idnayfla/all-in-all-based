@@ -165,32 +165,38 @@ export default function Sidebar({
           )}
         </div>
       </div>
-      {pendingDeleteId && (() => {
-        const target = projects.find(p => p.id === pendingDeleteId);
-        return (
-          <div className="delete-confirm-overlay" onClick={() => setPendingDeleteId(null)}>
-            <div className="delete-confirm-dialog" onClick={e => e.stopPropagation()}>
-              <p className="delete-confirm-title">Delete project?</p>
-              <p className="delete-confirm-name">⬡ {target?.name ?? 'this project'}</p>
-              <p className="delete-confirm-body">All files will be lost. This cannot be undone.</p>
-              <div className="delete-confirm-actions">
-                <button className="delete-confirm-cancel" onClick={() => setPendingDeleteId(null)}>
-                  Cancel
-                </button>
-                <button
-                  className="delete-confirm-confirm"
-                  onClick={() => {
-                    onDeleteProject(pendingDeleteId);
-                    setPendingDeleteId(null);
-                  }}
-                >
-                  Delete
-                </button>
+      {pendingDeleteId &&
+        (() => {
+          const target = projects.find(p => p.id === pendingDeleteId);
+          return (
+            <div className="delete-confirm-overlay" onClick={() => setPendingDeleteId(null)}>
+              <div className="delete-confirm-dialog" onClick={e => e.stopPropagation()}>
+                <p className="delete-confirm-title">Delete project?</p>
+                <p className="delete-confirm-name">⬡ {target?.name ?? 'this project'}</p>
+                <p className="delete-confirm-body">
+                  All files will be lost. This cannot be undone.
+                </p>
+                <div className="delete-confirm-actions">
+                  <button
+                    className="delete-confirm-cancel"
+                    onClick={() => setPendingDeleteId(null)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="delete-confirm-confirm"
+                    onClick={() => {
+                      onDeleteProject(pendingDeleteId);
+                      setPendingDeleteId(null);
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
     </aside>
   );
 }

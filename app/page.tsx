@@ -776,7 +776,11 @@ export default function Home() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session?.access_token ?? ''}`,
         },
-        body: JSON.stringify({ files, projectName: currentProject.name, projectId: currentProject.id }),
+        body: JSON.stringify({
+          files,
+          projectName: currentProject.name,
+          projectId: currentProject.id,
+        }),
       });
       clearTimeout(timeout);
       const data = await res.json();

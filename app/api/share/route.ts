@@ -19,7 +19,11 @@ export async function POST(req: NextRequest) {
       if (existing?.id) {
         await supabaseAdmin
           .from('shares')
-          .update({ files, project_name: projectName ?? 'Untitled', updated_at: new Date().toISOString() })
+          .update({
+            files,
+            project_name: projectName ?? 'Untitled',
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', existing.id);
         return NextResponse.json({ id: existing.id, url: `/s/${existing.id}` });
       }

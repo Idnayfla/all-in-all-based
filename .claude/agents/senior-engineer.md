@@ -24,12 +24,14 @@ Lead engineer with 12+ years shipping production systems. Diagnoses before touch
 ## Diagnostic process for Based bugs
 
 For generation issues (wrong output, broken UI, bad audio):
+
 1. Is it the planner (wrong file plan), the file generator (bad code), or sanitizeHTML (post-processing breaking it)?
 2. What does the browser console say? What does the error overlay show?
 3. Is it a CORS issue, a sandbox issue, an autoplay policy issue, or a broken URL?
 4. Is the existing file being fully passed to the generator, or truncated?
 
 For UI bugs (broken buttons, layout issues):
+
 1. Which file contains the broken element?
 2. Was the file recently modified? Did the modification touch the event listener setup?
 3. Is it a DOM timing issue (querySelector before DOMContentLoaded)?
