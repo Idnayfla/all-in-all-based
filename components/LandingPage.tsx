@@ -78,10 +78,10 @@ const SHIPPED_RECENT = [
   { icon: '◈', label: 'Music AI', desc: 'Generate original tracks from a description' },
   { icon: '◉', label: 'Image Gen', desc: 'FLUX + Nano Banana — text-to-image and editing' },
   { icon: '⊙', label: 'Game Engine', desc: 'Playable games built and rendered in the browser' },
-  { icon: '⬡', label: 'Windows Companion', desc: 'Floating overlay that watches your screen' },
 ];
 
 const COMING_NEXT = [
+  { label: 'Windows Companion', desc: 'Floating overlay that watches your screen — coming soon' },
   { label: '3D / Blueprint', desc: 'Describe a scene — Based renders it' },
   { label: 'Mobile App', desc: 'iOS + Android, feels native' },
   { label: 'Team Workspaces', desc: 'Share projects, collaborate in real time' },

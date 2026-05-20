@@ -49,10 +49,6 @@ const SHIPPED = [
   },
   { label: 'Incognito Mode', desc: 'Private sessions — nothing saved, nothing remembered.' },
   {
-    label: 'Windows Floating Companion',
-    desc: 'Electron overlay that floats above every window. Screen-aware, voice-ready.',
-  },
-  {
     label: 'Video Editor',
     desc: 'Built-in studio: trim, text overlays, speed control, FFmpeg export. No upload needed.',
   },
@@ -82,6 +78,10 @@ const NEXT = [
   {
     label: 'Mobile PWA',
     desc: 'Add to home screen on iOS and Android. Feels native, no App Store required.',
+  },
+  {
+    label: 'Windows Floating Companion',
+    desc: 'Electron overlay that floats above every window. Screen-aware, voice-ready.',
   },
 ];
 

@@ -188,13 +188,6 @@ export default function Home() {
     if (cached.length > 0) setProjects(cached);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Restore subscription tier from cache (server response always wins) ──
-  useEffect(() => {
-    const cached = localStorage.getItem('based_sub_tier');
-    // Only pre-fill 'pro' from cache; 'free' is already the default state.
-    // Server response at loadCloudData will overwrite this with authoritative data.
-    if (cached === 'pro') setSubscription(s => ({ ...s, tier: 'pro' }));
-  }, []);
 
   // ── Restore AI model preference ──────────────────────────────────────────
   useEffect(() => {
@@ -596,13 +589,17 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, [getHeaders, loadCloudData, runMigration]);
 
-  // ── Refresh cloud data when window regains focus ─────────────────────────
+  // ── Refresh cloud data when window regains focus or Android app resumes ──
   useEffect(() => {
-    const onFocus = () => {
-      if (user) loadCloudData();
-    };
+    const onFocus = () => { if (user) loadCloudData(); };
+    // visibilitychange catches Android resume (window.focus is unreliable there)
+    const onVisible = () => { if (document.visibilityState === 'visible' && user) loadCloudData(); };
     window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [user, loadCloudData]);
 
   // ── Generation events ────────────────────────────────────────────────────
