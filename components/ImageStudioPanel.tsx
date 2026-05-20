@@ -51,7 +51,11 @@ function filtersToCSS(f: Filters) {
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
-export default function ImageStudioPanel() {
+interface ImageStudioPanelProps {
+  authToken?: string;
+}
+
+export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
   const [layers, setLayers] = useState<Layer[]>(() => [mkLayer('Background')]);
   const [activeId, setActiveId] = useState('');
   const [tool, setTool] = useState<Tool>('brush');
@@ -413,10 +417,15 @@ export default function ImageStudioPanel() {
     setGenerating(true);
     setStatus(aiMode === 'generate' ? 'Generating image…' : 'Processing with AI…');
     try {
+      const authHeaders: Record<string, string> = {
+        'content-type': 'application/json',
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      };
+
       if (aiMode === 'generate') {
         const res = await fetch('/api/image', {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+          headers: authHeaders,
           body: JSON.stringify({ prompt: aiPrompt }),
         });
         const data = await res.json();
@@ -426,7 +435,7 @@ export default function ImageStudioPanel() {
         const base64 = flatten(false).split(',')[1];
         const res = await fetch('/api/image', {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+          headers: authHeaders,
           body: JSON.stringify({
             prompt: aiPrompt,
             sourceImageData: base64,
@@ -442,7 +451,7 @@ export default function ImageStudioPanel() {
         const maskDataUrl = maskRef.current?.toDataURL('image/png') ?? '';
         const res = await fetch('/api/image/edit', {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+          headers: authHeaders,
           body: JSON.stringify({
             mode: 'inpaint',
             sourceImageData: sourceBase64,
@@ -459,8 +468,8 @@ export default function ImageStudioPanel() {
 
       setAiPrompt('');
       setStatus('');
-    } catch (err: any) {
-      setStatus(err.message ?? 'Error');
+    } catch (err: unknown) {
+      setStatus(err instanceof Error ? err.message : String(err));
     } finally {
       setGenerating(false);
     }

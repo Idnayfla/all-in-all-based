@@ -1637,7 +1637,7 @@ export default function Home() {
             <StudioPanel authToken={authToken} subscriptionTier={subscription.tier} />
           </div>
           <div className={`panel ${activePanel === 'image' ? 'panel-active' : ''}`}>
-            <ImageStudioPanel />
+            <ImageStudioPanel authToken={authToken} />
           </div>
           <div className={`panel ${activePanel === 'notes' ? 'panel-active' : ''}`}>
             <NotesPanel authToken={authToken} />

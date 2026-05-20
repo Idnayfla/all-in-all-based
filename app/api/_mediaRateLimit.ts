@@ -26,7 +26,8 @@ export async function checkMediaRateLimit(
     .eq('user_id', user.id)
     .single();
 
-  if ((s?.subscription_tier ?? 'free') !== 'pro') {
+  const alwaysPro = process.env.ALWAYS_PRO === 'true';
+  if (!alwaysPro && (s?.subscription_tier ?? 'free') !== 'pro') {
     return NextResponse.json({ error: 'Pro subscription required' }, { status: 403 });
   }
 
