@@ -311,6 +311,13 @@ RULES:
 - startGame() must start the game loop (call requestAnimationFrame), not just set a flag
 - Script tags: <script defer src="game.js"></script> — always defer, never bare <script src="..."></script>
 
+NULL-SAFE DOM ACCESS — ALWAYS FOLLOW:
+- NEVER chain .value, .checked, .textContent, or any property directly on getElementById() or querySelector() — always assign to a variable first and null-check before use
+- Correct pattern: const el = document.getElementById('x'); if (!el) return; el.value = ...
+- Wrong pattern: document.getElementById('x').value = ... — crashes if element is missing
+- Every ID referenced in JS must exactly match an ID defined in the HTML — audit every getElementById/querySelector call against the HTML before finalising output
+- When reading form values: const el = document.getElementById('input-id'); if (!el) return; const val = el.value.trim();
+
 BUG FIXING RULES:
 - First, identify exactly which file(s) contain the broken code
 - Fix ONLY the affected file(s) — do not touch files that are working correctly
@@ -985,6 +992,15 @@ function sanitizeHTML(html: string): string {
   html = html.includes('<head>')
     ? html.replace('<head>', '<head>' + audioUnlock)
     : audioUnlock + html;
+
+  // Null-property error boundary — silently swallows "Cannot read properties of null"
+  // so one missing DOM element doesn't blank the entire app.
+  const NULL_GUARD = `<script>window.addEventListener('error',function(e){if(e.message&&e.message.includes('Cannot read prop')){e.preventDefault();}});</script>`;
+  if (!html.includes('Cannot read prop')) {
+    html = html.includes('<body>')
+      ? html.replace('<body>', '<body>' + NULL_GUARD)
+      : NULL_GUARD + html;
+  }
 
   return html.includes('</body>')
     ? html.replace('</body>', safetyNet + '\n</body>')
