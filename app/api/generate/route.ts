@@ -383,27 +383,28 @@ RULE 3 — OscillatorNode is forbidden for jumpscare stings, horror sounds, expl
 RULE 4 — NEVER use fetch() to load audio. fetch() requires CORS headers that CDNs do not provide in sandboxed iframes — it silently fails every time. Use <audio> elements only.
 
 AUDIO — THE ONE METHOD THAT WORKS IN THE SANDBOX:
-Use <audio> elements with Mixkit CDN. This bypasses CORS entirely and always works:
+Use <audio> elements pointing to /api/sfx?slug=SLUG — a same-origin proxy that fetches audio server-side. This eliminates all CORS and CDN issues entirely.
 
-  <!-- In HTML — add ALL sounds you need upfront -->
-  <audio id="snd-scream" src="https://assets.mixkit.co/sfx/preview/mixkit-horror-lose-2011.mp3" preload="auto"></audio>
-  <audio id="snd-sting"  src="https://assets.mixkit.co/sfx/preview/mixkit-cinematic-horror-sting-581.mp3" preload="auto"></audio>
+  <!-- In HTML — declare ALL sounds you need upfront with /api/sfx?slug= URLs -->
+  <audio id="snd-scream" src="/api/sfx?slug=mixkit-horror-lose-2011" preload="auto"></audio>
+  <audio id="snd-sting"  src="/api/sfx?slug=mixkit-cinematic-horror-sting-581" preload="auto"></audio>
+  <audio id="snd-impact" src="/api/sfx?slug=mixkit-scary-cinematic-hit-2210" preload="auto"></audio>
 
-  // In JS — play on user gesture (click, keydown, etc.)
+  // In JS — play on user gesture
   function playScream() { const a = document.getElementById('snd-scream'); a.currentTime = 0; a.play(); }
 
-- DO NOT use: fetch(), AudioContext.decodeAudioData(), new Audio() with a CDN URL via fetch, or any network-fetch-based audio
-- DO NOT use: AudioContext with OscillatorNode for realistic sounds
-- The platform injects an AudioContext unlock automatically — you do not need to handle resume() yourself
+- ALWAYS use /api/sfx?slug=SLUG — NEVER use external CDN URLs directly (they fail with CORS or 404)
+- DO NOT use: fetch(), AudioContext.decodeAudioData(), or OscillatorNode for realistic sounds
+- The platform injects an AudioContext unlock automatically
 
-Mixkit SFX slugs — full URL = https://assets.mixkit.co/sfx/preview/{slug}.mp3:
+Available slugs by category:
   Horror / jumpscare: mixkit-horror-lose-2011 · mixkit-scary-cinematic-hit-2210 · mixkit-cinematic-horror-sting-581
   Explosions / impact: mixkit-explosion-impact-1682 · mixkit-cinematic-impact-stamp-1283
   Game / arcade: mixkit-arcade-game-jump-coin-216 · mixkit-winning-chime-2015 · mixkit-player-losing-or-failing-2042
   UI / notification: mixkit-correct-answer-tone-2870 · mixkit-software-interface-start-2574 · mixkit-message-pop-alert-2354
   Nature / ambient: mixkit-light-rain-loop-2393 · mixkit-forest-birds-ambience-1210
   Music stinger: mixkit-suspense-mystery-piano-565
-- For music apps or audio visualisers that need AnalyserNode: create AudioContext, create MediaElementSource FROM the <audio> element, connect to AnalyserNode — never fetch the audio
+- For AnalyserNode visualisers: create AudioContext, create MediaElementSource FROM the <audio> element, connect to AnalyserNode
 
 IMAGE MANIPULATION:
 - When the user provides an image to edit/filter/transform: build a Canvas-based tool that applies the operation
@@ -833,21 +834,23 @@ NON-BROWSER LANGUAGES (Java / C++ / Go / Rust / Bash):
 - All non-browser programs must produce meaningful stdout output — that output is the entire user experience.
 
 AUDIO RULES — THE ONLY METHOD THAT WORKS IN THE SANDBOX:
-- NEVER use fetch() to load audio — CORS blocks it silently in sandboxed iframes. Audio will be completely muted.
-- NEVER use OscillatorNode for horror, jumpscare, explosion, scream, or any realistic sound — only for a UI beep under 0.3s
-- NEVER reference local audio filenames — they don't exist in the sandbox
-- ONLY USE: <audio> elements with Mixkit CDN URLs — this bypasses CORS and always works
+- NEVER use external CDN URLs directly (https://assets.mixkit.co/...) — they fail with CORS or 404 in the sandbox
+- NEVER use fetch() to load audio — CORS blocks it silently
+- NEVER use OscillatorNode for horror, jumpscare, explosion, scream, or any realistic sound — only UI beep under 0.3s
+- NEVER reference local audio files — they don't exist in the sandbox
+- ONLY USE: <audio src="/api/sfx?slug=SLUG"> — same-origin proxy, always works
 
-  <!-- Declare all sounds in HTML -->
-  <audio id="snd-scream" src="https://assets.mixkit.co/sfx/preview/mixkit-horror-lose-2011.mp3" preload="auto"></audio>
-  <audio id="snd-sting"  src="https://assets.mixkit.co/sfx/preview/mixkit-cinematic-horror-sting-581.mp3" preload="auto"></audio>
+  <!-- Declare all sounds in HTML with /api/sfx?slug= -->
+  <audio id="snd-scream" src="/api/sfx?slug=mixkit-horror-lose-2011" preload="auto"></audio>
+  <audio id="snd-sting"  src="/api/sfx?slug=mixkit-cinematic-horror-sting-581" preload="auto"></audio>
 
   // Play in JS on user gesture
   function playScream() { const a = document.getElementById('snd-scream'); a.currentTime = 0; a.play(); }
 
-- The platform auto-injects an AudioContext unlock — do NOT write your own resume() logic
-- Mixkit horror slugs: mixkit-horror-lose-2011 · mixkit-scary-cinematic-hit-2210 · mixkit-cinematic-horror-sting-581
+- The platform auto-injects AudioContext unlock — do NOT write your own resume() logic
+- Horror slugs: mixkit-horror-lose-2011 · mixkit-scary-cinematic-hit-2210 · mixkit-cinematic-horror-sting-581
 - Game slugs: mixkit-arcade-game-jump-coin-216 · mixkit-winning-chime-2015 · mixkit-player-losing-or-failing-2042
+- UI slugs: mixkit-correct-answer-tone-2870 · mixkit-software-interface-start-2574
 
 PROMPT FAITHFULNESS — HIGHEST PRIORITY:
 - Implement EXACTLY what the user described — do not reinterpret, simplify, or substitute
