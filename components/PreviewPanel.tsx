@@ -40,14 +40,9 @@ export default function PreviewPanel({
     return html;
   }, [htmlFile, cssFile, jsFile]);
 
-  useEffect(() => {
-    if (!previewHtml || !iframeRef.current) return;
-    const doc = iframeRef.current.contentDocument;
-    if (!doc) return;
-    doc.open();
-    doc.write(previewHtml);
-    doc.close();
-  }, [previewHtml]);
+  // srcdoc inherits the parent page's base URL so relative paths like
+  // /api/sfx?slug=... resolve correctly. contentDocument.write() set the
+  // base to about:blank, breaking all relative URL audio/fetch requests.
 
   const runCode = async () => {
     abortRef.current?.abort();
@@ -444,6 +439,7 @@ export default function PreviewPanel({
         className="preview-frame"
         sandbox="allow-scripts allow-same-origin allow-modals allow-forms"
         title="Preview"
+        srcDoc={previewHtml ?? ''}
         onClick={() => setShowExportMenu(false)}
       />
       {cropData && (
