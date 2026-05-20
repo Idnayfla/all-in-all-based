@@ -45,7 +45,7 @@ Owner: Hus Alfyandi · Updated: 2026-05-20
 ### Env Vars
 
 - [ ] All vars in `.env.local.example` are set in Vercel production
-- [ ] `NETLIFY_TOKEN` set (for publish route)
+- [x] `NETLIFY_TOKEN` set (for publish route)
 - [x] `NEXT_PUBLIC_POSTHOG_KEY` set
 
 ### Performance
