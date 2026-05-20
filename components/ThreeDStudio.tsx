@@ -275,22 +275,38 @@ export default function ThreeDStudio({ authToken }: { authToken?: string }) {
           },
         },
       };
+
+      // Strip markdown code fences and leading/trailing non-JS prose
+      let cleanCode = data.code
+        .replace(/^```(?:javascript|js)?\n?/m, '') // strip opening fence
+        .replace(/\n?```\s*$/m, '') // strip closing fence
+        .trim();
+
+      // If the code appears to start with natural language (no JS keywords/symbols),
+      // try to extract from first line that looks like JS
+      const jsStartMatch = cleanCode.match(
+        /^([\s\S]*?)((?:const|let|var|scene\.|while|\/\/|new |renderer\.|camera\.))/m
+      );
+      if (jsStartMatch && jsStartMatch[1].length > 0 && jsStartMatch[1].length < 200) {
+        cleanCode = cleanCode.slice(jsStartMatch[1].length);
+      }
+
       // eslint-disable-next-line no-new-func
-      const fn = new Function('THREE', 'scene', 'camera', 'renderer', data.code);
+      const fn = new Function('THREE', 'scene', 'camera', 'renderer', cleanCode);
       try {
         fn(THREE, scene, camera, rendererProxy);
         startTimeRef.current = performance.now();
         setStatus('');
-      } catch (execErr: any) {
-        setError(`Scene error: ${execErr?.message ?? execErr}`);
+      } catch (execErr: unknown) {
+        setError(`Scene error: ${execErr instanceof Error ? execErr.message : String(execErr)}`);
         setStatus('');
         // Roll back to default scene on execution error
         while (scene.children.length > 0) scene.remove(scene.children[0]);
         animateFnRef.current = null;
         buildDefaultScene(scene);
       }
-    } catch (e: any) {
-      setError(e?.message ?? 'Network error');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Network error');
       setStatus('');
     } finally {
       setGenerating(false);

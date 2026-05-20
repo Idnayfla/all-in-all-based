@@ -14,7 +14,10 @@ Use only Three.js core — no imports, no external libs.
 Clear the scene first: while(scene.children.length > 0) scene.remove(scene.children[0]);
 Then add lights, geometry, materials, meshes.
 You may also set up an animation loop by assigning to renderer.userData.animateFn = function(time) { ... } where time is elapsed ms.
-Return only executable JS — no markdown, no explanation, no backticks.`;
+Return only executable JS — no markdown, no explanation, no backticks.
+Output ONLY valid JavaScript. No explanations, no markdown, no code fences, no natural language outside of JS comments.
+Never write contractions (don't, can't, won't) outside of JS string literals or /* */ comments.
+If you need to add to an existing scene, always start by clearing it: while(scene.children.length > 0) scene.remove(scene.children[0]);`;
 
 export async function POST(req: NextRequest) {
   // Auth gate — must be signed in
