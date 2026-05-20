@@ -106,6 +106,12 @@ export default function Home() {
   const [showGalleryPublish, setShowGalleryPublish] = useState(false);
   const [galleryAuthorName, setGalleryAuthorName] = useState('');
   const [galleryPublished, setGalleryPublished] = useState(false);
+  const [apiKeys, setApiKeys] = useState<
+    { id: string; name: string; created_at: string; last_used_at: string | null }[]
+  >([]);
+  const [newApiKey, setNewApiKey] = useState<string | null>(null);
+  const [apiKeyName, setApiKeyName] = useState('');
+  const [apiKeyLoading, setApiKeyLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [authReady, setAuthReady] = useState(false);
   const [authToken, setAuthToken] = useState<string>('');
@@ -1009,7 +1015,17 @@ export default function Home() {
             </a>
             <button
               className={`icon-btn ${showSettings ? 'active' : ''}`}
-              onClick={() => setShowSettings(s => !s)}
+              onClick={() => {
+                setShowSettings(s => !s);
+                if (!showSettings && user && authToken) {
+                  getHeaders().then(h =>
+                    fetch('/api/apikey', { headers: h })
+                      .then(r => r.json())
+                      .then(d => setApiKeys(d.keys ?? []))
+                      .catch(() => {})
+                  );
+                }
+              }}
               title="Settings"
               aria-label="Toggle settings"
             >
@@ -1382,6 +1398,100 @@ export default function Home() {
                   <div className="settings-section">
                     <label className="settings-label">Referral</label>
                     <ReferralPanel getHeaders={getHeaders} />
+                  </div>
+                )}
+
+                {user && subscription.tier === 'pro' && (
+                  <div className="settings-section" style={{ position: 'relative' }}>
+                    <label className="settings-label">API Keys</label>
+                    <div className="apikey-section">
+                      {newApiKey && (
+                        <div className="apikey-reveal">
+                          <span className="apikey-reveal-label">Copy now — shown once</span>
+                          <div className="apikey-reveal-row">
+                            <code className="apikey-code">{newApiKey}</code>
+                            <button
+                              className="apikey-copy-btn"
+                              onClick={() => {
+                                navigator.clipboard.writeText(newApiKey);
+                                setNewApiKey(null);
+                              }}
+                            >
+                              Copy &amp; Close
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {apiKeys.map(k => (
+                        <div key={k.id} className="apikey-row">
+                          <div className="apikey-row-meta">
+                            <span className="apikey-name">{k.name}</span>
+                            <span className="apikey-hint">
+                              {k.last_used_at
+                                ? `Last used ${new Date(k.last_used_at).toLocaleDateString()}`
+                                : 'Never used'}
+                            </span>
+                          </div>
+                          <button
+                            className="apikey-revoke-btn"
+                            onClick={async () => {
+                              const h = await getHeaders();
+                              await fetch('/api/apikey', {
+                                method: 'DELETE',
+                                headers: h,
+                                body: JSON.stringify({ id: k.id }),
+                              });
+                              setApiKeys(prev => prev.filter(x => x.id !== k.id));
+                            }}
+                          >
+                            Revoke
+                          </button>
+                        </div>
+                      ))}
+                      {apiKeys.length < 3 && (
+                        <div className="apikey-create-row">
+                          <input
+                            className="apikey-name-input"
+                            placeholder="Key name (e.g. My Script)"
+                            value={apiKeyName}
+                            onChange={e => setApiKeyName(e.target.value)}
+                          />
+                          <button
+                            className="apikey-create-btn"
+                            disabled={apiKeyLoading}
+                            onClick={async () => {
+                              setApiKeyLoading(true);
+                              try {
+                                const h = await getHeaders();
+                                const res = await fetch('/api/apikey', {
+                                  method: 'POST',
+                                  headers: h,
+                                  body: JSON.stringify({ name: apiKeyName || 'Default' }),
+                                });
+                                const d = await res.json();
+                                if (d.key) {
+                                  setNewApiKey(d.key);
+                                  setApiKeyName('');
+                                  const h2 = await getHeaders();
+                                  fetch('/api/apikey', { headers: h2 })
+                                    .then(r => r.json())
+                                    .then(d2 => setApiKeys(d2.keys ?? []))
+                                    .catch(() => {});
+                                }
+                              } finally {
+                                setApiKeyLoading(false);
+                              }
+                            }}
+                          >
+                            {apiKeyLoading ? '...' : '+ Create Key'}
+                          </button>
+                        </div>
+                      )}
+                      <p className="apikey-hint-text">
+                        Use your key to call <code>/api/v1/generate</code> from any script or app.
+                        Max 3 keys.
+                      </p>
+                    </div>
                   </div>
                 )}
 
