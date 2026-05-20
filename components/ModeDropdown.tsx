@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-export type GenerationMode = 'chat' | 'flux' | 'nano-banana' | 'seedance' | 'music';
+export type GenerationMode = 'chat' | 'flux' | 'nano-banana' | 'seedance' | 'music' | '3d';
 
 const MODES: { value: GenerationMode; icon: string; label: string; pro?: boolean }[] = [
   { value: 'chat', icon: 'B>', label: 'Chat' },
@@ -10,6 +10,7 @@ const MODES: { value: GenerationMode; icon: string; label: string; pro?: boolean
   { value: 'nano-banana', icon: '◈', label: 'Image · Nano Banana 2', pro: true },
   { value: 'seedance', icon: '▸', label: 'Video · Seedance 2.0', pro: true },
   { value: 'music', icon: '♪', label: 'Music · Stable Audio', pro: true },
+  { value: '3d', icon: '◉', label: '3D Scene · Three.js', pro: true },
 ];
 
 interface ModeDropdownProps {
@@ -18,6 +19,7 @@ interface ModeDropdownProps {
   disabled: boolean;
   subscriptionTier?: 'free' | 'pro';
   onProRequired?: () => void;
+  onPanelSwitch?: (panel: string) => void;
 }
 
 export default function ModeDropdown({
@@ -26,6 +28,7 @@ export default function ModeDropdown({
   disabled,
   subscriptionTier,
   onProRequired,
+  onPanelSwitch,
 }: ModeDropdownProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -81,6 +84,9 @@ export default function ModeDropdown({
                       return;
                     }
                     onChange(m.value);
+                    if (m.value === '3d') {
+                      onPanelSwitch?.('3d');
+                    }
                     setOpen(false);
                   }}
                 >

@@ -31,6 +31,7 @@ import VideoEditorPanel from '@/components/VideoEditorPanel';
 import StudioPanel from '@/components/StudioPanel';
 import ImageStudioPanel from '@/components/ImageStudioPanel';
 import NotesPanel from '@/components/NotesPanel';
+import ThreeDStudio from '@/components/ThreeDStudio';
 import ProactiveCheckin from '@/components/ProactiveCheckin';
 import WallpaperCropper from '@/components/WallpaperCropper';
 import { track, identifyUser } from '@/lib/posthog';
@@ -94,7 +95,7 @@ export default function Home() {
   const [incognito, setIncognito] = useState(false);
   const [incognitoMessages, setIncognitoMessages] = useState<Message[]>([]);
   const [activePanel, setActivePanel] = useState<
-    'chat' | 'editor' | 'preview' | 'debug' | 'video' | 'studio' | 'image' | 'notes'
+    'chat' | 'editor' | 'preview' | 'debug' | 'video' | 'studio' | 'image' | 'notes' | '3d'
   >('chat');
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
@@ -1033,6 +1034,15 @@ export default function Home() {
               Notes
             </button>
             <button
+              className={`tab-btn ${activePanel === '3d' ? 'active' : ''}`}
+              onClick={() => {
+                setActivePanel('3d');
+                setShowSettings(false);
+              }}
+            >
+              3D
+            </button>
+            <button
               className={`tab-btn tab-btn-debug ${activePanel === 'debug' ? 'active' : ''}`}
               onClick={() => {
                 setActivePanel('debug');
@@ -1632,11 +1642,15 @@ export default function Home() {
           <div className={`panel ${activePanel === 'notes' ? 'panel-active' : ''}`}>
             <NotesPanel authToken={authToken} />
           </div>
+          <div className={`panel ${activePanel === '3d' ? 'panel-active' : ''}`}>
+            <ThreeDStudio authToken={authToken} />
+          </div>
 
           {activePanel !== 'video' &&
             activePanel !== 'studio' &&
             activePanel !== 'image' &&
             activePanel !== 'notes' &&
+            activePanel !== '3d' &&
             (incognito ? (
               <div className="panel panel-active">
                 <div className="incognito-banner">
@@ -1745,6 +1759,20 @@ export default function Home() {
                     onGenerationComplete={() => setActivePanel('preview')}
                     persona={persona}
                     onPersonaChange={setPersona}
+                    onPanelSwitch={panel =>
+                      setActivePanel(
+                        panel as
+                          | 'chat'
+                          | 'editor'
+                          | 'preview'
+                          | 'debug'
+                          | 'video'
+                          | 'studio'
+                          | 'image'
+                          | 'notes'
+                          | '3d'
+                      )
+                    }
                   />
                 </div>
                 <div className={`panel ${activePanel === 'editor' ? 'panel-active' : ''}`}>

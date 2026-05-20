@@ -176,6 +176,7 @@ export default function ChatPanel({
   onGenerationComplete,
   persona = 'based',
   onPersonaChange,
+  onPanelSwitch,
 }: {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -197,6 +198,7 @@ export default function ChatPanel({
   onGenerationComplete?: () => void;
   persona?: PersonaKey;
   onPersonaChange?: (p: PersonaKey) => void;
+  onPanelSwitch?: (panel: string) => void;
 }) {
   const [input, setInput] = useState(prefillMessage ?? '');
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
@@ -1286,6 +1288,7 @@ export default function ChatPanel({
             subscriptionTier={subscriptionTier}
             onProRequired={onProRequired}
             disabled={isGenerating || isGeneratingMedia}
+            onPanelSwitch={onPanelSwitch}
           />
           <PersonaSwitcher
             persona={persona}

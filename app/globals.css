@@ -11320,3 +11320,159 @@ body:has(.beta-banner) .app-root {
     padding: 4px 6px;
   }
 }
+
+/* ── Phase 15: 3D / Blueprint Studio ──────────────────────────────────────── */
+.threed-studio {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg1);
+  overflow: hidden;
+}
+
+.threed-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.threed-logo {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.threed-prompt-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.threed-prompt-input {
+  flex: 1;
+  min-width: 180px;
+  padding: 6px 10px;
+  font-size: 12px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.threed-prompt-input:focus {
+  border-color: var(--accent);
+}
+.threed-prompt-input:disabled {
+  opacity: 0.5;
+}
+.threed-prompt-input::placeholder {
+  color: var(--text3);
+}
+
+.threed-btn {
+  padding: 6px 12px;
+  font-size: 11px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg3);
+  color: var(--text2);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.threed-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.threed-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.threed-btn-primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+  font-weight: 600;
+}
+.threed-btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: #fff;
+}
+
+.threed-status {
+  font-size: 11px;
+  color: var(--accent);
+  width: 100%;
+  padding: 2px 0;
+}
+.threed-status--error {
+  color: #f87171;
+}
+
+.threed-canvas-wrap {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #0a0a10;
+}
+
+.threed-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.threed-controls-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.25);
+  pointer-events: none;
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+}
+
+.threed-loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 16, 0.75);
+  gap: 10px;
+  z-index: 10;
+}
+
+.threed-loading-spinner {
+  font-size: 28px;
+  color: var(--accent);
+  animation: threed-spin 1.4s linear infinite;
+}
+
+@keyframes threed-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.threed-loading-text {
+  font-size: 12px;
+  color: var(--text2);
+  letter-spacing: 0.05em;
+}
