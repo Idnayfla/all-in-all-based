@@ -96,7 +96,8 @@ export default function Sidebar({
                     />
                   ) : (
                     <>
-                      <span className="project-name">⬡ {p.name}</span>
+                      <span className="project-hex-icon">⬡</span>
+                      <span className="project-name">{p.name}</span>
                       <div className="project-actions">
                         <button
                           onClick={e => {
@@ -149,9 +150,9 @@ export default function Sidebar({
                 onClick={() => onSelectFile(f)}
               >
                 <span className="file-icon">{langIcon[f.language] ?? langIcon.default}</span>
-                <span style={{ flex: 1 }}>{f.name}</span>
+                <span className="file-name">{f.name}</span>
                 <button
-                  className="action-btn"
+                  className="action-btn file-download-btn"
                   onClick={e => {
                     e.stopPropagation();
                     downloadFile(f);

@@ -419,7 +419,7 @@ export default function Home() {
     return 'desktop';
   }
 
-  // Write heartbeat every 30s so other devices can detect us
+  // Write heartbeat immediately on load and on every project switch, then every 30s
   useEffect(() => {
     if (!user) return;
     const write = async () => {
@@ -437,10 +437,10 @@ export default function Home() {
         });
       } catch {}
     };
-    write();
+    write(); // fires immediately — catches project switches without waiting for interval
     const interval = setInterval(write, 30_000);
     return () => clearInterval(interval);
-  }, [user, getHeaders]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, currentProject, getHeaders]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // On load: check if another device was recently active with a project
   useEffect(() => {
