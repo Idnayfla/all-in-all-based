@@ -345,11 +345,17 @@ ANIMATION RULES — ALWAYS FOLLOW FOR ANY ANIMATED PROJECT:
 - Wrap the animation loop body in try/catch so errors surface visibly instead of freezing silently
 
 PROMPT FAITHFULNESS — ALWAYS FOLLOW EXACTLY:
-- When the user describes a specific sequence of events, scenario, or experience: implement it EXACTLY as described
-- "People running past, one triggers slow motion, a distant figure appears and approaches, then jumpscare" = build that exact 4-phase sequence
-- NEVER substitute the user's described concept with something vaguely similar — "dark hallway you click through" is NOT the same as "people running past with slow motion trigger"
-- Every named element, phase, character, and mechanic the user described must exist in the output
-- This is the most common failure mode: the AI generates something that sounds related but is completely different from what was asked
+- When the user describes a specific sequence of events, scenario, or experience: implement it EXACTLY as described, word for word
+- NEVER substitute the user's described concept with something vaguely similar
+- Every named element, phase, character, mechanic, and trigger the user described must exist in the output
+
+BAD (wrong): User describes "people running past, one triggers slow motion, distant figure approaches, jumpscare" → AI builds "dark hallway where you walk toward a wall and click until a monster appears"
+GOOD (right): AI builds exactly: runners spawning and crossing the screen → one triggers slow-motion → a figure appears far away → figure gradually approaches while clicks are disabled → flash + scream + jumpscare image
+
+BAD (wrong): User describes "a calm beach scene that slowly turns dark and stormy, then a face appears in the waves" → AI builds "a horror game with ocean sound effects"
+GOOD (right): AI builds the exact visual transformation sequence with the face reveal as described
+
+If the user described 4 phases, implement all 4. If they named specific characters, include those characters. Do not compress, simplify, or retheme.
 
 GRAPHICS — NEVER USE EMOJI AS VISUAL ELEMENTS:
 - Never use emoji characters (🎮🔴⭐🏠) as graphical elements, icons, or sprites in apps, games, or tools
@@ -743,6 +749,17 @@ For Rust: main.rs only (single-file programs that compile with rustc main.rs).
 For Bash: script.sh. Must be self-contained and runnable with bash script.sh.
 
 NON-BROWSER LANGUAGE RULE: For Java/C++/Go/Rust/Bash requests, output ONLY runnable source files. No HTML wrapper. The output will appear in a Debug/Console panel, not a web preview. Design programs that produce meaningful console output — interactive CLI apps, data processing, algorithms, simulations.
+
+DESCRIPTION FIELD RULE — MOST IMPORTANT:
+The "description" field must capture the specific mechanics and sequence the user described — NOT a generic summary.
+
+BAD (loses all detail): {"name":"index.html","description":"interactive horror experience"}
+GOOD (preserves the spec): {"name":"index.html","description":"people run across screen at normal speed; when one passes the player, trigger slow-motion; a distant figure appears and gradually walks closer while clicks are disabled; culminate in a jumpscare with flash + sound + 'Try again' reset"}
+
+BAD: {"name":"app.js","description":"game logic"}
+GOOD: {"name":"app.js","description":"state machine: NORMAL (runners spawn every 2s) → SLOWMO (one runner triggers it, time scale 0.1x, figure appears far right) → APPROACH (figure walks toward camera over 4s, clicks disabled) → SCARE (flash white, play scream audio, show jumpscare image, freeze 1s, reset)"}
+
+Always read the user's prompt carefully and include their described phases, characters, triggers, and sequence in the description. If the user described 4 phases, the description must mention all 4.
 
 Output format:
 [{"name":"filename.ext","language":"html|css|javascript|python|java|cpp|go|rust|bash","description":"..."}]`;
@@ -1591,16 +1608,17 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                 ? `\n\nThe user has provided an image. Wherever you need the image source, use exactly: ${IMAGE_SRC_PLACEHOLDER}\nDo NOT use any other URL or path — only ${IMAGE_SRC_PLACEHOLDER}. It will be replaced with the real base64 data URL at build time.`
                 : '';
 
-            const filePrompt = `${isModifyingExisting ? 'MODIFICATION' : 'NEW FILE'} — User request: ${lastUserMessage}
+            const filePrompt = `IMPLEMENT THIS EXACTLY — do not reinterpret, simplify, or substitute with something similar:
+"${lastUserMessage}"
 
 ${isModifyingExisting ? `MODIFY existing file: ${fileSpec.name}` : `Generate new file: ${fileSpec.name}`}
-Purpose: ${fileSpec.description}
+Planner notes (expand on the spec above — do not replace it): ${fileSpec.description}
 Language: ${fileSpec.language}
 
 All project files: ${filePlan.map(f => `${f.name} — ${f.description}`).join('\n')}
 ${generatedContext}${existingContext}${imagePlaceholderNote}
 
-${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. The full existing content is shown above. Make ONLY the changes needed for: "${lastUserMessage}". Every existing event listener, button, screen, and function must still work after your edit.` : `Generate ONLY ${fileSpec.name}, complete with no placeholders.`}`;
+${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. The full existing content is shown above. Make ONLY the changes needed. Every existing event listener, button, screen, and function must still work after your edit.` : `Generate ONLY ${fileSpec.name}, complete with no placeholders. Every mechanic, phase, and element described in the spec above must be present.`}`;
 
             controller.enqueue(
               encoder.encode(
