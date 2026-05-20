@@ -6,15 +6,28 @@ const ERROR_MESSAGES: Record<string, string> = {
   rate_limit_exceeded: 'Too many requests — please wait a moment and try again.',
 };
 
+interface FalErrorDetail {
+  type?: string;
+  msg?: string;
+}
+
+interface FalError {
+  body?: {
+    detail?: FalErrorDetail[] | string;
+    error?: string;
+  };
+  message?: string;
+}
+
 export function friendlyFalError(
-  err: any,
+  err: FalError,
   fallback = 'Generation failed — please try again.'
 ): string {
   const body = err.body;
   if (body) {
     if (Array.isArray(body.detail) && body.detail.length > 0) {
       const first = body.detail[0];
-      return ERROR_MESSAGES[first?.type] ?? first?.msg ?? fallback;
+      return (first?.type ? ERROR_MESSAGES[first.type] : undefined) ?? first?.msg ?? fallback;
     }
     if (typeof body.detail === 'string') {
       if (body.detail.includes('Exhausted balance')) {

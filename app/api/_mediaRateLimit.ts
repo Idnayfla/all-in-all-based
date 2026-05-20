@@ -36,7 +36,8 @@ export async function checkMediaRateLimit(
     new Date(s.media_reset_at).getMonth() !== now.getMonth() ||
     new Date(s.media_reset_at).getFullYear() !== now.getFullYear();
 
-  const count = needsReset ? 0 : ((s as any)?.[`${type}_count`] ?? 0);
+  const countKey = `${type}_count` as 'video_count' | 'image_count' | 'music_count';
+  const count = needsReset ? 0 : (s?.[countKey] ?? 0);
   const limit = LIMITS[type];
 
   if (count >= limit) {
@@ -48,7 +49,7 @@ export async function checkMediaRateLimit(
     );
   }
 
-  const updates: Record<string, any> = { user_id: user.id };
+  const updates: Record<string, unknown> = { user_id: user.id };
   if (needsReset) {
     updates.video_count = type === 'video' ? 1 : 0;
     updates.image_count = type === 'image' ? 1 : 0;

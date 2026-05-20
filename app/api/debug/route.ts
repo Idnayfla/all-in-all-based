@@ -51,8 +51,8 @@ export async function GET() {
   };
 
   const allOk =
-    (results.projects_table as any).ok &&
-    (results.user_settings_table as any).ok &&
-    (results.insert_test as any).ok;
+    (results.projects_table as { ok: boolean }).ok &&
+    (results.user_settings_table as { ok: boolean }).ok &&
+    (results.insert_test as { ok: boolean }).ok;
   return NextResponse.json({ status: allOk ? 'healthy' : 'errors_found', ...results });
 }
