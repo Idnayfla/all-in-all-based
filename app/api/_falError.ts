@@ -12,10 +12,8 @@ interface FalErrorDetail {
 }
 
 interface FalError {
-  body?: {
-    detail?: FalErrorDetail[] | string;
-    error?: string;
-  };
+  status?: unknown;
+  body?: unknown;
   message?: string;
 }
 
@@ -23,7 +21,7 @@ export function friendlyFalError(
   err: FalError,
   fallback = 'Generation failed — please try again.'
 ): string {
-  const body = err.body;
+  const body = err.body as { detail?: FalErrorDetail[] | string; error?: string } | undefined;
   if (body) {
     if (Array.isArray(body.detail) && body.detail.length > 0) {
       const first = body.detail[0];
