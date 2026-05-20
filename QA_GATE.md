@@ -16,8 +16,8 @@ Owner: Hus Alfyandi · Updated: 2026-05-20
 
 ### E2E Smoke (run locally or against beta URL)
 
-- [ ] `npm run test:e2e` — all 6 smoke tests pass
-- [ ] Set `TEST_BASE_URL=https://beta.getbased.dev` and re-run against prod environment
+- [x] `npm run test:e2e` — all 6 smoke tests pass
+- [x] Set `TEST_BASE_URL=https://beta.getbased.dev` and re-run against prod environment
 
 ### 2-Week Clean-Run on Beta
 
