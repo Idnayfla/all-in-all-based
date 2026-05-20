@@ -51,8 +51,11 @@ export async function POST(req: NextRequest) {
         .join('') ?? '';
 
     return NextResponse.json({ code });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('[generate-3d] Claude error:', e);
-    return NextResponse.json({ error: e?.message ?? 'Generation failed' }, { status: 500 });
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : 'Generation failed' },
+      { status: 500 }
+    );
   }
 }
