@@ -11,6 +11,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing code' }, { status: 400 });
     }
 
+    // Block claims from accounts less than 1 hour old (throwaway account abuse)
+    const {
+      data: { user: authUser },
+    } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (authUser?.created_at) {
+      const ageMs = Date.now() - new Date(authUser.created_at).getTime();
+      if (ageMs < 60 * 60 * 1000) {
+        return NextResponse.json(
+          { error: 'Account must be at least 1 hour old to claim a referral' },
+          { status: 429 }
+        );
+      }
+    }
+
     // Check if user already claimed a referral
     const { data: self } = await supabaseAdmin
       .from('user_settings')

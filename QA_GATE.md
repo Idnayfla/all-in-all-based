@@ -31,12 +31,12 @@ Owner: Hus Alfyandi · Updated: 2026-05-20
 - [x] debug route returns 404 in production
 - [x] iframe parent-frame override injected in sanitizeHTML
 - [x] E2B sandbox killed in finally block
-- [ ] Run `/security audit` agent — clear sign-off on Stripe webhook, referral, and notes endpoints
+- [x] Run `/security audit` agent — clear sign-off on Stripe webhook, referral, and notes endpoints
 
 ### PostHog
 
-- [ ] `NEXT_PUBLIC_POSTHOG_KEY` added to Vercel production env vars
-- [ ] Verify events firing in PostHog dashboard after a test generation
+- [x] `NEXT_PUBLIC_POSTHOG_KEY` added to Vercel production env vars
+- [x] Verify events firing in PostHog dashboard after a test generation
 
 ---
 
@@ -46,7 +46,7 @@ Owner: Hus Alfyandi · Updated: 2026-05-20
 
 - [ ] All vars in `.env.local.example` are set in Vercel production
 - [ ] `NETLIFY_TOKEN` set (for publish route)
-- [ ] `NEXT_PUBLIC_POSTHOG_KEY` set
+- [x] `NEXT_PUBLIC_POSTHOG_KEY` set
 
 ### Performance
 
