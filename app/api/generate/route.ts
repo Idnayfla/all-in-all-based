@@ -336,6 +336,14 @@ ARCHITECTURE PATTERNS:
 - Dashboards: fetch → transform → render, loading/error states always
 - Forms: validate on submit, show inline errors, disable during processing
 
+ANIMATION RULES — ALWAYS FOLLOW FOR ANY ANIMATED PROJECT:
+- Always wrap the entire animation init in: window.addEventListener('DOMContentLoaded', function() { ... })
+- Always get canvas context inside DOMContentLoaded, never at top level: const ctx = canvas.getContext('2d'); if (!ctx) return;
+- Every requestAnimationFrame loop must be cancellable: store the return value in a variable (let rafId); cancel with cancelAnimationFrame(rafId) before restarting
+- State machine pattern for multi-phase animations (e.g. dance → stare → reset): use a single 'state' variable ('dancing','staring','resetting'), update it inside the animation loop, never use setTimeout to switch state mid-loop
+- When MODIFYING an existing animation: keep the same state machine structure, only change the affected phase — do not restructure the entire loop
+- Wrap the animation loop body in try/catch so errors surface visibly instead of freezing silently
+
 GRAPHICS — NEVER USE EMOJI AS VISUAL ELEMENTS:
 - Never use emoji characters (🎮🔴⭐🏠) as graphical elements, icons, or sprites in apps, games, or tools
 - For icons and UI elements: use inline SVG shapes — <svg viewBox="0 0 24 24"><path .../></svg>
@@ -862,6 +870,31 @@ function sanitizeHTML(html: string): string {
   if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',wire);}else{wire();}
 })();
 </script>`;
+
+  // Global error catcher — shows a visible overlay instead of a silent blank screen
+  const errorCatcher = `
+<script>
+(function(){
+  window.onerror=function(msg,src,line,col,err){
+    var box=document.getElementById('__based_err__');
+    if(!box){
+      box=document.createElement('div');
+      box.id='__based_err__';
+      box.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#1a0000;color:#ff6b6b;font:12px/1.5 monospace;padding:10px 14px;z-index:99999;border-top:2px solid #ff3333;white-space:pre-wrap;max-height:40%;overflow:auto;';
+      document.body.appendChild(box);
+    }
+    box.textContent='JS Error: '+(msg||err)+(line?' (line '+line+')':'');
+    return false;
+  };
+  window.addEventListener('unhandledrejection',function(e){
+    window.onerror(e.reason?.message||String(e.reason));
+  });
+})();
+</script>`;
+
+  html = html.includes('<head>')
+    ? html.replace('<head>', '<head>' + errorCatcher)
+    : errorCatcher + html;
 
   return html.includes('</body>')
     ? html.replace('</body>', safetyNet + '\n</body>')
