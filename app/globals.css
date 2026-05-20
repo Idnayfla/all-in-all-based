@@ -1391,6 +1391,139 @@ body {
   font-size: 16px;
 }
 
+/* ── Persona Switcher ── */
+.persona-switcher {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.persona-switcher-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 44px;
+  padding: 0 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  border-radius: var(--r-lg);
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s,
+    transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  line-height: 1;
+  white-space: nowrap;
+}
+.persona-switcher-btn:hover:not(:disabled) {
+  background: var(--bg);
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+.persona-switcher-btn.active {
+  background: var(--accent-muted);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.persona-switcher-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.persona-switcher-symbol {
+  font-size: 13px;
+  line-height: 1;
+}
+.persona-switcher-name {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.persona-switcher-arrow {
+  font-size: 8px;
+  color: var(--text3);
+}
+
+.persona-switcher-panel {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  min-width: 230px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  z-index: 200;
+}
+
+.persona-switcher-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  border-radius: 7px;
+  color: var(--text2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.persona-switcher-option:hover {
+  background: var(--bg3);
+  color: var(--text);
+}
+.persona-switcher-option.selected {
+  background: rgba(124, 106, 247, 0.12);
+  color: var(--accent);
+}
+
+.persona-switcher-opt-symbol {
+  font-size: 14px;
+  line-height: 1;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+.persona-switcher-opt-label {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+.persona-switcher-opt-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: inherit;
+}
+.persona-switcher-opt-desc {
+  font-size: 10px;
+  color: var(--text3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.persona-switcher-option.selected .persona-switcher-opt-desc {
+  color: var(--accent);
+  opacity: 0.7;
+}
+.persona-switcher-check {
+  font-size: 10px;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
 .send-btn.send-btn-image {
   background: #9333ea;
 }

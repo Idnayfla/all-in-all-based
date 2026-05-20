@@ -155,6 +155,8 @@ export default function Home() {
     fromDevice?: 'mobile' | 'tablet' | 'desktop';
   } | null>(null);
   const [aiModel, setAiModelState] = useState<'based' | 'free'>('based');
+  const [persona, setPersona] =
+    useState<import('@/components/PersonaSwitcher').PersonaKey>('based');
   const setAiModel = (m: 'based' | 'free') => {
     setAiModelState(m);
     try {
@@ -782,6 +784,7 @@ export default function Home() {
     setActivePanel('chat');
     setCheckin(null);
     setShareUrl('');
+    setPersona('based');
     saveLastProject(id, name.trim());
     setTimeout(() => setPendingPrompt(''), 100);
 
@@ -815,6 +818,7 @@ export default function Home() {
     setShareId('');
     setGalleryPublished(false);
     setCheckin(null);
+    setPersona('based');
     saveLastProject(project.id, project.name);
   };
 
@@ -1739,6 +1743,8 @@ export default function Home() {
                     onReportBug={() => setShowFeedback(true)}
                     aiModel={aiModel}
                     onGenerationComplete={() => setActivePanel('preview')}
+                    persona={persona}
+                    onPersonaChange={setPersona}
                   />
                 </div>
                 <div className={`panel ${activePanel === 'editor' ? 'panel-active' : ''}`}>

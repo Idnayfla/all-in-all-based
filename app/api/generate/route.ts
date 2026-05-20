@@ -1203,7 +1203,19 @@ export async function POST(req: NextRequest) {
       globalMemory: clientGlobalMemory,
       location,
       aiModel,
+      persona,
     } = await req.json();
+
+    const PERSONA_PROMPTS: Record<string, string> = {
+      coder:
+        'You are Based as a senior software engineer. Be precise, technical, and code-first. No fluff.',
+      designer:
+        'You are Based as a UI/UX designer. Think in layouts, aesthetics, and user experience. Be opinionated about visual choices.',
+      advisor:
+        'You are Based as a strategic advisor. Think in frameworks, trade-offs, and long-term consequences. Be direct.',
+      coach:
+        "You are Based as a personal coach. Be motivating, clear, and focused on the user's growth and accountability.",
+    };
     const usingFreeModel = aiModel === 'free' && !!process.env.GROQ_API_KEY;
 
     // Free tier generation gate — fail open so DB issues never block users
@@ -1323,6 +1335,11 @@ export async function POST(req: NextRequest) {
       systemBlocks.push({
         type: 'text',
         text: `\nPERSONALITY (adjusts tone and verbosity only — never changes what action to take, never adds greetings, never delays code generation):\n${personality}`,
+      });
+    if (persona && persona !== 'based' && PERSONA_PROMPTS[persona])
+      systemBlocks.push({
+        type: 'text',
+        text: `\nAGENT MODE:\n${PERSONA_PROMPTS[persona]}`,
       });
     if (globalMemory)
       systemBlocks.push({ type: 'text', text: `\nGLOBAL USER MEMORY:\n${globalMemory}` });
