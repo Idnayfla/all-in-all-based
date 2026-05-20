@@ -107,7 +107,13 @@ export default function Home() {
   const [galleryAuthorName, setGalleryAuthorName] = useState('');
   const [galleryPublished, setGalleryPublished] = useState(false);
   const [apiKeys, setApiKeys] = useState<
-    { id: string; name: string; created_at: string; last_used_at: string | null }[]
+    {
+      id: string;
+      name: string;
+      created_at: string;
+      last_used_at: string | null;
+      calls_this_month: number;
+    }[]
   >([]);
   const [newApiKey, setNewApiKey] = useState<string | null>(null);
   const [apiKeyName, setApiKeyName] = useState('');
@@ -1427,9 +1433,10 @@ export default function Home() {
                           <div className="apikey-row-meta">
                             <span className="apikey-name">{k.name}</span>
                             <span className="apikey-hint">
+                              {k.calls_this_month ?? 0}/100 calls this month
                               {k.last_used_at
-                                ? `Last used ${new Date(k.last_used_at).toLocaleDateString()}`
-                                : 'Never used'}
+                                ? ` · Last used ${new Date(k.last_used_at).toLocaleDateString()}`
+                                : ''}
                             </span>
                           </div>
                           <button

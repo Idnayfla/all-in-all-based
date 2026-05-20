@@ -1,15 +1,14 @@
 // Based Personal API — v1/generate
 // Accepts an API key (sk-based-*) and returns generated files as JSON.
-// Pro tier only. Same pipeline as the app, non-streaming.
+// Pro tier only. Hard cap: 100 calls/month per key.
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserIdFromApiKey } from '../../_apiKeyAuth';
+import { getUserIdFromApiKey, ApiRateLimitError } from '../../_apiKeyAuth';
 import { supabaseAdmin } from '../../_auth';
 
 export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
-  // Auth via API key header
   const authHeader = req.headers.get('Authorization') ?? '';
   const apiKey = authHeader.replace('Bearer ', '').trim();
   if (!apiKey.startsWith('sk-based-')) {
@@ -20,16 +19,21 @@ export async function POST(req: NextRequest) {
   }
 
   let userId: string;
+  let callsUsed: number;
+  let callsLimit: number;
   try {
-    userId = await getUserIdFromApiKey(apiKey);
-  } catch {
+    ({ userId, callsUsed, callsLimit } = await getUserIdFromApiKey(apiKey));
+  } catch (err) {
+    if (err instanceof ApiRateLimitError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     return NextResponse.json({ error: 'Invalid or revoked API key' }, { status: 401 });
   }
 
   // Pro check
   const { data: settings } = await supabaseAdmin
     .from('user_settings')
-    .select('subscription_tier, pro_bonus_expires_at, generations_used, generation_limit')
+    .select('subscription_tier, pro_bonus_expires_at')
     .eq('user_id', userId)
     .single();
 
@@ -55,14 +59,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'prompt is required' }, { status: 400 });
   }
 
-  // Proxy to the internal generate endpoint with a service-level session
-  // We forward as a server-to-server call so the full pipeline runs unchanged.
   const origin = req.nextUrl.origin;
   const generateRes = await fetch(`${origin}/api/generate`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      // Service key header bypasses user auth inside generate — handled below
       'x-api-user-id': userId,
     },
     body: JSON.stringify({
@@ -77,7 +78,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Generation failed' }, { status: 500 });
   }
 
-  // Collect the streamed response and extract the final state
   const reader = generateRes.body?.getReader();
   if (!reader) return NextResponse.json({ error: 'No response body' }, { status: 500 });
 
@@ -103,9 +103,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({
-    files,
-    reply,
-    projectType: projectTypeOut,
-  });
+  return NextResponse.json(
+    { files, reply, projectType: projectTypeOut },
+    {
+      headers: {
+        'X-RateLimit-Limit': String(callsLimit),
+        'X-RateLimit-Remaining': String(callsLimit - callsUsed),
+        'X-RateLimit-Reset': 'monthly',
+      },
+    }
+  );
 }

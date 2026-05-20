@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
     const userId = await getUserId(req);
     const { data, error } = await supabaseAdmin
       .from('api_keys')
-      .select('id, name, created_at, last_used_at, revoked_at')
+      .select('id, name, created_at, last_used_at, revoked_at, calls_this_month')
       .eq('user_id', userId)
       .is('revoked_at', null)
       .order('created_at', { ascending: false });

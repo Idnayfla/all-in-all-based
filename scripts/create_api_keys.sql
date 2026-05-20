@@ -2,13 +2,15 @@
 -- Run once in Supabase SQL editor.
 
 create table if not exists api_keys (
-  id           uuid primary key default gen_random_uuid(),
-  created_at   timestamptz not null default now(),
-  user_id      uuid not null references auth.users(id) on delete cascade,
-  name         text not null default 'Default',
-  key_hash     text not null unique,   -- SHA-256 of the raw key, never store raw
-  last_used_at timestamptz,
-  revoked_at   timestamptz
+  id              uuid primary key default gen_random_uuid(),
+  created_at      timestamptz not null default now(),
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  name            text not null default 'Default',
+  key_hash        text not null unique,   -- SHA-256 of the raw key, never store raw
+  last_used_at    timestamptz,
+  revoked_at      timestamptz,
+  calls_this_month int not null default 0,
+  calls_reset_at   timestamptz not null default now()
 );
 
 alter table api_keys enable row level security;

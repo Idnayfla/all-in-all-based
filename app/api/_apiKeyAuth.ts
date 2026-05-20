@@ -1,22 +1,55 @@
 import { supabaseAdmin } from './_auth';
 
-export async function getUserIdFromApiKey(apiKey: string): Promise<string> {
+const API_MONTHLY_LIMIT = 100; // Pro tier: 100 calls/month
+
+export class ApiRateLimitError extends Error {
+  constructor() {
+    super(
+      'Monthly API limit reached (100 calls/month on Pro). Wait for next month or contact support.'
+    );
+    this.name = 'ApiRateLimitError';
+  }
+}
+
+export interface ApiKeyResult {
+  userId: string;
+  callsUsed: number;
+  callsLimit: number;
+}
+
+export async function getUserIdFromApiKey(apiKey: string): Promise<ApiKeyResult> {
   const hash = await sha256(apiKey);
   const { data, error } = await supabaseAdmin
     .from('api_keys')
-    .select('user_id, revoked_at')
+    .select('id, user_id, revoked_at, calls_this_month, calls_reset_at')
     .eq('key_hash', hash)
     .single();
 
   if (error || !data || data.revoked_at) throw new Error('Unauthorized');
 
-  // Update last_used_at fire-and-forget
-  void supabaseAdmin
-    .from('api_keys')
-    .update({ last_used_at: new Date().toISOString() })
-    .eq('key_hash', hash);
+  const now = new Date();
+  const resetAt = new Date(data.calls_reset_at);
+  const needsReset =
+    resetAt.getMonth() !== now.getMonth() || resetAt.getFullYear() !== now.getFullYear();
 
-  return data.user_id as string;
+  const currentCount = needsReset ? 0 : (data.calls_this_month ?? 0);
+
+  if (currentCount >= API_MONTHLY_LIMIT) throw new ApiRateLimitError();
+
+  await supabaseAdmin
+    .from('api_keys')
+    .update({
+      calls_this_month: needsReset ? 1 : currentCount + 1,
+      calls_reset_at: needsReset ? now.toISOString() : data.calls_reset_at,
+      last_used_at: now.toISOString(),
+    })
+    .eq('id', data.id);
+
+  return {
+    userId: data.user_id as string,
+    callsUsed: currentCount + 1,
+    callsLimit: API_MONTHLY_LIMIT,
+  };
 }
 
 async function sha256(text: string): Promise<string> {
