@@ -49,20 +49,27 @@ Non-code chat uses `sonnet`. `sanitizeHTML()` post-processes all HTML before sen
 
 ## Agent System
 
-Ten agents (9 specialists + 1 orchestrator) defined in `.claude/agents/`.
+Seventeen agents (16 specialists + 1 orchestrator) defined in `.claude/agents/`.
 
 ### Single-agent invocation
 
 ```
-[Agent: Architect]        — system design, scalability, cost modeling
-[Agent: Product]          — roadmap, specs, prioritization
-[Agent: Designer]         — design system, layouts, brand
-[Agent: Growth]           — copy, SEO, launch, onboarding
-[Agent: QA]               — test plans, bug triage, release gate
-[Agent: DevOps]           — infra, cost per user, monitoring
-[Agent: Security]         — auth audit, API security, OWASP
-[Agent: Chief of Staff]   — decisions log, changelog, roadmap status
-[Agent: Senior Engineer]  — deep bug diagnosis, generation pipeline, surgical fixes
+[Agent: Architect]          — system design, scalability, cost modeling
+[Agent: Product]            — roadmap, specs, prioritization
+[Agent: Designer]           — design system, layouts, brand
+[Agent: Growth]             — copy, SEO, launch, onboarding
+[Agent: QA]                 — test plans, bug triage, release gate
+[Agent: DevOps]             — infra, cost per user, monitoring
+[Agent: Security]           — auth audit, API security, OWASP
+[Agent: Chief of Staff]     — decisions log, changelog, roadmap status
+[Agent: Senior Engineer]    — deep bug diagnosis, generation pipeline, surgical fixes
+[Agent: Mobile]             — PWA, service workers, iOS/Android, app store submissions
+[Agent: Data Analyst]       — PostHog, funnels, retention, A/B testing, metrics
+[Agent: Legal]              — privacy policy, ToS, GDPR/PDPA, compliance
+[Agent: Community]          — feedback synthesis, Discord, support triage, changelog comms
+[Agent: Finance]            — MRR, unit economics, Stripe, API cost modelling, pricing
+[Agent: Technical Writer]   — API docs, user guides, error messages, CHANGELOG entries
+[Agent: AI Engineer]        — prompt architecture, model selection, pipeline optimisation
 ```
 
 ### Multi-agent workflows (Orchestrator coordinates all)
