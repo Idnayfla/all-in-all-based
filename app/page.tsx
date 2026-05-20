@@ -148,7 +148,7 @@ export default function Home() {
     'upgrade'
   );
   const [showFeedback, setShowFeedback] = useState(false);
-  const [checkin, setCheckin] = useState<{ id: string; name: string } | null>(null);
+  const [checkin, setCheckin] = useState<{ id: string; name: string; fromDevice?: 'mobile' | 'tablet' | 'desktop' } | null>(null);
   const [aiModel, setAiModelState] = useState<'based' | 'free'>('based');
   const setAiModel = (m: 'based' | 'free') => {
     setAiModelState(m);
@@ -410,6 +410,63 @@ export default function Home() {
       Authorization: `Bearer ${session?.access_token ?? ''}`,
     };
   }, []);
+
+  // ── Cross-device heartbeat ───────────────────────────────────────────────
+  function getDeviceType(): 'mobile' | 'tablet' | 'desktop' {
+    const ua = navigator.userAgent;
+    if (/ipad|tablet|(android(?!.*mobile))/i.test(ua)) return 'tablet';
+    if (/iphone|ipod|android/i.test(ua)) return 'mobile';
+    return 'desktop';
+  }
+
+  // Write heartbeat every 30s so other devices can detect us
+  useEffect(() => {
+    if (!user) return;
+    const write = async () => {
+      try {
+        const h = await getHeaders();
+        const p = currentProjectRef.current;
+        await fetch('/api/heartbeat', {
+          method: 'POST',
+          headers: { ...(h as Record<string, string>), 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            deviceType: getDeviceType(),
+            projectId: p?.id ?? null,
+            projectName: p?.name ?? null,
+          }),
+        });
+      } catch {}
+    };
+    write();
+    const interval = setInterval(write, 30_000);
+    return () => clearInterval(interval);
+  }, [user, getHeaders]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // On load: check if another device was recently active with a project
+  useEffect(() => {
+    if (!user || !authReady || currentProject) return;
+    try {
+      // Skip when local check-in will already fire
+      if (localStorage.getItem('based_interrupted')) return;
+      const raw = localStorage.getItem(LAST_PROJECT_KEY);
+      if (raw) {
+        const { at } = JSON.parse(raw) as { at: number };
+        if (Date.now() - at >= 3 * 60 * 1000) return;
+      }
+    } catch {}
+    let cancelled = false;
+    (async () => {
+      try {
+        const h = await getHeaders();
+        const res = await fetch(`/api/heartbeat?current=${getDeviceType()}`, { headers: h as HeadersInit });
+        if (!res.ok || cancelled) return;
+        const { heartbeat } = await res.json();
+        if (!heartbeat?.project_id || cancelled) return;
+        setCheckin({ id: heartbeat.project_id, name: heartbeat.project_name, fromDevice: heartbeat.device_type });
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, [user, authReady, currentProject]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Load user data from cloud ────────────────────────────────────────────
   const loadCloudData = useCallback(async () => {
@@ -1589,6 +1646,7 @@ export default function Home() {
                   {checkin && (
                     <ProactiveCheckin
                       projectName={checkin.name}
+                      fromDevice={checkin.fromDevice}
                       onContinue={() => {
                         const project = projects.find(p => p.id === checkin.id);
                         if (project) loadProject(project);

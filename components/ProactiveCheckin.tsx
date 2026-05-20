@@ -6,9 +6,16 @@ interface Props {
   projectName: string;
   onContinue: () => void;
   onDismiss: () => void;
+  fromDevice?: 'mobile' | 'tablet' | 'desktop';
 }
 
-export default function ProactiveCheckin({ projectName, onContinue, onDismiss }: Props) {
+const DEVICE_LABEL: Record<string, string> = {
+  mobile: 'your phone',
+  tablet: 'your tablet',
+  desktop: 'your desktop',
+};
+
+export default function ProactiveCheckin({ projectName, onContinue, onDismiss, fromDevice }: Props) {
   const dismissRef = useRef(onDismiss);
   useEffect(() => {
     dismissRef.current = onDismiss;
@@ -29,12 +36,23 @@ export default function ProactiveCheckin({ projectName, onContinue, onDismiss }:
     >
       <div className="checkin-header">
         <span className="checkin-icon">◈</span>
-        <span className="checkin-label">Welcome back.</span>
+        <span className="checkin-label">{fromDevice ? 'Picking up where you left off.' : 'Welcome back.'}</span>
       </div>
       <div className="checkin-body">
-        You were working on{' '}
-        <strong className="checkin-project-name">&ldquo;{projectName}&rdquo;</strong> — want to pick
-        up where you left off?
+        {fromDevice ? (
+          <>
+            You were on <strong className="checkin-project-name">{DEVICE_LABEL[fromDevice]}</strong>{' '}
+            working on{' '}
+            <strong className="checkin-project-name">&ldquo;{projectName}&rdquo;</strong> — load it
+            here?
+          </>
+        ) : (
+          <>
+            You were working on{' '}
+            <strong className="checkin-project-name">&ldquo;{projectName}&rdquo;</strong> — want to
+            pick up where you left off?
+          </>
+        )}
       </div>
       <div className="checkin-actions">
         <button className="checkin-continue" onClick={onContinue}>
