@@ -507,7 +507,7 @@ PHASER RULES:
 - Timers: this.time.addEvent({ delay: 2000, callback: fn, callbackScope: this, loop: true })
 - Tweens: this.tweens.add({ targets: obj, alpha: 0, duration: 300, onComplete: () => {...} })
 - Pass data between scenes: this.scene.start('GameOverScene', { score: this.score })
-- Sound: load real audio from Mixkit CDN URLs via AudioContext + decodeAudioData (same rules as AUDIO section above)
+- Sound: use <audio src="/api/sfx?slug=SLUG"> elements — never fetch() or decodeAudioData() (same rules as AUDIO section above)
 - Mobile: always add this.input.addPointer(1) and on-screen buttons for mobile touch
 
 GAME ENGINE — 3D GAMES (THREE.JS + CANNON.JS PHYSICS):

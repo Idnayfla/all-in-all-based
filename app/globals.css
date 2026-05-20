@@ -1093,6 +1093,78 @@ body {
   animation: voice-pulse 2s ease-in-out infinite;
 }
 
+/* Mobile floating prompt overlay */
+.mobile-input-overlay {
+  display: none;
+}
+@media (max-width: 768px) {
+  .mobile-input-overlay {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    z-index: 9000;
+    align-items: flex-start;
+    padding-top: 16px;
+  }
+  .mobile-input-sheet {
+    width: calc(100% - 24px);
+    margin: 0 auto;
+    background: var(--surface);
+    border: 1px solid #2a2a3a;
+    border-radius: 14px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  }
+  .mobile-input-textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid #2a2a3a;
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 15px;
+    font-family: var(--font-sans);
+    padding: 10px 12px;
+    resize: none;
+    outline: none;
+    min-height: 100px;
+    line-height: 1.5;
+  }
+  .mobile-input-textarea:focus {
+    border-color: var(--accent);
+  }
+  .mobile-input-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .mobile-input-cancel {
+    background: transparent;
+    border: 1px solid #333;
+    color: var(--text-muted);
+    border-radius: 8px;
+    padding: 9px 18px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .mobile-input-send {
+    background: var(--accent);
+    border: none;
+    color: #fff;
+    border-radius: 8px;
+    padding: 9px 22px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .mobile-input-send:disabled {
+    opacity: 0.4;
+  }
+}
+
 @keyframes voice-pulse {
   0%,
   100% {

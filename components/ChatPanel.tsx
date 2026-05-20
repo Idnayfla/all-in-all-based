@@ -225,6 +225,8 @@ export default function ChatPanel({
   const [reportedErrors, setReportedErrors] = useState<Set<string>>(new Set());
   const reportingInFlight = useRef<Set<string>>(new Set());
   const [micState, setMicState] = useState<'idle' | 'recording' | 'transcribing'>('idle');
+  const [mobileInputOpen, setMobileInputOpen] = useState(false);
+  const mobileTextareaRef = useRef<HTMLTextAreaElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
 
@@ -1325,6 +1327,12 @@ export default function ChatPanel({
               autoResize();
             }}
             onKeyDown={handleKey}
+            onFocus={() => {
+              if (window.innerWidth <= 768) {
+                setMobileInputOpen(true);
+                setTimeout(() => mobileTextareaRef.current?.focus(), 50);
+              }
+            }}
             placeholder={
               micState === 'recording'
                 ? 'Recording — press mic again to send…'
@@ -1366,6 +1374,64 @@ export default function ChatPanel({
         )}
         {micState === 'transcribing' && <div className="voice-hint">Transcribing your voice…</div>}
       </div>
+
+      {/* Mobile floating prompt overlay */}
+      <AnimatePresence>
+        {mobileInputOpen && (
+          <motion.div
+            className="mobile-input-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={() => setMobileInputOpen(false)}
+          >
+            <motion.div
+              className="mobile-input-sheet"
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -20, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              onClick={e => e.stopPropagation()}
+            >
+              <textarea
+                ref={mobileTextareaRef}
+                className="mobile-input-textarea"
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    setMobileInputOpen(false);
+                    send();
+                  }
+                }}
+                placeholder="Ask Based anything..."
+                rows={4}
+                autoFocus
+              />
+              <div className="mobile-input-actions">
+                <button
+                  className="mobile-input-cancel"
+                  onClick={() => setMobileInputOpen(false)}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="mobile-input-send"
+                  disabled={!input.trim() && !pendingImage}
+                  onClick={() => {
+                    setMobileInputOpen(false);
+                    send();
+                  }}
+                >
+                  Send
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {editingImageUrl && (
         <ImageEditorModal
           sourceImageUrl={editingImageUrl}
