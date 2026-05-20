@@ -17,8 +17,8 @@ const PANTHEON_URL = process.env.PANTHEON_API_URL ?? 'https://pantheon-api.verce
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
-function friendlyError(e: any): string {
-  const raw: string = e?.message ?? String(e);
+function friendlyError(e: unknown): string {
+  const raw: string = (e instanceof Error ? e.message : null) ?? String(e);
   try {
     const parsed = JSON.parse(raw);
     const t = parsed?.error?.type ?? parsed?.type;
@@ -36,7 +36,7 @@ function friendlyError(e: any): string {
   return raw || 'Something went wrong — please try again.';
 }
 
-function isRetryable(e: any): boolean {
+function isRetryable(e: unknown): boolean {
   const msg = friendlyError(e);
   return msg.includes('overloaded') || msg.includes('Rate limit');
 }
@@ -62,11 +62,11 @@ async function callPantheon(
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error((err as any).error ?? `Pantheon ${res.status}`);
+        throw new Error((err as { error?: string }).error ?? `Pantheon ${res.status}`);
       }
       const data = await res.json();
       return data.text ?? '';
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (attempt < RETRY_DELAYS.length && isRetryable(e)) {
         await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
         continue;
@@ -91,7 +91,7 @@ async function streamPantheonCollecting(
         onChunk(text);
       }
       return accumulated;
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (attempt < RETRY_DELAYS.length && isRetryable(e)) {
         onRetry();
         await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
@@ -114,7 +114,7 @@ async function* streamPantheon(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error((err as any).error ?? `Pantheon ${res.status}`);
+    throw new Error((err as { error?: string }).error ?? `Pantheon ${res.status}`);
   }
   const reader = res.body?.getReader();
   if (!reader) throw new Error('No response body');
@@ -148,8 +148,8 @@ async function* streamPantheon(
           yield txt;
         }
       } catch (e) {
-        if ((e as any).message?.includes('yield') || (e as any).constructor?.name !== 'SyntaxError')
-          throw e;
+        if (e instanceof SyntaxError) continue;
+        throw e;
       }
     }
   }
@@ -1024,7 +1024,14 @@ function stripTags(text: string) {
 
 type ApiContentBlock =
   | { type: 'text'; text: string }
-  | { type: 'image'; mediaType: string; data: string };
+  | { type: 'image'; mediaType: string; data: string }
+  | { type: 'clarify'; question: string }
+  | { type: 'error'; message: string }
+  | { type: string; [key: string]: unknown };
+
+type ApiMessage = { role: string; content: string | ApiContentBlock[] };
+
+type ProjectFile = { name: string; language: string; content: string };
 
 function msgToString(content: string | ApiContentBlock[]): string {
   if (typeof content === 'string') return content;
@@ -1050,23 +1057,29 @@ function toClaudeContent(
     return appendText ? content + appendText : content;
   }
   const blocks: ClaudeContentBlock[] = [];
-  for (const block of content as any[]) {
+  for (const block of content) {
     if (block.type === 'text') {
-      blocks.push({ type: 'text', text: block.text });
-    } else if (block.type === 'image' && block.mediaType && block.data) {
-      blocks.push({
-        type: 'image',
-        source: {
-          type: 'base64' as const,
-          media_type: block.mediaType as ImageMediaType,
-          data: block.data,
-        },
-      });
+      const b = block as { type: 'text'; text: string };
+      blocks.push({ type: 'text', text: b.text });
+    } else if (block.type === 'image') {
+      const b = block as { type: 'image'; mediaType: string; data: string };
+      if (b.mediaType && b.data) {
+        blocks.push({
+          type: 'image',
+          source: {
+            type: 'base64' as const,
+            media_type: b.mediaType as ImageMediaType,
+            data: b.data,
+          },
+        });
+      }
     } else if (block.type === 'clarify') {
+      const b = block as { type: 'clarify'; question: string };
       // clarify blocks become a plain-text summary so conversation history stays coherent
-      blocks.push({ type: 'text', text: `[Asked for clarification: "${block.question}"]` });
+      blocks.push({ type: 'text', text: `[Asked for clarification: "${b.question}"]` });
     } else if (block.type === 'error') {
-      blocks.push({ type: 'text', text: `[Error: ${block.message}]` });
+      const b = block as { type: 'error'; message: string };
+      blocks.push({ type: 'text', text: `[Error: ${b.message}]` });
     }
     // generated-image, generated-video, generated-music, etc. — skip, not relevant to generation context
   }
@@ -1079,24 +1092,27 @@ function toClaudeContent(
   return blocks;
 }
 
+type SystemBlock = { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } };
+
 async function callModel(
-  prompt: any,
-  systemPrompt: any,
+  prompt: string | ClaudeContentBlock[],
+  systemPrompt: string | SystemBlock[],
   modelType: 'planner' | 'generator' | 'summary',
   aiModel?: 'based' | 'free'
 ): Promise<string> {
-  const hasImages = Array.isArray(prompt) && prompt.some((b: any) => b.type === 'image');
+  const hasImages =
+    Array.isArray(prompt) && prompt.some((b: ClaudeContentBlock) => b.type === 'image');
 
   if (!hasImages) {
     const systemText = Array.isArray(systemPrompt)
-      ? systemPrompt.map((b: any) => b.text ?? '').join('\n')
-      : ((systemPrompt as string) ?? '');
+      ? systemPrompt.map(b => b.text ?? '').join('\n')
+      : (systemPrompt ?? '');
     const userText = Array.isArray(prompt)
-      ? prompt
-          .filter((b: any) => b.type === 'text')
-          .map((b: any) => b.text)
+      ? (prompt as ClaudeContentBlock[])
+          .filter((b): b is ClaudeTextBlock => b.type === 'text')
+          .map(b => b.text)
           .join('\n')
-      : (prompt as string);
+      : prompt;
     const msgs = [
       { role: 'system', content: systemText },
       { role: 'user', content: userText },
@@ -1120,10 +1136,10 @@ async function callModel(
         });
         const c = res.content[0];
         return c.type === 'text' ? c.text : '';
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.warn(
           '[callModel] Direct Anthropic failed, falling back to Pantheon:',
-          err?.message
+          err instanceof Error ? err.message : String(err)
         );
       }
     }
@@ -1178,8 +1194,11 @@ async function streamText(
         }
       }
       return accumulated;
-    } catch (err: any) {
-      console.warn('[streamText] Direct Anthropic failed, falling back to Pantheon:', err?.message);
+    } catch (err: unknown) {
+      console.warn(
+        '[streamText] Direct Anthropic failed, falling back to Pantheon:',
+        err instanceof Error ? err.message : String(err)
+      );
     }
   }
 
@@ -1285,14 +1304,14 @@ export async function POST(req: NextRequest) {
       } catch (e) {}
     }
 
-    const recentMessages = messages.slice(-10);
-    const lastUserMsg = recentMessages.filter((m: any) => m.role === 'user').pop();
+    const recentMessages: ApiMessage[] = (messages as ApiMessage[]).slice(-10);
+    const lastUserMsg = recentMessages.filter(m => m.role === 'user').pop();
     const lastUserMessage = msgToString(lastUserMsg?.content ?? '');
 
     // Extract image blocks from the last user message for reuse in planner + file generators
     const hasImage =
       Array.isArray(lastUserMsg?.content) &&
-      (lastUserMsg.content as any[]).some((b: any) => b.type === 'image');
+      (lastUserMsg.content as ApiContentBlock[]).some(b => b.type === 'image');
     const VALID_MEDIA_TYPES: ImageMediaType[] = [
       'image/jpeg',
       'image/png',
@@ -1314,11 +1333,11 @@ export async function POST(req: NextRequest) {
       : [];
 
     const context = existingFiles?.length
-      ? `\n\nCurrent project files:\n${existingFiles.map((f: any) => `--- ${f.name} (${f.language}) ---\n${f.content}`).join('\n\n')}`
+      ? `\n\nCurrent project files:\n${(existingFiles as ProjectFile[]).map(f => `--- ${f.name} (${f.language}) ---\n${f.content}`).join('\n\n')}`
       : '';
 
-    const anthropicMessages = recentMessages.map((m: any, i: number) => ({
-      role: m.role,
+    const anthropicMessages = recentMessages.map((m, i) => ({
+      role: m.role as 'user' | 'assistant',
       content:
         i === recentMessages.length - 1 && m.role === 'user'
           ? toClaudeContent(m.content, context || undefined)
@@ -1470,7 +1489,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
 
           // Step 1: Planner classifies intent and plans files
           const existingFilesContext = existingFiles?.length
-            ? `\n\nExisting files (read before deciding which files to include):\n${existingFiles.map((f: any) => `--- ${f.name} ---\n${(f.content as string).slice(0, 200).replace(/\n/g, ' ')}`).join('\n')}`
+            ? `\n\nExisting files (read before deciding which files to include):\n${(existingFiles as ProjectFile[]).map(f => `--- ${f.name} ---\n${f.content.slice(0, 200).replace(/\n/g, ' ')}`).join('\n')}`
             : '';
 
           const plannerPromptContent =
@@ -1509,14 +1528,16 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
           try {
             const jsonMatch = planText.match(/\[[\s\S]*\]/);
             const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : planText.trim());
-            if (Array.isArray(parsed) && parsed.length === 1 && (parsed[0] as any).chat === true) {
+            if (
+              Array.isArray(parsed) &&
+              parsed.length === 1 &&
+              (parsed[0] as { chat?: boolean }).chat === true
+            ) {
               routeToChat = true;
             } else if (Array.isArray(parsed) && parsed.length > 0) {
               filePlan = parsed;
               controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({ plan: filePlan.map((f: any) => f.name) })}\n\n`
-                )
+                encoder.encode(`data: ${JSON.stringify({ plan: filePlan.map(f => f.name) })}\n\n`)
               );
             } else {
               throw new Error('empty plan');
@@ -1653,10 +1674,12 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                 ? `\n\nAlready generated files:\n${generatedFiles.map(f => `--- ${f.name} ---\n${f.content.slice(0, 3000)}\n...[continues]`).join('\n\n')}`
                 : '';
 
-            const isModifyingExisting = existingFiles?.some((f: any) => f.name === fileSpec.name);
+            const isModifyingExisting = (existingFiles as ProjectFile[] | undefined)?.some(
+              f => f.name === fileSpec.name
+            );
             const existingContext = existingFiles?.length
-              ? `\n\nExisting files:\n${existingFiles
-                  .map((f: any) =>
+              ? `\n\nExisting files:\n${(existingFiles as ProjectFile[])
+                  .map(f =>
                     f.name === fileSpec.name
                       ? `--- ${f.name} (YOU ARE MODIFYING THIS FILE — preserve all existing event listeners, buttons, and logic unless explicitly asked to change them) ---\n${f.content}`
                       : `--- ${f.name} (context only) ---\n${f.content.slice(0, 600)}\n...[truncated]`
@@ -1850,7 +1873,7 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
               });
             } catch {}
           })();
-        } catch (e: any) {
+        } catch (e: unknown) {
           const friendly = friendlyError(e);
           Sentry.captureException(e, { extra: { message: lastUserMessage, aiModel } });
           trace?.update({ output: { error: friendly } });
@@ -1877,7 +1900,8 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
         Connection: 'keep-alive',
       },
     });
-  } catch (err: any) {
-    return NextResponse.json({ reply: `Error: ${err.message}`, files: [] }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ reply: `Error: ${message}`, files: [] }, { status: 500 });
   }
 }
