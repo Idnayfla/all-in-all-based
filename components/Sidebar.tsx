@@ -39,6 +39,7 @@ export default function Sidebar({
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const startRename = (p: Project) => {
     setEditingId(p.id);
@@ -110,7 +111,7 @@ export default function Sidebar({
                         <button
                           onClick={e => {
                             e.stopPropagation();
-                            onDeleteProject(p.id);
+                            setPendingDeleteId(p.id);
                           }}
                           className="action-btn danger"
                           title="Delete"
@@ -164,6 +165,32 @@ export default function Sidebar({
           )}
         </div>
       </div>
+      {pendingDeleteId && (() => {
+        const target = projects.find(p => p.id === pendingDeleteId);
+        return (
+          <div className="delete-confirm-overlay" onClick={() => setPendingDeleteId(null)}>
+            <div className="delete-confirm-dialog" onClick={e => e.stopPropagation()}>
+              <p className="delete-confirm-title">Delete project?</p>
+              <p className="delete-confirm-name">⬡ {target?.name ?? 'this project'}</p>
+              <p className="delete-confirm-body">All files will be lost. This cannot be undone.</p>
+              <div className="delete-confirm-actions">
+                <button className="delete-confirm-cancel" onClick={() => setPendingDeleteId(null)}>
+                  Cancel
+                </button>
+                <button
+                  className="delete-confirm-confirm"
+                  onClick={() => {
+                    onDeleteProject(pendingDeleteId);
+                    setPendingDeleteId(null);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </aside>
   );
 }

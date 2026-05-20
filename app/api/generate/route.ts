@@ -344,6 +344,13 @@ ANIMATION RULES — ALWAYS FOLLOW FOR ANY ANIMATED PROJECT:
 - When MODIFYING an existing animation: keep the same state machine structure, only change the affected phase — do not restructure the entire loop
 - Wrap the animation loop body in try/catch so errors surface visibly instead of freezing silently
 
+PROMPT FAITHFULNESS — ALWAYS FOLLOW EXACTLY:
+- When the user describes a specific sequence of events, scenario, or experience: implement it EXACTLY as described
+- "People running past, one triggers slow motion, a distant figure appears and approaches, then jumpscare" = build that exact 4-phase sequence
+- NEVER substitute the user's described concept with something vaguely similar — "dark hallway you click through" is NOT the same as "people running past with slow motion trigger"
+- Every named element, phase, character, and mechanic the user described must exist in the output
+- This is the most common failure mode: the AI generates something that sounds related but is completely different from what was asked
+
 GRAPHICS — NEVER USE EMOJI AS VISUAL ELEMENTS:
 - Never use emoji characters (🎮🔴⭐🏠) as graphical elements, icons, or sprites in apps, games, or tools
 - For icons and UI elements: use inline SVG shapes — <svg viewBox="0 0 24 24"><path .../></svg>
@@ -803,7 +810,29 @@ NON-BROWSER LANGUAGES (Java / C++ / Go / Rust / Bash):
 - Go: package main with import blocks. go run main.go must work standalone.
 - Rust: single main.rs compilable with rustc. Use std only.
 - Bash: bash-compatible script, shebang #!/bin/bash, POSIX-safe.
-- All non-browser programs must produce meaningful stdout output — that output is the entire user experience.`;
+- All non-browser programs must produce meaningful stdout output — that output is the entire user experience.
+
+AUDIO RULES — NO EXCEPTIONS:
+- NEVER use AudioContext OscillatorNode for horror sounds, jumpscares, explosions, screams, or anything realistic — oscillators sound fake and ruin the experience
+- The ONLY acceptable oscillator use: a single-tone UI beep under 0.3s
+- For ALL other audio: use <audio> elements with Mixkit CDN
+  <audio id="snd" src="https://assets.mixkit.co/sfx/preview/SLUG.mp3" preload="auto"></audio>
+  document.getElementById('snd').play();
+- Horror/jumpscare slugs: mixkit-horror-lose-2011 · mixkit-scary-cinematic-hit-2210 · mixkit-cinematic-horror-sting-581
+- NEVER reference local audio filenames — they don't exist in the sandbox
+
+PROMPT FAITHFULNESS — HIGHEST PRIORITY:
+- Implement EXACTLY what the user described — do not reinterpret, simplify, or substitute
+- If the user says "people running past, one triggers slow motion, distant figure approaches, then jumpscare" — build that exact sequence, not "a dark hallway where you click to get scared"
+- Every element, phase, and mechanic the user named must appear in the output
+- "I described X" complaints always mean the AI substituted Y — this is the worst failure mode
+
+NON-REGRESSION — WHEN MODIFYING EXISTING FILES:
+- EVERY existing event listener must still work after your edit
+- Before outputting: mentally verify the Start button, Try Again button, and all screens still function
+- Do NOT reorganize or restructure the DOMContentLoaded block when making a targeted change
+- Adding new features: write them alongside existing code, never replace the existing wiring
+- If the original has: btn.addEventListener('click', startGame) — it must still have that after your edit`;
 
 const PLANNER_SYSTEM_BLOCKS = [
   { type: 'text' as const, text: PLANNER_SYSTEM, cache_control: { type: 'ephemeral' as const } },
@@ -1546,8 +1575,15 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                 ? `\n\nAlready generated files:\n${generatedFiles.map(f => `--- ${f.name} ---\n${f.content.slice(0, 3000)}\n...[continues]`).join('\n\n')}`
                 : '';
 
+            const isModifyingExisting = existingFiles?.some((f: any) => f.name === fileSpec.name);
             const existingContext = existingFiles?.length
-              ? `\n\nExisting files to preserve:\n${existingFiles.map((f: any) => `--- ${f.name} ---\n${f.content.slice(0, 400)}\n...[truncated]`).join('\n\n')}`
+              ? `\n\nExisting files:\n${existingFiles
+                  .map((f: any) =>
+                    f.name === fileSpec.name
+                      ? `--- ${f.name} (YOU ARE MODIFYING THIS FILE — preserve all existing event listeners, buttons, and logic unless explicitly asked to change them) ---\n${f.content}`
+                      : `--- ${f.name} (context only) ---\n${f.content.slice(0, 600)}\n...[truncated]`
+                  )
+                  .join('\n\n')}`
               : '';
 
             const imagePlaceholderNote =
@@ -1555,16 +1591,16 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                 ? `\n\nThe user has provided an image. Wherever you need the image source, use exactly: ${IMAGE_SRC_PLACEHOLDER}\nDo NOT use any other URL or path — only ${IMAGE_SRC_PLACEHOLDER}. It will be replaced with the real base64 data URL at build time.`
                 : '';
 
-            const filePrompt = `Project: ${lastUserMessage}
+            const filePrompt = `${isModifyingExisting ? 'MODIFICATION' : 'NEW FILE'} — User request: ${lastUserMessage}
 
-Generate file: ${fileSpec.name}
+${isModifyingExisting ? `MODIFY existing file: ${fileSpec.name}` : `Generate new file: ${fileSpec.name}`}
 Purpose: ${fileSpec.description}
 Language: ${fileSpec.language}
 
 All project files: ${filePlan.map(f => `${f.name} — ${f.description}`).join('\n')}
 ${generatedContext}${existingContext}${imagePlaceholderNote}
 
-Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
+${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. The full existing content is shown above. Make ONLY the changes needed for: "${lastUserMessage}". Every existing event listener, button, screen, and function must still work after your edit.` : `Generate ONLY ${fileSpec.name}, complete with no placeholders.`}`;
 
             controller.enqueue(
               encoder.encode(

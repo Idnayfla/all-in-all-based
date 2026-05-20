@@ -776,7 +776,7 @@ export default function Home() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session?.access_token ?? ''}`,
         },
-        body: JSON.stringify({ files, projectName: currentProject.name }),
+        body: JSON.stringify({ files, projectName: currentProject.name, projectId: currentProject.id }),
       });
       clearTimeout(timeout);
       const data = await res.json();
@@ -967,7 +967,7 @@ export default function Home() {
                   disabled={isSharing}
                   title="Share project"
                 >
-                  {isSharing ? '...' : shareUrl ? '✓ Copied!' : '↗ Share'}
+                  {isSharing ? '...' : shareUrl ? '✓ Copied!' : shareId ? '↗ Update' : '↗ Share'}
                 </button>
                 {shareId && (
                   <button
