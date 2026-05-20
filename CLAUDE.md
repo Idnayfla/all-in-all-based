@@ -49,26 +49,27 @@ Non-code chat uses `sonnet`. `sanitizeHTML()` post-processes all HTML before sen
 
 ## Agent System
 
-Nine agents (8 specialists + 1 orchestrator) defined in `.claude/agents/`.
+Ten agents (9 specialists + 1 orchestrator) defined in `.claude/agents/`.
 
 ### Single-agent invocation
 
 ```
-[Agent: Architect]      — system design, scalability, cost modeling
-[Agent: Product]        — roadmap, specs, prioritization
-[Agent: Designer]       — design system, layouts, brand
-[Agent: Growth]         — copy, SEO, launch, onboarding
-[Agent: QA]             — test plans, bug triage, release gate
-[Agent: DevOps]         — infra, cost per user, monitoring
-[Agent: Security]       — auth audit, API security, OWASP
-[Agent: Chief of Staff] — decisions log, changelog, roadmap status
+[Agent: Architect]        — system design, scalability, cost modeling
+[Agent: Product]          — roadmap, specs, prioritization
+[Agent: Designer]         — design system, layouts, brand
+[Agent: Growth]           — copy, SEO, launch, onboarding
+[Agent: QA]               — test plans, bug triage, release gate
+[Agent: DevOps]           — infra, cost per user, monitoring
+[Agent: Security]         — auth audit, API security, OWASP
+[Agent: Chief of Staff]   — decisions log, changelog, roadmap status
+[Agent: Senior Engineer]  — deep bug diagnosis, generation pipeline, surgical fixes
 ```
 
 ### Multi-agent workflows (Orchestrator coordinates all)
 
 ```
 [Workflow: New Feature]     — Product → Architect → Designer → Dev → QA → DevOps → Chief of Staff
-[Workflow: Bug Fix]         — QA → Security → Dev → QA verify → Chief of Staff
+[Workflow: Bug Fix]         — Senior Engineer diagnoses → fixes → QA verifies → Chief of Staff
 [Workflow: Beta → Stable]   — QA gate → Product → Security → DevOps → Growth → Chief of Staff
 [Workflow: Architecture]    — Architect → Security + DevOps (parallel) → Chief of Staff
 [Workflow: Weekly Review]   — Chief of Staff → Product → DevOps
