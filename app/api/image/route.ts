@@ -67,23 +67,24 @@ export async function POST(req: NextRequest) {
             enable_safety_checker: true,
           },
         });
-        url = (result.data as any).images?.[0]?.url;
+        url = (result.data as { images?: { url: string }[] }).images?.[0]?.url;
       }
     }
 
     if (!url) return NextResponse.json({ error: 'No image returned' }, { status: 500 });
     return NextResponse.json({ url, prompt });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const falErr = err as { status?: unknown; body?: unknown; message?: string };
     console.error(
       '[image] FAL error — status:',
-      err.status,
+      falErr.status,
       '| body:',
-      JSON.stringify(err.body),
+      JSON.stringify(falErr.body),
       '| message:',
-      err.message
+      falErr.message
     );
     return NextResponse.json(
-      { error: friendlyFalError(err, 'Image generation failed — please try again.') },
+      { error: friendlyFalError(falErr, 'Image generation failed — please try again.') },
       { status: 500 }
     );
   }

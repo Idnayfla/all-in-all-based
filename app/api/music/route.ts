@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     if (!url) return NextResponse.json({ error: 'No audio URL returned' }, { status: 500 });
 
     return NextResponse.json({ url, enhanced });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

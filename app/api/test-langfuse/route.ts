@@ -23,7 +23,7 @@ export async function GET() {
     trace.span({ name: 'test-span' }).end({ output: { ok: true } });
     await lf.shutdownAsync();
     return NextResponse.json({ status: 'ok', traceId: trace.id, keys });
-  } catch (err: any) {
-    return NextResponse.json({ status: 'error', error: err.message, keys }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ status: 'error', error: err instanceof Error ? err.message : String(err), keys }, { status: 500 });
   }
 }

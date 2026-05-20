@@ -65,9 +65,10 @@ export async function POST(req: NextRequest) {
     );
 
     return NextResponse.json({ ok: true, bonusDays: REFERRAL_BONUS_DAYS });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized')
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'Unauthorized')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

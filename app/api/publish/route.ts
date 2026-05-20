@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     for (const [sha, content] of Object.entries(fileContents)) {
       if (deploy.required?.includes(sha)) {
         const fileName =
-          files.find((f: any) => {
+          files.find((f: { name: string }) => {
             return true;
           })?.name ?? 'index.html';
 
@@ -70,10 +70,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       url: site.ssl_url || site.url || `https://${site.subdomain}.netlify.app`,
     });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized')
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === 'Unauthorized')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     console.error(err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

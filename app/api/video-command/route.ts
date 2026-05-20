@@ -37,12 +37,12 @@ export async function POST(req: NextRequest) {
       system: SYSTEM,
       messages: [{ role: 'user', content: `Video duration: ${duration}s\nCommand: ${command}` }],
     });
-    const text = (msg.content[0] as any).text ?? '{}';
+    const text = (msg.content[0] as { type: string; text?: string }).text ?? '{}';
     const jsonStart = text.indexOf('{');
     const jsonEnd = text.lastIndexOf('}');
     const parsed = JSON.parse(text.slice(jsonStart, jsonEnd + 1));
     return NextResponse.json(parsed);
-  } catch (err: any) {
-    return NextResponse.json({ actions: [], message: `Error: ${err.message}` }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ actions: [], message: `Error: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 });
   }
 }

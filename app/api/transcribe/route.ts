@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
 
     const data = await res.json();
     return NextResponse.json({ text: data.text ?? '' });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[transcribe]', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

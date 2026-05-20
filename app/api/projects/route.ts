@@ -19,10 +19,11 @@ export async function GET(req: NextRequest) {
       updatedAt: new Date(p.updated_at).getTime(),
     }));
     return NextResponse.json({ projects });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized')
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'Unauthorized')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
@@ -55,10 +56,11 @@ export async function POST(req: NextRequest) {
         updatedAt: new Date(data.updated_at).getTime(),
       },
     });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized')
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'Unauthorized')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    console.error('[POST /api/projects]', err.message, err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    console.error('[POST /api/projects]', msg, err);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

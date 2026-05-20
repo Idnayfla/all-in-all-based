@@ -12,7 +12,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   if (!data) return new NextResponse('Not found', { status: 404 });
 
-  const htmlFile = data.files.find((f: any) => f.name === 'index.html') ?? data.files[0];
+  const htmlFile = data.files.find((f: { name: string }) => f.name === 'index.html') ?? data.files[0];
   if (!htmlFile) return new NextResponse('Not found', { status: 404 });
 
   return new NextResponse(htmlFile.content as string, {

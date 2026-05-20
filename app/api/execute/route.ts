@@ -47,7 +47,9 @@ export async function POST(req: NextRequest) {
     } else if (projectType === 'node') {
       const pkgFile = files.find((f: SandboxFile) => f.name === 'package.json');
       if (pkgFile) await run(sandbox, 'npm install --silent', workdir);
-      const entry = files.find((f: SandboxFile) => ['index.js', 'main.js', 'app.js'].includes(f.name));
+      const entry = files.find((f: SandboxFile) =>
+        ['index.js', 'main.js', 'app.js'].includes(f.name)
+      );
       if (!entry) throw new Error('No Node.js entry file found (index.js / main.js / app.js)');
       const r = await run(sandbox, `node ${entry.name}`, workdir);
       stdout = r.stdout;
@@ -130,7 +132,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ output: stdout, stderr });
   } catch (err: unknown) {
     console.error(err);
-    return NextResponse.json({ output: `Error: ${err instanceof Error ? err.message : String(err)}`, stderr: '' }, { status: 500 });
+    return NextResponse.json(
+      { output: `Error: ${err instanceof Error ? err.message : String(err)}`, stderr: '' },
+      { status: 500 }
+    );
   } finally {
     if (sandbox) {
       try {

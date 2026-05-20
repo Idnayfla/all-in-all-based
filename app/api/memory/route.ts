@@ -5,7 +5,7 @@ import { getUserId, supabaseAdmin } from '../_auth';
 function contentToText(content: unknown): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
-    return (content as any[])
+    return (content as { type: string; text?: string }[])
       .filter(b => b.type === 'text')
       .map(b => b.text ?? '')
       .join('\n');
@@ -22,10 +22,11 @@ export async function GET(req: NextRequest) {
       .eq('user_id', userId)
       .single();
     return NextResponse.json({ memory: data?.global_memory ?? '' });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized')
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'Unauthorized')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     const userId = await getUserId(req);
     const { messages } = await req.json();
 
-    const conversation = (messages as any[])
+    const conversation = (messages as { role: string; content: unknown }[])
       .map(m => `${String(m.role).toUpperCase()}: ${contentToText(m.content)}`)
       .join('\n');
 
@@ -84,9 +85,10 @@ STRICT RULES:
       .upsert({ user_id: userId, global_memory: newMemory }, { onConflict: 'user_id' });
 
     return NextResponse.json({ memory: newMemory });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized')
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'Unauthorized')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

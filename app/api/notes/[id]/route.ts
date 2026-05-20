@@ -17,10 +17,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       .eq('user_id', userId);
     if (error) throw error;
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized')
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'Unauthorized')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
@@ -31,9 +32,10 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const { error } = await supabaseAdmin.from('notes').delete().eq('id', id).eq('user_id', userId);
     if (error) throw error;
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized')
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'Unauthorized')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

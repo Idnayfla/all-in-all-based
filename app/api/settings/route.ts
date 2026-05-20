@@ -58,10 +58,11 @@ export async function GET(req: NextRequest) {
       subscriptionPeriodStart: data?.subscription_period_start ?? null,
       subscriptionPeriodEnd: data?.subscription_period_end ?? null,
     });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized')
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === 'Unauthorized')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -78,9 +79,10 @@ export async function PUT(req: NextRequest) {
       .upsert(upsertData, { onConflict: 'user_id' });
     if (error) throw error;
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized')
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message === 'Unauthorized')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

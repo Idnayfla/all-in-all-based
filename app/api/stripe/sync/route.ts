@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     const tier: 'free' | 'pro' = active ? 'pro' : 'free';
     const status = active?.status ?? 'canceled';
-    const item = (active as any)?.items?.data?.[0];
+    const item = (active as { items?: { data?: { current_period_start?: number; current_period_end?: number }[] } } | null)?.items?.data?.[0];
     const periodStart = item?.current_period_start ?? null;
     const periodEnd = item?.current_period_end ?? null;
 
@@ -47,9 +47,10 @@ export async function POST(req: NextRequest) {
     );
 
     return NextResponse.json({ synced: true, tier, status });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized')
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'Unauthorized')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
