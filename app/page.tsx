@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import NextImage from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
 import ChatPanel from '@/components/ChatPanel';
 import EditorPanel from '@/components/EditorPanel';
@@ -138,6 +139,7 @@ export default function Home() {
   const [authTab, setAuthTab] = useState<'signin' | 'signup'>('signin');
   const [theme, setTheme] = useState<AppTheme>(DEFAULT_THEME);
   const [showMemoryManager, setShowMemoryManager] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [createError, setCreateError] = useState<string | null>(null);
   const [subscription, setSubscription] = useState<{
     tier: 'free' | 'pro';
@@ -196,13 +198,13 @@ export default function Home() {
   useEffect(() => {
     const cached = loadProjectsCache();
     if (cached.length > 0) setProjects(cached);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Restore AI model preference ──────────────────────────────────────────
   useEffect(() => {
     const saved = localStorage.getItem('based_ai_model');
     if (saved === 'free' || saved === 'based') setAiModelState(saved);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Apply theme on mount from localStorage ──────────────────────────────
   useEffect(() => {
@@ -220,7 +222,7 @@ export default function Home() {
     }
     const savedBlur = parseInt(localStorage.getItem('based_wallpaper_blur') ?? '0');
     if (!isNaN(savedBlur)) setWallpaperBlur(savedBlur);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   function applyWallpaper(url: string | null) {
     document.body.style.backgroundImage = '';
@@ -331,7 +333,7 @@ export default function Home() {
         body: JSON.stringify({ files: remixFiles }),
       }).catch(() => {});
     } catch {}
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Handle return from Stripe checkout ──────────────────────────────────
   useEffect(() => {
@@ -361,7 +363,7 @@ export default function Home() {
       window.removeEventListener('beforeunload', handleUnload);
       window.removeEventListener('pagehide', handleUnload);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Proactive check-in: offer to resume last project ────────────────────
   useEffect(() => {
@@ -382,7 +384,7 @@ export default function Home() {
       if (Date.now() - at < 3 * 60 * 1000) return; // same session — skip
       setCheckin({ id, name });
     } catch {}
-  }, [user, authReady, currentProject]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, authReady, currentProject]);
 
   // dev-only console helpers
   useEffect(() => {
@@ -417,7 +419,7 @@ export default function Home() {
       delete w.__triggerCheckin;
       delete w.__simulateInterrupt;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Auth headers helper ──────────────────────────────────────────────────
   const getHeaders = useCallback(async (): Promise<HeadersInit> => {
@@ -459,7 +461,7 @@ export default function Home() {
     write(); // fires immediately — catches project switches without waiting for interval
     const interval = setInterval(write, 30_000);
     return () => clearInterval(interval);
-  }, [user, currentProject, getHeaders]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, currentProject, getHeaders]);
 
   // On load: check if another device was recently active with a project
   useEffect(() => {
@@ -671,7 +673,7 @@ export default function Home() {
     });
 
     return () => subscription.unsubscribe();
-  }, [getHeaders, loadCloudData, runMigration]);
+  }, [getHeaders, handleRemix, loadCloudData, runMigration]);
 
   // ── Refresh cloud data when window regains focus or Android app resumes ──
   useEffect(() => {
@@ -1143,7 +1145,7 @@ export default function Home() {
                 onClick={() => setShowSettings(s => !s)}
                 title={user.email}
               >
-                {avatarUrl ? <img src={avatarUrl} alt="avatar" /> : avatarInitial}
+                {avatarUrl ? <NextImage src={avatarUrl} alt="avatar" width={32} height={32} /> : avatarInitial}
               </button>
             )}
             <div className="header-status">
