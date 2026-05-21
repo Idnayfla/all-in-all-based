@@ -1152,7 +1152,12 @@ export default function Home() {
             <button
               className={`icon-btn ${showSettings ? 'active' : ''}`}
               onClick={() => {
+                const closing = showSettings;
                 setShowSettings(s => !s);
+                if (closing) {
+                  setApiKeyError(null);
+                  setNewApiKey(null);
+                }
                 if (!showSettings && user && authToken) {
                   getHeaders().then(h =>
                     fetch('/api/apikey', { headers: h })

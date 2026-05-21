@@ -121,6 +121,14 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
   const currentStroke = useRef<DrawStroke | null>(null);
   const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Cleanup debounce timers on unmount ────────────────────────────────────
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      if (titleTimer.current) clearTimeout(titleTimer.current);
+    };
+  }, []);
+
   // ── Tiptap editor ──────────────────────────────────────────────────────────
   const editor = useEditor({
     extensions: [
