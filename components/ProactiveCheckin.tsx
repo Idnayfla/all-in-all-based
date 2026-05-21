@@ -31,7 +31,7 @@ export default function ProactiveCheckin({
   useEffect(() => {
     const t = setTimeout(() => dismissRef.current(), 8000);
     return () => clearTimeout(t);
-  }, []);
+  }, [projectName]);
 
   return (
     <motion.div

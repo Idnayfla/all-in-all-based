@@ -1187,7 +1187,7 @@ async function callModel(
 
   // Image-containing calls stay on Anthropic (vision required)
   const response = await client.messages.create({
-    model: modelType === 'generator' ? 'claude-opus-4-7-20250219' : 'claude-haiku-4-5-20251001',
+    model: modelType === 'generator' ? 'claude-opus-4-7' : 'claude-haiku-4-5-20251001',
     max_tokens: modelType === 'generator' ? 16000 : 8000,
     system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],

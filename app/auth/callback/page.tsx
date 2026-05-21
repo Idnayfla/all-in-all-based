@@ -65,7 +65,12 @@ export default function AuthCallback() {
       if (session) go('/');
     });
 
-    return () => subscription.unsubscribe();
+    const fallback = setTimeout(() => go('/'), 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(fallback);
+    };
   }, [router]);
 
   return (

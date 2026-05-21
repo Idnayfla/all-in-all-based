@@ -29,7 +29,7 @@ export default function ReferralPanel({ getHeaders }: Props) {
       .catch((err: unknown) =>
         setError(err instanceof Error ? err.message : 'Could not load referral info')
       );
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [getHeaders]);
 
   if (error) return <div className="referral-loading">{error}</div>;
   if (!data) return <div className="referral-loading">Loading…</div>;
