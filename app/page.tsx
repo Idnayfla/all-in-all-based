@@ -1733,7 +1733,7 @@ export default function Home() {
             <NotesPanel authToken={authToken} />
           </div>
           <div className={`panel ${activePanel === '3d' ? 'panel-active' : ''}`}>
-            <ThreeDStudio authToken={authToken} />
+            <ThreeDStudio />
           </div>
 
           {activePanel !== 'video' &&
