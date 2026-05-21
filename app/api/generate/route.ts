@@ -1010,8 +1010,8 @@ function sanitizeHTML(html: string): string {
 
   // Null-property error boundary — silently swallows "Cannot read properties of null"
   // so one missing DOM element doesn't blank the entire app.
-  const NULL_GUARD = `<script>window.addEventListener('error',function(e){if(e.message&&e.message.includes('Cannot read prop')){e.preventDefault();}});</script>`;
-  if (!html.includes('Cannot read prop')) {
+  const NULL_GUARD = `<script id="__based_null_guard__">window.addEventListener('error',function(e){if(e.message&&e.message.includes('Cannot read prop')){e.preventDefault();}});</script>`;
+  if (!html.includes('__based_null_guard__')) {
     html = html.includes('<body>')
       ? html.replace('<body>', '<body>' + NULL_GUARD)
       : NULL_GUARD + html;
