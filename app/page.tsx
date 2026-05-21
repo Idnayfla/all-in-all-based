@@ -13,6 +13,7 @@ import ProjectNameModal from '@/components/ProjectNameModal';
 import AuthModal from '@/components/AuthModal';
 import SplashScreen from '@/components/SplashScreen';
 import PersonalityPanel from '@/components/PersonalityPanel';
+import PersonaSwitcher, { PERSONAS } from '@/components/PersonaSwitcher';
 import MemoryManager, { parseMemories } from '@/components/MemoryManager';
 import ThemeCustomizer, {
   AppTheme,
@@ -122,6 +123,7 @@ export default function Home() {
   const [newApiKey, setNewApiKey] = useState<string | null>(null);
   const [apiKeyName, setApiKeyName] = useState('');
   const [apiKeyLoading, setApiKeyLoading] = useState(false);
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [authToken, setAuthToken] = useState<string>('');
@@ -1323,6 +1325,16 @@ export default function Home() {
                     Free AI uses Llama 3.3 70B — no generation limits, no content restrictions.
                   </div>
                 </div>
+                <div className="settings-section">
+                  <label className="settings-label">Persona</label>
+                  <div className="settings-hint" style={{ marginBottom: 8 }}>
+                    {(() => {
+                      const current = PERSONAS.find(pItem => pItem.key === persona);
+                      return current ? `${current.symbol} ${current.name} — ${current.desc}` : '';
+                    })()}
+                  </div>
+                  <PersonaSwitcher persona={persona} onChange={setPersona} />
+                </div>
                 <div className="settings-section" style={{ position: 'relative' }}>
                   <label className="settings-label">AI Personality</label>
                   {subscription.tier === 'free' && (
@@ -1583,6 +1595,7 @@ export default function Home() {
                             disabled={apiKeyLoading}
                             onClick={async () => {
                               setApiKeyLoading(true);
+                              setApiKeyError(null);
                               try {
                                 const h = await getHeaders();
                                 const res = await fetch('/api/apikey', {
@@ -1599,7 +1612,15 @@ export default function Home() {
                                     .then(r => r.json())
                                     .then(d2 => setApiKeys(d2.keys ?? []))
                                     .catch(() => {});
+                                } else {
+                                  setApiKeyError(
+                                    d.error ?? 'Failed to generate key. Please try again.'
+                                  );
                                 }
+                              } catch {
+                                setApiKeyError(
+                                  'Network error. Please check your connection and try again.'
+                                );
                               } finally {
                                 setApiKeyLoading(false);
                               }
@@ -1609,6 +1630,7 @@ export default function Home() {
                           </button>
                         </div>
                       )}
+                      {apiKeyError && <p className="apikey-error-text">{apiKeyError}</p>}
                       <p className="apikey-hint-text">
                         Use your key to call <code>/api/v1/generate</code> from any script or app.
                         Max 3 keys.
@@ -1804,7 +1826,6 @@ export default function Home() {
                     aiModel={aiModel}
                     onGenerationComplete={() => setActivePanel('preview')}
                     persona={persona}
-                    onPersonaChange={setPersona}
                     onPanelSwitch={panel =>
                       setActivePanel(
                         panel as

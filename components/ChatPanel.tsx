@@ -7,7 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import ImageEditorModal from './ImageEditorModal';
 import ImageCropModal from './ImageCropModal';
 import ModeDropdown, { GenerationMode } from './ModeDropdown';
-import PersonaSwitcher, { PersonaKey } from './PersonaSwitcher';
+import { PersonaKey } from './PersonaSwitcher';
 import GeneratedVideoCard from './GeneratedVideoCard';
 import GeneratedMusicCard from './GeneratedMusicCard';
 import GeneratingCard from './GeneratingCard';
@@ -174,7 +174,6 @@ export default function ChatPanel({
   aiModel,
   onGenerationComplete,
   persona = 'based',
-  onPersonaChange,
   onPanelSwitch,
 }: {
   messages: Message[];
@@ -196,7 +195,6 @@ export default function ChatPanel({
   aiModel?: 'based' | 'free';
   onGenerationComplete?: () => void;
   persona?: PersonaKey;
-  onPersonaChange?: (p: PersonaKey) => void;
   onPanelSwitch?: (panel: string) => void;
 }) {
   const [input, setInput] = useState(prefillMessage ?? '');
@@ -1307,11 +1305,6 @@ export default function ChatPanel({
             onProRequired={onProRequired}
             disabled={isGenerating || isGeneratingMedia}
             onPanelSwitch={onPanelSwitch}
-          />
-          <PersonaSwitcher
-            persona={persona}
-            onChange={p => onPersonaChange?.(p)}
-            disabled={isGenerating || isGeneratingMedia}
           />
           <button
             type="button"

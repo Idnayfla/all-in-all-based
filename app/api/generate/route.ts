@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '../_auth';
@@ -887,11 +887,26 @@ const FILE_GENERATOR_SYSTEM_BLOCKS = [
 const IMAGE_SRC_PLACEHOLDER = '__BASED_IMAGE_SRC__';
 
 function sanitizeHTML(html: string): string {
-  // Add defer to external scripts so they run after DOM is ready
-  html = html.replace(/<script\b([^>]*?)src=/g, (match, attrs) => {
-    if (/\bdefer\b/.test(attrs) || /\basync\b/.test(attrs)) return match;
-    return `<script${attrs}defer src=`;
-  });
+  // Add defer to LOCAL/relative scripts only. CDN scripts (https:// URLs) must
+  // stay synchronous so libraries (Three.js, Phaser, etc.) are available before
+  // any inline <script> that uses them. Deferring a CDN library while user code
+  // is an inline script causes "THREE is not defined" — the inline runs at parse
+  // time, before the deferred CDN script has executed.
+  html = html.replace(
+    /<script(\b[^>]*?)\bsrc=(['"])(?!https?:\/\/)([^'"]+)\2/gi,
+    (match, attrs) => {
+      if (/\bdefer\b/i.test(attrs) || /\basync\b/i.test(attrs)) return match;
+      return match.replace(/\bsrc=/, 'defer src=');
+    }
+  );
+
+  // Auto-inject Three.js CDN if the HTML uses THREE but has no Three.js script tag.
+  // The AI often generates new THREE.Scene() without the required CDN <script>.
+  if (/\bTHREE\b/.test(html) && !/three(?:\.min)?\.js/i.test(html)) {
+    const threeTag =
+      '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>';
+    html = html.includes('<head>') ? html.replace('<head>', '<head>' + threeTag) : threeTag + html;
+  }
 
   // Freeze window.parent and window.top so generated apps cannot reach the host frame
   const parentOverride = `<script>(function(){try{Object.defineProperty(window,'parent',{get:function(){return window;},configurable:false});Object.defineProperty(window,'top',{get:function(){return window;},configurable:false});}catch(e){}})();</script>`;

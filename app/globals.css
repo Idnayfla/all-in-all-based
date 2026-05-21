@@ -1450,7 +1450,7 @@ body {
 
 .persona-switcher-panel {
   position: absolute;
-  bottom: calc(100% + 8px);
+  top: calc(100% + 8px);
   left: 0;
   background: var(--bg2);
   border: 1px solid var(--border);
@@ -8295,6 +8295,12 @@ body:has(.beta-banner) .app-root {
   padding: 6px 10px;
   margin: 0 0 10px;
   line-height: 1.5;
+}
+.apikey-error-text {
+  font-size: 11px;
+  color: #ff6b6b;
+  line-height: 1.5;
+  margin: 4px 0 0;
 }
 .apikey-hint-text {
   font-size: 10px;
