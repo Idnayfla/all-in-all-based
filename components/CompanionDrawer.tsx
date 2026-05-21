@@ -20,6 +20,7 @@ interface Props {
   onMessagesChange: (msgs: CMsg[]) => void;
   onClose: () => void;
   onGeneratingChange: (v: boolean) => void;
+  authToken?: string;
 }
 
 export default function CompanionDrawer({
@@ -30,6 +31,7 @@ export default function CompanionDrawer({
   onMessagesChange,
   onClose,
   onGeneratingChange,
+  authToken,
 }: Props) {
   const [messages, setMessages] = useState<CMsg[]>(initialMessages);
   const syncRef = useRef(onMessagesChange);
@@ -131,7 +133,10 @@ export default function CompanionDrawer({
     try {
       const res = await fetch('/api/companion', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify({
           messages: history.map(m => ({ role: m.role, content: m.content })),
           memory,
