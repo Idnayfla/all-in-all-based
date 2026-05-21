@@ -1556,6 +1556,31 @@ export default function Home() {
                 {user && subscription.tier === 'pro' && (
                   <div className="settings-section" style={{ position: 'relative' }}>
                     <label className="settings-label">API Keys</label>
+                    <div className="pantheon-onboarding-card">
+                      <span className="pantheon-onboarding-title">Pantheon VSCode Extension</span>
+                      <ol className="pantheon-onboarding-steps">
+                        <li>
+                          Install the extension from the{' '}
+                          <a
+                            href="https://marketplace.visualstudio.com/items?itemName=Idnayfla.pantheon"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="pantheon-onboarding-link"
+                          >
+                            VS Code Marketplace
+                          </a>
+                        </li>
+                        <li>
+                          Generate a key below — name it{' '}
+                          <code className="pantheon-onboarding-code">VSCode</code> or anything you
+                          like
+                        </li>
+                        <li>
+                          Paste it into extension settings under{' '}
+                          <code className="pantheon-onboarding-code">pantheon.apiKey</code>
+                        </li>
+                      </ol>
+                    </div>
                     <p className="apikey-migration-notice">
                       Keys generated before 21 May 2026 used an old format and will not work. Revoke
                       them and generate a new one.

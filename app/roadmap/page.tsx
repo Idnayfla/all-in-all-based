@@ -149,6 +149,9 @@ export default function RoadmapPage() {
           B&gt;
         </Link>
         <nav className="rm-header-nav">
+          <Link href="/changelog" className="rm-nav-link">
+            Changelog
+          </Link>
           <Link href="/gallery" className="rm-nav-link">
             Gallery
           </Link>
@@ -226,6 +229,10 @@ export default function RoadmapPage() {
       </section>
 
       <footer className="rm-footer">
+        <Link href="/changelog" className="rm-footer-link">
+          Changelog
+        </Link>
+        <span className="rm-footer-sep">·</span>
         <Link href="/gallery" className="rm-footer-link">
           Gallery
         </Link>
