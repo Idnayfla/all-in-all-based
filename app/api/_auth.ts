@@ -9,7 +9,10 @@ export const supabaseAdmin = createClient(
 export async function getUserId(req: NextRequest): Promise<string> {
   const token = req.headers.get('Authorization')?.replace('Bearer ', '');
   if (!token) throw new Error('Unauthorized');
-  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+  const {
+    data: { user },
+    error,
+  } = await supabaseAdmin.auth.getUser(token);
   if (error || !user) throw new Error('Unauthorized');
   return user.id;
 }

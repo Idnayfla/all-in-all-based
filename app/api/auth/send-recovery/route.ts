@@ -19,7 +19,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (error || !data?.properties?.action_link) {
-      return NextResponse.json({ error: error?.message ?? 'No action link returned' }, { status: 500 });
+      return NextResponse.json(
+        { error: error?.message ?? 'No action link returned' },
+        { status: 500 }
+      );
     }
 
     const { error: sendError } = await resend.emails.send({
@@ -49,7 +52,8 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

@@ -12,19 +12,20 @@
 
 ## File Map
 
-| Action | Path | What changes |
-|--------|------|-------------|
-| Modify | `app/page.tsx:17-20` | Add `ContentBlock` type, update `Message.content`, add `contentToString` |
-| Modify | `app/api/generate/route.ts:279,285-290` | Add `toClaudeContent()` + `msgToString()`, update message mapping |
-| Modify | `app/api/memory/route.ts:25-27` | Normalise `content` to string before building conversation text |
-| Modify | `app/globals.css` | Add `.chat-input-row`, `.upload-btn`, `.chat-image-preview`, `.img-clear-btn`, `.chat-img-thumb`; update `.chat-input-area` |
-| Modify | `components/ChatPanel.tsx` | `pendingImage` state, `handleFileChange`, `clearPendingImage`, updated `send()`, updated JSX |
+| Action | Path                                    | What changes                                                                                                                |
+| ------ | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Modify | `app/page.tsx:17-20`                    | Add `ContentBlock` type, update `Message.content`, add `contentToString`                                                    |
+| Modify | `app/api/generate/route.ts:279,285-290` | Add `toClaudeContent()` + `msgToString()`, update message mapping                                                           |
+| Modify | `app/api/memory/route.ts:25-27`         | Normalise `content` to string before building conversation text                                                             |
+| Modify | `app/globals.css`                       | Add `.chat-input-row`, `.upload-btn`, `.chat-image-preview`, `.img-clear-btn`, `.chat-img-thumb`; update `.chat-input-area` |
+| Modify | `components/ChatPanel.tsx`              | `pendingImage` state, `handleFileChange`, `clearPendingImage`, updated `send()`, updated JSX                                |
 
 ---
 
 ## Task 1: Add ContentBlock types to app/page.tsx
 
 **Files:**
+
 - Modify: `app/page.tsx:17-20`
 
 - [ ] **Step 1: Replace the Message interface block**
@@ -43,7 +44,11 @@ Replace that entire block with:
 ```ts
 export type ContentBlock =
   | { type: 'text'; text: string }
-  | { type: 'image'; mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'; data: string };
+  | {
+      type: 'image';
+      mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+      data: string;
+    };
 
 export interface Message {
   role: 'user' | 'assistant';
@@ -79,6 +84,7 @@ git commit -m "feat: add ContentBlock type and contentToString to Message"
 ## Task 2: Update generate API route for vision
 
 **Files:**
+
 - Modify: `app/api/generate/route.ts:252,279,285-290`
 
 - [ ] **Step 1: Add `msgToString` and `toClaudeContent` helper functions**
@@ -86,11 +92,16 @@ git commit -m "feat: add ContentBlock type and contentToString to Message"
 In `app/api/generate/route.ts`, after the `stripTags` function (which ends around line 252), add these two functions:
 
 ```ts
-type ApiContentBlock = { type: 'text'; text: string } | { type: 'image'; mediaType: string; data: string };
+type ApiContentBlock =
+  | { type: 'text'; text: string }
+  | { type: 'image'; mediaType: string; data: string };
 
 function msgToString(content: string | ApiContentBlock[]): string {
   if (typeof content === 'string') return content;
-  return content.filter(b => b.type === 'text').map(b => (b as { type: 'text'; text: string }).text).join('\n');
+  return content
+    .filter(b => b.type === 'text')
+    .map(b => (b as { type: 'text'; text: string }).text)
+    .join('\n');
 }
 
 function toClaudeContent(content: string | ApiContentBlock[], appendText?: string) {
@@ -129,9 +140,7 @@ Find this block (around lines 285–290):
 ```ts
 const anthropicMessages = recentMessages.map((m: any, i: number) => ({
   role: m.role,
-  content: i === recentMessages.length - 1 && m.role === 'user'
-    ? m.content + context
-    : m.content,
+  content: i === recentMessages.length - 1 && m.role === 'user' ? m.content + context : m.content,
 }));
 ```
 
@@ -140,9 +149,10 @@ Replace it with:
 ```ts
 const anthropicMessages = recentMessages.map((m: any, i: number) => ({
   role: m.role,
-  content: i === recentMessages.length - 1 && m.role === 'user'
-    ? toClaudeContent(m.content, context || undefined)
-    : toClaudeContent(m.content),
+  content:
+    i === recentMessages.length - 1 && m.role === 'user'
+      ? toClaudeContent(m.content, context || undefined)
+      : toClaudeContent(m.content),
 }));
 ```
 
@@ -166,6 +176,7 @@ git commit -m "feat: add vision support to generate API route"
 ## Task 3: Fix memory route for ContentBlock content
 
 **Files:**
+
 - Modify: `app/api/memory/route.ts:25-27`
 
 - [ ] **Step 1: Update conversation builder to normalise content**
@@ -173,9 +184,7 @@ git commit -m "feat: add vision support to generate API route"
 Find this block (lines 25–27):
 
 ```ts
-const conversation = messages
-  .map((m: any) => `${m.role.toUpperCase()}: ${m.content}`)
-  .join('\n');
+const conversation = messages.map((m: any) => `${m.role.toUpperCase()}: ${m.content}`).join('\n');
 ```
 
 Replace it with:
@@ -183,9 +192,13 @@ Replace it with:
 ```ts
 const conversation = messages
   .map((m: any) => {
-    const text = typeof m.content === 'string'
-      ? m.content
-      : (m.content as any[]).filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n');
+    const text =
+      typeof m.content === 'string'
+        ? m.content
+        : (m.content as any[])
+            .filter((b: any) => b.type === 'text')
+            .map((b: any) => b.text)
+            .join('\n');
     return `${m.role.toUpperCase()}: ${text}`;
   })
   .join('\n');
@@ -211,6 +224,7 @@ git commit -m "fix: normalise content blocks to text in memory route"
 ## Task 4: Add CSS for image upload UI
 
 **Files:**
+
 - Modify: `app/globals.css:146-148`
 
 - [ ] **Step 1: Update `.chat-input-area` and add new classes**
@@ -219,8 +233,12 @@ Find the `.chat-input-area` rule (around line 146):
 
 ```css
 .chat-input-area {
-  padding: 16px 24px; border-top: 1px solid var(--border-subtle); background: var(--bg2);
-  display: flex; gap: 12px; align-items: flex-end;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg2);
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
   padding-bottom: calc(16px + env(safe-area-inset-bottom));
 }
 ```
@@ -229,13 +247,19 @@ Replace it with:
 
 ```css
 .chat-input-area {
-  padding: 16px 24px; border-top: 1px solid var(--border-subtle); background: var(--bg2);
-  display: flex; flex-direction: column; gap: 8px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
   padding-bottom: calc(16px + env(safe-area-inset-bottom));
 }
 
 .chat-input-row {
-  display: flex; gap: 12px; align-items: flex-end;
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
 }
 ```
 
@@ -245,31 +269,63 @@ Immediately after the `.send-btn:disabled` rule (around line 168), insert:
 
 ```css
 .upload-btn {
-  background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
-  color: var(--text2); font-size: 16px; width: 44px; height: 44px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; flex-shrink: 0; transition: color 0.15s, border-color 0.15s;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text2);
+  font-size: 16px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
   padding: 0;
 }
-.upload-btn:hover { color: var(--accent); border-color: var(--accent); }
-.upload-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.upload-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.upload-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
 .chat-image-preview {
-  display: flex; align-items: center; gap: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 6px 8px;
-  background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 .img-clear-btn {
-  background: transparent; border: none; color: var(--text2);
-  cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px;
+  background: transparent;
+  border: none;
+  color: var(--text2);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
   transition: color 0.15s;
 }
-.img-clear-btn:hover { color: var(--danger); }
+.img-clear-btn:hover {
+  color: var(--danger);
+}
 
 .chat-img-thumb {
-  width: 64px; height: 64px; object-fit: cover;
-  border-radius: 6px; border: 1px solid var(--border); display: block;
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  display: block;
 }
 ```
 
@@ -293,6 +349,7 @@ git commit -m "feat: add CSS for image upload button and preview strip"
 ## Task 5: Update ChatPanel with image upload UI and logic
 
 **Files:**
+
 - Modify: `components/ChatPanel.tsx`
 
 This is the largest task. Make changes in order: imports, state, handlers, `send()`, JSX.
@@ -300,11 +357,13 @@ This is the largest task. Make changes in order: imports, state, handlers, `send
 - [ ] **Step 1: Update the import line**
 
 Find line 4:
+
 ```ts
 import { Message, FileNode } from '@/app/page';
 ```
 
 Replace with:
+
 ```ts
 import { Message, FileNode, ContentBlock, contentToString } from '@/app/page';
 ```
@@ -334,7 +393,11 @@ const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
   reader.onload = () => {
     const dataUrl = reader.result as string;
     const [prefix, data] = dataUrl.split(',');
-    const mediaType = prefix.split(':')[1].split(';')[0] as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+    const mediaType = prefix.split(':')[1].split(';')[0] as
+      | 'image/jpeg'
+      | 'image/png'
+      | 'image/webp'
+      | 'image/gif';
     setPendingImage({ data, mediaType, previewUrl: dataUrl });
   };
   reader.readAsDataURL(file);
@@ -412,24 +475,37 @@ if (!incognito) {
 Find this block (around lines 268–271):
 
 ```tsx
-{m.role === 'assistant' && genProgress && i === messages.length - 1
-  ? <ProgressBar progress={genProgress} />
-  : <ReactMarkdown>{m.content}</ReactMarkdown>
+{
+  m.role === 'assistant' && genProgress && i === messages.length - 1 ? (
+    <ProgressBar progress={genProgress} />
+  ) : (
+    <ReactMarkdown>{m.content}</ReactMarkdown>
+  );
 }
 ```
 
 Replace with:
 
 ```tsx
-{m.role === 'assistant' && genProgress && i === messages.length - 1
-  ? <ProgressBar progress={genProgress} />
-  : typeof m.content === 'string'
-    ? <ReactMarkdown>{m.content}</ReactMarkdown>
-    : (m.content as ContentBlock[]).map((block, j) =>
-        block.type === 'image'
-          ? <img key={j} className="chat-img-thumb" src={`data:${block.mediaType};base64,${block.data}`} alt="uploaded image" />
-          : <ReactMarkdown key={j}>{block.text}</ReactMarkdown>
+{
+  m.role === 'assistant' && genProgress && i === messages.length - 1 ? (
+    <ProgressBar progress={genProgress} />
+  ) : typeof m.content === 'string' ? (
+    <ReactMarkdown>{m.content}</ReactMarkdown>
+  ) : (
+    (m.content as ContentBlock[]).map((block, j) =>
+      block.type === 'image' ? (
+        <img
+          key={j}
+          className="chat-img-thumb"
+          src={`data:${block.mediaType};base64,${block.data}`}
+          alt="uploaded image"
+        />
+      ) : (
+        <ReactMarkdown key={j}>{block.text}</ReactMarkdown>
       )
+    )
+  );
 }
 ```
 
@@ -443,7 +519,10 @@ Find the entire `<div className="chat-input-area">` block (lines 278–292):
     ref={textareaRef}
     className="chat-textarea"
     value={input}
-    onChange={e => { setInput(e.target.value); autoResize(); }}
+    onChange={e => {
+      setInput(e.target.value);
+      autoResize();
+    }}
     onKeyDown={handleKey}
     placeholder="Ask Based anything..."
     rows={1}
@@ -462,7 +541,9 @@ Replace with:
   {pendingImage && (
     <div className="chat-image-preview">
       <img className="chat-img-thumb" src={pendingImage.previewUrl} alt="preview" />
-      <button className="img-clear-btn" onClick={clearPendingImage} title="Remove image">✕</button>
+      <button className="img-clear-btn" onClick={clearPendingImage} title="Remove image">
+        ✕
+      </button>
     </div>
   )}
   <div className="chat-input-row">
@@ -479,13 +560,20 @@ Replace with:
       ref={textareaRef}
       className="chat-textarea"
       value={input}
-      onChange={e => { setInput(e.target.value); autoResize(); }}
+      onChange={e => {
+        setInput(e.target.value);
+        autoResize();
+      }}
       onKeyDown={handleKey}
       placeholder="Ask Based anything..."
       rows={1}
       disabled={isGenerating}
     />
-    <button className="send-btn" onClick={() => send()} disabled={isGenerating || (!input.trim() && !pendingImage)}>
+    <button
+      className="send-btn"
+      onClick={() => send()}
+      disabled={isGenerating || (!input.trim() && !pendingImage)}
+    >
       Send
     </button>
   </div>
@@ -510,6 +598,7 @@ Expected: no errors in any of the modified files.
 - [ ] **Step 9: Smoke-test in browser**
 
 The dev server is running at `http://localhost:3000`. Verify:
+
 1. The 📎 button appears to the left of the textarea
 2. Clicking 📎 opens a file picker
 3. Selecting a JPG/PNG shows a thumbnail preview above the input

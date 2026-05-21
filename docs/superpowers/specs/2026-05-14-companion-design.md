@@ -27,25 +27,30 @@ A 300px wide drawer that slides in from the right edge, overlaying the active pa
 3. **Input area** — two capture buttons row + text input + send button.
 
 **Capture card** (appears in messages when a capture is triggered):
+
 - Purple-tinted border and header label ("📷 Preview captured")
 - Thumbnail of the captured content
 - A purple scan-line CSS animation sweeps down once on reveal — the "magic moment"
 - After scan completes, Based begins streaming its response
 
 **Capture buttons:**
+
 - `📷 Capture preview` — active/highlighted when Preview panel is active, captures the iframe via canvas API (no browser permission prompt)
 - `🖥 Share screen` — triggers `getDisplayMedia`, opens browser's screen share picker for any external screen/window/tab
 
 **Message bubbles:**
+
 - User: `rgba(124,58,237,0.15)` background, purple border, right-aligned, `border-radius: 10px 10px 2px 10px`
 - Assistant: `#16162a` background, left-aligned, `border-radius: 10px 10px 10px 2px`, streams with blinking cursor
 
 **Surfaces:**
+
 - Drawer background: `#0e0e1a`
 - Left border: `1px solid rgba(124,58,237,0.2)` + `box-shadow: -1px 0 32px rgba(124,58,237,0.08)`
 - Input area background: `#0c0c18`, separated by `1px solid rgba(124,58,237,0.1)`
 
 **Animation (Framer Motion):**
+
 - Open: `x: 300 → 0`, `opacity: 0 → 1`, spring `{ stiffness: 380, damping: 34 }`
 - Close: `x: 0 → 300`, `opacity: 1 → 0`, same spring
 - Wrapped in `AnimatePresence` in `page.tsx`
@@ -57,11 +62,13 @@ A 300px wide drawer that slides in from the right edge, overlaying the active pa
 A floating button fixed to the bottom-left corner of the viewport (`position: fixed`, `bottom: 24px`, `left: 24px`). Always rendered, always on top (`z-index: 9999`).
 
 **Visual:**
+
 - 48×48px circle, gradient `linear-gradient(135deg, #7c3aed, #4f46e5)`
 - "B" label, `font-weight: 800`
 - `box-shadow: 0 4px 20px rgba(124,58,237,0.45)`
 
 **States:**
+
 - **Idle:** Two concentric CSS rings (`border: 1px solid rgba(124,58,237,0.2)`) with a slow breathe animation (`scale 1 → 1.1`, 3s ease-in-out, infinite, staggered 0.5s offset on outer ring)
 - **Responding:** Single ring, faster pulse animation (1s), brighter `box-shadow` on core (`rgba(124,58,237,0.7)`)
 - **Open:** No rings — drawer is open, trigger acts as close button
@@ -80,6 +87,7 @@ captureScreen(): Promise<string | null>              // base64 PNG via getDispla
 ```
 
 **`capturePreview`:**
+
 - Takes the current `files` array (already in scope — no DOM access needed)
 - Returns a `PreviewCapture` object: `{ html, css, js, label }` — the raw source
 - No browser permission prompt, no canvas, no new dependencies
@@ -87,6 +95,7 @@ captureScreen(): Promise<string | null>              // base64 PNG via getDispla
 - Claude sees the actual source — more useful for code analysis than a pixel screenshot
 
 **`captureScreen`:**
+
 - Calls `navigator.mediaDevices.getDisplayMedia({ video: true })`
 - Grabs first video frame via an offscreen `<video>` + `<canvas>`
 - Stops the stream immediately after capture
@@ -101,6 +110,7 @@ Both functions return `null` on failure (permission denied, no files loaded, etc
 A lightweight streaming endpoint — not the full planner/generator pipeline. Uses `claude-sonnet-4-6` directly.
 
 **Request body:**
+
 ```ts
 {
   messages: Array<{ role: 'user' | 'assistant', content: string | ContentBlock[] }>,
@@ -112,6 +122,7 @@ A lightweight streaming endpoint — not the full planner/generator pipeline. Us
 ```
 
 **Behavior:**
+
 - Prepends system prompt: personality + global memory (same as main chat, non-code path)
 - If `screenshot` is present, attaches it as a vision block to the latest user message
 - If `previewSource` is present, prepends it as a code block to the latest user message text
@@ -162,13 +173,13 @@ Companion chat history lives inside `CompanionDrawer` as local state — intenti
 
 ## Files Changed / Created
 
-| File | Change |
-|------|--------|
-| `components/CompanionDrawer.tsx` | New — drawer UI + capture buttons + streaming chat |
-| `hooks/useScreenCapture.ts` | New — `capturePreview` + `captureScreen` |
-| `app/api/companion/route.ts` | New — lightweight sonnet chat endpoint with vision |
-| `app/page.tsx` | Add `showCompanion`, `isCompanionGenerating` state; render `CompanionTrigger` + `CompanionDrawer` |
-| `app/globals.css` | Add trigger breathe/pulse keyframes + companion surface tokens |
+| File                             | Change                                                                                            |
+| -------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `components/CompanionDrawer.tsx` | New — drawer UI + capture buttons + streaming chat                                                |
+| `hooks/useScreenCapture.ts`      | New — `capturePreview` + `captureScreen`                                                          |
+| `app/api/companion/route.ts`     | New — lightweight sonnet chat endpoint with vision                                                |
+| `app/page.tsx`                   | Add `showCompanion`, `isCompanionGenerating` state; render `CompanionTrigger` + `CompanionDrawer` |
+| `app/globals.css`                | Add trigger breathe/pulse keyframes + companion surface tokens                                    |
 
 ---
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const betaCode = process.env.BETA_ACCESS_CODE;
   if (!betaCode) return NextResponse.next(); // no code set → gate inactive (production)
 

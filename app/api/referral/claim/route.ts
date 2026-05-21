@@ -11,6 +11,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing code' }, { status: 400 });
     }
 
+    // Block claims from accounts less than 1 hour old (throwaway account abuse)
+    const {
+      data: { user: authUser },
+    } = await supabaseAdmin.auth.admin.getUserById(userId);
+    if (authUser?.created_at) {
+      const ageMs = Date.now() - new Date(authUser.created_at).getTime();
+      if (ageMs < 60 * 60 * 1000) {
+        return NextResponse.json(
+          { error: 'Account must be at least 1 hour old to claim a referral' },
+          { status: 429 }
+        );
+      }
+    }
+
     // Check if user already claimed a referral
     const { data: self } = await supabaseAdmin
       .from('user_settings')
@@ -41,15 +55,20 @@ export async function POST(req: NextRequest) {
     // Grant new user 7 days free Pro
     const bonusExpires = new Date(Date.now() + REFERRAL_BONUS_DAYS * 86400000).toISOString();
 
-    await supabaseAdmin.from('user_settings').upsert({
-      user_id: userId,
-      referred_by: code.toUpperCase(),
-      pro_bonus_expires_at: bonusExpires,
-    }, { onConflict: 'user_id' });
+    await supabaseAdmin.from('user_settings').upsert(
+      {
+        user_id: userId,
+        referred_by: code.toUpperCase(),
+        pro_bonus_expires_at: bonusExpires,
+      },
+      { onConflict: 'user_id' }
+    );
 
     return NextResponse.json({ ok: true, bonusDays: REFERRAL_BONUS_DAYS });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

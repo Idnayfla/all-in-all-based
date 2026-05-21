@@ -22,15 +22,30 @@ interface Props {
   onGeneratingChange: (v: boolean) => void;
 }
 
-export default function CompanionDrawer({ memory, files, projectName, initialMessages, onMessagesChange, onClose, onGeneratingChange }: Props) {
+export default function CompanionDrawer({
+  memory,
+  files,
+  projectName,
+  initialMessages,
+  onMessagesChange,
+  onClose,
+  onGeneratingChange,
+}: Props) {
   const [messages, setMessages] = useState<CMsg[]>(initialMessages);
   const syncRef = useRef(onMessagesChange);
-  useEffect(() => { syncRef.current = onMessagesChange; });
-  useEffect(() => { syncRef.current(messages); }, [messages]);
+  useEffect(() => {
+    syncRef.current = onMessagesChange;
+  });
+  useEffect(() => {
+    syncRef.current(messages);
+  }, [messages]);
   const [input, setInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [pendingCapture, setPendingCapture] = useState<{
-    label: string; source: string; isScreenshot: boolean; thumb?: string;
+    label: string;
+    source: string;
+    isScreenshot: boolean;
+    thumb?: string;
   } | null>(null);
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [isMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 600);
@@ -48,7 +63,10 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
     textareaRef.current?.focus();
   }, []);
 
-  const flashError = (msg: string) => { setCaptureError(msg); setTimeout(() => setCaptureError(null), 2500); };
+  const flashError = (msg: string) => {
+    setCaptureError(msg);
+    setTimeout(() => setCaptureError(null), 2500);
+  };
 
   const handleMobileImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -56,7 +74,12 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
     const reader = new FileReader();
     reader.onload = ev => {
       const dataUrl = ev.target?.result as string;
-      setPendingCapture({ label: 'Screenshot attached', source: dataUrl, isScreenshot: true, thumb: dataUrl });
+      setPendingCapture({
+        label: 'Screenshot attached',
+        source: dataUrl,
+        isScreenshot: true,
+        thumb: dataUrl,
+      });
     };
     reader.readAsDataURL(file);
     e.target.value = '';
@@ -64,14 +87,25 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
 
   const handleCapturePreview = () => {
     const cap = capturePreview(files);
-    if (!cap) { flashError('No project files loaded'); return; }
+    if (!cap) {
+      flashError('No project files loaded');
+      return;
+    }
     setPendingCapture({ label: cap.label, source: cap.source, isScreenshot: false });
   };
 
   const handleCaptureScreen = async () => {
     const dataUrl = await captureScreen();
-    if (!dataUrl) { flashError('Screen share cancelled'); return; }
-    setPendingCapture({ label: 'Screen captured', source: dataUrl, isScreenshot: true, thumb: dataUrl });
+    if (!dataUrl) {
+      flashError('Screen share cancelled');
+      return;
+    }
+    setPendingCapture({
+      label: 'Screen captured',
+      source: dataUrl,
+      isScreenshot: true,
+      thumb: dataUrl,
+    });
   };
 
   const send = async () => {
@@ -80,7 +114,8 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
 
     const cap = pendingCapture;
     const userMsg: CMsg = {
-      role: 'user', content: text,
+      role: 'user',
+      content: text,
       captureLabel: cap?.label,
       isScreenshot: cap?.isScreenshot,
       captureThumb: cap?.thumb,
@@ -123,21 +158,31 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
         for (const line of lines) {
           if (!line.startsWith('data: ')) continue;
           const raw = line.slice(6).trim();
-          if (raw === '[DONE]') { streamDone = true; break; }
+          if (raw === '[DONE]') {
+            streamDone = true;
+            break;
+          }
           try {
             const { text: chunk } = JSON.parse(raw);
-            if (chunk) setMessages(prev => {
-              const next = [...prev];
-              next[next.length - 1] = { ...next[next.length - 1], content: next[next.length - 1].content + chunk };
-              return next;
-            });
+            if (chunk)
+              setMessages(prev => {
+                const next = [...prev];
+                next[next.length - 1] = {
+                  ...next[next.length - 1],
+                  content: next[next.length - 1].content + chunk,
+                };
+                return next;
+              });
           } catch {}
         }
       }
     } catch {
       setMessages(prev => {
         const next = [...prev];
-        next[next.length - 1] = { ...next[next.length - 1], content: '✕ Failed to get a response.' };
+        next[next.length - 1] = {
+          ...next[next.length - 1],
+          content: '✕ Failed to get a response.',
+        };
         return next;
       });
     } finally {
@@ -158,8 +203,17 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
         <span className="companion-logo">⬡</span>
         <span className="companion-title">BASED</span>
         <span className="companion-session">#{sessionId.current}</span>
-        <button className="companion-clear" onClick={() => setMessages([])} disabled={isGenerating} title="Clear history">↺</button>
-        <button className="companion-close" onClick={onClose} title="Close">✕</button>
+        <button
+          className="companion-clear"
+          onClick={() => setMessages([])}
+          disabled={isGenerating}
+          title="Clear history"
+        >
+          ↺
+        </button>
+        <button className="companion-close" onClick={onClose} title="Close">
+          ✕
+        </button>
       </div>
 
       <div className="companion-messages">
@@ -199,7 +253,9 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
             onClick={handleCapturePreview}
             disabled={isGenerating}
             title="Send project source code to Based"
-          >📄 Code</button>
+          >
+            📄 Code
+          </button>
           {isMobile ? (
             <>
               <input
@@ -214,14 +270,18 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
                 onClick={() => mobileImageRef.current?.click()}
                 disabled={isGenerating}
                 title="Attach a screenshot from your photos"
-              >📷 Photo</button>
+              >
+                📷 Photo
+              </button>
             </>
           ) : (
             <button
               className={`companion-capture-btn${pendingCapture?.isScreenshot ? ' active' : ''}`}
               onClick={handleCaptureScreen}
               disabled={isGenerating || !screenCaptureSupported}
-            >🖥 Screen</button>
+            >
+              🖥 Screen
+            </button>
           )}
           {captureError && <span className="companion-capture-error">{captureError}</span>}
         </div>
@@ -229,7 +289,9 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
         {pendingCapture && (
           <div className="companion-pending-badge">
             {pendingCapture.isScreenshot ? '🖥' : '📷'} {pendingCapture.label}
-            <button className="companion-pending-clear" onClick={() => setPendingCapture(null)}>✕</button>
+            <button className="companion-pending-clear" onClick={() => setPendingCapture(null)}>
+              ✕
+            </button>
           </div>
         )}
 
@@ -239,7 +301,12 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
             className="companion-textarea"
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                send();
+              }
+            }}
             placeholder="Ask Based anything..."
             rows={1}
             disabled={isGenerating}
@@ -248,7 +315,9 @@ export default function CompanionDrawer({ memory, files, projectName, initialMes
             className="companion-send"
             onClick={send}
             disabled={isGenerating || !input.trim()}
-          >{isGenerating ? <span className="spinner" /> : '▶'}</button>
+          >
+            {isGenerating ? <span className="spinner" /> : '▶'}
+          </button>
         </div>
       </div>
     </motion.div>

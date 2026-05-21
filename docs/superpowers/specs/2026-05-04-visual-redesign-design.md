@@ -11,12 +11,12 @@ Tidy up the UI to be cleaner, more readable, and more user-friendly. The dark ae
 
 ## Design Decisions
 
-| Decision | Choice |
-|---|---|
-| Visual direction | Clean & readable — whitespace, hierarchy, minimal chrome |
-| Color accents | Purple (`#7c6af7`) for user / active states, teal (`#6af7c8`) for AI / secondary. Pink only for destructive actions (delete). |
-| Chat typography | System sans-serif for prose (`-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`), Space Mono stays for UI labels, buttons, code blocks |
-| Approach scope | CSS + component restructure (approach C) |
+| Decision         | Choice                                                                                                                                          |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Visual direction | Clean & readable — whitespace, hierarchy, minimal chrome                                                                                        |
+| Color accents    | Purple (`#7c6af7`) for user / active states, teal (`#6af7c8`) for AI / secondary. Pink only for destructive actions (delete).                   |
+| Chat typography  | System sans-serif for prose (`-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif`), Space Mono stays for UI labels, buttons, code blocks |
+| Approach scope   | CSS + component restructure (approach C)                                                                                                        |
 
 ---
 
@@ -27,6 +27,7 @@ Tidy up the UI to be cleaner, more readable, and more user-friendly. The dark ae
 **Current:** Individual nav buttons (CHAT, ✎, ◉, ⚙) with borders; incognito mixed in with panel nav.
 
 **New:**
+
 - Logo area: icon + "BASED" wordmark + project name (separated by a left-border divider)
 - Pill tab switcher in the center-right: `Chat | Editor | Preview` as a segmented control in a rounded container (`background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; padding: 3px`) with the active tab as a filled pill
 - Secondary controls cluster on the far right: incognito button + settings button (both icon-only, borderless on rest, bordered on hover), separated from status by a divider
@@ -37,6 +38,7 @@ Tidy up the UI to be cleaner, more readable, and more user-friendly. The dark ae
 **Current:** Both user and assistant messages are full-width boxes with background + border + border-radius.
 
 **New:**
+
 - Remove the box entirely — no background, no border-radius
 - Left border accent: `border-left: 2px solid` — purple (`rgba(124,106,247,0.5)`) for user, teal (`rgba(106,247,200,0.4)`) for Based
 - Padding: `2px 0 2px 18px`
@@ -57,6 +59,7 @@ Tidy up the UI to be cleaner, more readable, and more user-friendly. The dark ae
 **Current:** Large `⬡` symbol at low opacity, "ALL IN ALL BASED" heading, typo in subtitle ("Making your life easier is what matter."), monospace suggestion chips.
 
 **New:**
+
 - Icon: a small rounded square with a gradient background (`linear-gradient(135deg, rgba(124,106,247,0.25), rgba(106,247,200,0.15))`) and a subtle border — replaces the large symbol
 - Title: `BASED` in Space Mono, `font-weight: 700; letter-spacing: 3px; font-size: 16px`
 - Subtitle: `"Your AI coding assistant. Describe what you want to build."` in system sans-serif, `font-size: 14px; color: var(--text3); line-height: 1.7`
@@ -73,6 +76,7 @@ Tidy up the UI to be cleaner, more readable, and more user-friendly. The dark ae
 **Current:** Items have `border-left: 2px solid transparent` already but active uses accent background.
 
 **New:**
+
 - Active project: `border-left-color: var(--accent)` (purple) + very subtle background `rgba(124,106,247,0.08)`
 - Active file: `border-left-color: var(--accent3)` (teal) + `rgba(106,247,200,0.06)` background
 - Section header labels: `letter-spacing: 3px; font-size: 10px; color: var(--text3)` — keep current style, just ensure consistent 16px top padding
@@ -90,12 +94,12 @@ Tidy up the UI to be cleaner, more readable, and more user-friendly. The dark ae
 
 ## Files to Change
 
-| File | Type of change |
-|---|---|
-| `app/globals.css` | Primary — typography, message styles, header, sidebar, empty states, color cleanup |
-| `app/page.tsx` | Header JSX restructure (pill tabs, secondary controls cluster) |
-| `components/ChatPanel.tsx` | Message markup (remove box, add border-left), placeholder text, empty state JSX |
-| `components/Sidebar.tsx` | Active state class usage (minor, mostly CSS-driven) |
+| File                       | Type of change                                                                     |
+| -------------------------- | ---------------------------------------------------------------------------------- |
+| `app/globals.css`          | Primary — typography, message styles, header, sidebar, empty states, color cleanup |
+| `app/page.tsx`             | Header JSX restructure (pill tabs, secondary controls cluster)                     |
+| `components/ChatPanel.tsx` | Message markup (remove box, add border-left), placeholder text, empty state JSX    |
+| `components/Sidebar.tsx`   | Active state class usage (minor, mostly CSS-driven)                                |
 
 ---
 

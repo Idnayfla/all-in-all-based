@@ -3,61 +3,93 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileNode } from '@/app/page';
 import ImageCropModal from './ImageCropModal';
 
-export default function PreviewPanel({ files, projectType, subscriptionTier, onProRequired }: {
+export default function PreviewPanel({
+  files,
+  projectType,
+  subscriptionTier,
+  onProRequired,
+}: {
   files: FileNode[];
   projectType: string;
   subscriptionTier?: 'free' | 'pro';
   onProRequired?: () => void;
 }) {
   const [output, setOutput] = useState('');
+  const [stderr, setStderr] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [cropData, setCropData] = useState<{ url: string; format: 'png' | 'jpg' } | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
   const htmlFile = files.find(f => f.language === 'html');
-  const cssFile  = files.find(f => f.language === 'css');
-  const jsFile   = files.find(f => f.language === 'javascript' || f.language === 'js');
+  const cssFile = files.find(f => f.language === 'css');
+  const jsFile = files.find(f => f.language === 'javascript' || f.language === 'js');
 
   const previewHtml = useMemo(() => {
     if (!htmlFile) return null;
     let html = htmlFile.content;
+    // srcdoc iframes always have a null/opaque origin (MDN spec) — even with
+    // allow-same-origin. Without <base>, relative URLs like /api/sfx?slug=...
+    // resolve to null:///api/sfx?slug=... and never reach the server.
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    if (origin) {
+      html = html.includes('<head>')
+        ? html.replace('<head>', `<head><base href="${origin}">`)
+        : `<base href="${origin}">${html}`;
+    }
     if (cssFile) html = html.replace('</head>', `<style>${cssFile.content}</style></head>`);
-    if (jsFile)  html = html.replace('</body>', `<script>${jsFile.content}</script></body>`);
+    if (jsFile) html = html.replace('</body>', `<script>${jsFile.content}</script></body>`);
     if (!html.includes('name="viewport"') && !html.includes("name='viewport'")) {
-      html = html.replace('<head>', '<head><meta name="viewport" content="width=device-width, initial-scale=1">');
+      html = html.replace(
+        '<head>',
+        '<head><meta name="viewport" content="width=device-width, initial-scale=1">'
+      );
     }
     return html;
   }, [htmlFile, cssFile, jsFile]);
 
-  useEffect(() => {
-    if (!previewHtml || !iframeRef.current) return;
-    const doc = iframeRef.current.contentDocument;
-    if (!doc) return;
-    doc.open();
-    doc.write(previewHtml);
-    doc.close();
-  }, [previewHtml]);
-
   const runCode = async () => {
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
     setIsRunning(true);
     setOutput('');
+    setStderr('');
     try {
       const res = await fetch('/api/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ files, projectType }),
+        signal: ctrl.signal,
       });
       const data = await res.json();
-      setOutput(data.output);
-    } catch {
-      setOutput('Error: Could not execute code.');
+      setOutput(data.output ?? '');
+      setStderr(data.stderr ?? '');
+    } catch (err: unknown) {
+      if (!(err instanceof Error && err.name === 'AbortError'))
+        setOutput('Error: Could not execute code.');
     } finally {
       setIsRunning(false);
+      abortRef.current = null;
     }
   };
 
-  const captureCanvas = async (scale = Math.max(window.devicePixelRatio ?? 1, 2)): Promise<HTMLCanvasElement | null> => {
+  const cancelRun = () => {
+    abortRef.current?.abort();
+    setIsRunning(false);
+    setOutput('· Execution cancelled.');
+  };
+
+  const openInTab = () => {
+    if (!previewHtml) return;
+    const blob = new Blob([previewHtml], { type: 'text/html' });
+    window.open(URL.createObjectURL(blob), '_blank');
+  };
+
+  const captureCanvas = async (
+    scale = Math.max(window.devicePixelRatio ?? 1, 2)
+  ): Promise<HTMLCanvasElement | null> => {
     const iframe = iframeRef.current;
     if (!iframe?.contentDocument?.body) return null;
     const { default: html2canvas } = await import('html2canvas');
@@ -65,9 +97,9 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
       useCORS: true,
       allowTaint: true,
       scale,
-      width:        iframe.offsetWidth,
-      height:       iframe.offsetHeight,
-      windowWidth:  iframe.offsetWidth,
+      width: iframe.offsetWidth,
+      height: iframe.offsetHeight,
+      windowWidth: iframe.offsetWidth,
       windowHeight: iframe.offsetHeight,
       logging: false,
     });
@@ -80,7 +112,9 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
       const canvas = await captureCanvas();
       if (!canvas) return;
       setCropData({ url: canvas.toDataURL('image/png'), format: 'png' });
-    } finally { setIsExporting(false); }
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const exportJPG = async () => {
@@ -89,8 +123,10 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
     try {
       const canvas = await captureCanvas();
       if (!canvas) return;
-      setCropData({ url: canvas.toDataURL('image/png'), format: 'jpg' });
-    } finally { setIsExporting(false); }
+      setCropData({ url: canvas.toDataURL('image/jpeg', 0.92), format: 'jpg' });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const exportGIF = async () => {
@@ -104,8 +140,8 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
       // @ts-ignore — gif.js has no types
       const GIF = (await import('gif.js')).default;
 
-      const w          = iframe.offsetWidth;
-      const h          = iframe.offsetHeight;
+      const w = iframe.offsetWidth;
+      const h = iframe.offsetHeight;
       const frameCount = 16;
       const frameDelay = 120; // ms per frame
 
@@ -113,16 +149,20 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
       const gif = new GIF({
         workers: 2,
         quality: 8,
-        width:   Math.round(w * gifScale),
-        height:  Math.round(h * gifScale),
+        width: Math.round(w * gifScale),
+        height: Math.round(h * gifScale),
         workerScript: '/gif.worker.js',
       });
 
       for (let i = 0; i < frameCount; i++) {
         const canvas = await html2canvas(iframe.contentDocument.body, {
-          useCORS: true, allowTaint: true,
+          useCORS: true,
+          allowTaint: true,
           scale: 1.5,
-          width: w, height: h, windowWidth: w, windowHeight: h,
+          width: w,
+          height: h,
+          windowWidth: w,
+          windowHeight: h,
           logging: false,
         });
         gif.addFrame(canvas, { delay: frameDelay, copy: true });
@@ -131,7 +171,7 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
 
       await new Promise<void>((resolve, reject) => {
         gif.on('finished', (blob: Blob) => {
-          const url  = URL.createObjectURL(blob);
+          const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.download = 'based-export.gif';
           link.href = url;
@@ -142,12 +182,33 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
         gif.on('error', reject);
         gif.render();
       });
-    } finally { setIsExporting(false); }
+    } finally {
+      setIsExporting(false);
+    }
   };
 
-  const exportPDF = () => {
-    iframeRef.current?.contentWindow?.print();
+  const exportPDF = async () => {
+    setIsExporting(true);
     setShowExportMenu(false);
+    try {
+      const canvas = await captureCanvas(2);
+      if (!canvas) return;
+      const { PDFDocument } = await import('pdf-lib');
+      const jpegData = canvas.toDataURL('image/jpeg', 0.95).split(',')[1];
+      const bytes = new Uint8Array(Array.from(atob(jpegData), c => c.charCodeAt(0)));
+      const pdf = await PDFDocument.create();
+      const img = await pdf.embedJpg(bytes);
+      const page = pdf.addPage([img.width / 2, img.height / 2]);
+      page.drawImage(img, { x: 0, y: 0, width: page.getWidth(), height: page.getHeight() });
+      const pdfBytes = await pdf.save();
+      const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'based-export.pdf';
+      a.click();
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const exportDOCX = async () => {
@@ -166,15 +227,17 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
         const text = (el as HTMLElement).innerText?.trim();
         if (!text) return;
         const tag = el.tagName.toLowerCase();
-        const headingMap: Record<string, typeof HeadingLevel[keyof typeof HeadingLevel]> = {
-          h1: HeadingLevel.HEADING_1, h2: HeadingLevel.HEADING_2,
-          h3: HeadingLevel.HEADING_3, h4: HeadingLevel.HEADING_4,
+        const headingMap: Record<string, (typeof HeadingLevel)[keyof typeof HeadingLevel]> = {
+          h1: HeadingLevel.HEADING_1,
+          h2: HeadingLevel.HEADING_2,
+          h3: HeadingLevel.HEADING_3,
+          h4: HeadingLevel.HEADING_4,
         };
-        children.push(new Paragraph(
-          headingMap[tag]
-            ? { text, heading: headingMap[tag] }
-            : { children: [new TextRun(text)] }
-        ));
+        children.push(
+          new Paragraph(
+            headingMap[tag] ? { text, heading: headingMap[tag] } : { children: [new TextRun(text)] }
+          )
+        );
       });
 
       if (children.length === 0) {
@@ -186,9 +249,13 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
       const blob = await Packer.toBlob(doc);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url; a.download = 'based-export.docx'; a.click();
+      a.href = url;
+      a.download = 'based-export.docx';
+      a.click();
       URL.revokeObjectURL(url);
-    } finally { setIsExporting(false); }
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const exportPPTX = async () => {
@@ -205,7 +272,9 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
       const slide = pptx.addSlide();
       slide.addImage({ data: imgData, x: 0, y: 0, w: '100%', h: '100%' });
       await pptx.writeFile({ fileName: 'based-export.pptx' });
-    } finally { setIsExporting(false); }
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const exportXLSX = async () => {
@@ -238,44 +307,75 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
         XLSX.utils.book_append_sheet(wb, ws, `Sheet${i + 1}`);
       });
       XLSX.writeFile(wb, 'based-export.xlsx');
-    } finally { setIsExporting(false); }
+    } finally {
+      setIsExporting(false);
+    }
   };
 
-  if (projectType === 'python' || projectType === 'node') {
+  const COMPILED_TYPES = ['python', 'node', 'java', 'cpp', 'go', 'rust', 'bash'];
+  const LANG_LABELS: Record<string, string> = {
+    python: 'Python',
+    node: 'Node.js',
+    java: 'Java',
+    cpp: 'C++',
+    go: 'Go',
+    rust: 'Rust',
+    bash: 'Bash',
+  };
+  if (COMPILED_TYPES.includes(projectType)) {
     return (
       <div className="preview-panel">
         <div className="preview-header">
-          <span>⬡ Terminal Output</span>
-          <button className="run-btn" onClick={runCode} disabled={isRunning || files.length === 0}>
-            {isRunning ? '◈ Running...' : '▶ Run'}
-          </button>
+          <span>⬡ {LANG_LABELS[projectType] ?? projectType} — Terminal</span>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {isRunning ? (
+              <button className="run-btn run-btn-cancel" onClick={cancelRun}>
+                ◼ Cancel
+              </button>
+            ) : (
+              <button className="run-btn" onClick={runCode} disabled={files.length === 0}>
+                ▶ Run
+              </button>
+            )}
+          </div>
         </div>
         <div className="terminal-output">
-          {output ? (
-            <pre className="terminal-text">{output}</pre>
+          {output || stderr ? (
+            <>
+              {output && <pre className="terminal-text">{output}</pre>}
+              {stderr && <pre className="terminal-text terminal-stderr">{stderr}</pre>}
+            </>
           ) : (
-            <div className="terminal-empty">Click Run to execute your code in a live sandbox.</div>
+            <div className="terminal-empty">
+              {['java', 'go', 'rust'].includes(projectType)
+                ? `Click Run — Based will compile and execute your ${LANG_LABELS[projectType]} code in a sandbox.`
+                : 'Click Run to execute your code in a live sandbox.'}
+            </div>
           )}
         </div>
       </div>
     );
   }
 
-  if (!previewHtml) return (
-    <div className="preview-panel">
-      <div className="preview-header">⬡ Preview</div>
-      <div className="preview-empty">
-        <div className="preview-empty-icon">⬡</div>
-        <div className="preview-empty-text">Generate an HTML project to see a preview here.</div>
+  if (!previewHtml)
+    return (
+      <div className="preview-panel">
+        <div className="preview-header">⬡ Preview</div>
+        <div className="preview-empty">
+          <div className="preview-empty-icon">⬡</div>
+          <div className="preview-empty-text">Generate an HTML project to see a preview here.</div>
+        </div>
       </div>
-    </div>
-  );
+    );
 
   return (
     <div className="preview-panel">
       <div className="preview-header">
         <span>⬡ Preview — Live</span>
-        <div className="preview-actions" style={{ position: 'relative' }}>
+        <div className="preview-actions" style={{ position: 'relative', display: 'flex', gap: 6 }}>
+          <button className="run-btn" onClick={openInTab} title="Open in new browser tab">
+            ↗ New Tab
+          </button>
           <button
             className="run-btn"
             onClick={() => setShowExportMenu(s => !s)}
@@ -285,24 +385,56 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
           </button>
           {showExportMenu && (
             <div className="export-menu">
-              <button className="export-menu-item" onClick={exportPNG}>PNG</button>
-              <button className="export-menu-item" onClick={subscriptionTier === 'free' ? onProRequired : exportJPG}>
-                JPG {subscriptionTier === 'free' && <span className="export-menu-badge export-menu-badge--pro">⬡ Pro</span>}
+              <button className="export-menu-item" onClick={exportPNG}>
+                PNG
               </button>
-              <button className="export-menu-item" onClick={subscriptionTier === 'free' ? onProRequired : exportGIF}>
-                GIF&nbsp;<span className="export-menu-badge">{subscriptionTier === 'free' ? '⬡ Pro' : 'animated'}</span>
+              <button
+                className="export-menu-item"
+                onClick={subscriptionTier === 'free' ? onProRequired : exportJPG}
+              >
+                JPG{' '}
+                {subscriptionTier === 'free' && (
+                  <span className="export-menu-badge export-menu-badge--pro">⬡ Pro</span>
+                )}
               </button>
-              <button className="export-menu-item" onClick={subscriptionTier === 'free' ? onProRequired : exportPDF}>
-                PDF {subscriptionTier === 'free' && <span className="export-menu-badge export-menu-badge--pro">⬡ Pro</span>}
+              <button
+                className="export-menu-item"
+                onClick={subscriptionTier === 'free' ? onProRequired : exportGIF}
+              >
+                GIF&nbsp;
+                <span className="export-menu-badge">
+                  {subscriptionTier === 'free' ? '⬡ Pro' : 'animated'}
+                </span>
+              </button>
+              <button
+                className="export-menu-item"
+                onClick={subscriptionTier === 'free' ? onProRequired : exportPDF}
+              >
+                PDF{' '}
+                {subscriptionTier === 'free' && (
+                  <span className="export-menu-badge export-menu-badge--pro">⬡ Pro</span>
+                )}
               </button>
               <button className="export-menu-item" onClick={exportXLSX}>
                 Excel <span className="export-menu-badge">.xlsx</span>
               </button>
-              <button className="export-menu-item" onClick={subscriptionTier === 'free' ? onProRequired : exportDOCX}>
-                Word {subscriptionTier === 'free' && <span className="export-menu-badge export-menu-badge--pro">⬡ Pro</span>}
+              <button
+                className="export-menu-item"
+                onClick={subscriptionTier === 'free' ? onProRequired : exportDOCX}
+              >
+                Word{' '}
+                {subscriptionTier === 'free' && (
+                  <span className="export-menu-badge export-menu-badge--pro">⬡ Pro</span>
+                )}
               </button>
-              <button className="export-menu-item" onClick={subscriptionTier === 'free' ? onProRequired : exportPPTX}>
-                PowerPoint {subscriptionTier === 'free' && <span className="export-menu-badge export-menu-badge--pro">⬡ Pro</span>}
+              <button
+                className="export-menu-item"
+                onClick={subscriptionTier === 'free' ? onProRequired : exportPPTX}
+              >
+                PowerPoint{' '}
+                {subscriptionTier === 'free' && (
+                  <span className="export-menu-badge export-menu-badge--pro">⬡ Pro</span>
+                )}
               </button>
             </div>
           )}
@@ -311,8 +443,10 @@ export default function PreviewPanel({ files, projectType, subscriptionTier, onP
       <iframe
         ref={iframeRef}
         className="preview-frame"
-        sandbox="allow-scripts allow-same-origin allow-modals allow-downloads"
+        sandbox="allow-scripts allow-same-origin allow-modals allow-forms"
+        allow="autoplay"
         title="Preview"
+        srcDoc={previewHtml ?? ''}
         onClick={() => setShowExportMenu(false)}
       />
       {cropData && (

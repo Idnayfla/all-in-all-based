@@ -29,25 +29,46 @@ export default function DebugPanel() {
     <div className="debug-panel">
       <div className="debug-header">
         <span className="debug-title">Stream Debug</span>
-        <button className="debug-clear" onClick={() => { setEvents([]); setRawStream(''); }}>Clear</button>
+        <button
+          className="debug-clear"
+          onClick={() => {
+            setEvents([]);
+            setRawStream('');
+          }}
+        >
+          Clear
+        </button>
       </div>
 
       <div className="debug-tabs">
-        <button className={`debug-tab${tab === 'events' ? ' active' : ''}`} onClick={() => setTab('events')}>Events</button>
-        <button className={`debug-tab${tab === 'raw' ? ' active' : ''}`} onClick={() => setTab('raw')}>Raw Stream</button>
+        <button
+          className={`debug-tab${tab === 'events' ? ' active' : ''}`}
+          onClick={() => setTab('events')}
+        >
+          Events
+        </button>
+        <button
+          className={`debug-tab${tab === 'raw' ? ' active' : ''}`}
+          onClick={() => setTab('raw')}
+        >
+          Raw Stream
+        </button>
       </div>
 
       <div className="debug-body">
         {tab === 'events' && (
           <div className="debug-scroll">
-            {events.length === 0 && <div className="debug-empty">No events yet. Send a message.</div>}
+            {events.length === 0 && (
+              <div className="debug-empty">No events yet. Send a message.</div>
+            )}
             {events.map((ev, i) => (
               <div key={i} className={`debug-event debug-event-${ev.type}`}>
                 <span className="debug-time">{ev.time} </span>
-                <span className="debug-type">[{ev.type.toUpperCase()}]</span>
-                {' '}
+                <span className="debug-type">[{ev.type.toUpperCase()}]</span>{' '}
                 <span className="debug-data">
-                  {ev.type === 'chunk' ? ev.data.slice(0, 80) + (ev.data.length > 80 ? '…' : '') : ev.data}
+                  {ev.type === 'chunk'
+                    ? ev.data.slice(0, 80) + (ev.data.length > 80 ? '…' : '')
+                    : ev.data}
                 </span>
               </div>
             ))}
@@ -56,13 +77,16 @@ export default function DebugPanel() {
         )}
         {tab === 'raw' && (
           <div className="debug-scroll">
-            <pre className="debug-raw">{rawStream || 'Raw stream appears here during generation…'}</pre>
+            <pre className="debug-raw">
+              {rawStream || 'Raw stream appears here during generation…'}
+            </pre>
           </div>
         )}
       </div>
 
       <div className="debug-footer">
-        {events.length} events · {events.filter(e => e.type === 'chunk').length} chunks · {events.filter(e => e.type === 'done').length} done
+        {events.length} events · {events.filter(e => e.type === 'chunk').length} chunks ·{' '}
+        {events.filter(e => e.type === 'done').length} done
       </div>
     </div>
   );

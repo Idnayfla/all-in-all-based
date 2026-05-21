@@ -3,6 +3,28 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type VoiceState = 'idle' | 'listening' | 'activated' | 'unsupported';
 
+// Browser SpeechRecognition API types (not yet in TypeScript's lib.dom.d.ts)
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+}
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+interface SpeechRecognitionInstance extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((e: SpeechRecognitionEvent) => void) | null;
+  onerror: ((e: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognitionInstance;
+}
+
 export function useVoiceActivation(onCommand: (text: string) => void, triggerWord = 'based') {
   const [state, setState] = useState<VoiceState>('idle');
   const [transcript, setTranscript] = useState('');
@@ -10,28 +32,56 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
   const stateRef = useRef<VoiceState>('idle');
   const onCommandRef = useRef(onCommand);
   onCommandRef.current = onCommand;
-  const activeRef = useRef<any>(null);
+  const activeRef = useRef<SpeechRecognitionInstance | null>(null);
   const lastCommandRef = useRef('');
-  // Once granted we skip getUserMedia on subsequent starts to avoid device contention
   const permissionGranted = useRef(false);
+  // Accumulate all transcript text while the user is speaking (push-to-talk mode)
+  const accumulatedRef = useRef('');
 
-  const updateState = (s: VoiceState) => { stateRef.current = s; setState(s); };
+  const updateState = (s: VoiceState) => {
+    stateRef.current = s;
+    setState(s);
+  };
 
-  const stop = useCallback(() => {
-    try { activeRef.current?.stop(); } catch {}
+  const stop = useCallback((submitAccumulated = false) => {
+    try {
+      activeRef.current?.stop();
+    } catch {}
     activeRef.current = null;
-    updateState('idle');
-    setTranscript('');
+
+    // Push-to-talk: if the user manually stopped, submit whatever they said
+    if (submitAccumulated && accumulatedRef.current.trim()) {
+      const text = accumulatedRef.current.trim();
+      updateState('activated');
+      setTranscript(text);
+      onCommandRef.current(text);
+      setTimeout(() => {
+        setTranscript('');
+        if (stateRef.current === 'activated') updateState('idle');
+      }, 900);
+    } else {
+      updateState('idle');
+      setTranscript('');
+    }
+
+    accumulatedRef.current = '';
     setError(null);
     lastCommandRef.current = '';
   }, []);
 
   const startRec = useCallback(() => {
-    const SR = typeof window !== 'undefined'
-      ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      : null;
+    const w =
+      typeof window !== 'undefined'
+        ? (window as Window & {
+            SpeechRecognition?: SpeechRecognitionConstructor;
+            webkitSpeechRecognition?: SpeechRecognitionConstructor;
+          })
+        : null;
+    const SR: SpeechRecognitionConstructor | undefined =
+      w?.SpeechRecognition ?? w?.webkitSpeechRecognition;
     if (!SR) return;
 
+    accumulatedRef.current = '';
     const rec = new SR();
     rec.lang = 'en-US';
     rec.continuous = true;
@@ -39,42 +89,44 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
     rec.maxAlternatives = 1;
     activeRef.current = rec;
 
-    rec.onstart = () => console.log('[voice] recognition started ✓');
-    rec.onspeechstart = () => console.log('[voice] speech detected ✓');
-    rec.onspeechend   = () => console.log('[voice] speech ended');
-
-    rec.onresult = (e: any) => {
+    rec.onresult = (e: SpeechRecognitionEvent) => {
       let full = '';
       for (let i = 0; i < e.results.length; i++) full += e.results[i][0].transcript;
       full = full.trim();
-      console.log('[voice] transcript:', full);
 
+      // Always update accumulated transcript so push-to-talk can submit it
+      accumulatedRef.current = full;
+      setTranscript(full);
+
+      // Wake-word detection (hands-free mode)
       const lower = full.toLowerCase();
       const idx = lower.indexOf(triggerWord);
-      if (idx === -1) return;
-
-      const command = full.slice(idx + triggerWord.length).replace(/^[,!.?\s]+/, '').trim();
-      if (!command || command === lastCommandRef.current) return;
-
-      const lastResult = e.results[e.results.length - 1];
-      if (!lastResult.isFinal) return;
-
-      lastCommandRef.current = command;
-      console.log('[voice] command:', command);
-      updateState('activated');
-      setTranscript(command);
-      onCommandRef.current(command);
-      setTimeout(() => {
-        setTranscript('');
-        lastCommandRef.current = '';
-        if (stateRef.current === 'activated') updateState('listening');
-      }, 900);
+      if (idx !== -1) {
+        const command = full
+          .slice(idx + triggerWord.length)
+          .replace(/^[,!.?\s]+/, '')
+          .trim();
+        if (command && command !== lastCommandRef.current) {
+          const lastResult = e.results[e.results.length - 1];
+          if (lastResult.isFinal) {
+            lastCommandRef.current = command;
+            updateState('activated');
+            setTranscript(command);
+            onCommandRef.current(command);
+            accumulatedRef.current = '';
+            setTimeout(() => {
+              setTranscript('');
+              lastCommandRef.current = '';
+              if (stateRef.current === 'activated') updateState('listening');
+            }, 900);
+          }
+        }
+      }
     };
 
-    rec.onerror = (e: any) => {
-      console.warn('[voice] error:', e.error);
+    rec.onerror = (e: SpeechRecognitionErrorEvent) => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        setError('Mic denied — click the 🔒 lock icon in the address bar → allow Microphone');
+        setError('Mic denied — click the lock icon in the address bar → allow Microphone');
         updateState('idle');
       } else if (e.error === 'network') {
         setError('Network error — Chrome voice requires internet access');
@@ -84,7 +136,6 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
     };
 
     rec.onend = () => {
-      console.log('[voice] ended, state:', stateRef.current);
       if (stateRef.current === 'listening' || stateRef.current === 'activated') {
         setTimeout(() => {
           if (stateRef.current === 'listening' || stateRef.current === 'activated') startRec();
@@ -92,18 +143,24 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
       }
     };
 
-    console.log('[voice] calling rec.start()');
-    try { rec.start(); } catch (err: any) {
-      console.warn('[voice] start threw:', err.message);
-      setError(`Could not start mic: ${err.message}`);
+    try {
+      rec.start();
+    } catch (err: unknown) {
+      setError(`Could not start mic: ${err instanceof Error ? err.message : String(err)}`);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [triggerWord]);
 
   const start = useCallback(async () => {
-    const SR = typeof window !== 'undefined'
-      ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      : null;
+    const w2 =
+      typeof window !== 'undefined'
+        ? (window as Window & {
+            SpeechRecognition?: SpeechRecognitionConstructor;
+            webkitSpeechRecognition?: SpeechRecognitionConstructor;
+          })
+        : null;
+    const SR: SpeechRecognitionConstructor | undefined =
+      w2?.SpeechRecognition ?? w2?.webkitSpeechRecognition;
     if (!SR) {
       updateState('unsupported');
       setError('Speech recognition not supported — use Chrome or Edge');
@@ -113,23 +170,20 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
     setError(null);
 
     if (!permissionGranted.current) {
-      // First run: probe permission via getUserMedia then release immediately.
-      // We don't skip this even if Permissions API says granted — some browsers lie.
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         stream.getTracks().forEach(t => t.stop());
         permissionGranted.current = true;
-        console.log('[voice] mic permission confirmed ✓ — waiting for device to release');
-        // Give the audio hardware 300ms to fully release before SR grabs it
         await new Promise(r => setTimeout(r, 300));
-      } catch (err: any) {
-        console.warn('[voice] getUserMedia failed:', err.name, err.message);
-        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-          setError('Mic blocked — click the 🔒 lock icon in the address bar → allow Microphone');
-        } else if (err.name === 'NotFoundError') {
+      } catch (err: unknown) {
+        const name = err instanceof Error ? err.name : '';
+        const msg = err instanceof Error ? err.message : String(err);
+        if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+          setError('Mic blocked — click the lock icon in the address bar → allow Microphone');
+        } else if (name === 'NotFoundError') {
           setError('No microphone found — plug in a mic and try again');
         } else {
-          setError(`Mic error: ${err.message}`);
+          setError(`Mic error: ${msg}`);
         }
         updateState('idle');
         return;
@@ -140,11 +194,23 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
     startRec();
   }, [startRec]);
 
+  // Toggle: start if idle, stop-and-submit if listening
   const toggle = useCallback(() => {
-    stateRef.current === 'idle' ? start() : stop();
+    if (stateRef.current === 'idle') {
+      start();
+    } else {
+      stop(true); // submit whatever was accumulated
+    }
   }, [start, stop]);
 
-  useEffect(() => () => { try { activeRef.current?.stop(); } catch {} }, []);
+  useEffect(
+    () => () => {
+      try {
+        activeRef.current?.stop();
+      } catch {}
+    },
+    []
+  );
 
   return { state, transcript, error, toggle };
 }

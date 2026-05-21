@@ -14,10 +14,26 @@ interface GalleryItem {
 }
 
 const PILLARS = [
-  { icon: '◈', title: 'All Models',       desc: 'Based routes every request to the best AI model for the job — code, vision, audio, reasoning. You never choose.' },
-  { icon: '⬡', title: 'All Tasks',        desc: 'Build apps, answer questions, analyse data, write content, generate media. One companion, every task.' },
-  { icon: '◉', title: 'All Generation',   desc: 'Code · Images · Video · Music — describe it, Based creates it. Live preview updates as each file is written.' },
-  { icon: '⊙', title: 'Community-Driven', desc: 'Hit a bug? Report it. Love a feature? Support it. Based gets better every time you use it.' },
+  {
+    icon: '◈',
+    title: 'All Models',
+    desc: 'Based routes every request to the best AI model for the job — code, vision, audio, reasoning. You never choose.',
+  },
+  {
+    icon: '⬡',
+    title: 'All Tasks',
+    desc: 'Build apps, answer questions, analyse data, write content, generate media. One companion, every task.',
+  },
+  {
+    icon: '◉',
+    title: 'All Generation',
+    desc: 'Code · Images · Video · Music — describe it, Based creates it. Live preview updates as each file is written.',
+  },
+  {
+    icon: '⊙',
+    title: 'Community-Driven',
+    desc: 'Hit a bug? Report it. Love a feature? Support it. Based gets better every time you use it.',
+  },
 ];
 
 const MARQUEE_ITEMS = [
@@ -57,27 +73,27 @@ const BENTO = [
 ];
 
 const SHIPPED_RECENT = [
-  { icon: '⬡', label: 'Music Studio',      desc: 'Full DAW — piano, drums, voice recording, effects' },
-  { icon: '▸',  label: 'Video Editor',      desc: 'Trim, text overlays, speed control, FFmpeg export' },
-  { icon: '◈', label: 'Music AI',          desc: 'Generate original tracks from a description' },
-  { icon: '◉', label: 'Image Gen',         desc: 'FLUX + Nano Banana — text-to-image and editing' },
-  { icon: '⊙', label: 'Game Engine',       desc: 'Playable games built and rendered in the browser' },
-  { icon: '⬡', label: 'Windows Companion', desc: 'Floating overlay that watches your screen' },
+  { icon: '⬡', label: 'Music Studio', desc: 'Full DAW — piano, drums, voice recording, effects' },
+  { icon: '▸', label: 'Video Editor', desc: 'Trim, text overlays, speed control, FFmpeg export' },
+  { icon: '◈', label: 'Music AI', desc: 'Generate original tracks from a description' },
+  { icon: '◉', label: 'Image Gen', desc: 'FLUX + Nano Banana — text-to-image and editing' },
+  { icon: '⊙', label: 'Game Engine', desc: 'Playable games built and rendered in the browser' },
 ];
 
 const COMING_NEXT = [
-  { label: 'Image Studio',   desc: 'Canvas, layers, AI-assisted edits' },
+  { label: 'Windows Companion', desc: 'Floating overlay that watches your screen — coming soon' },
   { label: '3D / Blueprint', desc: 'Describe a scene — Based renders it' },
-  { label: 'Mobile App',     desc: 'iOS + Android, feels native' },
-  { label: 'Proactive AI',   desc: '"You were working on X — continue?"' },
+  { label: 'Mobile App', desc: 'iOS + Android, feels native' },
+  { label: 'Team Workspaces', desc: 'Share projects, collaborate in real time' },
+  { label: 'Based Model', desc: 'Our own fine-tuned model, trained on your builds' },
 ];
 
 const COMPARISONS = [
-  { them: 'One AI, one job',           us: 'One AI, every job' },
-  { them: 'Outputs text',              us: 'Outputs apps, images, video, music' },
-  { them: 'You manage the tools',      us: 'Based manages everything' },
+  { them: 'One AI, one job', us: 'One AI, every job' },
+  { them: 'Outputs text', us: 'Outputs apps, images, video, music' },
+  { them: 'You manage the tools', us: 'Based manages everything' },
   { them: 'Forgets you every session', us: 'Remembers your style forever' },
-  { them: 'You find the bugs',         us: 'Report it — we fix it' },
+  { them: 'You find the bugs', us: 'Report it — we fix it' },
 ];
 
 function LandingGalleryCard({ item }: { item: GalleryItem }) {
@@ -86,7 +102,9 @@ function LandingGalleryCard({ item }: { item: GalleryItem }) {
 
   useEffect(() => {
     const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) setVisible(true); },
+      ([entry]) => {
+        if (entry.isIntersecting) setVisible(true);
+      },
       { rootMargin: '200px' }
     );
     if (wrapRef.current) observer.observe(wrapRef.current);
@@ -104,12 +122,16 @@ function LandingGalleryCard({ item }: { item: GalleryItem }) {
             scrolling="no"
           />
         ) : (
-          <div className="landing-gal-placeholder"><span>B&gt;</span></div>
+          <div className="landing-gal-placeholder">
+            <span>B&gt;</span>
+          </div>
         )}
       </div>
       <div className="landing-gal-card-body">
         <span className="landing-gal-card-name">{item.project_name}</span>
-        <span className="landing-gal-card-meta">by {item.author_name ?? 'Anonymous'} · ↻ {item.remix_count}</span>
+        <span className="landing-gal-card-meta">
+          by {item.author_name ?? 'Anonymous'} · ↻ {item.remix_count}
+        </span>
       </div>
     </a>
   );
@@ -132,9 +154,15 @@ export default function LandingPage({ onSignIn }: Props) {
       <header className="landing-header">
         <div className="landing-logo">B&gt;</div>
         <nav className="landing-header-nav">
-          <a href="/gallery" className="landing-nav-link">Gallery</a>
-          <a href="/roadmap" className="landing-nav-link">Roadmap</a>
-          <button className="landing-signin-btn" onClick={() => onSignIn('signin')}>Sign In</button>
+          <a href="/gallery" className="landing-nav-link">
+            Gallery
+          </a>
+          <a href="/roadmap" className="landing-nav-link">
+            Roadmap
+          </a>
+          <button className="landing-signin-btn" onClick={() => onSignIn('signin')}>
+            Sign In
+          </button>
         </nav>
       </header>
 
@@ -155,7 +183,9 @@ export default function LandingPage({ onSignIn }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.18, type: 'spring', stiffness: 180, damping: 24 }}
         >
-          Never leaves<br />your side.
+          Never leaves
+          <br />
+          your side.
         </motion.h1>
         <motion.p
           className="landing-subheadline"
@@ -163,7 +193,9 @@ export default function LandingPage({ onSignIn }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.28 }}
         >
-          Not a tool. Not just a chatbot. Based is your overly attached companion AI — it builds your apps, edits your video, composes your music, answers anything, and remembers everything about you.
+          Not a tool. Not just a chatbot. Based is your overly attached companion AI — it builds
+          your apps, edits your video, composes your music, answers anything, and remembers
+          everything about you.
         </motion.p>
         <motion.div
           className="landing-ctas"
@@ -171,8 +203,12 @@ export default function LandingPage({ onSignIn }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.38 }}
         >
-          <button className="landing-cta-primary" onClick={() => onSignIn('signup')}>Start free →</button>
-          <button className="landing-cta-secondary" onClick={() => onSignIn('signin')}>Sign In</button>
+          <button className="landing-cta-primary" onClick={() => onSignIn('signup')}>
+            Start free →
+          </button>
+          <button className="landing-cta-secondary" onClick={() => onSignIn('signin')}>
+            Sign In
+          </button>
         </motion.div>
         <motion.div
           className="landing-hint"
@@ -250,13 +286,17 @@ export default function LandingPage({ onSignIn }: Props) {
           <div className="landing-comparison-col landing-comparison-col--them">
             <div className="landing-comparison-col-header">Others</div>
             {COMPARISONS.map(c => (
-              <div key={c.them} className="landing-comparison-row landing-comparison-row--them">✕ {c.them}</div>
+              <div key={c.them} className="landing-comparison-row landing-comparison-row--them">
+                ✕ {c.them}
+              </div>
             ))}
           </div>
           <div className="landing-comparison-col landing-comparison-col--us">
             <div className="landing-comparison-col-header">Based</div>
             {COMPARISONS.map(c => (
-              <div key={c.us} className="landing-comparison-row landing-comparison-row--us">◈ {c.us}</div>
+              <div key={c.us} className="landing-comparison-row landing-comparison-row--us">
+                ◈ {c.us}
+              </div>
             ))}
           </div>
         </motion.div>
@@ -269,9 +309,13 @@ export default function LandingPage({ onSignIn }: Props) {
             <div>
               <div className="landing-gallery-label">Community Gallery</div>
               <h2 className="landing-gallery-title">Built with Based.</h2>
-              <p className="landing-gallery-sub">Real projects, built by real people. Browse and remix anything.</p>
+              <p className="landing-gallery-sub">
+                Real projects, built by real people. Browse and remix anything.
+              </p>
             </div>
-            <a href="/gallery" className="landing-gallery-browse-btn">Browse all →</a>
+            <a href="/gallery" className="landing-gallery-browse-btn">
+              Browse all →
+            </a>
           </div>
           <div className="landing-gal-grid">
             {galleryItems.map(item => (
@@ -279,7 +323,9 @@ export default function LandingPage({ onSignIn }: Props) {
             ))}
           </div>
           <div className="landing-gallery-cta-row">
-            <a href="/gallery" className="landing-gallery-cta-link">See everything in the gallery →</a>
+            <a href="/gallery" className="landing-gallery-cta-link">
+              See everything in the gallery →
+            </a>
           </div>
         </section>
       )}
@@ -295,9 +341,14 @@ export default function LandingPage({ onSignIn }: Props) {
           <div>
             <div className="landing-roadmap-label">Built in public · Shaped by users</div>
             <h2 className="landing-roadmap-title">Always shipping.</h2>
-            <p className="landing-roadmap-sub">Based gets better every week. Here&apos;s what&apos;s been built and what&apos;s coming.</p>
+            <p className="landing-roadmap-sub">
+              Based gets better every week. Here&apos;s what&apos;s been built and what&apos;s
+              coming.
+            </p>
           </div>
-          <a href="/roadmap" className="landing-roadmap-btn">Full roadmap →</a>
+          <a href="/roadmap" className="landing-roadmap-btn">
+            Full roadmap →
+          </a>
         </motion.div>
         <motion.div
           className="landing-roadmap-grid"
@@ -328,7 +379,9 @@ export default function LandingPage({ onSignIn }: Props) {
                 </div>
               </div>
             ))}
-            <a href="/roadmap" className="landing-roadmap-see-all">See full roadmap →</a>
+            <a href="/roadmap" className="landing-roadmap-see-all">
+              See full roadmap →
+            </a>
           </div>
         </motion.div>
       </section>
@@ -351,7 +404,9 @@ export default function LandingPage({ onSignIn }: Props) {
         >
           <div className="landing-tier landing-tier--free">
             <div className="landing-tier-label">Free</div>
-            <div className="landing-tier-price">$0<span>/mo</span></div>
+            <div className="landing-tier-price">
+              $0<span>/mo</span>
+            </div>
             <ul className="landing-tier-features">
               <li>10 generations/month</li>
               <li>3 projects</li>
@@ -359,12 +414,18 @@ export default function LandingPage({ onSignIn }: Props) {
               <li>PNG &amp; Excel export</li>
               <li>Per-project memory</li>
             </ul>
-            <button className="landing-tier-cta" onClick={() => onSignIn('signup')}>Get Started</button>
+            <button className="landing-tier-cta" onClick={() => onSignIn('signup')}>
+              Get Started
+            </button>
           </div>
           <div className="landing-tier landing-tier--pro">
             <div className="landing-tier-pro-badge">PRO</div>
             <div className="landing-tier-label">Pro</div>
-            <div className="landing-tier-price">$12<span>/mo</span></div>
+            <div className="landing-tier-price">
+              <span className="pricing-original-price">$20</span>
+              $12<span>/mo</span>
+            </div>
+            <div className="pricing-founding-label">Founding member price</div>
             <ul className="landing-tier-features">
               <li>Unlimited generations</li>
               <li>Unlimited projects</li>
@@ -376,7 +437,12 @@ export default function LandingPage({ onSignIn }: Props) {
               <li>Global AI memory across projects</li>
               <li>Export — JPG, GIF, PDF, Word, PowerPoint</li>
             </ul>
-            <button className="landing-tier-cta landing-tier-cta--pro" onClick={() => onSignIn('signup')}>Upgrade to Pro</button>
+            <button
+              className="landing-tier-cta landing-tier-cta--pro"
+              onClick={() => onSignIn('signup')}
+            >
+              Upgrade to Pro
+            </button>
           </div>
         </motion.div>
       </section>
@@ -391,17 +457,32 @@ export default function LandingPage({ onSignIn }: Props) {
         >
           <div className="landing-closer-badge">B&gt;</div>
           <h2 className="landing-closer-headline">Your companion is waiting.</h2>
-          <p className="landing-closer-sub">Free plan, no credit card. Based is ready when you are.</p>
-          <button className="landing-cta-primary" onClick={() => onSignIn('signup')}>Start free →</button>
+          <p className="landing-closer-sub">
+            Free plan, no credit card. Based is ready when you are.
+          </p>
+          <button className="landing-cta-primary" onClick={() => onSignIn('signup')}>
+            Start free →
+          </button>
         </motion.div>
       </section>
 
       <footer className="landing-footer">
-        <a href="/roadmap" className="landing-footer-link">Roadmap</a>
+        <a href="/roadmap" className="landing-footer-link">
+          Roadmap
+        </a>
         <span className="landing-footer-sep">·</span>
-        <a href="/gallery" className="landing-footer-link">Gallery</a>
+        <a href="/gallery" className="landing-footer-link">
+          Gallery
+        </a>
         <span className="landing-footer-sep">·</span>
-        <a href="https://ko-fi.com/basedfund" target="_blank" rel="noopener noreferrer" className="landing-footer-link">◈ Support</a>
+        <a
+          href="https://ko-fi.com/basedfund"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="landing-footer-link"
+        >
+          ◈ Support
+        </a>
       </footer>
     </div>
   );

@@ -16,8 +16,13 @@ export default function GeneratedMusicCard({ url, prompt }: GeneratedMusicCardPr
   const toggle = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    if (playing) { audio.pause(); setPlaying(false); }
-    else { void audio.play(); setPlaying(true); }
+    if (playing) {
+      audio.pause();
+      setPlaying(false);
+    } else {
+      void audio.play();
+      setPlaying(true);
+    }
   };
 
   return (
@@ -42,10 +47,7 @@ export default function GeneratedMusicCard({ url, prompt }: GeneratedMusicCardPr
             <motion.div
               key={i}
               className="waveform-bar"
-              animate={playing
-                ? { height: ['4px', `${h}px`, '4px'] }
-                : { height: '4px' }
-              }
+              animate={playing ? { height: ['4px', `${h}px`, '4px'] } : { height: '4px' }}
               transition={{
                 duration: 0.5 + (i % 5) * 0.08,
                 repeat: Infinity,
@@ -55,11 +57,24 @@ export default function GeneratedMusicCard({ url, prompt }: GeneratedMusicCardPr
             />
           ))}
         </div>
-        <audio ref={audioRef} src={url} onEnded={() => setPlaying(false)} style={{ display: 'none' }} />
+        <audio
+          ref={audioRef}
+          src={url}
+          onEnded={() => setPlaying(false)}
+          style={{ display: 'none' }}
+        />
       </div>
       <div className="generated-image-prompt">{prompt}</div>
       <div className="generated-image-actions">
-        <a className="generated-image-download" href={url} download target="_blank" rel="noreferrer">↓ Download</a>
+        <a
+          className="generated-image-download"
+          href={url}
+          download
+          target="_blank"
+          rel="noreferrer"
+        >
+          ↓ Download
+        </a>
       </div>
     </motion.div>
   );

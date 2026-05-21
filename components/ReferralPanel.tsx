@@ -14,17 +14,24 @@ interface Props {
 
 export default function ReferralPanel({ getHeaders }: Props) {
   const [data, setData] = useState<ReferralData | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    getHeaders().then(headers =>
-      fetch('/api/referral', { headers })
-        .then(r => r.ok ? r.json() : null)
-        .then(d => d && setData(d))
-        .catch(() => {})
-    );
+    getHeaders()
+      .then(headers =>
+        fetch('/api/referral', { headers }).then(r => {
+          if (!r.ok) throw new Error(`Request failed (${r.status})`);
+          return r.json();
+        })
+      )
+      .then((d: ReferralData) => setData(d))
+      .catch((err: unknown) =>
+        setError(err instanceof Error ? err.message : 'Could not load referral info')
+      );
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (error) return <div className="referral-loading">{error}</div>;
   if (!data) return <div className="referral-loading">Loading…</div>;
 
   const link = `https://getbased.dev/?ref=${data.code}`;
@@ -38,9 +45,9 @@ export default function ReferralPanel({ getHeaders }: Props) {
   return (
     <div className="referral-panel">
       <p className="referral-desc">
-        Share Based, earn Pro time for you and a friend.
-        Your friend gets <strong>3 days free Pro</strong> when they sign up.
-        You get <strong>7 days free Pro</strong> when they subscribe.
+        Share Based, earn Pro time for you and a friend. Your friend gets{' '}
+        <strong>3 days free Pro</strong> when they sign up. You get <strong>7 days free Pro</strong>{' '}
+        when they subscribe.
       </p>
 
       <div className="referral-link-row">

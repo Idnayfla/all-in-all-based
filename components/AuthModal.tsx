@@ -11,17 +11,20 @@ interface Props {
 }
 
 export default function AuthModal({ defaultTab = 'signin', onClose }: Props) {
-  const [tab, setTab]         = useState<Tab>(defaultTab);
-  const [email, setEmail]     = useState('');
+  const [tab, setTab] = useState<Tab>(defaultTab);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState('');
+  const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
   const clearForm = () => {
-    setEmail(''); setPassword(''); setConfirm('');
-    setError(''); setMessage('');
+    setEmail('');
+    setPassword('');
+    setConfirm('');
+    setError('');
+    setMessage('');
   };
 
   const handleOAuth = async (provider: 'google' | 'github') => {
@@ -35,7 +38,8 @@ export default function AuthModal({ defaultTab = 'signin', onClose }: Props) {
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(''); setLoading(true);
+    setError('');
+    setLoading(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setLoading(false);
     if (error) setError(error.message);
@@ -43,25 +47,36 @@ export default function AuthModal({ defaultTab = 'signin', onClose }: Props) {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (password !== confirm) { setError("Passwords don't match"); return; }
-    if (password.length < 8)  { setError('Password must be at least 8 characters'); return; }
-    setError(''); setLoading(true);
+    if (password !== confirm) {
+      setError("Passwords don't match");
+      return;
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+    setError('');
+    setLoading(true);
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
     setLoading(false);
-    if (error) setError(
-      error.message.toLowerCase().includes('rate limit')
-        ? 'Too many emails sent recently — please wait a few minutes and try again.'
-        : error.message
-    );
+    if (error)
+      setError(
+        error.message.toLowerCase().includes('rate limit')
+          ? 'Too many emails sent recently — please wait a few minutes and try again.'
+          : error.message
+      );
     else setMessage('Check your inbox to verify your email.');
   };
 
   const handleForgotPassword = async () => {
-    if (!email) { setError('Enter your email address first'); return; }
+    if (!email) {
+      setError('Enter your email address first');
+      return;
+    }
     setLoading(true);
     setError('');
     try {
@@ -96,7 +111,9 @@ export default function AuthModal({ defaultTab = 'signin', onClose }: Props) {
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       >
         {onClose && (
-          <button className="auth-close-btn" onClick={onClose} aria-label="Close">✕</button>
+          <button className="auth-close-btn" onClick={onClose} aria-label="Close">
+            ✕
+          </button>
         )}
         <div className="auth-logo">B&gt;</div>
         <div className="auth-title">Welcome to Based</div>
@@ -112,23 +129,38 @@ export default function AuthModal({ defaultTab = 'signin', onClose }: Props) {
           </button>
         </div>
 
-        <div className="auth-divider"><span>or</span></div>
+        <div className="auth-divider">
+          <span>or</span>
+        </div>
 
         <div className="auth-tabs">
           <button
             className={`auth-tab${tab === 'signin' ? ' active' : ''}`}
-            onClick={() => { setTab('signin'); clearForm(); }}
-          >Sign In</button>
+            onClick={() => {
+              setTab('signin');
+              clearForm();
+            }}
+          >
+            Sign In
+          </button>
           <button
             className={`auth-tab${tab === 'signup' ? ' active' : ''}`}
-            onClick={() => { setTab('signup'); clearForm(); }}
-          >Sign Up</button>
+            onClick={() => {
+              setTab('signup');
+              clearForm();
+            }}
+          >
+            Sign Up
+          </button>
         </div>
 
         {message ? (
           <div className="auth-message">{message}</div>
         ) : (
-          <form onSubmit={tab === 'signin' ? handleSignIn : handleSignUp} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <form
+            onSubmit={tab === 'signin' ? handleSignIn : handleSignUp}
+            style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
+          >
             <input
               className="auth-input"
               type="email"

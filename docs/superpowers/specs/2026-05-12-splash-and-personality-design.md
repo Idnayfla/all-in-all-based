@@ -28,16 +28,17 @@ No session-storage skip — shows every page load as requested.
 
 ### Animation Sequence (total ~3.2s)
 
-| Time | Event |
-|------|-------|
-| 0s | 120 particles scattered across black screen, begin drifting inward |
-| 0–1.2s | Particles converge to centre with eased trajectories |
-| 1.2s | `B>` snaps to full opacity + pulse ring expands outward |
-| 1.4–2.0s | "All in All Based" tagline fades up |
-| 2.0–2.8s | Hold: film-grain overlay at 4% opacity, particles fully dissolved |
-| 2.8–3.2s | Full-screen wipe blade (left→right) reveals the app beneath |
+| Time     | Event                                                              |
+| -------- | ------------------------------------------------------------------ |
+| 0s       | 120 particles scattered across black screen, begin drifting inward |
+| 0–1.2s   | Particles converge to centre with eased trajectories               |
+| 1.2s     | `B>` snaps to full opacity + pulse ring expands outward            |
+| 1.4–2.0s | "All in All Based" tagline fades up                                |
+| 2.0–2.8s | Hold: film-grain overlay at 4% opacity, particles fully dissolved  |
+| 2.8–3.2s | Full-screen wipe blade (left→right) reveals the app beneath        |
 
 **Particle system (canvas):**
+
 - 120 particles, each with a random start position, random target within a 100×50px region centred on canvas
 - Easing: `easeInOutQuad` on `progress` per particle
 - Per-particle random delay (0–0.4s) and speed (0.02–0.05 per frame) for organic feel
@@ -45,32 +46,36 @@ No session-storage skip — shows every page load as requested.
 - Canvas sized to full viewport, redrawn each frame via `requestAnimationFrame`
 
 **Logo reveal:**
+
 - `B>` at 72px monospace, opacity transition from 0→1 at t=1.2s (`scale(0.8)→scale(1)`, 0.6s ease)
 - Pulse ring: 1px solid purple border, scale 0.5→2.5, opacity 0.8→0 over 1.2s
 - Tagline: 11px monospace, letter-spacing 6px, `#5a5a8a`, fade up 8px over 0.6s
 
 **Wipe transition:**
+
 - A full-screen `#050508` div, `transform: scaleX(1)` → `scaleX(0)`, `transform-origin` flips left→right
 - Duration: 0.5s, `cubic-bezier(0.7, 0, 0.3, 1)`
 - Accompanied by a 2px vertical blade (`background: linear-gradient(180deg, transparent, #7c6af7, transparent)`) that races across
 
 **Grain overlay:**
+
 - Inline SVG `feTurbulence` noise at 4% opacity, `position: absolute; inset: 0; pointer-events: none`
 
 ### Audio (Web Audio API — no audio files)
 
 All sounds synthesised at runtime. No external files, no bundle impact.
 
-| Time | Sound | Implementation |
-|------|-------|----------------|
-| 0s | Sub-bass drone | OscillatorNode 40Hz, sine, gain 0→0.3 over 0.5s, sustains to 1.2s |
-| 0.8s | Rising sweep | OscillatorNode 80Hz→200Hz frequency ramp over 0.4s, gain 0.2 |
-| 1.2s | Impact thud | Two detuned oscillators: 80Hz + 84Hz, gain 0.5→0 over 0.3s |
-| 1.2s | Crystalline chord | Three OscillatorNodes: 466Hz (Bb4) + 587Hz (D5) + 740Hz (F#5), triangle wave, gain 0.15→0 over 0.8s |
-| 1.4s | Shimmer | BufferSourceNode (white noise), BiquadFilterNode highpass 3000Hz, gain burst 0→0.1→0 over 50ms |
-| 2.8s | All gains fade to 0 | Ramp all active nodes to 0 before wipe completes |
+| Time | Sound               | Implementation                                                                                      |
+| ---- | ------------------- | --------------------------------------------------------------------------------------------------- |
+| 0s   | Sub-bass drone      | OscillatorNode 40Hz, sine, gain 0→0.3 over 0.5s, sustains to 1.2s                                   |
+| 0.8s | Rising sweep        | OscillatorNode 80Hz→200Hz frequency ramp over 0.4s, gain 0.2                                        |
+| 1.2s | Impact thud         | Two detuned oscillators: 80Hz + 84Hz, gain 0.5→0 over 0.3s                                          |
+| 1.2s | Crystalline chord   | Three OscillatorNodes: 466Hz (Bb4) + 587Hz (D5) + 740Hz (F#5), triangle wave, gain 0.15→0 over 0.8s |
+| 1.4s | Shimmer             | BufferSourceNode (white noise), BiquadFilterNode highpass 3000Hz, gain burst 0→0.1→0 over 50ms      |
+| 2.8s | All gains fade to 0 | Ramp all active nodes to 0 before wipe completes                                                    |
 
 **Autoplay handling:**
+
 - Create `AudioContext` on component mount
 - Call `context.resume()` — succeeds if user has previously interacted with the page, suspended otherwise
 - If `context.state === 'suspended'` after mount: render a small `▸` icon (bottom-right, `position: absolute`, `z-index: 10000`) with a subtle pulse animation
@@ -126,6 +131,7 @@ Extra notes
 ### Slider Component
 
 Each slider is a controlled `<div>`-based track (not `<input type="range">`) for full styling control:
+
 - Track: 3px height, `#2a2a4a` background, `border-radius: 2px`
 - Fill: gradient `#7c6af7 → #9c8af7` from left to thumb position
 - Thumb: 14px circle, white fill, `2px solid #7c6af7` border, `box-shadow: 0 0 8px rgba(124,106,247,0.5)`
@@ -161,6 +167,7 @@ The base identity prompt in `app/api/generate/route.ts` stays untouched.
 ### Locked Identity Card
 
 Replaces the current editable textarea header. Styled card:
+
 - Background: `rgba(124,106,247, 0.06)`, border: `1px solid rgba(124,106,247, 0.2)`, `border-radius: 12px`
 - Left content: `◆ Core identity` label in purple, `[FIXED]` tag in muted text
 - No click interaction

@@ -31,23 +31,58 @@ export default async function SharePage({ params }: { params: Promise<{ id: stri
 
   if (error || !data) notFound();
 
-  const htmlFile = data.files.find((f: any) => f.name === 'index.html') ?? data.files[0];
+  const htmlFile =
+    data.files.find((f: { name: string; content: string }) => f.name === 'index.html') ??
+    data.files[0];
   if (!htmlFile) notFound();
 
   const srcDoc = htmlFile.content;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#0d0d0d', fontFamily: 'system-ui, sans-serif' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', borderBottom: '1px solid #222', flexShrink: 0 }}>
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100vh',
+        background: '#0d0d0d',
+        fontFamily: 'system-ui, sans-serif',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px 16px',
+          borderBottom: '1px solid #222',
+          flexShrink: 0,
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ color: '#8b5cf6', fontWeight: 700, fontFamily: 'monospace', fontSize: 16 }}>B&gt;</span>
-          <span style={{ color: '#e5e5e5', fontSize: 14, fontWeight: 500 }}>{data.project_name}</span>
+          <span
+            style={{ color: '#8b5cf6', fontWeight: 700, fontFamily: 'monospace', fontSize: 16 }}
+          >
+            B&gt;
+          </span>
+          <span style={{ color: '#e5e5e5', fontSize: 14, fontWeight: 500 }}>
+            {data.project_name}
+          </span>
         </div>
         <a
           href="https://getbased.dev"
           target="_blank"
           rel="noopener noreferrer"
-          style={{ background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: 6, padding: '6px 14px', fontSize: 13, fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}
+          style={{
+            background: '#8b5cf6',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 6,
+            padding: '6px 14px',
+            fontSize: 13,
+            fontWeight: 600,
+            textDecoration: 'none',
+            cursor: 'pointer',
+          }}
         >
           Build your own →
         </a>

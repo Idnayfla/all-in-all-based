@@ -12,19 +12,20 @@
 
 ## File Map
 
-| File | Action | Responsibility |
-|------|--------|---------------|
-| `app/api/companion/route.ts` | Create | Lightweight SSE streaming endpoint — sonnet + vision, no planner |
-| `hooks/useScreenCapture.ts` | Create | `capturePreview(files)` returns source snapshot; `captureScreen()` returns base64 PNG via getDisplayMedia |
-| `components/CompanionDrawer.tsx` | Create | Full drawer UI — messages, capture cards, streaming chat, input |
-| `app/globals.css` | Modify | Companion CSS: drawer surfaces, message bubbles, trigger animations, scan-line, cursor |
-| `app/page.tsx` | Modify | Add `showCompanion` + `isCompanionGenerating` state; render fixed trigger button + `CompanionDrawer` |
+| File                             | Action | Responsibility                                                                                            |
+| -------------------------------- | ------ | --------------------------------------------------------------------------------------------------------- |
+| `app/api/companion/route.ts`     | Create | Lightweight SSE streaming endpoint — sonnet + vision, no planner                                          |
+| `hooks/useScreenCapture.ts`      | Create | `capturePreview(files)` returns source snapshot; `captureScreen()` returns base64 PNG via getDisplayMedia |
+| `components/CompanionDrawer.tsx` | Create | Full drawer UI — messages, capture cards, streaming chat, input                                           |
+| `app/globals.css`                | Modify | Companion CSS: drawer surfaces, message bubbles, trigger animations, scan-line, cursor                    |
+| `app/page.tsx`                   | Modify | Add `showCompanion` + `isCompanionGenerating` state; render fixed trigger button + `CompanionDrawer`      |
 
 ---
 
 ## Task 1: API endpoint — `/api/companion/route.ts`
 
 **Files:**
+
 - Create: `app/api/companion/route.ts`
 
 - [ ] **Step 1: Create the file**
@@ -60,14 +61,20 @@ export async function POST(req: NextRequest) {
       return {
         role: 'user' as const,
         content: [
-          { type: 'image' as const, source: { type: 'base64' as const, media_type: 'image/png' as const, data: base64 } },
+          {
+            type: 'image' as const,
+            source: { type: 'base64' as const, media_type: 'image/png' as const, data: base64 },
+          },
           { type: 'text' as const, text: m.content },
         ],
       };
     }
 
     if (previewSource) {
-      return { role: 'user' as const, content: `Here is the current preview source:\n\n${previewSource}\n\n${m.content}` };
+      return {
+        role: 'user' as const,
+        content: `Here is the current preview source:\n\n${previewSource}\n\n${m.content}`,
+      };
     }
 
     return m;
@@ -86,7 +93,9 @@ export async function POST(req: NextRequest) {
       try {
         for await (const chunk of stream) {
           if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk.delta.text })}\n\n`));
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ text: chunk.delta.text })}\n\n`)
+            );
           }
         }
       } finally {
@@ -100,7 +109,7 @@ export async function POST(req: NextRequest) {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
+      Connection: 'keep-alive',
     },
   });
 }
@@ -117,6 +126,7 @@ Expected: no errors related to `app/api/companion/route.ts`
 Run: `npm run dev`
 
 In a second terminal:
+
 ```bash
 curl -X POST http://localhost:3000/api/companion \
   -H "Content-Type: application/json" \
@@ -138,6 +148,7 @@ git commit -m "feat: add /api/companion streaming endpoint"
 ## Task 2: Screen capture hook — `hooks/useScreenCapture.ts`
 
 **Files:**
+
 - Create: `hooks/useScreenCapture.ts`
 
 - [ ] **Step 1: Create the file**
@@ -173,7 +184,9 @@ export async function captureScreen(): Promise<string | null> {
     const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
     const video = document.createElement('video');
     video.srcObject = stream;
-    await new Promise<void>(resolve => { video.onloadedmetadata = () => resolve(); });
+    await new Promise<void>(resolve => {
+      video.onloadedmetadata = () => resolve();
+    });
     await video.play();
 
     const canvas = document.createElement('canvas');
@@ -210,6 +223,7 @@ git commit -m "feat: add useScreenCapture hook (preview source + getDisplayMedia
 ## Task 3: CSS — add companion styles to `app/globals.css`
 
 **Files:**
+
 - Modify: `app/globals.css`
 
 - [ ] **Step 1: Append companion styles to the end of `app/globals.css`**
@@ -272,7 +286,9 @@ git commit -m "feat: add useScreenCapture hook (preview source + getDisplayMedia
   font-weight: 800;
   color: white;
   box-shadow: 0 4px 20px rgba(124, 58, 237, 0.45);
-  transition: box-shadow 0.2s ease, transform 0.15s ease;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
 }
 
 .companion-trigger:hover .companion-trigger-core {
@@ -285,13 +301,27 @@ git commit -m "feat: add useScreenCapture hook (preview source + getDisplayMedia
 }
 
 @keyframes companion-breathe {
-  0%, 100% { transform: scale(1); opacity: 0.6; }
-  50%       { transform: scale(1.1); opacity: 1; }
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
 }
 
 @keyframes companion-pulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50%       { transform: scale(1.15); opacity: 0.7; }
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.7;
+  }
 }
 
 /* Drawer */
@@ -440,8 +470,13 @@ git commit -m "feat: add useScreenCapture hook (preview source + getDisplayMedia
 }
 
 @keyframes companion-blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
 }
 
 /* Capture cards */
@@ -481,10 +516,20 @@ git commit -m "feat: add useScreenCapture hook (preview source + getDisplayMedia
 }
 
 @keyframes companion-scan {
-  0%   { top: 0; opacity: 0; }
-  8%   { opacity: 1; }
-  92%  { opacity: 1; }
-  100% { top: 100%; opacity: 0; }
+  0% {
+    top: 0;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
 }
 
 .companion-thumb-iframe {
@@ -536,7 +581,9 @@ git commit -m "feat: add useScreenCapture hook (preview source + getDisplayMedia
   font-size: 10px;
   color: #555;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -598,7 +645,9 @@ git commit -m "feat: add useScreenCapture hook (preview source + getDisplayMedia
   justify-content: center;
   flex-shrink: 0;
   box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
-  transition: opacity 0.15s, transform 0.15s;
+  transition:
+    opacity 0.15s,
+    transform 0.15s;
 }
 
 .companion-send:disabled {
@@ -630,6 +679,7 @@ git commit -m "feat: add companion CSS — drawer, trigger, scan-line, cursor"
 ## Task 4: Companion Drawer component — `components/CompanionDrawer.tsx`
 
 **Files:**
+
 - Create: `components/CompanionDrawer.tsx`
 
 - [ ] **Step 1: Create the component**
@@ -906,11 +956,13 @@ git commit -m "feat: add CompanionDrawer component"
 ## Task 5: Wire up in `app/page.tsx`
 
 **Files:**
+
 - Modify: `app/page.tsx`
 
 - [ ] **Step 1: Add imports at the top of `app/page.tsx`**
 
 Find the existing import block and add:
+
 ```typescript
 import CompanionDrawer from '@/components/CompanionDrawer';
 ```
@@ -918,11 +970,13 @@ import CompanionDrawer from '@/components/CompanionDrawer';
 - [ ] **Step 2: Add companion state to the `Home` component**
 
 Find the line:
+
 ```typescript
 const [createError, setCreateError] = useState<string | null>(null);
 ```
 
 Add after it:
+
 ```typescript
 const [showCompanion, setShowCompanion] = useState(false);
 const [isCompanionGenerating, setIsCompanionGenerating] = useState(false);
@@ -931,6 +985,7 @@ const [isCompanionGenerating, setIsCompanionGenerating] = useState(false);
 - [ ] **Step 3: Add the fixed floating trigger button**
 
 Find the closing `</div>` of the `app-root` div (the very last `</div>` before the final `return` closing). It's just before:
+
 ```tsx
     </div>
   );
@@ -940,34 +995,40 @@ Find the closing `</div>` of the `app-root` div (the very last `</div>` before t
 Add the trigger and drawer just before the closing `</div>` of `app-root`:
 
 ```tsx
-      {/* Companion trigger */}
-      {!showSplash && (
-        <button
-          className={`companion-trigger${isCompanionGenerating ? ' responding' : ''}`}
-          onClick={() => setShowCompanion(s => !s)}
-          aria-label="Toggle Based companion"
-        >
-          <div className="companion-trigger-rings">
-            <div className="companion-trigger-ring" />
-            <div className="companion-trigger-ring companion-trigger-ring-outer" />
-          </div>
-          <div className="companion-trigger-core">B</div>
-        </button>
-      )}
+{
+  /* Companion trigger */
+}
+{
+  !showSplash && (
+    <button
+      className={`companion-trigger${isCompanionGenerating ? ' responding' : ''}`}
+      onClick={() => setShowCompanion(s => !s)}
+      aria-label="Toggle Based companion"
+    >
+      <div className="companion-trigger-rings">
+        <div className="companion-trigger-ring" />
+        <div className="companion-trigger-ring companion-trigger-ring-outer" />
+      </div>
+      <div className="companion-trigger-core">B</div>
+    </button>
+  );
+}
 
-      {/* Companion drawer */}
-      <AnimatePresence>
-        {showCompanion && (
-          <CompanionDrawer
-            personality={personality}
-            globalMemory={globalMemory}
-            activePanel={activePanel}
-            files={files}
-            onClose={() => setShowCompanion(false)}
-            onGeneratingChange={setIsCompanionGenerating}
-          />
-        )}
-      </AnimatePresence>
+{
+  /* Companion drawer */
+}
+<AnimatePresence>
+  {showCompanion && (
+    <CompanionDrawer
+      personality={personality}
+      globalMemory={globalMemory}
+      activePanel={activePanel}
+      files={files}
+      onClose={() => setShowCompanion(false)}
+      onGeneratingChange={setIsCompanionGenerating}
+    />
+  )}
+</AnimatePresence>;
 ```
 
 - [ ] **Step 4: Verify TypeScript compiles**

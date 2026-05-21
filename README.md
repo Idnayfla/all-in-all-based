@@ -27,6 +27,7 @@ Describe what you want. AIAB plans it, builds it, runs it, and lets you publish 
 ## ✨ Features
 
 ### 🧠 Multi-Model Architecture
+
 - **Haiku** — file planning, memory extraction, post-generation summaries
 - **Sonnet** — general conversation
 - **Opus** — full multi-file code generation
@@ -34,6 +35,7 @@ Describe what you want. AIAB plans it, builds it, runs it, and lets you publish 
 - **Seedance 2.0** — text-to-video and image-to-video via ByteDance (with audio toggle)
 
 ### 💻 Code Generation
+
 - 3-step pipeline: Haiku plans → Opus generates → Haiku summarises
 - Multi-file output with live progress bar (per-file status + %)
 - Supports HTML/CSS/JS, Python, Node.js
@@ -41,6 +43,7 @@ Describe what you want. AIAB plans it, builds it, runs it, and lets you publish 
 - Post-generation HTML sanitization and safety injection
 
 ### 🎨 Image Generation & Editing
+
 - Text-to-image and image-to-image (FLUX, Nano Banana 2)
 - **Image Editor Modal:**
   - Transform mode — image-to-image with FLUX
@@ -49,32 +52,38 @@ Describe what you want. AIAB plans it, builds it, runs it, and lets you publish 
   - Download from modal
 
 ### 🎬 Video Generation
+
 - Text-to-video and image-to-video via Seedance 2.0
 - Audio toggle (off by default)
 - Autoplay, controls, loop, download
 
 ### 📁 Project & File Management
+
 - Create (custom name modal), load, rename, delete projects
 - Auto-save to localStorage on every change
 - Projects and files sorted by recency
 - Export full project as ZIP via JSZip
 
 ### 🧪 Execution & Preview
+
 - Live HTML iframe preview with inline CSS/JS injection
 - Python + Node.js execution via E2B sandbox (terminal output)
 - Publish to Netlify — SHA-1 hashing, multi-file deploy, returns live URL
 
 ### 🧩 Memory System
+
 - **Global memory** — auto-extracted by Haiku, stored in Redis, injected into every request
 - **Per-project memory** — localStorage, editable in Settings
 - Manual save via Settings panel
 
 ### 🕵️ Incognito Mode
+
 - No memory saved, no messages persisted
 - All messages wiped on toggle-off
 - Session banner displayed
 
 ### 🎨 UI & Animations
+
 - Framer Motion throughout — message slide-ins, chip staggers, modal zooms, spring interactions
 - Shimmer loading cards during image/video generation
 - Animated BASED logo with configurable shape and colour
@@ -83,32 +92,34 @@ Describe what you want. AIAB plans it, builds it, runs it, and lets you publish 
 - Mobile-optimised sidebar with spring slide-out animation
 
 ### 🛡 Error Handling
+
 - Friendly FAL error mapping (no_media_generated, balance exhausted, rate limits → plain English)
 
 ---
 
 ## 🛠 Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (App Router) |
-| Language | TypeScript 5 |
-| AI — Text | Anthropic Claude (Haiku, Sonnet, Opus) |
-| AI — Image | fal.ai (FLUX, Nano Banana 2, Flux Pro Fill) |
-| AI — Video | ByteDance Seedance 2.0 via fal.ai |
-| Code Editor | Monaco Editor |
-| Code Execution | E2B Sandbox |
-| Memory Storage | Redis |
-| File Export | JSZip |
-| Deployment | Vercel + Netlify (publish target) |
-| Animations | Framer Motion |
-| Styling | Tailwind CSS v4 |
+| Layer          | Technology                                  |
+| -------------- | ------------------------------------------- |
+| Framework      | Next.js 16 (App Router)                     |
+| Language       | TypeScript 5                                |
+| AI — Text      | Anthropic Claude (Haiku, Sonnet, Opus)      |
+| AI — Image     | fal.ai (FLUX, Nano Banana 2, Flux Pro Fill) |
+| AI — Video     | ByteDance Seedance 2.0 via fal.ai           |
+| Code Editor    | Monaco Editor                               |
+| Code Execution | E2B Sandbox                                 |
+| Memory Storage | Redis                                       |
+| File Export    | JSZip                                       |
+| Deployment     | Vercel + Netlify (publish target)           |
+| Animations     | Framer Motion                               |
+| Styling        | Tailwind CSS v4                             |
 
 ---
 
 ## 🚀 Getting Started
 
 ### Prerequisites
+
 - Node.js 18+
 - Anthropic API Key → [console.anthropic.com](https://console.anthropic.com)
 - E2B API Key → [e2b.dev](https://e2b.dev)
@@ -149,6 +160,7 @@ Open [http://localhost:3000](http://localhost:3000)
 ## 👤 Author
 
 **Mohamad Hus Alfyandi**
+
 - GitHub: [@Idnayfla](https://github.com/Idnayfla)
 - LinkedIn: [linkedin.com/in/hus-alfyandi](https://linkedin.com/in/hus-alfyandi)
 

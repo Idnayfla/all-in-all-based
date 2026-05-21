@@ -12,37 +12,49 @@
 
 ## File Map
 
-| File | Action | What it does |
-|---|---|---|
-| `app/page.tsx` | Modify | Add `generated-video` to `ContentBlock` union |
-| `app/api/image/route.ts` | Modify | Add `model` param + `sourceImageData` → image-to-image routing |
-| `app/api/video/route.ts` | Create | Seedance 2.0 text-to-video + image-to-video |
-| `components/ModeDropdown.tsx` | Create | Animated 4-option generation mode dropdown |
-| `components/GeneratedVideoCard.tsx` | Create | Option-B video player card with play button |
-| `components/ChatPanel.tsx` | Modify | State, send functions, routing, new components, Framer Motion |
-| `app/globals.css` | Modify | Styles for ModeDropdown and GeneratedVideoCard |
+| File                                | Action | What it does                                                   |
+| ----------------------------------- | ------ | -------------------------------------------------------------- |
+| `app/page.tsx`                      | Modify | Add `generated-video` to `ContentBlock` union                  |
+| `app/api/image/route.ts`            | Modify | Add `model` param + `sourceImageData` → image-to-image routing |
+| `app/api/video/route.ts`            | Create | Seedance 2.0 text-to-video + image-to-video                    |
+| `components/ModeDropdown.tsx`       | Create | Animated 4-option generation mode dropdown                     |
+| `components/GeneratedVideoCard.tsx` | Create | Option-B video player card with play button                    |
+| `components/ChatPanel.tsx`          | Modify | State, send functions, routing, new components, Framer Motion  |
+| `app/globals.css`                   | Modify | Styles for ModeDropdown and GeneratedVideoCard                 |
 
 ---
 
 ## Task 1: Add `generated-video` to the ContentBlock union
 
 **Files:**
+
 - Modify: `app/page.tsx:18-21`
 
 - [ ] **Step 1: Add the new variant**
 
 In `app/page.tsx`, change lines 18–21 from:
+
 ```ts
 export type ContentBlock =
   | { type: 'text'; text: string }
-  | { type: 'image'; mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'; data: string }
+  | {
+      type: 'image';
+      mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+      data: string;
+    }
   | { type: 'generated-image'; url: string; prompt: string };
 ```
+
 To:
+
 ```ts
 export type ContentBlock =
   | { type: 'text'; text: string }
-  | { type: 'image'; mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif'; data: string }
+  | {
+      type: 'image';
+      mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+      data: string;
+    }
   | { type: 'generated-image'; url: string; prompt: string }
   | { type: 'generated-video'; url: string; prompt: string };
 ```
@@ -52,6 +64,7 @@ export type ContentBlock =
 ```bash
 cd /workspaces/all-in-all-based && npx tsc --noEmit 2>&1 | head -30
 ```
+
 Expected: no new errors introduced.
 
 - [ ] **Step 3: Commit**
@@ -66,6 +79,7 @@ git commit -m "feat: add generated-video ContentBlock type"
 ## Task 2: Extend `/api/image/route.ts` — model selector + image-reference fix
 
 **Files:**
+
 - Modify: `app/api/image/route.ts`
 
 - [ ] **Step 1: Replace the file with the extended version**
@@ -152,6 +166,7 @@ export async function POST(req: NextRequest) {
 ```bash
 npx tsc --noEmit 2>&1 | head -30
 ```
+
 Expected: no errors.
 
 - [ ] **Step 3: Commit**
@@ -166,6 +181,7 @@ git commit -m "feat: extend /api/image with model param and image-reference supp
 ## Task 3: Create `/api/video/route.ts`
 
 **Files:**
+
 - Create: `app/api/video/route.ts`
 
 - [ ] **Step 1: Create the file**
@@ -219,6 +235,7 @@ export async function POST(req: NextRequest) {
 ```bash
 npx tsc --noEmit 2>&1 | head -30
 ```
+
 Expected: no errors.
 
 - [ ] **Step 3: Commit**
@@ -233,6 +250,7 @@ git commit -m "feat: add /api/video route for Seedance 2.0"
 ## Task 4: Create `components/ModeDropdown.tsx`
 
 **Files:**
+
 - Create: `components/ModeDropdown.tsx`
 
 - [ ] **Step 1: Create the component**
@@ -245,10 +263,10 @@ import { AnimatePresence, motion } from 'motion/react';
 export type GenerationMode = 'chat' | 'flux' | 'nano-banana' | 'seedance';
 
 const MODES: { value: GenerationMode; icon: string; label: string }[] = [
-  { value: 'chat',        icon: '💬', label: 'Chat' },
-  { value: 'flux',        icon: '🎨', label: 'Image · FLUX' },
+  { value: 'chat', icon: '💬', label: 'Chat' },
+  { value: 'flux', icon: '🎨', label: 'Image · FLUX' },
   { value: 'nano-banana', icon: '🍌', label: 'Image · Nano Banana 2' },
-  { value: 'seedance',    icon: '🎬', label: 'Video · Seedance 2.0' },
+  { value: 'seedance', icon: '🎬', label: 'Video · Seedance 2.0' },
 ];
 
 interface ModeDropdownProps {
@@ -285,7 +303,9 @@ export default function ModeDropdown({ mode, onChange, disabled }: ModeDropdownP
           className="mode-dropdown-arrow"
           animate={{ rotate: open ? 180 : 0 }}
           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-        >▼</motion.span>
+        >
+          ▼
+        </motion.span>
       </motion.button>
 
       <AnimatePresence>
@@ -301,7 +321,10 @@ export default function ModeDropdown({ mode, onChange, disabled }: ModeDropdownP
               <button
                 key={m.value}
                 className={`mode-dropdown-option${mode === m.value ? ' selected' : ''}`}
-                onClick={() => { onChange(m.value); setOpen(false); }}
+                onClick={() => {
+                  onChange(m.value);
+                  setOpen(false);
+                }}
               >
                 <span>{m.icon}</span>
                 <span className="mode-dropdown-label">{m.label}</span>
@@ -321,6 +344,7 @@ export default function ModeDropdown({ mode, onChange, disabled }: ModeDropdownP
 ```bash
 npx tsc --noEmit 2>&1 | head -30
 ```
+
 Expected: no errors.
 
 - [ ] **Step 3: Commit**
@@ -335,6 +359,7 @@ git commit -m "feat: add animated ModeDropdown component"
 ## Task 5: Create `components/GeneratedVideoCard.tsx`
 
 **Files:**
+
 - Create: `components/GeneratedVideoCard.tsx`
 
 - [ ] **Step 1: Create the component**
@@ -376,7 +401,15 @@ export default function GeneratedVideoCard({ url, prompt }: GeneratedVideoCardPr
       </div>
       <div className="generated-image-prompt">{prompt}</div>
       <div className="generated-image-actions">
-        <a className="generated-image-download" href={url} download target="_blank" rel="noreferrer">↓ Download</a>
+        <a
+          className="generated-image-download"
+          href={url}
+          download
+          target="_blank"
+          rel="noreferrer"
+        >
+          ↓ Download
+        </a>
       </div>
     </motion.div>
   );
@@ -388,6 +421,7 @@ export default function GeneratedVideoCard({ url, prompt }: GeneratedVideoCardPr
 ```bash
 npx tsc --noEmit 2>&1 | head -30
 ```
+
 Expected: no errors.
 
 - [ ] **Step 3: Commit**
@@ -402,6 +436,7 @@ git commit -m "feat: add GeneratedVideoCard component with animated play button"
 ## Task 6: Add CSS for ModeDropdown and GeneratedVideoCard
 
 **Files:**
+
 - Modify: `app/globals.css`
 
 - [ ] **Step 1: Replace `.image-mode-btn` block and add new styles**
@@ -410,45 +445,110 @@ Find the `.image-mode-btn` block in `app/globals.css` (around line 238) and repl
 
 ```css
 /* ── Mode Dropdown ── */
-.mode-dropdown { position: relative; flex-shrink: 0; }
+.mode-dropdown {
+  position: relative;
+  flex-shrink: 0;
+}
 
 .mode-dropdown-btn {
-  display: flex; align-items: center; gap: 4px;
-  padding: 10px 10px; background: var(--bg3); border: 1px solid var(--border);
-  color: var(--text2); font-size: 16px; cursor: pointer; border-radius: 8px;
-  transition: border-color 0.15s, color 0.15s, background 0.15s; line-height: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 8px;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
+  line-height: 1;
 }
-.mode-dropdown-btn:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); }
-.mode-dropdown-btn.active { background: rgba(124,106,247,0.1); border-color: var(--accent); color: var(--accent); }
-.mode-dropdown-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.mode-dropdown-btn:hover {
+  background: var(--bg);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.mode-dropdown-btn.active {
+  background: rgba(124, 106, 247, 0.1);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.mode-dropdown-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 
-.mode-dropdown-arrow { font-size: 8px; color: var(--text3); display: inline-block; }
+.mode-dropdown-arrow {
+  font-size: 8px;
+  color: var(--text3);
+  display: inline-block;
+}
 
 .mode-dropdown-panel {
-  position: absolute; bottom: calc(100% + 8px); left: 0;
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 10px; padding: 6px; min-width: 210px;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.5); z-index: 200;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  min-width: 210px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  z-index: 200;
 }
 
 .mode-dropdown-option {
-  display: flex; align-items: center; gap: 10px; width: 100%;
-  padding: 8px 10px; background: none; border: none; border-radius: 7px;
-  color: var(--text2); font-family: var(--font-mono); font-size: 12px;
-  cursor: pointer; text-align: left; transition: background 0.12s, color 0.12s;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: none;
+  border: none;
+  border-radius: 7px;
+  color: var(--text2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
-.mode-dropdown-option:hover { background: var(--bg3); color: var(--text); }
-.mode-dropdown-option.selected { background: rgba(124,106,247,0.12); color: var(--accent); }
+.mode-dropdown-option:hover {
+  background: var(--bg3);
+  color: var(--text);
+}
+.mode-dropdown-option.selected {
+  background: rgba(124, 106, 247, 0.12);
+  color: var(--accent);
+}
 
-.mode-dropdown-label { flex: 1; }
-.mode-dropdown-check { font-size: 11px; color: var(--accent); }
-.mode-dropdown-icon { font-size: 16px; }
+.mode-dropdown-label {
+  flex: 1;
+}
+.mode-dropdown-check {
+  font-size: 11px;
+  color: var(--accent);
+}
+.mode-dropdown-icon {
+  font-size: 16px;
+}
 ```
 
 Also add the `.send-btn-image` override right after (keep it, just make sure it's still present):
+
 ```css
-.send-btn-image { background: #9333ea !important; }
-.send-btn-image:hover:not(:disabled) { background: #7e22ce !important; }
+.send-btn-image {
+  background: #9333ea !important;
+}
+.send-btn-image:hover:not(:disabled) {
+  background: #7e22ce !important;
+}
 ```
 
 - [ ] **Step 2: Add video card styles after `.generated-image-download:hover`**
@@ -458,28 +558,46 @@ After the `.generated-image-download:hover` rule (around line 268), add:
 ```css
 /* ── Generated Video Card ── */
 .generated-video-wrap {
-  display: flex; flex-direction: column; gap: 8px; max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 480px;
 }
 
 .generated-video-thumb {
-  width: 100%; aspect-ratio: 16/9;
+  width: 100%;
+  aspect-ratio: 16/9;
   background: linear-gradient(135deg, #1a1a2e, #16213e);
-  border-radius: 10px; border: 1px solid var(--border);
-  display: flex; align-items: center; justify-content: center;
-  overflow: hidden; position: relative;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
 }
 
 .generated-video-player {
-  width: 100%; height: 100%; display: block; border-radius: 10px;
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 10px;
 }
 
 .generated-video-play-btn {
-  width: 56px; height: 56px;
-  background: rgba(124,106,247,0.85); border: none; border-radius: 50%;
-  color: #fff; font-size: 20px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
+  width: 56px;
+  height: 56px;
+  background: rgba(124, 106, 247, 0.85);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding-left: 4px;
-  box-shadow: 0 4px 20px rgba(124,106,247,0.4);
+  box-shadow: 0 4px 20px rgba(124, 106, 247, 0.4);
 }
 ```
 
@@ -488,6 +606,7 @@ After the `.generated-image-download:hover` rule (around line 268), add:
 ```bash
 npx tsc --noEmit 2>&1 | head -30
 ```
+
 Expected: no errors.
 
 - [ ] **Step 4: Commit**
@@ -502,6 +621,7 @@ git commit -m "feat: add CSS for ModeDropdown and GeneratedVideoCard"
 ## Task 7: Update `components/ChatPanel.tsx` — core changes
 
 **Files:**
+
 - Modify: `components/ChatPanel.tsx`
 
 - [ ] **Step 1: Replace the imports block**
@@ -523,10 +643,13 @@ import GeneratedVideoCard from './GeneratedVideoCard';
 - [ ] **Step 2: Replace `imageMode` state with `generationMode`**
 
 Find:
+
 ```ts
 const [imageMode, setImageMode] = useState(false);
 ```
+
 Replace with:
+
 ```ts
 const [generationMode, setGenerationMode] = useState<GenerationMode>('chat');
 ```
@@ -543,10 +666,16 @@ const sendImage = async () => {
   setIsGeneratingImage(true);
 
   const userMsg: Message = { role: 'user', content: prompt };
-  const loadingMsg: Message = { role: 'assistant', content: [{ type: 'text', text: '🎨 Generating image...' }] };
+  const loadingMsg: Message = {
+    role: 'assistant',
+    content: [{ type: 'text', text: '🎨 Generating image...' }],
+  };
   setMessages(prev => [...prev, userMsg, loadingMsg]);
 
-  const body: Record<string, string> = { prompt, model: generationMode === 'nano-banana' ? 'nano-banana' : 'flux' };
+  const body: Record<string, string> = {
+    prompt,
+    model: generationMode === 'nano-banana' ? 'nano-banana' : 'flux',
+  };
   if (pendingImage) {
     body.sourceImageData = pendingImage.data;
     body.sourceMediaType = pendingImage.mediaType;
@@ -586,7 +715,10 @@ const sendVideo = async () => {
   setIsGeneratingImage(true);
 
   const userMsg: Message = { role: 'user', content: prompt };
-  const loadingMsg: Message = { role: 'assistant', content: [{ type: 'text', text: '🎬 Generating video...' }] };
+  const loadingMsg: Message = {
+    role: 'assistant',
+    content: [{ type: 'text', text: '🎬 Generating video...' }],
+  };
   setMessages(prev => [...prev, userMsg, loadingMsg]);
 
   const body: Record<string, string> = { prompt };
@@ -622,6 +754,7 @@ const sendVideo = async () => {
 - [ ] **Step 5: Update send-routing helper**
 
 Replace the `handleKey` function:
+
 ```ts
 const handleKey = (e: React.KeyboardEvent) => {
   if (e.key === 'Enter' && !e.shiftKey) {
@@ -636,6 +769,7 @@ const handleKey = (e: React.KeyboardEvent) => {
 - [ ] **Step 6: Add `generated-video` to `renderContent`**
 
 Inside `renderContent`, after the `generated-image` block and before the `text` block, add:
+
 ```tsx
 if (block.type === 'generated-video') {
   return <GeneratedVideoCard key={i} url={block.url} prompt={block.prompt} />;
@@ -645,6 +779,7 @@ if (block.type === 'generated-video') {
 - [ ] **Step 7: Replace the toolbar JSX**
 
 In the JSX, replace the `<button className="image-mode-btn"...>` element with:
+
 ```tsx
 <ModeDropdown
   mode={generationMode}
@@ -654,6 +789,7 @@ In the JSX, replace the `<button className="image-mode-btn"...>` element with:
 ```
 
 Update the send button to use `generationMode`:
+
 ```tsx
 <button
   className={`send-btn${generationMode !== 'chat' ? ' send-btn-image' : ''}`}
@@ -669,16 +805,20 @@ Update the send button to use `generationMode`:
 ```
 
 Update the upload button disabled state (enable in all modes, not just when not in image-mode):
+
 ```tsx
 <button
   className="upload-btn"
   onClick={() => fileInputRef.current?.click()}
   disabled={isGenerating || generationMode === 'chat'}
   title="Attach image"
->📎</button>
+>
+  📎
+</button>
 ```
 
 Update the textarea placeholder:
+
 ```tsx
 placeholder={
   generationMode === 'seedance' ? 'Describe a video to generate...' :
@@ -688,8 +828,9 @@ placeholder={
 ```
 
 Update the textarea `onKeyDown`:
+
 ```tsx
-onKeyDown={handleKey}
+onKeyDown = { handleKey };
 ```
 
 - [ ] **Step 8: Type-check**
@@ -697,6 +838,7 @@ onKeyDown={handleKey}
 ```bash
 npx tsc --noEmit 2>&1 | head -40
 ```
+
 Expected: no errors.
 
 - [ ] **Step 9: Commit**
@@ -711,6 +853,7 @@ git commit -m "feat: wire ModeDropdown, sendVideo, image-reference fix into Chat
 ## Task 8: Add Framer Motion animations throughout ChatPanel
 
 **Files:**
+
 - Modify: `components/ChatPanel.tsx`
 
 - [ ] **Step 1: Animate the messages list**
@@ -729,10 +872,11 @@ Find the messages `map` in the JSX (the block that renders `<div key={i} classNa
     >
       <div className="message-role">{m.role === 'user' ? 'YOU' : 'BASED'}</div>
       <div className="message-content">
-        {m.role === 'assistant' && genProgress && i === messages.length - 1
-          ? <ProgressBar progress={genProgress} />
-          : renderContent(m.content)
-        }
+        {m.role === 'assistant' && genProgress && i === messages.length - 1 ? (
+          <ProgressBar progress={genProgress} />
+        ) : (
+          renderContent(m.content)
+        )}
       </div>
     </motion.div>
   ))}
@@ -746,18 +890,22 @@ Note: `initial={false}` prevents the animation from playing on page load for pre
 Find the `SUGGESTIONS.map` block inside `chat-empty`. Replace `<button>` with `<motion.button>`:
 
 ```tsx
-{SUGGESTIONS.map((s, index) => (
-  <motion.button
-    key={s}
-    className="suggestion-btn"
-    onClick={() => send(s)}
-    initial={{ opacity: 0, y: 8 }}
-    animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: index * 0.06, type: 'spring', stiffness: 400, damping: 30 }}
-    whileHover={{ scale: 1.03 }}
-    whileTap={{ scale: 0.97 }}
-  >{s}</motion.button>
-))}
+{
+  SUGGESTIONS.map((s, index) => (
+    <motion.button
+      key={s}
+      className="suggestion-btn"
+      onClick={() => send(s)}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.06, type: 'spring', stiffness: 400, damping: 30 }}
+      whileHover={{ scale: 1.03 }}
+      whileTap={{ scale: 0.97 }}
+    >
+      {s}
+    </motion.button>
+  ));
+}
 ```
 
 - [ ] **Step 3: Animate the send button**
@@ -794,7 +942,9 @@ Find the `{pendingImage && (...)}` block. Wrap it in `<AnimatePresence>` and the
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
     >
       <img className="chat-img-thumb" src={pendingImage.previewUrl} alt="pending upload" />
-      <button className="img-clear-btn" onClick={clearPendingImage} title="Remove image">✕</button>
+      <button className="img-clear-btn" onClick={clearPendingImage} title="Remove image">
+        ✕
+      </button>
     </motion.div>
   )}
 </AnimatePresence>
@@ -817,8 +967,18 @@ if (block.type === 'generated-image') {
       <img className="generated-image" src={block.url} alt={block.prompt} />
       <div className="generated-image-prompt">{block.prompt}</div>
       <div className="generated-image-actions">
-        <a className="generated-image-download" href={block.url} download target="_blank" rel="noreferrer">↓ Download</a>
-        <button className="generated-image-edit-btn" onClick={() => setEditingImageUrl(block.url)}>✏ Edit</button>
+        <a
+          className="generated-image-download"
+          href={block.url}
+          download
+          target="_blank"
+          rel="noreferrer"
+        >
+          ↓ Download
+        </a>
+        <button className="generated-image-edit-btn" onClick={() => setEditingImageUrl(block.url)}>
+          ✏ Edit
+        </button>
       </div>
     </motion.div>
   );
@@ -828,10 +988,13 @@ if (block.type === 'generated-image') {
 - [ ] **Step 6: Animate the progress bar fill**
 
 In the `ProgressBar` component, find:
+
 ```tsx
 <div className="gen-progress-bar-fill" style={{ width: `${pct}%` }} />
 ```
+
 Replace with:
+
 ```tsx
 <motion.div
   className="gen-progress-bar-fill"
@@ -845,6 +1008,7 @@ Replace with:
 ```bash
 npx tsc --noEmit 2>&1 | head -40
 ```
+
 Expected: no errors.
 
 - [ ] **Step 8: Commit**

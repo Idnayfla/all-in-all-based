@@ -9,7 +9,12 @@ interface ProjectNameModalProps {
   title?: string;
 }
 
-export default function ProjectNameModal({ onConfirm, onCancel, defaultValue = '', title = 'New Project' }: ProjectNameModalProps) {
+export default function ProjectNameModal({
+  onConfirm,
+  onCancel,
+  defaultValue = '',
+  title = 'New Project',
+}: ProjectNameModalProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -32,7 +37,9 @@ export default function ProjectNameModal({ onConfirm, onCancel, defaultValue = '
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.15 }}
-      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
+      onClick={e => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
     >
       <motion.div
         className="modal-box"
@@ -51,14 +58,18 @@ export default function ProjectNameModal({ onConfirm, onCancel, defaultValue = '
           maxLength={60}
         />
         <div className="modal-actions">
-          <button className="modal-btn modal-btn-cancel" onClick={onCancel}>Cancel</button>
+          <button className="modal-btn modal-btn-cancel" onClick={onCancel}>
+            Cancel
+          </button>
           <button
             className="modal-btn modal-btn-confirm"
             onClick={() => {
               const val = inputRef.current?.value.trim();
               if (val) onConfirm(val);
             }}
-          >Create</button>
+          >
+            Create
+          </button>
         </div>
       </motion.div>
     </motion.div>

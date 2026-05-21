@@ -5,11 +5,28 @@ import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 
 const langIcon: Record<string, string> = {
-  typescript: 'TS', javascript: 'JS', tsx: 'TSX', jsx: 'JSX',
-  html: 'HT', css: 'CS', json: 'JS', python: 'PY', default: '◻'
+  typescript: 'TS',
+  javascript: 'JS',
+  tsx: 'TSX',
+  jsx: 'JSX',
+  html: 'HT',
+  css: 'CS',
+  json: 'JS',
+  python: 'PY',
+  default: '◻',
 };
 
-export default function Sidebar({ files, activeFile, onSelectFile, projects, currentProject, onNewProject, onLoadProject, onDeleteProject, onRenameProject }: {
+export default function Sidebar({
+  files,
+  activeFile,
+  onSelectFile,
+  projects,
+  currentProject,
+  onNewProject,
+  onLoadProject,
+  onDeleteProject,
+  onRenameProject,
+}: {
   files: FileNode[];
   activeFile: FileNode | null;
   onSelectFile: (f: FileNode) => void;
@@ -22,6 +39,7 @@ export default function Sidebar({ files, activeFile, onSelectFile, projects, cur
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const startRename = (p: Project) => {
     setEditingId(p.id);
@@ -50,39 +68,62 @@ export default function Sidebar({ files, activeFile, onSelectFile, projects, cur
       <div className="sidebar-section">
         <div className="sidebar-header-row">
           <span className="sidebar-header">Projects</span>
-          <button className="sidebar-new-btn" onClick={onNewProject}>+</button>
+          <button className="sidebar-new-btn" onClick={onNewProject}>
+            +
+          </button>
         </div>
         <div className="sidebar-projects">
           {projects.length === 0 ? (
             <div className="no-files">No projects yet.</div>
           ) : (
-            [...projects].sort((a, b) => b.updatedAt - a.updatedAt).map(p => (
-              <div
-                key={p.id}
-                className={`project-item ${currentProject?.id === p.id ? 'active' : ''}`}
-                onClick={() => onLoadProject(p)}
-              >
-                {editingId === p.id ? (
-                  <input
-                    className="rename-input"
-                    value={editName}
-                    onChange={e => setEditName(e.target.value)}
-                    onBlur={() => confirmRename(p.id)}
-                    onKeyDown={e => e.key === 'Enter' && confirmRename(p.id)}
-                    autoFocus
-                    onClick={e => e.stopPropagation()}
-                  />
-                ) : (
-                  <>
-                    <span className="project-name">⬡ {p.name}</span>
-                    <div className="project-actions">
-                      <button onClick={e => { e.stopPropagation(); startRename(p); }} className="action-btn" title="Rename">✎</button>
-                      <button onClick={e => { e.stopPropagation(); onDeleteProject(p.id); }} className="action-btn danger" title="Delete">✕</button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ))
+            [...projects]
+              .sort((a, b) => b.updatedAt - a.updatedAt)
+              .map(p => (
+                <div
+                  key={p.id}
+                  className={`project-item ${currentProject?.id === p.id ? 'active' : ''}`}
+                  onClick={() => onLoadProject(p)}
+                >
+                  {editingId === p.id ? (
+                    <input
+                      className="rename-input"
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      onBlur={() => confirmRename(p.id)}
+                      onKeyDown={e => e.key === 'Enter' && confirmRename(p.id)}
+                      autoFocus
+                      onClick={e => e.stopPropagation()}
+                    />
+                  ) : (
+                    <>
+                      <span className="project-hex-icon">⬡</span>
+                      <span className="project-name">{p.name}</span>
+                      <div className="project-actions">
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            startRename(p);
+                          }}
+                          className="action-btn"
+                          title="Rename"
+                        >
+                          ✎
+                        </button>
+                        <button
+                          onClick={e => {
+                            e.stopPropagation();
+                            setPendingDeleteId(p.id);
+                          }}
+                          className="action-btn danger"
+                          title="Delete"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))
           )}
         </div>
       </div>
@@ -93,7 +134,9 @@ export default function Sidebar({ files, activeFile, onSelectFile, projects, cur
         <div className="sidebar-header-row">
           <span className="sidebar-header">Files</span>
           {files.length > 0 && (
-            <button className="sidebar-new-btn" onClick={exportZip} title="Export as ZIP">↓</button>
+            <button className="sidebar-new-btn" onClick={exportZip} title="Export as ZIP">
+              ↓
+            </button>
           )}
         </div>
         <div className="sidebar-files">
@@ -107,17 +150,54 @@ export default function Sidebar({ files, activeFile, onSelectFile, projects, cur
                 onClick={() => onSelectFile(f)}
               >
                 <span className="file-icon">{langIcon[f.language] ?? langIcon.default}</span>
-                <span style={{ flex: 1 }}>{f.name}</span>
+                <span className="file-name">{f.name}</span>
                 <button
-                  className="action-btn"
-                  onClick={e => { e.stopPropagation(); downloadFile(f); }}
+                  className="action-btn file-download-btn"
+                  onClick={e => {
+                    e.stopPropagation();
+                    downloadFile(f);
+                  }}
                   title="Download file"
-                >↓</button>
+                >
+                  ↓
+                </button>
               </div>
             ))
           )}
         </div>
       </div>
+      {pendingDeleteId &&
+        (() => {
+          const target = projects.find(p => p.id === pendingDeleteId);
+          return (
+            <div className="delete-confirm-overlay" onClick={() => setPendingDeleteId(null)}>
+              <div className="delete-confirm-dialog" onClick={e => e.stopPropagation()}>
+                <p className="delete-confirm-title">Delete project?</p>
+                <p className="delete-confirm-name">⬡ {target?.name ?? 'this project'}</p>
+                <p className="delete-confirm-body">
+                  All files will be lost. This cannot be undone.
+                </p>
+                <div className="delete-confirm-actions">
+                  <button
+                    className="delete-confirm-cancel"
+                    onClick={() => setPendingDeleteId(null)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="delete-confirm-confirm"
+                    onClick={() => {
+                      onDeleteProject(pendingDeleteId);
+                      setPendingDeleteId(null);
+                    }}
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
     </aside>
   );
 }

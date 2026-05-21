@@ -3,6 +3,8 @@ import { fal } from '@fal-ai/client';
 import { friendlyFalError } from '../_falError';
 import { checkMediaRateLimit } from '../_mediaRateLimit';
 
+export const maxDuration = 120;
+
 if (process.env.FAL_KEY) fal.config({ credentials: process.env.FAL_KEY });
 
 export async function POST(req: NextRequest) {
@@ -33,12 +35,12 @@ export async function POST(req: NextRequest) {
         const result = await fal.subscribe('fal-ai/nano-banana-2/edit', {
           input: { image_urls: [imageUrl], prompt },
         });
-        url = (result.data as any).images?.[0]?.url;
+        url = (result.data as { images?: { url: string }[] }).images?.[0]?.url;
       } else {
         const result = await fal.subscribe('fal-ai/nano-banana-2', {
           input: { prompt, num_images: 1 },
         });
-        url = (result.data as any).images?.[0]?.url;
+        url = (result.data as { images?: { url: string }[] }).images?.[0]?.url;
       }
     } else {
       if (imageUrl) {
@@ -53,7 +55,7 @@ export async function POST(req: NextRequest) {
             enable_safety_checker: true,
           },
         });
-        url = (result.data as any).images?.[0]?.url;
+        url = (result.data as { images?: { url: string }[] }).images?.[0]?.url;
       } else {
         const result = await fal.subscribe('fal-ai/flux/dev', {
           input: {
@@ -65,14 +67,25 @@ export async function POST(req: NextRequest) {
             enable_safety_checker: true,
           },
         });
-        url = (result.data as any).images?.[0]?.url;
+        url = (result.data as { images?: { url: string }[] }).images?.[0]?.url;
       }
     }
 
     if (!url) return NextResponse.json({ error: 'No image returned' }, { status: 500 });
     return NextResponse.json({ url, prompt });
-  } catch (err: any) {
-    console.error('[image] FAL error — status:', err.status, '| body:', JSON.stringify(err.body), '| message:', err.message);
-    return NextResponse.json({ error: friendlyFalError(err, 'Image generation failed — please try again.') }, { status: 500 });
+  } catch (err: unknown) {
+    const falErr = err as { status?: unknown; body?: unknown; message?: string };
+    console.error(
+      '[image] FAL error — status:',
+      falErr.status,
+      '| body:',
+      JSON.stringify(falErr.body),
+      '| message:',
+      falErr.message
+    );
+    return NextResponse.json(
+      { error: friendlyFalError(falErr, 'Image generation failed — please try again.') },
+      { status: 500 }
+    );
   }
 }

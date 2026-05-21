@@ -23,16 +23,16 @@ const ACCENT_SWATCHES = [
 ];
 
 const FONTS = [
-  { value: "'Space Mono', monospace",       label: 'Space Mono',       hint: 'Geometric · default' },
-  { value: "'JetBrains Mono', monospace",   label: 'JetBrains Mono',   hint: 'Developer clean' },
-  { value: "'Fira Code', monospace",        label: 'Fira Code',        hint: 'Warm · ligatures' },
-  { value: "'IBM Plex Mono', monospace",    label: 'IBM Plex Mono',    hint: 'Corporate precise' },
-  { value: "'Source Code Pro', monospace",  label: 'Source Code Pro',  hint: 'Minimal · sharp' },
-  { value: "'Inconsolata', monospace",      label: 'Inconsolata',      hint: 'Slim · elegant' },
-  { value: "'Courier Prime', monospace",    label: 'Courier Prime',    hint: 'Typewriter classic' },
-  { value: "'Share Tech Mono', monospace",  label: 'Share Tech Mono',  hint: 'Retro terminal' },
-  { value: "'Oxanium', monospace",          label: 'Oxanium',          hint: 'Futuristic · sci-fi' },
-  { value: "'Syne Mono', monospace",        label: 'Syne Mono',        hint: 'Artistic · editorial' },
+  { value: "'Space Mono', monospace", label: 'Space Mono', hint: 'Geometric · default' },
+  { value: "'JetBrains Mono', monospace", label: 'JetBrains Mono', hint: 'Developer clean' },
+  { value: "'Fira Code', monospace", label: 'Fira Code', hint: 'Warm · ligatures' },
+  { value: "'IBM Plex Mono', monospace", label: 'IBM Plex Mono', hint: 'Corporate precise' },
+  { value: "'Source Code Pro', monospace", label: 'Source Code Pro', hint: 'Minimal · sharp' },
+  { value: "'Inconsolata', monospace", label: 'Inconsolata', hint: 'Slim · elegant' },
+  { value: "'Courier Prime', monospace", label: 'Courier Prime', hint: 'Typewriter classic' },
+  { value: "'Share Tech Mono', monospace", label: 'Share Tech Mono', hint: 'Retro terminal' },
+  { value: "'Oxanium', monospace", label: 'Oxanium', hint: 'Futuristic · sci-fi' },
+  { value: "'Syne Mono', monospace", label: 'Syne Mono', hint: 'Artistic · editorial' },
 ];
 
 export function applyTheme(theme: AppTheme) {

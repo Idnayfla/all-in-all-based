@@ -3,6 +3,8 @@ import { fal } from '@fal-ai/client';
 import { friendlyFalError } from '../_falError';
 import { checkMediaRateLimit } from '../_mediaRateLimit';
 
+export const maxDuration = 180;
+
 if (process.env.FAL_KEY) fal.config({ credentials: process.env.FAL_KEY });
 
 export async function POST(req: NextRequest) {
@@ -28,18 +30,31 @@ export async function POST(req: NextRequest) {
       const result = await fal.subscribe('bytedance/seedance-2.0/image-to-video', {
         input: { image_url: imageUrl, prompt, generate_audio: !!generateAudio },
       });
-      url = (result.data as any).video?.url ?? (result.data as any).videos?.[0]?.url;
+      const videoData = result.data as { video?: { url: string }; videos?: { url: string }[] };
+      url = videoData.video?.url ?? videoData.videos?.[0]?.url;
     } else {
       const result = await fal.subscribe('bytedance/seedance-2.0/text-to-video', {
         input: { prompt, generate_audio: !!generateAudio },
       });
-      url = (result.data as any).video?.url ?? (result.data as any).videos?.[0]?.url;
+      const videoData = result.data as { video?: { url: string }; videos?: { url: string }[] };
+      url = videoData.video?.url ?? videoData.videos?.[0]?.url;
     }
 
     if (!url) return NextResponse.json({ error: 'No video returned' }, { status: 500 });
     return NextResponse.json({ url, prompt });
-  } catch (err: any) {
-    console.error('[video] FAL error — status:', err.status, '| body:', JSON.stringify(err.body), '| message:', err.message);
-    return NextResponse.json({ error: friendlyFalError(err, 'Video generation failed — please try again.') }, { status: 500 });
+  } catch (err: unknown) {
+    const falErr = err as { status?: unknown; body?: unknown; message?: string };
+    console.error(
+      '[video] FAL error — status:',
+      falErr.status,
+      '| body:',
+      JSON.stringify(falErr.body),
+      '| message:',
+      falErr.message
+    );
+    return NextResponse.json(
+      { error: friendlyFalError(falErr, 'Video generation failed — please try again.') },
+      { status: 500 }
+    );
   }
 }

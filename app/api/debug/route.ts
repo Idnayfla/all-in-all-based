@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../_auth';
 
 export async function GET() {
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
+
   const results: Record<string, unknown> = {};
 
   // Test projects table
@@ -24,9 +28,14 @@ export async function GET() {
 
   // Test a dry-run INSERT into projects (then immediately delete)
   const testId = '00000000-0000-0000-0000-000000000001';
-  const { error: insertError } = await supabaseAdmin
-    .from('projects')
-    .insert({ id: testId, user_id: '00000000-0000-0000-0000-000000000000', name: '__debug_test__', files: [], messages: [], memory: '' });
+  const { error: insertError } = await supabaseAdmin.from('projects').insert({
+    id: testId,
+    user_id: '00000000-0000-0000-0000-000000000000',
+    name: '__debug_test__',
+    files: [],
+    messages: [],
+    memory: '',
+  });
 
   if (!insertError) {
     await supabaseAdmin.from('projects').delete().eq('id', testId);
@@ -41,6 +50,9 @@ export async function GET() {
     anthropic_key: process.env.APP_ANTHROPIC_API_KEY ? 'set' : 'MISSING',
   };
 
-  const allOk = (results.projects_table as any).ok && (results.user_settings_table as any).ok && (results.insert_test as any).ok;
+  const allOk =
+    (results.projects_table as { ok: boolean }).ok &&
+    (results.user_settings_table as { ok: boolean }).ok &&
+    (results.insert_test as { ok: boolean }).ok;
   return NextResponse.json({ status: allOk ? 'healthy' : 'errors_found', ...results });
 }

@@ -10,14 +10,14 @@ export async function POST(req: NextRequest) {
 
     const { error } = await supabaseAdmin.from('feedback').insert({
       message: message.trim(),
-      email:   email?.trim() || null,
-      type:    type || 'general',
+      email: email?.trim() || null,
+      type: type || 'general',
       context: context?.trim() || null,
     });
 
     if (error) throw error;
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('[feedback]', e);
     return NextResponse.json({ error: 'Could not save feedback' }, { status: 500 });
   }

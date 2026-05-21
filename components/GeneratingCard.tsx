@@ -9,7 +9,12 @@ const DOTS = [0, 1, 2];
 
 export default function GeneratingCard({ type }: GeneratingCardProps) {
   const icon = type === 'image' ? '◈' : type === 'music' ? '♪' : '▸';
-  const label = type === 'image' ? 'Generating image' : type === 'music' ? 'Composing music' : 'Generating video';
+  const label =
+    type === 'image'
+      ? 'Generating image'
+      : type === 'music'
+        ? 'Composing music'
+        : 'Generating video';
 
   return (
     <motion.div
@@ -35,7 +40,9 @@ export default function GeneratingCard({ type }: GeneratingCardProps) {
               className="generating-dot"
               animate={{ opacity: [0, 1, 0] }}
               transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2, ease: 'easeInOut' }}
-            >.</motion.span>
+            >
+              .
+            </motion.span>
           ))}
         </div>
       </div>

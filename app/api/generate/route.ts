@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '../_auth';
 import { searchWeb } from '@/lib/tavily';
 import { getWeather } from '@/lib/weather';
+import { createLangfuseClient } from '@/lib/langfuse';
 
 export const maxDuration = 300;
 
@@ -12,23 +14,29 @@ const client = new Anthropic({
 
 const PANTHEON_KEY = process.env.PANTHEON_OWNER_KEY ?? 'pk_owner_based_internal';
 const PANTHEON_URL = process.env.PANTHEON_API_URL ?? 'https://pantheon-api.vercel.app';
+const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
-function friendlyError(e: any): string {
-  const raw: string = e?.message ?? String(e);
+function friendlyError(e: unknown): string {
+  const raw: string = (e instanceof Error ? e.message : null) ?? String(e);
   try {
     const parsed = JSON.parse(raw);
     const t = parsed?.error?.type ?? parsed?.type;
     const m = parsed?.error?.message ?? parsed?.message;
-    if (t === 'overloaded_error') return 'Based is a bit overloaded right now — wait a moment and try again.';
-    if (t === 'rate_limit_error')  return 'Rate limit hit — please wait a few seconds and try again.';
+    if (t === 'overloaded_error')
+      return 'Based is a bit overloaded right now — wait a moment and try again.';
+    if (t === 'rate_limit_error')
+      return 'Rate limit hit — please wait a few seconds and try again.';
     if (m) return m;
   } catch {}
-  if (raw.toLowerCase().includes('overload')) return 'Based is a bit overloaded right now — wait a moment and try again.';
-  if (raw.toLowerCase().includes('rate limit') || raw.toLowerCase().includes('429')) return 'Rate limit hit — please wait a few seconds and try again.';
+  if (raw.toLowerCase().includes('overload'))
+    return 'Based is a bit overloaded right now — wait a moment and try again.';
+  if (raw.toLowerCase().includes('rate limit') || raw.toLowerCase().includes('429'))
+    return 'Rate limit hit — please wait a few seconds and try again.';
   return raw || 'Something went wrong — please try again.';
 }
 
-function isRetryable(e: any): boolean {
+function isRetryable(e: unknown): boolean {
   const msg = friendlyError(e);
   return msg.includes('overloaded') || msg.includes('Rate limit');
 }
@@ -45,15 +53,20 @@ async function callPantheon(
       const res = await fetch(`${PANTHEON_URL}/api/v1/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${PANTHEON_KEY}` },
-        body: JSON.stringify({ messages, task_type: taskType, stream: false, max_tokens: maxTokens }),
+        body: JSON.stringify({
+          messages,
+          task_type: taskType,
+          stream: false,
+          max_tokens: maxTokens,
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: res.statusText }));
-        throw new Error((err as any).error ?? `Pantheon ${res.status}`);
+        throw new Error((err as { error?: string }).error ?? `Pantheon ${res.status}`);
       }
       const data = await res.json();
       return data.text ?? '';
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (attempt < RETRY_DELAYS.length && isRetryable(e)) {
         await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
         continue;
@@ -78,7 +91,7 @@ async function streamPantheonCollecting(
         onChunk(text);
       }
       return accumulated;
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (attempt < RETRY_DELAYS.length && isRetryable(e)) {
         onRetry();
         await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
@@ -101,7 +114,7 @@ async function* streamPantheon(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error((err as any).error ?? `Pantheon ${res.status}`);
+    throw new Error((err as { error?: string }).error ?? `Pantheon ${res.status}`);
   }
   const reader = res.body?.getReader();
   if (!reader) throw new Error('No response body');
@@ -120,20 +133,107 @@ async function* streamPantheon(
       try {
         const parsed = JSON.parse(payload);
         // detect forwarded Anthropic error events
-        if (parsed.type === 'error') throw new Error(parsed.error?.message ?? JSON.stringify(parsed));
+        if (parsed.type === 'error')
+          throw new Error(parsed.error?.message ?? JSON.stringify(parsed));
         if (parsed.type === 'text') {
           const txt: string = parsed.text;
           // detect error JSON forwarded as text content
           if (txt.trimStart().startsWith('{"type":"error"')) {
-            try { throw new Error(JSON.parse(txt)?.error?.message ?? txt); } catch (inner) { throw inner; }
+            try {
+              throw new Error(JSON.parse(txt)?.error?.message ?? txt);
+            } catch (inner) {
+              throw inner;
+            }
           }
           yield txt;
         }
       } catch (e) {
-        if ((e as any).message?.includes('yield') || (e as any).constructor?.name !== 'SyntaxError') throw e;
+        if (e instanceof SyntaxError) continue;
+        throw e;
       }
     }
   }
+}
+
+// Groq free tier: 6K TPM — cap tokens to stay within limits
+const GROQ_MAX_TOKENS = 8000;
+
+async function callGroq(
+  messages: Array<{ role: string; content: string }>,
+  maxTokens = GROQ_MAX_TOKENS
+): Promise<string> {
+  const capped = Math.min(maxTokens, GROQ_MAX_TOKENS);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({ model: GROQ_MODEL, messages, stream: false, max_tokens: capped }),
+    });
+    if (res.status === 429) {
+      // Cap retry wait at 15s — long retry-after means daily limit is hit, not worth waiting
+      const retryAfter = Math.min(parseInt(res.headers.get('retry-after') ?? '5', 10), 15);
+      await new Promise(r => setTimeout(r, retryAfter * 1000));
+      continue;
+    }
+    if (!res.ok) throw new Error(`Groq ${res.status}: ${await res.text()}`);
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content ?? '';
+  }
+  throw new Error('Free AI daily limit reached — switch to Based AI or try again tomorrow.');
+}
+
+async function streamGroqCollecting(
+  messages: Array<{ role: string; content: string }>,
+  maxTokens: number,
+  onChunk: (text: string) => void
+): Promise<string> {
+  const capped = Math.min(maxTokens, GROQ_MAX_TOKENS);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const res = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+      },
+      body: JSON.stringify({ model: GROQ_MODEL, messages, stream: true, max_tokens: capped }),
+    });
+    if (res.status === 429) {
+      const retryAfter = Math.min(parseInt(res.headers.get('retry-after') ?? '5', 10), 15);
+      await new Promise(r => setTimeout(r, retryAfter * 1000));
+      continue;
+    }
+    if (!res.ok) throw new Error(`Groq ${res.status}: ${await res.text()}`);
+    const reader = res.body?.getReader();
+    if (!reader) throw new Error('No body');
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let accumulated = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const payload = line.slice(6).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const parsed = JSON.parse(payload);
+          const text: string = parsed.choices?.[0]?.delta?.content ?? '';
+          if (text) {
+            accumulated += text;
+            onChunk(text);
+          }
+        } catch {}
+      }
+    }
+    return accumulated;
+  }
+  throw new Error('Groq rate limit — try again in a moment.');
 }
 
 const SYSTEM = `You are Based — a sharp, direct AI that can do anything: answer questions, do math, analyse data, write, explain, plan, AND build fully working web apps, games, dashboards, and tools.
@@ -153,7 +253,7 @@ RESPONSE RULES:
 - NEVER convert a data question into an app. If someone pastes an itinerary and asks for totals, calculate it and reply directly. Same for any maths, budgets, lists, or data analysis.
 
 STRICT OUTPUT FORMAT:
-<forge_type>html|python|node</forge_type>
+<forge_type>html|python|node|java|cpp|go|rust|bash</forge_type>
 <forge_file name="filename.ext" language="html|css|javascript|typescript|python|json">
 ...complete file content...
 </forge_file>
@@ -211,6 +311,13 @@ RULES:
 - startGame() must start the game loop (call requestAnimationFrame), not just set a flag
 - Script tags: <script defer src="game.js"></script> — always defer, never bare <script src="..."></script>
 
+NULL-SAFE DOM ACCESS — ALWAYS FOLLOW:
+- NEVER chain .value, .checked, .textContent, or any property directly on getElementById() or querySelector() — always assign to a variable first and null-check before use
+- Correct pattern: const el = document.getElementById('x'); if (!el) return; el.value = ...
+- Wrong pattern: document.getElementById('x').value = ... — crashes if element is missing
+- Every ID referenced in JS must exactly match an ID defined in the HTML — audit every getElementById/querySelector call against the HTML before finalising output
+- When reading form values: const el = document.getElementById('input-id'); if (!el) return; const val = el.value.trim();
+
 BUG FIXING RULES:
 - First, identify exactly which file(s) contain the broken code
 - Fix ONLY the affected file(s) — do not touch files that are working correctly
@@ -236,6 +343,27 @@ ARCHITECTURE PATTERNS:
 - Dashboards: fetch → transform → render, loading/error states always
 - Forms: validate on submit, show inline errors, disable during processing
 
+ANIMATION RULES — ALWAYS FOLLOW FOR ANY ANIMATED PROJECT:
+- Always wrap the entire animation init in: window.addEventListener('DOMContentLoaded', function() { ... })
+- Always get canvas context inside DOMContentLoaded, never at top level: const ctx = canvas.getContext('2d'); if (!ctx) return;
+- Every requestAnimationFrame loop must be cancellable: store the return value in a variable (let rafId); cancel with cancelAnimationFrame(rafId) before restarting
+- State machine pattern for multi-phase animations (e.g. dance → stare → reset): use a single 'state' variable ('dancing','staring','resetting'), update it inside the animation loop, never use setTimeout to switch state mid-loop
+- When MODIFYING an existing animation: keep the same state machine structure, only change the affected phase — do not restructure the entire loop
+- Wrap the animation loop body in try/catch so errors surface visibly instead of freezing silently
+
+PROMPT FAITHFULNESS — ALWAYS FOLLOW EXACTLY:
+- When the user describes a specific sequence of events, scenario, or experience: implement it EXACTLY as described, word for word
+- NEVER substitute the user's described concept with something vaguely similar
+- Every named element, phase, character, mechanic, and trigger the user described must exist in the output
+
+BAD (wrong): User describes "people running past, one triggers slow motion, distant figure approaches, jumpscare" → AI builds "dark hallway where you walk toward a wall and click until a monster appears"
+GOOD (right): AI builds exactly: runners spawning and crossing the screen → one triggers slow-motion → a figure appears far away → figure gradually approaches while clicks are disabled → flash + scream + jumpscare image
+
+BAD (wrong): User describes "a calm beach scene that slowly turns dark and stormy, then a face appears in the waves" → AI builds "a horror game with ocean sound effects"
+GOOD (right): AI builds the exact visual transformation sequence with the face reveal as described
+
+If the user described 4 phases, implement all 4. If they named specific characters, include those characters. Do not compress, simplify, or retheme.
+
 GRAPHICS — NEVER USE EMOJI AS VISUAL ELEMENTS:
 - Never use emoji characters (🎮🔴⭐🏠) as graphical elements, icons, or sprites in apps, games, or tools
 - For icons and UI elements: use inline SVG shapes — <svg viewBox="0 0 24 24"><path .../></svg>
@@ -244,6 +372,46 @@ GRAPHICS — NEVER USE EMOJI AS VISUAL ELEMENTS:
 - For game sprites: always use Phaser graphics.generateTexture() or draw directly on Canvas — never emoji
 - Emoji are only acceptable inside prose text or chat messages — never as a substitute for real graphics
 - When in doubt: a colored SVG circle beats an emoji every time
+
+IMAGES IN GENERATED HTML — ABSOLUTE URLS ONLY:
+- NEVER use local filenames in <img src>, CSS url(), or fetch() calls — "scary.jpg", "monster.png", "image.jpg" do not exist in the sandbox and will silently fail
+- Every image must use a full absolute HTTPS URL that actually resolves, OR be drawn with Canvas 2D / inline SVG
+- For horror/jumpscare images: https://picsum.photos/seed/horror/800/600 (or any seed word) — or draw directly on canvas
+- For placeholder images of any theme: https://picsum.photos/seed/[keyword]/[width]/[height]
+- Canvas-drawn faces are preferred for jumpscares: ctx.arc for eyes, ctx.bezierCurveTo for jagged mouth, blood-red fills
+- Flash effect: full-screen <div> that snaps to opacity 1 then transitions to 0
+- Shake effect: CSS @keyframes translateX(-10px) → (10px) alternating fast
+- Always include a "Click to start" gate before autoplay effects
+
+AUDIO — RULES (BREAKING THESE MAKES AUDIO SILENT OR CORRUPTED):
+RULE 1 — NEVER use local filenames: new Audio('sound.mp3'), fetch('jump.wav'), <audio src="file.mp3"> — these files do not exist in the sandbox. Silent failure every time.
+RULE 2 — NEVER create audio Blob files for download with .mp3 or .wav extension unless you encode them properly. Web Audio API cannot produce MP3. If you must export audio, encode as WAV manually (PCM header + raw Float32 samples) — not as a raw blob with an audio extension.
+RULE 3 — OscillatorNode is forbidden for jumpscare stings, horror sounds, explosions, nature sounds, voices, screams, or anything that should feel real. The ONLY acceptable use of OscillatorNode is a simple UI beep (single tone, < 0.3s). Everything else = Mixkit CDN.
+RULE 4 — NEVER use fetch() to load audio. fetch() requires CORS headers that CDNs do not provide in sandboxed iframes — it silently fails every time. Use <audio> elements only.
+
+AUDIO — THE ONE METHOD THAT WORKS IN THE SANDBOX:
+Use <audio> elements pointing to /api/sfx?slug=SLUG — a same-origin proxy that fetches audio server-side. This eliminates all CORS and CDN issues entirely.
+
+  <!-- In HTML — declare ALL sounds you need upfront with /api/sfx?slug= URLs -->
+  <audio id="snd-scream" src="/api/sfx?slug=mixkit-horror-lose-2011" preload="auto"></audio>
+  <audio id="snd-sting"  src="/api/sfx?slug=mixkit-cinematic-horror-sting-581" preload="auto"></audio>
+  <audio id="snd-impact" src="/api/sfx?slug=mixkit-scary-cinematic-hit-2210" preload="auto"></audio>
+
+  // In JS — play on user gesture
+  function playScream() { const a = document.getElementById('snd-scream'); a.currentTime = 0; a.play(); }
+
+- ALWAYS use /api/sfx?slug=SLUG — NEVER use external CDN URLs directly (they fail with CORS or 404)
+- DO NOT use: fetch(), AudioContext.decodeAudioData(), or OscillatorNode for realistic sounds
+- The platform injects an AudioContext unlock automatically
+
+Available slugs by category:
+  Horror / jumpscare: mixkit-horror-lose-2011 · mixkit-scary-cinematic-hit-2210 · mixkit-cinematic-horror-sting-581
+  Explosions / impact: mixkit-explosion-impact-1682 · mixkit-cinematic-impact-stamp-1283
+  Game / arcade: mixkit-arcade-game-jump-coin-216 · mixkit-winning-chime-2015 · mixkit-player-losing-or-failing-2042
+  UI / notification: mixkit-correct-answer-tone-2870 · mixkit-software-interface-start-2574 · mixkit-message-pop-alert-2354
+  Nature / ambient: mixkit-light-rain-loop-2393 · mixkit-forest-birds-ambience-1210
+  Music stinger: mixkit-suspense-mystery-piano-565
+- For AnalyserNode visualisers: create AudioContext, create MediaElementSource FROM the <audio> element, connect to AnalyserNode
 
 IMAGE MANIPULATION:
 - When the user provides an image to edit/filter/transform: build a Canvas-based tool that applies the operation
@@ -346,7 +514,7 @@ PHASER RULES:
 - Timers: this.time.addEvent({ delay: 2000, callback: fn, callbackScope: this, loop: true })
 - Tweens: this.tweens.add({ targets: obj, alpha: 0, duration: 300, onComplete: () => {...} })
 - Pass data between scenes: this.scene.start('GameOverScene', { score: this.score })
-- Sound: use Web Audio API beeps via AudioContext — never load external audio files
+- Sound: use <audio src="/api/sfx?slug=SLUG"> elements — never fetch() or decodeAudioData() (same rules as AUDIO section above)
 - Mobile: always add this.input.addPointer(1) and on-screen buttons for mobile touch
 
 GAME ENGINE — 3D GAMES (THREE.JS + CANNON.JS PHYSICS):
@@ -546,6 +714,7 @@ BUG FIXES AND CORRECTIONS:
 - Do NOT include files that are already working correctly — leave them untouched
 - A button fix is never a reason to regenerate a working game engine or style file
 - Only include a file if you are genuinely changing something in it
+- "Add a button", "bring me back to start", "add a try again" → look at the file snippets above, find which file has the relevant logic, include ONLY that file (or those files if 2 are genuinely needed)
 
 ELEMENT-LEVEL CHANGES (most important rule for modifications):
 - "Change the icon", "swap the logo", "replace the image", "make the button X", "change the color of Y" → output ONLY the file containing that element, change ONLY that element
@@ -553,6 +722,7 @@ ELEMENT-LEVEL CHANGES (most important rule for modifications):
 - "Change the icon to a star" = find the icon in the existing files, replace just that shape/SVG/element, keep everything else identical
 - "Change it to X" with existing files = surgical swap of the mentioned thing, all surrounding code stays
 - If the user says "change to [thing]" without specifying what to change, ask which element they mean — do NOT regenerate the whole project
+- CRITICAL: adding a single button or small feature = 1 file max. Changing game logic = at most 2 files. NEVER return all 3+ files for a small change.
 
 FEEDBACK FOR IMPROVEMENT:
 - If the user gives subjective feedback ("looks bad", "make it prettier", "feels slow", "boring", "too basic", "needs polish", "ugly", "improve the design", "doesn't feel right", "make it better"):
@@ -574,17 +744,36 @@ PHASER 3 GAMES (any 2D game with physics, enemies, collectibles, or multiple sce
 3D GAMES (Three.js + Cannon.js, FPS, platformer, racing):
 - 1-2 files. index.html with inline JS is fine for most 3D games.
 
-MEDIUM (multi-page apps, dashboards, chat UI, large Phaser game with 4+ scenes):
-- 3-5 files. index.html + style.css + 1-3 JS modules split by responsibility.
+MEDIUM (multi-page apps, dashboards, chat UI, large Phaser game with 4+ scenes, jumpscare / horror experience, interactive story, animation-heavy app, any app that loads external audio):
+- 3-5 files. index.html + style.css + app.js (or named modules split by responsibility).
+- Rule: if the app loads external audio AND has CSS animations AND timed JS events → always MEDIUM minimum.
 
 COMPLEX (RPG, multiplayer game, large data app, distinct subsystems like rooms/entities/audio/UI):
 - Up to 8 files. Split by subsystem — one clear concern per file.
 - Only add rooms.js, entities.js, audio.js etc. if those systems actually exist in the project.
 
 For Python: main.py and supporting modules only as needed.
+For Java: Main.java (public class must be named Main) + supporting .java files as needed.
+For C++: main.cpp + supporting .h/.cpp files. Keep it compilable with g++ main.cpp -o program.
+For Go: main.go in a main package. go run main.go must work.
+For Rust: main.rs only (single-file programs that compile with rustc main.rs).
+For Bash: script.sh. Must be self-contained and runnable with bash script.sh.
+
+NON-BROWSER LANGUAGE RULE: For Java/C++/Go/Rust/Bash requests, output ONLY runnable source files. No HTML wrapper. The output will appear in a Debug/Console panel, not a web preview. Design programs that produce meaningful console output — interactive CLI apps, data processing, algorithms, simulations.
+
+DESCRIPTION FIELD RULE — MOST IMPORTANT:
+The "description" field must capture the specific mechanics and sequence the user described — NOT a generic summary.
+
+BAD (loses all detail): {"name":"index.html","description":"interactive horror experience"}
+GOOD (preserves the spec): {"name":"index.html","description":"people run across screen at normal speed; when one passes the player, trigger slow-motion; a distant figure appears and gradually walks closer while clicks are disabled; culminate in a jumpscare with flash + sound + 'Try again' reset"}
+
+BAD: {"name":"app.js","description":"game logic"}
+GOOD: {"name":"app.js","description":"state machine: NORMAL (runners spawn every 2s) → SLOWMO (one runner triggers it, time scale 0.1x, figure appears far right) → APPROACH (figure walks toward camera over 4s, clicks disabled) → SCARE (flash white, play scream audio, show jumpscare image, freeze 1s, reset)"}
+
+Always read the user's prompt carefully and include their described phases, characters, triggers, and sequence in the description. If the user described 4 phases, the description must mention all 4.
 
 Output format:
-[{"name":"filename.ext","language":"html|css|javascript|python","description":"..."}]`;
+[{"name":"filename.ext","language":"html|css|javascript|python|java|cpp|go|rust|bash","description":"..."}]`;
 
 const FILE_GENERATOR_SYSTEM = `You are Based, an elite coding assistant. Generate ONE file as part of a larger project.
 
@@ -641,24 +830,89 @@ SCREEN TRANSITION — USE THIS EXACT PATTERN, NO VARIATIONS:
   });
 
 - startGame() must call requestAnimationFrame to actually start the loop
-- Every ID in JS must exactly match the ID in the HTML — copy-paste, do not retype`;
+- Every ID in JS must exactly match the ID in the HTML — copy-paste, do not retype
+
+NON-BROWSER LANGUAGES (Java / C++ / Go / Rust / Bash):
+- Java: class name must match the filename (e.g., Main.java has public class Main). Use standard library only unless the plan specifies dependencies.
+- C++: single main.cpp compilable with g++ -std=c++17. Include all necessary headers. No external libraries unless in plan.
+- Go: package main with import blocks. go run main.go must work standalone.
+- Rust: single main.rs compilable with rustc. Use std only.
+- Bash: bash-compatible script, shebang #!/bin/bash, POSIX-safe.
+- All non-browser programs must produce meaningful stdout output — that output is the entire user experience.
+
+AUDIO RULES — THE ONLY METHOD THAT WORKS IN THE SANDBOX:
+- NEVER use external CDN URLs directly (https://assets.mixkit.co/...) — they fail with CORS or 404 in the sandbox
+- NEVER use fetch() to load audio — CORS blocks it silently
+- NEVER use OscillatorNode for horror, jumpscare, explosion, scream, or any realistic sound — only UI beep under 0.3s
+- NEVER reference local audio files — they don't exist in the sandbox
+- ONLY USE: <audio src="/api/sfx?slug=SLUG"> — same-origin proxy, always works
+
+  <!-- Declare all sounds in HTML with /api/sfx?slug= -->
+  <audio id="snd-scream" src="/api/sfx?slug=mixkit-horror-lose-2011" preload="auto"></audio>
+  <audio id="snd-sting"  src="/api/sfx?slug=mixkit-cinematic-horror-sting-581" preload="auto"></audio>
+
+  // Play in JS on user gesture
+  function playScream() { const a = document.getElementById('snd-scream'); a.currentTime = 0; a.play(); }
+
+- The platform auto-injects AudioContext unlock — do NOT write your own resume() logic
+- Horror slugs: mixkit-horror-lose-2011 · mixkit-scary-cinematic-hit-2210 · mixkit-cinematic-horror-sting-581
+- Game slugs: mixkit-arcade-game-jump-coin-216 · mixkit-winning-chime-2015 · mixkit-player-losing-or-failing-2042
+- UI slugs: mixkit-correct-answer-tone-2870 · mixkit-software-interface-start-2574
+
+PROMPT FAITHFULNESS — HIGHEST PRIORITY:
+- Implement EXACTLY what the user described — do not reinterpret, simplify, or substitute
+- If the user says "people running past, one triggers slow motion, distant figure approaches, then jumpscare" — build that exact sequence, not "a dark hallway where you click to get scared"
+- Every element, phase, and mechanic the user named must appear in the output
+- "I described X" complaints always mean the AI substituted Y — this is the worst failure mode
+
+NON-REGRESSION — WHEN MODIFYING EXISTING FILES:
+- EVERY existing event listener must still work after your edit
+- Before outputting: mentally verify the Start button, Try Again button, and all screens still function
+- Do NOT reorganize or restructure the DOMContentLoaded block when making a targeted change
+- Adding new features: write them alongside existing code, never replace the existing wiring
+- If the original has: btn.addEventListener('click', startGame) — it must still have that after your edit`;
 
 const PLANNER_SYSTEM_BLOCKS = [
   { type: 'text' as const, text: PLANNER_SYSTEM, cache_control: { type: 'ephemeral' as const } },
 ];
 
 const FILE_GENERATOR_SYSTEM_BLOCKS = [
-  { type: 'text' as const, text: FILE_GENERATOR_SYSTEM, cache_control: { type: 'ephemeral' as const } },
+  {
+    type: 'text' as const,
+    text: FILE_GENERATOR_SYSTEM,
+    cache_control: { type: 'ephemeral' as const },
+  },
 ];
 
 const IMAGE_SRC_PLACEHOLDER = '__BASED_IMAGE_SRC__';
 
 function sanitizeHTML(html: string): string {
-  // Add defer to external scripts so they run after DOM is ready
-  html = html.replace(/<script\b([^>]*?)src=/g, (match, attrs) => {
-    if (/\bdefer\b/.test(attrs) || /\basync\b/.test(attrs)) return match;
-    return `<script${attrs}defer src=`;
-  });
+  // Add defer to LOCAL/relative scripts only. CDN scripts (https:// URLs) must
+  // stay synchronous so libraries (Three.js, Phaser, etc.) are available before
+  // any inline <script> that uses them. Deferring a CDN library while user code
+  // is an inline script causes "THREE is not defined" — the inline runs at parse
+  // time, before the deferred CDN script has executed.
+  html = html.replace(
+    /<script(\b[^>]*?)\bsrc=(['"])(?!https?:\/\/)([^'"]+)\2/gi,
+    (match, attrs) => {
+      if (/\bdefer\b/i.test(attrs) || /\basync\b/i.test(attrs)) return match;
+      return match.replace(/\bsrc=/, 'defer src=');
+    }
+  );
+
+  // Auto-inject Three.js CDN if the HTML uses THREE but has no Three.js script tag.
+  // The AI often generates new THREE.Scene() without the required CDN <script>.
+  if (/\bTHREE\b/.test(html) && !/three(?:\.min)?\.js/i.test(html)) {
+    const threeTag =
+      '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>';
+    html = html.includes('<head>') ? html.replace('<head>', '<head>' + threeTag) : threeTag + html;
+  }
+
+  // Freeze window.parent and window.top so generated apps cannot reach the host frame
+  const parentOverride = `<script>(function(){try{Object.defineProperty(window,'parent',{get:function(){return window;},configurable:false});Object.defineProperty(window,'top',{get:function(){return window;},configurable:false});}catch(e){}})();</script>`;
+  html = html.includes('<head>')
+    ? html.replace('<head>', '<head>' + parentOverride)
+    : parentOverride + html;
 
   // Inject a safety net that guarantees Start/Begin/Play buttons work
   // regardless of what the AI generated — finds buttons by text content,
@@ -679,6 +933,8 @@ function sanitizeHTML(html: string): string {
     }
   }
   function showGame(){
+    var hasKnownIds=MENU_IDS.concat(GAME_IDS).some(function(id){return !!document.getElementById(id);});
+    if(!hasKnownIds)return;
     MENU_IDS.forEach(function(id){var el=document.getElementById(id);if(el){el.classList.remove('active');el.style.display='none';}});
     document.querySelectorAll('.screen.active').forEach(function(el){el.classList.remove('active');});
     var shown=false;
@@ -688,7 +944,7 @@ function sanitizeHTML(html: string): string {
     document.querySelectorAll('button,[role="button"],.btn,.button').forEach(function(btn){
       if(btn._bw)return;
       var t=(btn.textContent||'').trim().toLowerCase();
-      if(!START_WORDS.some(function(w){return t===w||t.indexOf(w)===0;}))return;
+      if(!START_WORDS.some(function(w){return t===w;}))return;
       btn._bw=true;
       btn.addEventListener('click',function(){showGame();tryStart();});
     });
@@ -696,6 +952,70 @@ function sanitizeHTML(html: string): string {
   if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',wire);}else{wire();}
 })();
 </script>`;
+
+  // Global error catcher — shows a visible overlay instead of a silent blank screen
+  const errorCatcher = `
+<script>
+(function(){
+  window.onerror=function(msg,src,line,col,err){
+    var box=document.getElementById('__based_err__');
+    if(!box){
+      box=document.createElement('div');
+      box.id='__based_err__';
+      box.style.cssText='position:fixed;bottom:0;left:0;right:0;background:#1a0000;color:#ff6b6b;font:12px/1.5 monospace;padding:10px 14px;z-index:99999;border-top:2px solid #ff3333;white-space:pre-wrap;max-height:40%;overflow:auto;';
+      document.body.appendChild(box);
+    }
+    box.textContent='JS Error: '+(msg||err)+(line?' (line '+line+')':'');
+    return false;
+  };
+  window.addEventListener('unhandledrejection',function(e){
+    window.onerror(e.reason?.message||String(e.reason));
+  });
+})();
+</script>`;
+
+  html = html.includes('<head>')
+    ? html.replace('<head>', '<head>' + errorCatcher)
+    : errorCatcher + html;
+
+  // Universal audio unlock — first user gesture unblocks all audio in the sandbox.
+  // Without this, AudioContext stays suspended and audio.play() is silently rejected
+  // because the iframe counts as a cross-origin context for autoplay policy purposes.
+  const audioUnlock = `<script>(function(){
+  var _unlocked=false;
+  function _unlock(){
+    if(_unlocked)return; _unlocked=true;
+    // Resume any AudioContext the app created (checks window.* names)
+    ['__audioCtx','audioCtx','ctx','context','audioContext'].forEach(function(k){
+      var c=window[k];
+      if(c&&c.state==='suspended'&&typeof c.resume==='function')c.resume();
+    });
+    // iOS Safari warm-up: every <audio> must be play()-then-paused synchronously
+    // inside a gesture handler before iOS grants future .play() rights.
+    // Targeting only [data-autoplay] missed all AI-generated elements — fix: select all.
+    document.querySelectorAll('audio').forEach(function(a){
+      var p=a.play();
+      // pause only — don't reset currentTime so buffered position is preserved
+      if(p&&typeof p.then==='function')p.then(function(){a.pause();}).catch(function(){});
+    });
+  }
+  ['click','touchstart','keydown','pointerdown'].forEach(function(e){
+    document.addEventListener(e,_unlock,{once:true,capture:true});
+  });
+})();</script>`;
+
+  html = html.includes('<head>')
+    ? html.replace('<head>', '<head>' + audioUnlock)
+    : audioUnlock + html;
+
+  // Null-property error boundary — silently swallows "Cannot read properties of null"
+  // so one missing DOM element doesn't blank the entire app.
+  const NULL_GUARD = `<script>window.addEventListener('error',function(e){if(e.message&&e.message.includes('Cannot read prop')){e.preventDefault();}});</script>`;
+  if (!html.includes('Cannot read prop')) {
+    html = html.includes('<body>')
+      ? html.replace('<body>', '<body>' + NULL_GUARD)
+      : NULL_GUARD + html;
+  }
 
   return html.includes('</body>')
     ? html.replace('</body>', safetyNet + '\n</body>')
@@ -735,7 +1055,14 @@ function stripTags(text: string) {
 
 type ApiContentBlock =
   | { type: 'text'; text: string }
-  | { type: 'image'; mediaType: string; data: string };
+  | { type: 'image'; mediaType: string; data: string }
+  | { type: 'clarify'; question: string }
+  | { type: 'error'; message: string }
+  | { type: string; [key: string]: unknown };
+
+type ApiMessage = { role: string; content: string | ApiContentBlock[] };
+
+type ProjectFile = { name: string; language: string; content: string };
 
 function msgToString(content: string | ApiContentBlock[]): string {
   if (typeof content === 'string') return content;
@@ -761,16 +1088,29 @@ function toClaudeContent(
     return appendText ? content + appendText : content;
   }
   const blocks: ClaudeContentBlock[] = [];
-  for (const block of content as any[]) {
+  for (const block of content) {
     if (block.type === 'text') {
-      blocks.push({ type: 'text', text: block.text });
-    } else if (block.type === 'image' && block.mediaType && block.data) {
-      blocks.push({ type: 'image', source: { type: 'base64' as const, media_type: block.mediaType as ImageMediaType, data: block.data } });
+      const b = block as { type: 'text'; text: string };
+      blocks.push({ type: 'text', text: b.text });
+    } else if (block.type === 'image') {
+      const b = block as { type: 'image'; mediaType: string; data: string };
+      if (b.mediaType && b.data) {
+        blocks.push({
+          type: 'image',
+          source: {
+            type: 'base64' as const,
+            media_type: b.mediaType as ImageMediaType,
+            data: b.data,
+          },
+        });
+      }
     } else if (block.type === 'clarify') {
+      const b = block as { type: 'clarify'; question: string };
       // clarify blocks become a plain-text summary so conversation history stays coherent
-      blocks.push({ type: 'text', text: `[Asked for clarification: "${block.question}"]` });
+      blocks.push({ type: 'text', text: `[Asked for clarification: "${b.question}"]` });
     } else if (block.type === 'error') {
-      blocks.push({ type: 'text', text: `[Error: ${block.message}]` });
+      const b = block as { type: 'error'; message: string };
+      blocks.push({ type: 'text', text: `[Error: ${b.message}]` });
     }
     // generated-image, generated-video, generated-music, etc. — skip, not relevant to generation context
   }
@@ -783,26 +1123,66 @@ function toClaudeContent(
   return blocks;
 }
 
+type SystemBlock = { type: 'text'; text: string; cache_control?: { type: 'ephemeral' } };
+
 async function callModel(
-  prompt: any,
-  systemPrompt: any,
-  modelType: 'planner' | 'generator' | 'summary'
+  prompt: string | ClaudeContentBlock[],
+  systemPrompt: string | SystemBlock[],
+  modelType: 'planner' | 'generator' | 'summary',
+  aiModel?: 'based' | 'free'
 ): Promise<string> {
-  const hasImages = Array.isArray(prompt) && prompt.some((b: any) => b.type === 'image');
+  const hasImages =
+    Array.isArray(prompt) && prompt.some((b: ClaudeContentBlock) => b.type === 'image');
 
   if (!hasImages) {
     const systemText = Array.isArray(systemPrompt)
-      ? systemPrompt.map((b: any) => b.text ?? '').join('\n')
-      : (systemPrompt as string) ?? '';
+      ? systemPrompt.map(b => b.text ?? '').join('\n')
+      : (systemPrompt ?? '');
     const userText = Array.isArray(prompt)
-      ? prompt.filter((b: any) => b.type === 'text').map((b: any) => b.text).join('\n')
-      : (prompt as string);
-    const taskType = modelType === 'generator' ? 'chat' : 'fast_chat';
-    return callPantheon(
-      [{ role: 'system', content: systemText }, { role: 'user', content: userText }],
-      taskType,
-      modelType === 'generator' ? 16000 : 8000
-    );
+      ? (prompt as ClaudeContentBlock[])
+          .filter((b): b is ClaudeTextBlock => b.type === 'text')
+          .map(b => b.text)
+          .join('\n')
+      : prompt;
+    const msgs = [
+      { role: 'system', content: systemText },
+      { role: 'user', content: userText },
+    ];
+    const maxTokens = modelType === 'generator' ? 8000 : modelType === 'planner' ? 300 : 800;
+
+    // Direct Anthropic — fastest path when key is present
+    const hasOwnKey =
+      process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'placeholder';
+    if (hasOwnKey) {
+      try {
+        const directModel =
+          modelType === 'planner' || modelType === 'summary'
+            ? 'claude-haiku-4-5-20251001'
+            : 'claude-sonnet-4-6';
+        const res = await client.messages.create({
+          model: directModel,
+          max_tokens: maxTokens,
+          system: systemText,
+          messages: [{ role: 'user', content: userText }],
+        });
+        const c = res.content[0];
+        return c.type === 'text' ? c.text : '';
+      } catch (err: unknown) {
+        console.warn(
+          '[callModel] Direct Anthropic failed, falling back to Pantheon:',
+          err instanceof Error ? err.message : String(err)
+        );
+      }
+    }
+
+    if (aiModel === 'free' && process.env.GROQ_API_KEY) {
+      try {
+        return await callGroq(msgs, maxTokens);
+      } catch {
+        /* fall through to Pantheon */
+      }
+    }
+    return callPantheon(msgs, modelType === 'generator' ? 'chat' : 'fast_chat', maxTokens);
   }
 
   // Image-containing calls stay on Anthropic (vision required)
@@ -816,30 +1196,107 @@ async function callModel(
   return content.type === 'text' ? content.text : '';
 }
 
+async function streamText(
+  messages: Array<{ role: string; content: string }>,
+  maxTokens: number,
+  onChunk: (text: string) => void,
+  onRetry: () => void,
+  aiModel?: 'based' | 'free',
+  taskType: 'fast_chat' | 'chat' = 'chat'
+): Promise<string> {
+  // Direct Anthropic streaming — fastest path when key is present
+  const hasOwnKey =
+    process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'placeholder';
+  if (hasOwnKey) {
+    try {
+      const systemMsg = messages.find(m => m.role === 'system');
+      const userMsg = messages.find(m => m.role === 'user');
+      let accumulated = '';
+      const stream = client.messages.stream({
+        model: 'claude-opus-4-7',
+        max_tokens: maxTokens,
+        system: systemMsg?.content ?? '',
+        messages: [{ role: 'user', content: userMsg?.content ?? '' }],
+      });
+      for await (const chunk of stream) {
+        if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+          accumulated += chunk.delta.text;
+          onChunk(chunk.delta.text);
+        }
+      }
+      return accumulated;
+    } catch (err: unknown) {
+      console.warn(
+        '[streamText] Direct Anthropic failed, falling back to Pantheon:',
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+  }
+
+  if (aiModel === 'free' && process.env.GROQ_API_KEY) {
+    try {
+      return await streamGroqCollecting(messages, maxTokens, onChunk);
+    } catch {
+      /* fall through */
+    }
+  }
+  return streamPantheonCollecting(messages, taskType, maxTokens, onChunk, onRetry);
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const { messages, existingFiles, personality, memory, globalMemory: clientGlobalMemory, location } = await req.json();
+    const {
+      messages,
+      existingFiles,
+      personality,
+      memory,
+      globalMemory: clientGlobalMemory,
+      location,
+      aiModel,
+      persona,
+    } = await req.json();
+
+    const PERSONA_PROMPTS: Record<string, string> = {
+      coder:
+        'You are Based as a senior software engineer. Be precise, technical, and code-first. No fluff.',
+      designer:
+        'You are Based as a UI/UX designer. Think in layouts, aesthetics, and user experience. Be opinionated about visual choices.',
+      advisor:
+        'You are Based as a strategic advisor. Think in frameworks, trade-offs, and long-term consequences. Be direct.',
+      coach:
+        "You are Based as a personal coach. Be motivating, clear, and focused on the user's growth and accountability.",
+    };
+    const usingFreeModel = aiModel === 'free' && !!process.env.GROQ_API_KEY;
 
     // Free tier generation gate — fail open so DB issues never block users
     // ALWAYS_PRO=true bypasses all tier checks (set on beta deployment)
+    // Free AI model bypasses limits entirely (uses Groq, not our Anthropic credits)
     const alwaysPro = process.env.ALWAYS_PRO === 'true';
     const authToken = req.headers.get('Authorization')?.replace('Bearer ', '');
-    if (!alwaysPro && authToken) {
+    let supabaseUserId: string | undefined;
+    if (!alwaysPro && !usingFreeModel && authToken) {
       try {
-        const { data: { user } } = await supabaseAdmin.auth.getUser(authToken);
+        const {
+          data: { user },
+        } = await supabaseAdmin.auth.getUser(authToken);
         if (user) {
+          supabaseUserId = user.id;
           const { data: s } = await supabaseAdmin
             .from('user_settings')
-            .select('subscription_tier, generations_used, generations_reset_at, pro_bonus_expires_at')
+            .select(
+              'subscription_tier, generations_used, generations_reset_at, pro_bonus_expires_at'
+            )
             .eq('user_id', user.id)
             .single();
 
-          const hasBonusPro = !!s?.pro_bonus_expires_at && new Date(s.pro_bonus_expires_at) > new Date();
+          const hasBonusPro =
+            !!s?.pro_bonus_expires_at && new Date(s.pro_bonus_expires_at) > new Date();
           const effectiveTier = s?.subscription_tier === 'pro' || hasBonusPro ? 'pro' : 'free';
 
           if (effectiveTier === 'free') {
             const now = new Date();
-            const needsReset = !s?.generations_reset_at ||
+            const needsReset =
+              !s?.generations_reset_at ||
               new Date(s.generations_reset_at).getMonth() !== now.getMonth() ||
               new Date(s.generations_reset_at).getFullYear() !== now.getFullYear();
             const used = needsReset ? 0 : (s?.generations_used ?? 0);
@@ -848,14 +1305,23 @@ export async function POST(req: NextRequest) {
               return NextResponse.json({ error: 'generation_limit_reached' }, { status: 402 });
             }
 
-            void (async () => { try { await supabaseAdmin.from('user_settings').upsert({
-              user_id: user.id,
-              generations_used: used + 1,
-              generations_reset_at: needsReset ? now.toISOString() : s.generations_reset_at,
-            }, { onConflict: 'user_id' }); } catch {} })();
+            void (async () => {
+              try {
+                await supabaseAdmin.from('user_settings').upsert(
+                  {
+                    user_id: user.id,
+                    generations_used: used + 1,
+                    generations_reset_at: needsReset ? now.toISOString() : s.generations_reset_at,
+                  },
+                  { onConflict: 'user_id' }
+                );
+              } catch {}
+            })();
           }
         }
-      } catch { /* fail open */ }
+      } catch {
+        /* fail open */
+      }
     }
 
     let globalMemory = clientGlobalMemory || '';
@@ -864,50 +1330,88 @@ export async function POST(req: NextRequest) {
         const { createClient } = await import('redis');
         const redis = createClient({ url: process.env.REDIS_URL });
         await redis.connect();
-        globalMemory = await redis.get('based_memory') ?? '';
+        globalMemory = (await redis.get('based_memory')) ?? '';
         await redis.disconnect();
-      } catch (e) {}
+      } catch {}
     }
 
-    const recentMessages = messages.slice(-10);
-    const lastUserMsg = recentMessages.filter((m: any) => m.role === 'user').pop();
+    const recentMessages: ApiMessage[] = (messages as ApiMessage[]).slice(-10);
+    const lastUserMsg = recentMessages.filter(m => m.role === 'user').pop();
     const lastUserMessage = msgToString(lastUserMsg?.content ?? '');
 
     // Extract image blocks from the last user message for reuse in planner + file generators
-    const hasImage = Array.isArray(lastUserMsg?.content) &&
-      (lastUserMsg.content as any[]).some((b: any) => b.type === 'image');
-    const VALID_MEDIA_TYPES: ImageMediaType[] = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const hasImage =
+      Array.isArray(lastUserMsg?.content) &&
+      (lastUserMsg.content as ApiContentBlock[]).some(b => b.type === 'image');
+    const VALID_MEDIA_TYPES: ImageMediaType[] = [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+    ];
     const imageBlocks: ClaudeImageBlock[] = hasImage
       ? (lastUserMsg.content as ApiContentBlock[])
           .filter((b): b is Extract<ApiContentBlock, { type: 'image' }> => b.type === 'image')
           .filter(b => VALID_MEDIA_TYPES.includes(b.mediaType as ImageMediaType))
           .map(b => ({
             type: 'image' as const,
-            source: { type: 'base64' as const, media_type: b.mediaType as ImageMediaType, data: b.data },
+            source: {
+              type: 'base64' as const,
+              media_type: b.mediaType as ImageMediaType,
+              data: b.data,
+            },
           }))
       : [];
 
     const context = existingFiles?.length
-      ? `\n\nCurrent project files:\n${existingFiles.map((f: any) => `--- ${f.name} (${f.language}) ---\n${f.content}`).join('\n\n')}`
+      ? `\n\nCurrent project files:\n${(existingFiles as ProjectFile[]).map(f => `--- ${f.name} (${f.language}) ---\n${f.content}`).join('\n\n')}`
       : '';
 
-    const anthropicMessages = recentMessages.map((m: any, i: number) => ({
-      role: m.role,
-      content: i === recentMessages.length - 1 && m.role === 'user'
-        ? toClaudeContent(m.content, context || undefined)
-        : toClaudeContent(m.content),
+    const anthropicMessages = recentMessages.map((m, i) => ({
+      role: m.role as 'user' | 'assistant',
+      content:
+        i === recentMessages.length - 1 && m.role === 'user'
+          ? toClaudeContent(m.content, context || undefined)
+          : toClaudeContent(m.content),
     }));
 
     // Static SYSTEM is first so it caches across all requests; dynamic parts appended after.
-    const systemBlocks: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }> = [
-      { type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } },
-    ];
-    if (personality) systemBlocks.push({ type: 'text', text: `\nPERSONALITY (adjusts tone and verbosity only — never changes what action to take, never adds greetings, never delays code generation):\n${personality}` });
-    if (globalMemory) systemBlocks.push({ type: 'text', text: `\nGLOBAL USER MEMORY:\n${globalMemory}` });
+    const systemBlocks: Array<{
+      type: 'text';
+      text: string;
+      cache_control?: { type: 'ephemeral' };
+    }> = [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }];
+    if (personality)
+      systemBlocks.push({
+        type: 'text',
+        text: `\nPERSONALITY (adjusts tone and verbosity only — never changes what action to take, never adds greetings, never delays code generation):\n${personality}`,
+      });
+    if (persona && persona !== 'based' && PERSONA_PROMPTS[persona])
+      systemBlocks.push({
+        type: 'text',
+        text: `\nAGENT MODE:\n${PERSONA_PROMPTS[persona]}`,
+      });
+    if (globalMemory)
+      systemBlocks.push({ type: 'text', text: `\nGLOBAL USER MEMORY:\n${globalMemory}` });
     if (memory) systemBlocks.push({ type: 'text', text: `\nPROJECT MEMORY:\n${memory}` });
-    systemBlocks.push({ type: 'text', text: '\nCRITICAL RULE (overrides everything above): When the user asks to build, create, make, design, animate, fix, or generate anything — output forge_file code immediately. Never greet, ask clarifying questions, or refuse a code request. Go straight to the files.' });
+    systemBlocks.push({
+      type: 'text',
+      text: '\nCRITICAL RULE (overrides everything above): When the user asks to build, create, make, design, animate, fix, or generate anything — output forge_file code immediately. Never greet, ask clarifying questions, or refuse a code request. Go straight to the files.',
+    });
 
     const encoder = new TextEncoder();
+
+    const lf = createLangfuseClient();
+    if (!lf) console.warn('[LangFuse] client is null — keys missing');
+    else console.log('[LangFuse] client ready');
+    const trace = lf?.trace({
+      name: 'generate',
+      input: { message: lastUserMessage.slice(0, 500), aiModel, hasImage },
+      userId: supabaseUserId,
+    });
+    if (trace) console.log('[LangFuse] trace:', trace.id);
+
+    const startMs = Date.now();
 
     const readable = new ReadableStream({
       async start(controller) {
@@ -925,50 +1429,87 @@ export async function POST(req: NextRequest) {
               if (match) {
                 const needs = JSON.parse(match[0]);
                 if (needs.needsSearch && process.env.TAVILY_API_KEY && needs.searchQuery) {
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ searching: 'web' })}\n\n`));
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ searching: 'web' })}\n\n`)
+                  );
                   const results = await searchWeb(needs.searchQuery);
-                  if (results) realtimeContext += `\nWEB SEARCH for "${needs.searchQuery}":\n${results}`;
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ searching: null })}\n\n`));
+                  if (results)
+                    realtimeContext += `\nWEB SEARCH for "${needs.searchQuery}":\n${results}`;
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ searching: null })}\n\n`)
+                  );
                 }
                 if (needs.needsWeather && process.env.OPENWEATHER_API_KEY) {
-                  const loc = needs.weatherLocation
-                    ? needs.weatherLocation
-                    : location ?? null;
+                  const loc = needs.weatherLocation ? needs.weatherLocation : (location ?? null);
                   if (loc) {
                     const weather = await getWeather(loc);
                     if (weather) realtimeContext += `\nCURRENT WEATHER:\n${weather}`;
                   }
                 }
               }
-            } catch { /* fail open */ }
+            } catch {
+              /* fail open */
+            }
           }
           if (realtimeContext) {
-            systemBlocks.push({ type: 'text', text: `\nREAL-TIME DATA (use this as actual data in the generated app — do not invent fake values when real data is provided):\n${realtimeContext}` });
+            systemBlocks.push({
+              type: 'text',
+              text: `\nREAL-TIME DATA (use this as actual data in the generated app — do not invent fake values when real data is provided):\n${realtimeContext}`,
+            });
           }
 
           // ── Intent clarity check (Akinator-style) ──────────────────────
           // Fast check before planning — if the request is too vague, ask one
           // clarifying question with chip options instead of guessing wrong.
-          if (imageBlocks.length === 0 && typeof lastUserMessage === 'string' && lastUserMessage.trim().length > 0) {
+          const msgWords =
+            typeof lastUserMessage === 'string' ? lastUserMessage.trim().split(/\s+/).length : 0;
+          const skipClarity =
+            imageBlocks.length > 0 ||
+            msgWords < 4 || // "Hi", "Hello", "Thanks", "ok cool" — skip entirely
+            /^(hi|hey|hello|thanks|thank you|ok|okay|sure|lol|nice|cool|great|good|sounds good|got it|understood|yep|yup|nope|yes|no|what|why|how|hmm)\b/i.test(
+              typeof lastUserMessage === 'string' ? lastUserMessage.trim() : ''
+            );
+
+          if (
+            !skipClarity &&
+            typeof lastUserMessage === 'string' &&
+            lastUserMessage.trim().length > 0
+          ) {
             try {
               const clarityRaw = await callPantheon(
                 [
-                  { role: 'system', content: `Analyze this request. Return ONLY raw JSON, no markdown or explanation.
+                  {
+                    role: 'system',
+                    content: `Analyze this request. Return ONLY raw JSON, no markdown or explanation.
 If it is a question, calculation, analysis, or data task (not a build request) — always: {"clear":true}
+If it is a greeting, casual conversation, feedback, or anything that is not a build request — always: {"clear":true}
 If it is a build request specific enough to build directly: {"clear":true}
-If it is a genuinely vague BUILD request and one question would significantly improve the result: {"clear":false,"question":"short question?","options":["Option A","Option B","Option C"]}
-Options must be 2-5 words. Be very generous with "clear".
-CLEAR examples: "snake game", "todo list with drag and drop", "calculate my trip expenses [data]", "what is 20% of 500", "translate this text", "write a cover letter"
-VAGUE examples (only these should ever be false): "make an app", "build something cool", "a game", "a tool", "make something nice"` },
+If it is a genuinely vague BUILD request (only "build"/"make"/"create"/"make me" with NO subject) and one question would significantly improve the result: {"clear":false,"question":"short question?","options":["Option A","Option B","Option C"]}
+Options must be 2-5 words. Be extremely generous with "clear" — only fire for pure "make me something" with zero details.
+CLEAR examples: "snake game", "todo list with drag and drop", "what is 20% of 500", "translate this text", "write a cover letter", "hi", "hello", "how are you"
+VAGUE examples (ONLY these should ever be false): "make an app", "build something", "a game" (with NO other details), "make something nice"`,
+                  },
                   { role: 'user', content: lastUserMessage.trim() },
                 ],
                 'fast_chat',
                 120
               );
-              const cleaned = clarityRaw.trim().replace(/^```json|^```|```$/g, '').trim();
+              const cleaned = clarityRaw
+                .trim()
+                .replace(/^```json|^```|```$/g, '')
+                .trim();
               const clarity = JSON.parse(cleaned);
-              if (!clarity.clear && clarity.question && Array.isArray(clarity.options) && clarity.options.length >= 2) {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify({ clarify: true, question: clarity.question, options: clarity.options.slice(0, 3) })}\n\n`));
+              if (
+                !clarity.clear &&
+                clarity.question &&
+                Array.isArray(clarity.options) &&
+                clarity.options.length >= 2
+              ) {
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ clarify: true, question: clarity.question, options: clarity.options.slice(0, 3) })}\n\n`
+                  )
+                );
                 controller.close();
                 return;
               }
@@ -978,11 +1519,39 @@ VAGUE examples (only these should ever be false): "make an app", "build somethin
           }
 
           // Step 1: Planner classifies intent and plans files
-          const plannerPromptContent = imageBlocks.length > 0
-            ? [...imageBlocks, { type: 'text' as const, text: lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '') }]
-            : lastUserMessage + (existingFiles?.length ? `\n\nExisting files: ${existingFiles.map((f: any) => f.name).join(', ')}` : '');
+          const existingFilesContext = existingFiles?.length
+            ? `\n\nExisting files (read before deciding which files to include):\n${(existingFiles as ProjectFile[]).map(f => `--- ${f.name} ---\n${f.content.slice(0, 200).replace(/\n/g, ' ')}`).join('\n')}`
+            : '';
 
-          const planText = await callModel(plannerPromptContent, PLANNER_SYSTEM_BLOCKS, 'planner');
+          const plannerPromptContent =
+            imageBlocks.length > 0
+              ? [
+                  ...imageBlocks,
+                  {
+                    type: 'text' as const,
+                    text: lastUserMessage + existingFilesContext,
+                  },
+                ]
+              : lastUserMessage + existingFilesContext;
+
+          const planGeneration = trace?.generation({
+            name: 'planner',
+            model: 'claude-haiku-4-5-20251001',
+            input: lastUserMessage,
+          });
+          const planText = await callModel(
+            plannerPromptContent,
+            PLANNER_SYSTEM_BLOCKS,
+            'planner',
+            usingFreeModel ? 'free' : 'based'
+          );
+          planGeneration?.end({
+            output: planText.slice(0, 500),
+            usage: {
+              input: Math.ceil(lastUserMessage.length / 4),
+              output: Math.ceil(planText.length / 4),
+            },
+          });
 
           let filePlan: { name: string; language: string; description: string }[] = [];
           let routeToChat = false;
@@ -990,15 +1559,21 @@ VAGUE examples (only these should ever be false): "make an app", "build somethin
           try {
             const jsonMatch = planText.match(/\[[\s\S]*\]/);
             const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : planText.trim());
-            if (Array.isArray(parsed) && parsed.length === 1 && (parsed[0] as any).chat === true) {
+            if (
+              Array.isArray(parsed) &&
+              parsed.length === 1 &&
+              (parsed[0] as { chat?: boolean }).chat === true
+            ) {
               routeToChat = true;
             } else if (Array.isArray(parsed) && parsed.length > 0) {
               filePlan = parsed;
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ plan: filePlan.map((f: any) => f.name) })}\n\n`));
+              controller.enqueue(
+                encoder.encode(`data: ${JSON.stringify({ plan: filePlan.map(f => f.name) })}\n\n`)
+              );
             } else {
               throw new Error('empty plan');
             }
-          } catch (e) {
+          } catch {
             if (!routeToChat) {
               // Planner parse failed — stream via Pantheon (Anthropic fallback for images)
               let fullText = '';
@@ -1006,27 +1581,54 @@ VAGUE examples (only these should ever be false): "make an app", "build somethin
                 const stream = await client.messages.stream({
                   model: 'claude-opus-4-7',
                   max_tokens: 16000,
-                  system: [{ type: 'text' as const, text: SYSTEM, cache_control: { type: 'ephemeral' as const } }],
+                  system: [
+                    {
+                      type: 'text' as const,
+                      text: SYSTEM,
+                      cache_control: { type: 'ephemeral' as const },
+                    },
+                  ],
                   messages: anthropicMessages,
                 });
                 for await (const chunk of stream) {
                   if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
                     fullText += chunk.delta.text;
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+                    controller.enqueue(
+                      encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
+                    );
                   }
                 }
               } else {
-                const sysText = systemBlocks.map(b => b.text).join('\n');
-                const msgs = [{ role: 'system', content: sysText }, ...anthropicMessages.map((m: { role: string; content: unknown }) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : lastUserMessage }))];
-                fullText = await streamPantheonCollecting(msgs, 'chat', 16000,
-                  t => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
-                  () => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`))
+                const sysText = usingFreeModel
+                  ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally.'
+                  : systemBlocks.map(b => b.text).join('\n');
+                const msgs = [
+                  { role: 'system', content: sysText },
+                  ...anthropicMessages.map((m: { role: string; content: unknown }) => ({
+                    role: m.role,
+                    content: typeof m.content === 'string' ? m.content : lastUserMessage,
+                  })),
+                ];
+                fullText = await streamText(
+                  msgs,
+                  16000,
+                  t =>
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+                  () =>
+                    controller.enqueue(
+                      encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)
+                    ),
+                  usingFreeModel ? 'free' : 'based'
                 );
               }
               const files = parseFiles(fullText);
               const projectType = parseType(fullText);
               const reply = stripTags(fullText);
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, reply, files, projectType })}\n\n`));
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ done: true, reply, files, projectType })}\n\n`
+                )
+              );
               return;
             }
           }
@@ -1043,59 +1645,111 @@ VAGUE examples (only these should ever be false): "make an app", "build somethin
               for await (const chunk of stream) {
                 if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
                   fullText += chunk.delta.text;
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
+                  );
                 }
               }
             } else {
-              const sysText = systemBlocks.map(b => b.text).join('\n');
-              const msgs = [{ role: 'system', content: sysText }, ...anthropicMessages.map((m: { role: string; content: unknown }) => ({ role: m.role, content: typeof m.content === 'string' ? m.content : lastUserMessage }))];
-              fullText = await streamPantheonCollecting(msgs, 'chat', 4096,
-                t => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
-                () => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`))
+              const sysText = usingFreeModel
+                ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally.'
+                : systemBlocks.map(b => b.text).join('\n');
+              const msgs = [
+                { role: 'system', content: sysText },
+                ...anthropicMessages.map((m: { role: string; content: unknown }) => ({
+                  role: m.role,
+                  content: typeof m.content === 'string' ? m.content : lastUserMessage,
+                })),
+              ];
+              fullText = await streamText(
+                msgs,
+                4096,
+                t =>
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+                () =>
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)
+                  ),
+                usingFreeModel ? 'free' : 'based'
               );
             }
             const files = parseFiles(fullText);
             const projectType = parseType(fullText);
             const reply = stripTags(fullText);
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, reply, files, projectType })}\n\n`));
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ done: true, reply, files, projectType })}\n\n`
+              )
+            );
             return;
           }
 
-          const projectType = filePlan.some(f => f.language === 'python') ? 'python' : 'html';
+          const projectType = (() => {
+            const langs = filePlan.map((f: { language: string }) => f.language);
+            if (langs.some(l => l === 'java')) return 'java';
+            if (langs.some(l => l === 'cpp')) return 'cpp';
+            if (langs.some(l => l === 'go')) return 'go';
+            if (langs.some(l => l === 'rust')) return 'rust';
+            if (langs.some(l => l === 'bash')) return 'bash';
+            if (langs.some(l => l === 'python')) return 'python';
+            return 'html';
+          })();
           const generatedFiles: { name: string; language: string; content: string }[] = [];
 
           // Step 2: Generate each file individually
           for (let i = 0; i < filePlan.length; i++) {
             const fileSpec = filePlan[i];
 
-            const generatedContext = generatedFiles.length > 0
-              ? `\n\nAlready generated files:\n${generatedFiles.map(f => `--- ${f.name} ---\n${f.content.slice(0, 3000)}\n...[continues]`).join('\n\n')}`
-              : '';
+            const generatedContext =
+              generatedFiles.length > 0
+                ? `\n\nAlready generated files:\n${generatedFiles.map(f => `--- ${f.name} ---\n${f.content.slice(0, 3000)}\n...[continues]`).join('\n\n')}`
+                : '';
 
+            const isModifyingExisting = (existingFiles as ProjectFile[] | undefined)?.some(
+              f => f.name === fileSpec.name
+            );
             const existingContext = existingFiles?.length
-              ? `\n\nExisting files to preserve:\n${existingFiles.map((f: any) => `--- ${f.name} ---\n${f.content.slice(0, 400)}\n...[truncated]`).join('\n\n')}`
+              ? `\n\nExisting files:\n${(existingFiles as ProjectFile[])
+                  .map(f =>
+                    f.name === fileSpec.name
+                      ? `--- ${f.name} (YOU ARE MODIFYING THIS FILE — preserve all existing event listeners, buttons, and logic unless explicitly asked to change them) ---\n${f.content}`
+                      : `--- ${f.name} (context only) ---\n${f.content.slice(0, 600)}\n...[truncated]`
+                  )
+                  .join('\n\n')}`
               : '';
 
-            const imagePlaceholderNote = imageBlocks.length > 0
-              ? `\n\nThe user has provided an image. Wherever you need the image source, use exactly: ${IMAGE_SRC_PLACEHOLDER}\nDo NOT use any other URL or path — only ${IMAGE_SRC_PLACEHOLDER}. It will be replaced with the real base64 data URL at build time.`
-              : '';
+            const imagePlaceholderNote =
+              imageBlocks.length > 0
+                ? `\n\nThe user has provided an image. Wherever you need the image source, use exactly: ${IMAGE_SRC_PLACEHOLDER}\nDo NOT use any other URL or path — only ${IMAGE_SRC_PLACEHOLDER}. It will be replaced with the real base64 data URL at build time.`
+                : '';
 
-            const filePrompt = `Project: ${lastUserMessage}
+            const filePrompt = `IMPLEMENT THIS EXACTLY — do not reinterpret, simplify, or substitute with something similar:
+"${lastUserMessage}"
 
-Generate file: ${fileSpec.name}
-Purpose: ${fileSpec.description}
+${isModifyingExisting ? `MODIFY existing file: ${fileSpec.name}` : `Generate new file: ${fileSpec.name}`}
+Planner notes (expand on the spec above — do not replace it): ${fileSpec.description}
 Language: ${fileSpec.language}
 
 All project files: ${filePlan.map(f => `${f.name} — ${f.description}`).join('\n')}
 ${generatedContext}${existingContext}${imagePlaceholderNote}
 
-Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
+${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. The full existing content is shown above. Make ONLY the changes needed. Every existing event listener, button, screen, and function must still work after your edit.` : `Generate ONLY ${fileSpec.name}, complete with no placeholders. Every mechanic, phase, and element described in the spec above must be present.`}`;
 
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`));
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ status: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`
+              )
+            );
+            const fileGeneration = trace?.generation({
+              name: `generate-file:${fileSpec.name}`,
+              model: 'claude-opus-4-7',
+              input: filePrompt,
+            });
 
-            const filePromptContent = imageBlocks.length > 0
-              ? [...imageBlocks, { type: 'text' as const, text: filePrompt }]
-              : filePrompt;
+            const filePromptContent =
+              imageBlocks.length > 0
+                ? [...imageBlocks, { type: 'text' as const, text: filePrompt }]
+                : filePrompt;
 
             let fileText = '';
             if (imageBlocks.length > 0) {
@@ -1109,7 +1763,9 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
               for await (const chunk of fileStream) {
                 if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
                   fileText += chunk.delta.text;
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
+                  );
                 }
               }
               const fileResult = await fileStream.finalMessage();
@@ -1126,35 +1782,50 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
                 for await (const chunk of contStream) {
                   if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
                     fileText += chunk.delta.text;
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`));
+                    controller.enqueue(
+                      encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
+                    );
                   }
                 }
               }
             } else {
-              // Text-only files routed through Pantheon (multi-provider fallback)
               const msgs = [
                 { role: 'system', content: FILE_GENERATOR_SYSTEM },
                 { role: 'user', content: filePrompt },
               ];
-              fileText = await streamPantheonCollecting(msgs, 'chat', 16000,
-                t => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
-                () => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`))
+              fileText = await streamText(
+                msgs,
+                16000,
+                t =>
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+                () =>
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)
+                  ),
+                usingFreeModel ? 'free' : 'based'
               );
             }
 
             const parsedFiles = parseFiles(fileText);
-            const filesToAdd = parsedFiles.length > 0 ? parsedFiles : [{
-              name: fileSpec.name,
-              language: fileSpec.language,
-              content: fileText.replace(/^<forge_file[^>]*>\n?/, '').trim() || fileText.trim(),
-            }];
+            const filesToAdd =
+              parsedFiles.length > 0
+                ? parsedFiles
+                : [
+                    {
+                      name: fileSpec.name,
+                      language: fileSpec.language,
+                      content:
+                        fileText.replace(/^<forge_file[^>]*>\n?/, '').trim() || fileText.trim(),
+                    },
+                  ];
 
-            const imageDataUrl = imageBlocks.length > 0
-              ? `data:${imageBlocks[0].source.media_type};base64,${imageBlocks[0].source.data}`
-              : null;
+            const imageDataUrl =
+              imageBlocks.length > 0
+                ? `data:${imageBlocks[0].source.media_type};base64,${imageBlocks[0].source.data}`
+                : null;
 
             for (const f of filesToAdd) {
-              let content = imageDataUrl
+              const content = imageDataUrl
                 ? f.content.replaceAll(IMAGE_SRC_PLACEHOLDER, imageDataUrl)
                 : f.content;
               generatedFiles.push(
@@ -1162,45 +1833,106 @@ Generate ONLY ${fileSpec.name}, complete with no placeholders.`;
               );
             }
 
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ progress: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`));
+            fileGeneration?.end({
+              output: fileText.slice(0, 200),
+              usage: {
+                input: Math.ceil(filePrompt.length / 4),
+                output: Math.ceil(fileText.length / 4),
+              },
+            });
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ progress: { file: fileSpec.name, current: i + 1, total: filePlan.length } })}\n\n`
+              )
+            );
           }
 
           // Step 3: Brief summary — use a minimal system to avoid code-gen rules confusing haiku
-          const summarySystem = 'You are Based. Reply with 1-2 plain sentences describing what was just built. No code, no forge tags, no lists.';
+          const summarySystem =
+            'You are Based. Reply with 1-2 plain sentences describing what was just built. No code, no forge tags, no lists.';
           const summaryPrompt = `User asked: "${lastUserMessage}"\nFiles generated: ${generatedFiles.map(f => f.name).join(', ')}\n\nDescribe what was built in 1-2 sentences.`;
-          const reply = await callModel(summaryPrompt, summarySystem, 'summary')
-            || `Built ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}`;
+          const reply =
+            (await callModel(
+              summaryPrompt,
+              summarySystem,
+              'summary',
+              usingFreeModel ? 'free' : 'based'
+            )) ||
+            `Built ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}`;
 
           let suggestions: string[] = [];
           try {
             const suggestText = await callModel(
               `The user just built: "${lastUserMessage}"\nFiles: ${generatedFiles.map(f => f.name).join(', ')}\n\nOutput exactly 3 short follow-up action suggestions as a JSON array. Max 5 words each. Be specific to what was built.\nExamples: ["Add dark mode", "Make it mobile-friendly", "Add sound effects"]\nJSON only, no explanation.`,
               'Output only a valid JSON array of exactly 3 short strings. No markdown.',
-              'planner'
+              'planner',
+              usingFreeModel ? 'free' : 'based'
             );
             const match = suggestText.match(/\[[\s\S]*?\]/);
-            if (match) suggestions = (JSON.parse(match[0]) as unknown[]).filter((s): s is string => typeof s === 'string').slice(0, 3);
+            if (match)
+              suggestions = (JSON.parse(match[0]) as unknown[])
+                .filter((s): s is string => typeof s === 'string')
+                .slice(0, 3);
           } catch {}
 
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, reply, files: generatedFiles, projectType, suggestions })}\n\n`));
+          trace?.update({ output: { files: generatedFiles.map(f => f.name), reply } });
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({ done: true, reply, files: generatedFiles, projectType, suggestions })}\n\n`
+            )
+          );
 
-        } catch (e: any) {
+          void (async () => {
+            try {
+              await supabaseAdmin.from('inference_logs').insert({
+                user_id: supabaseUserId ?? null,
+                model: usingFreeModel ? GROQ_MODEL : 'claude-opus-4-7',
+                project_type: projectType,
+                prompt: lastUserMessage.slice(0, 2000),
+                response: reply.slice(0, 1000),
+                input_tokens: Math.ceil(lastUserMessage.length / 4),
+                output_tokens: generatedFiles.reduce(
+                  (acc, f) => acc + Math.ceil(f.content.length / 4),
+                  0
+                ),
+                latency_ms: Date.now() - startMs,
+                provider: usingFreeModel
+                  ? 'groq'
+                  : process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'placeholder'
+                    ? 'anthropic'
+                    : 'pantheon',
+              });
+            } catch {}
+          })();
+        } catch (e: unknown) {
           const friendly = friendlyError(e);
+          Sentry.captureException(e, { extra: { message: lastUserMessage, aiModel } });
+          trace?.update({ output: { error: friendly } });
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: friendly })}\n\n`));
         } finally {
+          try {
+            if (lf) {
+              console.log('[LangFuse] shutting down...');
+              await lf.shutdownAsync();
+              console.log('[LangFuse] done');
+            }
+          } catch (lfErr) {
+            console.error('[LangFuse] shutdown failed:', lfErr);
+          }
           controller.close();
         }
-      }
+      },
     });
 
     return new Response(readable, {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
+        Connection: 'keep-alive',
       },
     });
-  } catch (err: any) {
-    return NextResponse.json({ reply: `Error: ${err.message}`, files: [] }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ reply: `Error: ${message}`, files: [] }, { status: 500 });
   }
 }

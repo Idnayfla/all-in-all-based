@@ -24,9 +24,11 @@ export async function GET(req: NextRequest, ctx: Ctx) {
         updatedAt: new Date(data.updated_at).getTime(),
       },
     });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
@@ -48,9 +50,11 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
       .eq('user_id', userId);
     if (error) throw error;
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
@@ -65,8 +69,10 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
       .eq('user_id', userId);
     if (error) throw error;
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

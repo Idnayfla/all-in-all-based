@@ -6,15 +6,32 @@ interface Props {
   projectName: string;
   onContinue: () => void;
   onDismiss: () => void;
+  fromDevice?: 'mobile' | 'tablet' | 'desktop';
+  error?: string;
 }
 
-export default function ProactiveCheckin({ projectName, onContinue, onDismiss }: Props) {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+const DEVICE_LABEL: Record<string, string> = {
+  mobile: 'your phone',
+  tablet: 'your tablet',
+  desktop: 'your desktop',
+};
+
+export default function ProactiveCheckin({
+  projectName,
+  onContinue,
+  onDismiss,
+  fromDevice,
+  error,
+}: Props) {
+  const dismissRef = useRef(onDismiss);
+  useEffect(() => {
+    dismissRef.current = onDismiss;
+  });
 
   useEffect(() => {
-    timerRef.current = setTimeout(onDismiss, 8000);
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, [onDismiss]);
+    const t = setTimeout(() => dismissRef.current(), 8000);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <motion.div
@@ -26,16 +43,36 @@ export default function ProactiveCheckin({ projectName, onContinue, onDismiss }:
     >
       <div className="checkin-header">
         <span className="checkin-icon">◈</span>
-        <span className="checkin-label">Welcome back.</span>
+        <span className="checkin-label">
+          {fromDevice ? 'Picking up where you left off.' : 'Welcome back.'}
+        </span>
       </div>
       <div className="checkin-body">
-        You were working on{' '}
-        <strong className="checkin-project-name">&ldquo;{projectName}&rdquo;</strong>
-        {' '}— want to pick up where you left off?
+        {error ? (
+          <span className="checkin-error">{error}</span>
+        ) : fromDevice ? (
+          <>
+            You were on <strong className="checkin-project-name">{DEVICE_LABEL[fromDevice]}</strong>{' '}
+            working on <strong className="checkin-project-name">&ldquo;{projectName}&rdquo;</strong>{' '}
+            — load it here?
+          </>
+        ) : (
+          <>
+            You were working on{' '}
+            <strong className="checkin-project-name">&ldquo;{projectName}&rdquo;</strong> — want to
+            pick up where you left off?
+          </>
+        )}
       </div>
       <div className="checkin-actions">
-        <button className="checkin-continue" onClick={onContinue}>Continue →</button>
-        <button className="checkin-dismiss" onClick={onDismiss}>Not now</button>
+        {!error && (
+          <button className="checkin-continue" onClick={onContinue}>
+            Continue →
+          </button>
+        )}
+        <button className="checkin-dismiss" onClick={onDismiss}>
+          {error ? 'Dismiss' : 'Not now'}
+        </button>
       </div>
       <div className="checkin-timer-bar">
         <div className="checkin-timer-progress" />

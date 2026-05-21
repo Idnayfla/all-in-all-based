@@ -1,13 +1,18 @@
 import { useEffect, useRef } from 'react';
 
-type Panel = 'chat' | 'editor' | 'preview' | 'debug' | 'video' | 'studio';
-const ORDER: Panel[] = ['chat', 'editor', 'preview'];
+type Panel =
+  | 'chat'
+  | 'editor'
+  | 'preview'
+  | 'debug'
+  | 'video'
+  | 'studio'
+  | 'image'
+  | 'notes'
+  | '3d';
+const ORDER: Panel[] = ['chat', 'editor', 'preview', 'video', 'studio', 'image', 'notes', '3d'];
 
-export function useSwipePanels(
-  active: Panel,
-  setActive: (p: Panel) => void,
-  enabled: boolean,
-) {
+export function useSwipePanels(active: Panel, setActive: (p: Panel) => void, enabled: boolean) {
   const startX = useRef(0);
   const startY = useRef(0);
 
@@ -31,15 +36,15 @@ export function useSwipePanels(
       if (idx === -1) return;
 
       if (dx < 0 && idx < ORDER.length - 1) setActive(ORDER[idx + 1]); // swipe left → next
-      if (dx > 0 && idx > 0)               setActive(ORDER[idx - 1]); // swipe right → prev
+      if (dx > 0 && idx > 0) setActive(ORDER[idx - 1]); // swipe right → prev
     }
 
     document.addEventListener('touchstart', onTouchStart, { passive: true });
-    document.addEventListener('touchend',   onTouchEnd,   { passive: true });
+    document.addEventListener('touchend', onTouchEnd, { passive: true });
 
     return () => {
       document.removeEventListener('touchstart', onTouchStart);
-      document.removeEventListener('touchend',   onTouchEnd);
+      document.removeEventListener('touchend', onTouchEnd);
     };
   }, [active, setActive, enabled]);
 }

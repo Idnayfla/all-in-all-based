@@ -13,6 +13,7 @@
 ### Task 1: Delete AnimatedLogo.tsx and LogoEditorModal.tsx
 
 **Files:**
+
 - Delete: `components/AnimatedLogo.tsx`
 - Delete: `components/LogoEditorModal.tsx`
 
@@ -43,6 +44,7 @@ git commit -m "feat: delete AnimatedLogo and LogoEditorModal components"
 ### Task 2: Simplify useLogoConfig.ts to config-only module
 
 **Files:**
+
 - Modify: `hooks/useLogoConfig.ts`
 
 Current file (48 lines) has `'use client'`, `useState` import, `KEY` const, `readStored()` function, and `useLogoConfig()` hook. Keep only the `LogoConfig` interface and `LOGO_DEFAULTS` const.
@@ -91,9 +93,11 @@ git commit -m "feat: simplify useLogoConfig to config-only module, remove hook a
 ### Task 3: Update page.tsx — swap AnimatedLogo for LogoDisplay, remove sidebarOpen machinery
 
 **Files:**
+
 - Modify: `app/page.tsx`
 
 Changes needed:
+
 1. Line 9: replace `import AnimatedLogo from '@/components/AnimatedLogo'` with imports for `LogoDisplay` and `LOGO_DEFAULTS`
 2. Line 52: remove `const [sidebarOpen, setSidebarOpen] = useState(false);`
 3. Line 113: remove `setSidebarOpen(false);` inside `newProject()`
@@ -106,11 +110,13 @@ Changes needed:
 - [ ] **Step 1: Replace AnimatedLogo import with LogoDisplay imports**
 
 Find:
+
 ```tsx
 import AnimatedLogo from '@/components/AnimatedLogo';
 ```
 
 Replace with:
+
 ```tsx
 import LogoDisplay from '@/components/LogoDisplay';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
@@ -119,8 +125,9 @@ import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
 - [ ] **Step 2: Remove sidebarOpen state declaration**
 
 Find:
+
 ```tsx
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+const [sidebarOpen, setSidebarOpen] = useState(false);
 ```
 
 Replace with (delete the line entirely — use empty string as replacement or remove manually).
@@ -128,19 +135,28 @@ Replace with (delete the line entirely — use empty string as replacement or re
 - [ ] **Step 3: Remove setSidebarOpen(false) from newProject**
 
 Find:
+
 ```tsx
-    setFiles([]); setMessages([]); setActiveFile(null); setActivePanel('chat');
-    setSidebarOpen(false);
+setFiles([]);
+setMessages([]);
+setActiveFile(null);
+setActivePanel('chat');
+setSidebarOpen(false);
 ```
 
 Replace with:
+
 ```tsx
-    setFiles([]); setMessages([]); setActiveFile(null); setActivePanel('chat');
+setFiles([]);
+setMessages([]);
+setActiveFile(null);
+setActivePanel('chat');
 ```
 
 - [ ] **Step 4: Remove setSidebarOpen(false) from loadProject**
 
 Find:
+
 ```tsx
     setActivePanel('chat');
     setSidebarOpen(false);
@@ -148,6 +164,7 @@ Find:
 ```
 
 Replace with:
+
 ```tsx
     setActivePanel('chat');
   };
@@ -156,21 +173,31 @@ Replace with:
 - [ ] **Step 5: Remove hamburger button and replace AnimatedLogo**
 
 Find:
+
 ```tsx
           <button className="hamburger" onClick={() => setSidebarOpen(s => !s)}>☰</button>
           <AnimatedLogo />
 ```
 
 Replace with:
+
 ```tsx
-          <LogoDisplay config={LOGO_DEFAULTS} />
+<LogoDisplay config={LOGO_DEFAULTS} />
 ```
 
 - [ ] **Step 6: Remove the sidebarOpen overlay div**
 
 Find:
+
 ```tsx
-        {sidebarOpen && <div onClick={() => setSidebarOpen(false)} style={{position:'fixed',inset:0,zIndex:199,background:'rgba(0,0,0,0.5)'}} />}
+{
+  sidebarOpen && (
+    <div
+      onClick={() => setSidebarOpen(false)}
+      style={{ position: 'fixed', inset: 0, zIndex: 199, background: 'rgba(0,0,0,0.5)' }}
+    />
+  );
+}
 ```
 
 Replace with (delete the line — empty replacement).
@@ -178,8 +205,9 @@ Replace with (delete the line — empty replacement).
 - [ ] **Step 7: Remove isOpen prop from Sidebar**
 
 Find:
+
 ```tsx
-          isOpen={sidebarOpen}
+isOpen = { sidebarOpen };
 ```
 
 Replace with (delete the line — empty replacement).
@@ -204,15 +232,18 @@ git commit -m "feat: replace AnimatedLogo with static LogoDisplay, remove hambur
 ### Task 4: Remove dead CSS from globals.css
 
 **Files:**
+
 - Modify: `app/globals.css`
 
 Remove the following CSS blocks (confirmed line numbers from grep):
+
 - Lines 673–678: `.animated-logo-root` and hover state
 - Lines 720–738: `.logo-edit-btn` and `.logo-edit-btn:hover`
 - Lines 745–915: all `.logo-editor-*` rules (backdrop, panel, header, title, close, preview, controls, label, value, input, shape-picker, shape-btn, swatch-row, swatch, slider-row, slider, slider-cap, footer, reset-link, save-btn)
 - Lines 313–324: `.hamburger` rule and `@media (min-width: 769px) { .hamburger { display: none; } }`
 
 **Keep** (do NOT touch):
+
 - `.animated-logo-wrap`, `.logo-icon-svg`, `.animated-logo-text` — still used by LogoDisplay
 - `@keyframes logo-shimmer-slide`, `.logo-shimmer` — still used by LogoDisplay
 - Mobile override `.animated-logo-text { font-size: 14px }` inside `@media (max-width: 768px)`
@@ -220,9 +251,11 @@ Remove the following CSS blocks (confirmed line numbers from grep):
 - [ ] **Step 1: Remove .animated-logo-root block**
 
 Find and delete:
+
 ```css
 .animated-logo-root {
 ```
+
 ...through its closing `}` (lines ~673–678). The block contains a hover rule. Remove both `.animated-logo-root` and `.animated-logo-root:hover` (or however many closing braces cover both rules).
 
 Verify by searching for `.animated-logo-root` after editing — should return no matches.
@@ -230,49 +263,70 @@ Verify by searching for `.animated-logo-root` after editing — should return no
 - [ ] **Step 2: Remove .logo-edit-btn block**
 
 Find and delete from:
+
 ```css
 .logo-edit-btn {
 ```
+
 through and including:
+
 ```css
-.logo-edit-btn:hover { color: var(--accent); border-color: var(--accent); }
+.logo-edit-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
 ```
 
-- [ ] **Step 3: Remove all .logo-editor-* blocks**
+- [ ] **Step 3: Remove all .logo-editor-\* blocks**
 
 Find and delete from:
+
 ```css
 .logo-editor-backdrop {
 ```
+
 through and including the last editor rule:
+
 ```css
-.logo-save-btn:hover { opacity: 0.85; }
+.logo-save-btn:hover {
+  opacity: 0.85;
+}
 ```
 
 This is approximately lines 745–915. After deletion, verify:
+
 ```bash
 grep -n "logo-editor\|logo-shape\|logo-swatch\|logo-slider\|logo-reset\|logo-save" /workspaces/all-in-all-based/app/globals.css
 ```
+
 Expected: no matches.
 
 - [ ] **Step 4: Remove hamburger CSS**
 
 Find and delete:
+
 ```css
   .hamburger {
 ```
+
 through its closing `}` block (lines ~313–320).
 
 Also find and delete:
+
 ```css
-  .hamburger { display: none; }
+.hamburger {
+  display: none;
+}
 ```
+
 (inside `@media (min-width: 769px)`, line ~324).
 
 Verify:
+
 ```bash
 grep -n "hamburger" /workspaces/all-in-all-based/app/globals.css
 ```
+
 Expected: no matches.
 
 - [ ] **Step 5: Verify dev server compiles without errors**

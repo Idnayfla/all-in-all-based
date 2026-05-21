@@ -19,9 +19,11 @@ export async function GET(req: NextRequest) {
       updatedAt: new Date(p.updated_at).getTime(),
     }));
     return NextResponse.json({ projects });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
@@ -30,7 +32,13 @@ export async function POST(req: NextRequest) {
     const userId = await getUserId(req);
     const { name, id } = await req.json();
     if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 });
-    const row: Record<string, unknown> = { user_id: userId, name: name.trim(), files: [], messages: [], memory: '' };
+    const row: Record<string, unknown> = {
+      user_id: userId,
+      name: name.trim(),
+      files: [],
+      messages: [],
+      memory: '',
+    };
     if (id) row.id = id;
     const { data, error } = await supabaseAdmin
       .from('projects')
@@ -48,9 +56,11 @@ export async function POST(req: NextRequest) {
         updatedAt: new Date(data.updated_at).getTime(),
       },
     });
-  } catch (err: any) {
-    if (err.message === 'Unauthorized') return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    console.error('[POST /api/projects]', err.message, err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg === 'Unauthorized')
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    console.error('[POST /api/projects]', msg, err);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
