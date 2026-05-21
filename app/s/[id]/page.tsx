@@ -90,7 +90,7 @@ export default async function SharePage({ params }: { params: Promise<{ id: stri
       <iframe
         srcDoc={srcDoc}
         style={{ flex: 1, border: 'none', width: '100%' }}
-        sandbox="allow-scripts allow-same-origin allow-modals"
+        sandbox="allow-scripts allow-modals"
         title={data.project_name}
       />
     </div>
