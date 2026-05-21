@@ -143,13 +143,31 @@ export default function Home() {
   const [showMemoryManager, setShowMemoryManager] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [createError, setCreateError] = useState<string | null>(null);
+  // Seed subscription tier from localStorage so Pro users see Pro immediately on
+  // refresh, before the async /api/settings call resolves. This prevents the race
+  // where auth-session hydration is slow and the fetch fires with an empty token,
+  // gets a 401, and leaves the user stuck on Free for the whole session.
+  const cachedSubTier = (() => {
+    try {
+      const v = localStorage.getItem('based_sub_tier');
+      return v === 'pro' || v === 'free' ? v : 'free';
+    } catch {
+      return 'free' as const;
+    }
+  })();
   const [subscription, setSubscription] = useState<{
     tier: 'free' | 'pro';
     status: string;
     generationsUsed: number;
     periodStart: string | null;
     periodEnd: string | null;
-  }>({ tier: 'free', status: 'active', generationsUsed: 0, periodStart: null, periodEnd: null });
+  }>({
+    tier: cachedSubTier,
+    status: 'active',
+    generationsUsed: 0,
+    periodStart: null,
+    periodEnd: null,
+  });
   const [showPricing, setShowPricing] = useState(false);
   const [pricingReason, setPricingReason] = useState<'generations' | 'projects' | 'upgrade'>(
     'upgrade'
@@ -546,7 +564,10 @@ export default function Home() {
         periodStart: subscriptionPeriodStart ?? null,
         periodEnd: subscriptionPeriodEnd ?? null,
       });
-      localStorage.setItem('based_sub_tier', tier);
+      // Persist confirmed tier so the next refresh can seed from it optimistically
+      try {
+        localStorage.setItem('based_sub_tier', tier);
+      } catch {}
 
       // Stripe sync is intentionally NOT run automatically on load.
       // Webhooks keep the DB in sync; the manual Re-sync button handles edge cases.
@@ -1513,7 +1534,9 @@ export default function Home() {
                               periodStart: subscriptionPeriodStart ?? null,
                               periodEnd: subscriptionPeriodEnd ?? null,
                             });
-                            localStorage.setItem('based_sub_tier', tier);
+                            try {
+                              localStorage.setItem('based_sub_tier', tier);
+                            } catch {}
                           }
                         }
                       }}
