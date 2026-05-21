@@ -4,6 +4,22 @@ User-facing record of what shipped on beta.getbased.dev.
 
 ---
 
+## [Beta] 2026-05-21 — API Keys, Persona Settings & Stability
+
+### Added
+
+- **API Keys for Pantheon** — Pro users can now generate personal API keys (`pk_live_` format) in Settings → API Keys and use them with the Pantheon VSCode extension to connect your editor directly to Based
+- **3D / Blueprint Studio** — Build and preview Three.js 3D scenes with AI generation. Describe a scene and Based renders it live in the browser
+- **Persona switcher moved to Settings** — The Based / Coder / Designer / Advisor / Coach mode selector is now a persistent preference saved in Settings, so your chosen persona sticks between sessions
+
+### Fixed
+
+- **Proactive check-in resume** — Clicking "Continue" on a project check-in now always takes you back to the correct project. Also shows a clear message if the project was deleted instead of silently opening a blank session
+- **Pro status on refresh** — Pro users no longer lose their subscription status after a page refresh. Previously required clearing cache and re-logging in to restore Pro features
+- **THREE.js games** — Generated games using Three.js no longer crash with "THREE is not defined". The library now loads reliably on every generation
+
+---
+
 ## [Beta] 2026-05-19 — Generation Engine Reliability
 
 ### Added
