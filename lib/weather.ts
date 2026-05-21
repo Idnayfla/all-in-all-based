@@ -13,5 +13,6 @@ export async function getWeather(location: string | { lat: number; lon: number }
   if (!res.ok) return '';
 
   const d = await res.json();
-  return `${d.name}, ${d.sys?.country}: ${d.weather[0]?.description}, ${Math.round(d.main.temp)}°C (feels like ${Math.round(d.main.feels_like)}°C), humidity ${d.main.humidity}%, wind ${d.wind.speed} m/s`;
+  if (!d.main || !d.wind) return '';
+  return `${d.name}, ${d.sys?.country}: ${d.weather?.[0]?.description}, ${Math.round(d.main.temp)}°C (feels like ${Math.round(d.main.feels_like)}°C), humidity ${d.main.humidity}%, wind ${d.wind.speed} m/s`;
 }
