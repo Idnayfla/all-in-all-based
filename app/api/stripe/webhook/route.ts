@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
           { onConflict: 'user_id' }
         );
 
-        // Reward the referrer with 30 days free Pro
+        // Reward the referrer with 7 days free Pro
         try {
           const { data: newSub } = await supabaseAdmin
             .from('user_settings')

@@ -97,7 +97,9 @@ export default function GalleryPage() {
     await fetch(`/api/gallery/remix/${item.id}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${session?.access_token ?? ''}` },
-    }).catch(() => {});
+    }).catch(() => {
+      setRemixingId(null);
+    });
 
     localStorage.setItem('based_pending_remix', item.id);
     window.location.href = '/';

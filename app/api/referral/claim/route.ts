@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid referral code' }, { status: 404 });
     }
 
-    // Grant new user 7 days free Pro
+    // Grant new user 3 days free Pro
     const bonusExpires = new Date(Date.now() + REFERRAL_BONUS_DAYS * 86400000).toISOString();
 
     await supabaseAdmin.from('user_settings').upsert(

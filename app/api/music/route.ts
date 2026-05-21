@@ -11,7 +11,7 @@ const client = new Anthropic({
 async function enhancePrompt(prompt: string): Promise<string> {
   try {
     const res = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-haiku-4-5',
       max_tokens: 200,
       system:
         'You are a music prompt engineer. Expand a short music request into a rich, detailed prompt for an AI music generator. Include: mood/emotion, instruments, tempo (BPM range), key (major/minor), genre, dynamics, and atmosphere. Output only the enhanced prompt — no explanation, no quotes.',
