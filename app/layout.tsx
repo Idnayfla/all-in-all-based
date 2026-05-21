@@ -1,15 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import ErrorBoundary from '@/components/ErrorBoundary';
 import ClientOnly from '@/components/ClientOnly';
-import ServiceWorkerInit from '@/components/ServiceWorkerInit';
-import LaunchSplash from '@/components/LaunchSplash';
-import InstallPrompt from '@/components/InstallPrompt';
+import AppChrome from '@/components/AppChrome';
 import Script from 'next/script';
-import { Analytics } from '@vercel/analytics/react';
-import BetaBanner from '@/components/BetaBanner';
-import PostHogProvider from '@/components/PostHogProvider';
-import GlobalCompanionBubble from '@/components/GlobalCompanionBubble';
 
 export const metadata: Metadata = {
   title: 'Based — AI Dev Studio',
@@ -81,45 +74,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body suppressHydrationWarning>
-        <BetaBanner />
-        <LaunchSplash />
-        <InstallPrompt />
-        <ServiceWorkerInit />
         <ClientOnly>
-          <PostHogProvider>
-            <ErrorBoundary>{children}</ErrorBoundary>
-          </PostHogProvider>
-          <GlobalCompanionBubble />
+          <AppChrome>{children}</AppChrome>
         </ClientOnly>
-        <Analytics />
-        {/* Meta Pixel */}
-        <Script
-          id="meta-pixel"
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              !function(f,b,e,v,n,t,s)
-              {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-              n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-              if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-              n.queue=[];t=b.createElement(e);t.async=!0;
-              t.src=v;s=b.getElementsByTagName(e)[0];
-              s.parentNode.insertBefore(t,s)}(window, document,'script',
-              'https://connect.facebook.net/en_US/fbevents.js');
-              fbq('init', '27291121733834066');
-              fbq('track', 'PageView');
-            `,
-          }}
-        />
-        <noscript>
-          <img
-            height="1"
-            width="1"
-            style={{ display: 'none' }}
-            src="https://www.facebook.com/tr?id=27291121733834066&ev=PageView&noscript=1"
-            alt=""
-          />
-        </noscript>
       </body>
     </html>
   );
