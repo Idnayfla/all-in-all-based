@@ -3,11 +3,7 @@ import { supabaseAdmin } from '../../../_auth';
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { data } = await supabaseAdmin
-    .from('shares')
-    .select('files')
-    .eq('id', id)
-    .single();
+  const { data } = await supabaseAdmin.from('shares').select('files').eq('id', id).single();
 
   if (!data) return new NextResponse('Not found', { status: 404 });
 
