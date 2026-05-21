@@ -185,7 +185,7 @@ const ENTRIES: ChangeEntry[] = [
     ],
   },
   {
-    date: '2026-05-xx',
+    date: '2026-05-19',
     label: 'Beta',
     title: 'Personal Notes (Phase 12)',
     sections: [

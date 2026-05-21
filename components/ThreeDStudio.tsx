@@ -1,6 +1,7 @@
 'use client';
 import { useRef, useState, useEffect, useCallback } from 'react';
 import * as THREE from 'three';
+import { supabase } from '@/lib/supabase';
 
 // OrbitControls inline (no addons import needed — just the core behaviour)
 function createOrbitControls(
@@ -143,7 +144,7 @@ function buildDefaultScene(scene: THREE.Scene) {
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
-export default function ThreeDStudio({ authToken }: { authToken?: string }) {
+export default function ThreeDStudio() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
@@ -240,11 +241,16 @@ export default function ThreeDStudio({ authToken }: { authToken?: string }) {
     setError('');
     setStatus('◈ Generating scene...');
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       const res = await fetch('/api/generate-3d', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          ...(session?.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : {}),
         },
         body: JSON.stringify({ prompt }),
       });
@@ -311,7 +317,7 @@ export default function ThreeDStudio({ authToken }: { authToken?: string }) {
     } finally {
       setGenerating(false);
     }
-  }, [prompt, generating, authToken]);
+  }, [prompt, generating]);
 
   return (
     <div className="threed-studio">
