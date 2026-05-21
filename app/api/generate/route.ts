@@ -12,7 +12,7 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || process.env.APP_ANTHROPIC_API_KEY,
 });
 
-const PANTHEON_KEY = process.env.PANTHEON_OWNER_KEY ?? 'pk_owner_based_internal';
+const PANTHEON_KEY = process.env.PANTHEON_API_KEY ?? process.env.PANTHEON_OWNER_KEY ?? '';
 const PANTHEON_URL = process.env.PANTHEON_API_URL ?? 'https://pantheon-api.vercel.app';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';

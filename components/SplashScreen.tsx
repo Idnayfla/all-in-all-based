@@ -112,11 +112,50 @@ export default function SplashScreen({ onDone }: Props) {
   useEffect(() => {
     const audioCtx = new AudioContext();
     audioCtxRef.current = audioCtx;
-    if (audioCtx.state === 'suspended') {
+
+    let started = false;
+
+    const tryStart = () => {
+      if (started) return;
+      audioCtx
+        .resume()
+        .then(() => {
+          if (audioCtx.state === 'running' && !started) {
+            started = true;
+            masterGainRef.current = startAudio(audioCtx);
+            setShowMute(false);
+          }
+        })
+        .catch(() => {
+          // autoplay blocked — show fallback button
+          queueMicrotask(() => setShowMute(true));
+        });
+    };
+
+    // Attempt autoplay immediately
+    if (audioCtx.state === 'running') {
+      started = true;
+      masterGainRef.current = startAudio(audioCtx);
+    } else {
+      // Show button as fallback immediately, then try to autoplay
       queueMicrotask(() => setShowMute(true));
-      return;
+      tryStart();
     }
-    masterGainRef.current = startAudio(audioCtx);
+
+    // Any user interaction anywhere on the document unlocks audio
+    const handleInteraction = () => {
+      if (!started) tryStart();
+    };
+    document.addEventListener('click', handleInteraction, { capture: true });
+    document.addEventListener('keydown', handleInteraction, { capture: true });
+    document.addEventListener('touchstart', handleInteraction, { capture: true });
+
+    return () => {
+      document.removeEventListener('click', handleInteraction, { capture: true });
+      document.removeEventListener('keydown', handleInteraction, { capture: true });
+      document.removeEventListener('touchstart', handleInteraction, { capture: true });
+      audioCtxRef.current?.close();
+    };
   }, []);
 
   const unmute = () => {
