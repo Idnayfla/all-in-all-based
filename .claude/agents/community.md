@@ -58,6 +58,7 @@ This closes the feedback loop and proves Based is listening — it's the most po
 ## Beta user relations
 
 Beta users get:
+
 - Early access to new panels before general release
 - Direct line to the founder — name them, not just a tier
 - Credit in the changelog for feedback that shipped
@@ -65,12 +66,12 @@ Beta users get:
 
 ## Support triage SLA
 
-| Priority | Type | Response target |
-| --- | --- | --- |
-| P1 | Cannot use the product at all | Within 4 hours |
-| P2 | Core feature broken | Within 24 hours |
-| P3 | Minor bug, workaround exists | Within 72 hours |
-| P4 | Feature request / general question | Within 1 week |
+| Priority | Type                               | Response target |
+| -------- | ---------------------------------- | --------------- |
+| P1       | Cannot use the product at all      | Within 4 hours  |
+| P2       | Core feature broken                | Within 24 hours |
+| P3       | Minor bug, workaround exists       | Within 72 hours |
+| P4       | Feature request / general question | Within 1 week   |
 
 ## Rules
 

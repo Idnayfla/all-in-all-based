@@ -29,7 +29,11 @@ export async function POST(req: NextRequest) {
 
     const tier: 'free' | 'pro' = active ? 'pro' : 'free';
     const status = active?.status ?? 'canceled';
-    const item = (active as { items?: { data?: { current_period_start?: number; current_period_end?: number }[] } } | null)?.items?.data?.[0];
+    const item = (
+      active as {
+        items?: { data?: { current_period_start?: number; current_period_end?: number }[] };
+      } | null
+    )?.items?.data?.[0];
     const periodStart = item?.current_period_start ?? null;
     const periodEnd = item?.current_period_end ?? null;
 

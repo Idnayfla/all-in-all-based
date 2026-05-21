@@ -1,6 +1,39 @@
 'use client';
 import { useRef, useState, useCallback, useEffect, type ReactElement } from 'react';
+import type * as ToneTypes from 'tone';
 import GeneratedMusicCard from './GeneratedMusicCard';
+
+// ── Tone state types ───────────────────────────────────────────────────────
+interface ToneFxChain {
+  reverb: ToneTypes.Reverb;
+  delay: ToneTypes.FeedbackDelay;
+  distortion: ToneTypes.Distortion;
+  pitchShift: ToneTypes.PitchShift;
+  panner: ToneTypes.Panner;
+}
+
+// Tone.js exports many instrument classes with mutually-incompatible TypeScript signatures
+// due to contravariance on triggerAttackRelease. We store them as unknown and cast at
+// the specific guarded call sites (all inside try{} blocks).
+interface ToneState {
+  Tone: typeof ToneTypes;
+  synths: Record<string, unknown>;
+  drums: Record<string, unknown>;
+  synthFx: Record<string, ToneFxChain>;
+  recorder: ToneTypes.Recorder;
+  masterGain: ToneTypes.Gain;
+}
+
+// Minimal interface for calling common instrument methods
+// Note/time args use string since Tone's Frequency/Time unit types are strings at runtime
+interface PlayableInstrument {
+  volume: { value: number };
+  triggerAttackRelease: (
+    noteOrDuration: string | string[],
+    durationOrTime?: string | number,
+    time?: number
+  ) => unknown;
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Track {
@@ -128,8 +161,8 @@ export default function StudioPanel({
   const [exporting, setExporting] = useState(false);
   const [status, setStatus] = useState('');
 
-  const tRef = useRef<any>(null); // { Tone, synths, drums, fx }
-  const seqRef = useRef<any>(null);
+  const tRef = useRef<ToneState | null>(null); // { Tone, synths, drums, fx }
+  const seqRef = useRef<ToneTypes.Sequence | null>(null);
   const mrRef = useRef<MediaRecorder | null>(null);
   const micRafRef = useRef(0);
   const audioElRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
@@ -139,7 +172,7 @@ export default function StudioPanel({
   const initTone = useCallback(async () => {
     if (tRef.current) return tRef.current;
     setStatus('Loading audio engine…');
-    const Tone = (await import('tone')) as any;
+    const Tone = (await import('tone')) as typeof ToneTypes;
     await Tone.start();
     Tone.Transport.bpm.value = bpm;
 
@@ -258,41 +291,41 @@ export default function StudioPanel({
       envelope: { attack: 0.001, decay: 0.3 },
     }).connect(masterGain);
     const snare = new Tone.NoiseSynth({
-      noise: { type: 'white' as any },
+      noise: { type: 'white' as const },
       envelope: { attack: 0.001, decay: 0.15 },
     }).connect(masterGain);
     const hhc = new Tone.MetalSynth({
-      frequency: 400,
       envelope: { attack: 0.001, decay: 0.05 },
       resonance: 5000,
       harmonicity: 5.1,
       modulationIndex: 32,
       octaves: 1.5,
     }).connect(masterGain);
+    hhc.frequency.value = 400;
     const hhopen = new Tone.MetalSynth({
-      frequency: 400,
       envelope: { attack: 0.001, decay: 0.4 },
       resonance: 5000,
       harmonicity: 5.1,
       modulationIndex: 32,
       octaves: 1.5,
     }).connect(masterGain);
+    hhopen.frequency.value = 400;
     const clap = new Tone.NoiseSynth({
-      noise: { type: 'pink' as any },
+      noise: { type: 'pink' as const },
       envelope: { attack: 0.005, decay: 0.1 },
     }).connect(masterGain);
     const tom1 = new Tone.MembraneSynth({ pitchDecay: 0.08, octaves: 4 }).connect(masterGain);
     const tom2 = new Tone.MembraneSynth({ pitchDecay: 0.1, octaves: 3 }).connect(masterGain);
     const ride = new Tone.MetalSynth({
-      frequency: 250,
       envelope: { attack: 0.001, decay: 0.5 },
       resonance: 3000,
       harmonicity: 5.1,
       modulationIndex: 16,
       octaves: 1.5,
     }).connect(masterGain);
+    ride.frequency.value = 250;
 
-    const synthFx: Record<string, any> = {
+    const synthFx: Record<string, ToneFxChain> = {
       piano: pianoFx,
       epiano: epFx,
       synth: leadFx,
@@ -334,7 +367,7 @@ export default function StudioPanel({
     return obj;
   }, [bpm]);
 
-  const getSynth = (instrument: string) => {
+  const getSynth = (instrument: string): PlayableInstrument | null => {
     const map: Record<string, string> = {
       piano: 'piano',
       epiano: 'epiano',
@@ -349,7 +382,7 @@ export default function StudioPanel({
       brass: 'brass',
       flute: 'flute',
     };
-    return tRef.current?.synths[map[instrument] ?? 'lead'] ?? null;
+    return (tRef.current?.synths[map[instrument] ?? 'lead'] as PlayableInstrument) ?? null;
   };
 
   // ── Play a note ─────────────────────────────────────────────────────────
@@ -412,15 +445,15 @@ export default function StudioPanel({
           track.drumPattern.forEach((row, ri) => {
             if (!row[step]) return;
             const drumId = DRUM_ROWS[ri]?.id;
-            const drumMap: Record<string, any> = {
-              kick: drums.kick,
-              snare: drums.snare,
-              hhc: drums.hhc,
-              hhopen: drums.hhopen,
-              clap: drums.clap,
-              tom1: drums.tom1,
-              tom2: drums.tom2,
-              ride: drums.ride,
+            const drumMap: Record<string, PlayableInstrument> = {
+              kick: drums.kick as PlayableInstrument,
+              snare: drums.snare as PlayableInstrument,
+              hhc: drums.hhc as PlayableInstrument,
+              hhopen: drums.hhopen as PlayableInstrument,
+              clap: drums.clap as PlayableInstrument,
+              tom1: drums.tom1 as PlayableInstrument,
+              tom2: drums.tom2 as PlayableInstrument,
+              ride: drums.ride as PlayableInstrument,
             };
             const d = drumMap[drumId];
             if (!d) return;
@@ -639,8 +672,8 @@ export default function StudioPanel({
       const displayPrompt = data.enhanced || fullPrompt;
       setGeneratedTracks(prev => [{ url: data.url, prompt: displayPrompt }, ...prev]);
       setMusicPrompt('');
-    } catch (e: any) {
-      setMusicError(e.message);
+    } catch (e: unknown) {
+      setMusicError(e instanceof Error ? e.message : String(e));
     } finally {
       setMusicGenerating(false);
     }

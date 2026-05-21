@@ -19,7 +19,12 @@ export async function searchWeb(query: string, maxResults = 3): Promise<string> 
 
   const parts: string[] = [];
   if (data.answer) parts.push(`Answer: ${data.answer}`);
-  (data.results ?? []).slice(0, maxResults).forEach((r: any) => {
+  interface TavilyResult {
+    title: string;
+    content: string;
+    url: string;
+  }
+  (data.results ?? []).slice(0, maxResults).forEach((r: TavilyResult) => {
     parts.push(`[${r.title}]\n${r.content}\nSource: ${r.url}`);
   });
 

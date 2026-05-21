@@ -15,7 +15,12 @@ const DEVICE_LABEL: Record<string, string> = {
   desktop: 'your desktop',
 };
 
-export default function ProactiveCheckin({ projectName, onContinue, onDismiss, fromDevice }: Props) {
+export default function ProactiveCheckin({
+  projectName,
+  onContinue,
+  onDismiss,
+  fromDevice,
+}: Props) {
   const dismissRef = useRef(onDismiss);
   useEffect(() => {
     dismissRef.current = onDismiss;
@@ -36,15 +41,16 @@ export default function ProactiveCheckin({ projectName, onContinue, onDismiss, f
     >
       <div className="checkin-header">
         <span className="checkin-icon">◈</span>
-        <span className="checkin-label">{fromDevice ? 'Picking up where you left off.' : 'Welcome back.'}</span>
+        <span className="checkin-label">
+          {fromDevice ? 'Picking up where you left off.' : 'Welcome back.'}
+        </span>
       </div>
       <div className="checkin-body">
         {fromDevice ? (
           <>
             You were on <strong className="checkin-project-name">{DEVICE_LABEL[fromDevice]}</strong>{' '}
-            working on{' '}
-            <strong className="checkin-project-name">&ldquo;{projectName}&rdquo;</strong> — load it
-            here?
+            working on <strong className="checkin-project-name">&ldquo;{projectName}&rdquo;</strong>{' '}
+            — load it here?
           </>
         ) : (
           <>

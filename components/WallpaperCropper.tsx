@@ -196,7 +196,7 @@ export default function WallpaperCropper({ src, onCrop, onSkip }: Props) {
   function onPointerDown(e: React.MouseEvent | React.TouchEvent) {
     if (!loaded) return;
     e.preventDefault();
-    const { x: px, y: py } = getCanvasPos(e as any);
+    const { x: px, y: py } = getCanvasPos(e);
     const handle = hitTestHandle(px, py, crop);
     if (handle) {
       dragState.current = { type: 'resize', handle, startX: px, startY: py, origCrop: { ...crop } };
@@ -247,7 +247,13 @@ export default function WallpaperCropper({ src, onCrop, onSkip }: Props) {
 
   // Attach global mousemove/mouseup/touchmove/touchend so drag works even when cursor leaves canvas
   useEffect(() => {
-    function onMove(e: MouseEvent | TouchEvent) {
+    function onMouseMove(e: MouseEvent) {
+      if (!dragState.current) return;
+      e.preventDefault();
+      const { x, y } = getCanvasPos(e);
+      applyDrag(x, y);
+    }
+    function onTouchMove(e: TouchEvent) {
       if (!dragState.current) return;
       e.preventDefault();
       const { x, y } = getCanvasPos(e);
@@ -256,14 +262,14 @@ export default function WallpaperCropper({ src, onCrop, onSkip }: Props) {
     function onUp() {
       dragState.current = null;
     }
-    window.addEventListener('mousemove', onMove as any);
+    window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onUp);
-    window.addEventListener('touchmove', onMove as any, { passive: false });
+    window.addEventListener('touchmove', onTouchMove, { passive: false });
     window.addEventListener('touchend', onUp);
     return () => {
-      window.removeEventListener('mousemove', onMove as any);
+      window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onUp);
-      window.removeEventListener('touchmove', onMove as any);
+      window.removeEventListener('touchmove', onTouchMove);
       window.removeEventListener('touchend', onUp);
     };
   }, [applyDrag]);

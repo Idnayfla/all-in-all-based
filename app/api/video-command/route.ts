@@ -43,6 +43,9 @@ export async function POST(req: NextRequest) {
     const parsed = JSON.parse(text.slice(jsonStart, jsonEnd + 1));
     return NextResponse.json(parsed);
   } catch (err: unknown) {
-    return NextResponse.json({ actions: [], message: `Error: ${err instanceof Error ? err.message : String(err)}` }, { status: 500 });
+    return NextResponse.json(
+      { actions: [], message: `Error: ${err instanceof Error ? err.message : String(err)}` },
+      { status: 500 }
+    );
   }
 }

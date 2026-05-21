@@ -42,12 +42,14 @@ Based has a developer API with `sk-based-` key authentication. Documents needed:
 **Voice**: direct, confident, no corporate language. Based has a personality — let it show in docs.
 
 **Structure**:
+
 - Start with what the reader can do after reading this, not what the doc covers
 - One concept per section
 - Code examples for every API endpoint — no exceptions
 - Every error message links to a resolution
 
 **Length**:
+
 - API reference: as long as needed, never padded
 - User guides: short — if it takes 5 paragraphs to explain a feature, the feature has a UX problem
 - Tooltips: one sentence, action-oriented ("Press Enter to generate" not "Generation is triggered by Enter")
@@ -75,11 +77,13 @@ Keep it user-facing. "Fixed race condition in generation pipeline" is not a chan
 ## Error message framework
 
 Every error message must answer:
+
 1. What happened (past tense, specific)
 2. Why it happened (if the user can understand it)
 3. What to do next (imperative, specific)
 
 Examples:
+
 - Bad: "Error 500"
 - Bad: "Something went wrong"
 - Good: "Generation failed — the request timed out. Try a simpler prompt or break your project into smaller steps."

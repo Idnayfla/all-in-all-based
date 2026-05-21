@@ -59,8 +59,8 @@ export default function PricingModal({
       const { url, error: err } = await res.json();
       if (err) throw new Error(err);
       window.location.href = url;
-    } catch (e: any) {
-      setError(e.message ?? 'Something went wrong. Please try again.');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
       setLoading(false);
     }
   };

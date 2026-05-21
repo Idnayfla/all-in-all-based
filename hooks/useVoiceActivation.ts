@@ -3,6 +3,28 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type VoiceState = 'idle' | 'listening' | 'activated' | 'unsupported';
 
+// Browser SpeechRecognition API types (not yet in TypeScript's lib.dom.d.ts)
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+}
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+}
+interface SpeechRecognitionInstance extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onresult: ((e: SpeechRecognitionEvent) => void) | null;
+  onerror: ((e: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+}
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognitionInstance;
+}
+
 export function useVoiceActivation(onCommand: (text: string) => void, triggerWord = 'based') {
   const [state, setState] = useState<VoiceState>('idle');
   const [transcript, setTranscript] = useState('');
@@ -10,7 +32,7 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
   const stateRef = useRef<VoiceState>('idle');
   const onCommandRef = useRef(onCommand);
   onCommandRef.current = onCommand;
-  const activeRef = useRef<any>(null);
+  const activeRef = useRef<SpeechRecognitionInstance | null>(null);
   const lastCommandRef = useRef('');
   const permissionGranted = useRef(false);
   // Accumulate all transcript text while the user is speaking (push-to-talk mode)
@@ -48,10 +70,15 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
   }, []);
 
   const startRec = useCallback(() => {
-    const SR =
+    const w =
       typeof window !== 'undefined'
-        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        ? (window as Window & {
+            SpeechRecognition?: SpeechRecognitionConstructor;
+            webkitSpeechRecognition?: SpeechRecognitionConstructor;
+          })
         : null;
+    const SR: SpeechRecognitionConstructor | undefined =
+      w?.SpeechRecognition ?? w?.webkitSpeechRecognition;
     if (!SR) return;
 
     accumulatedRef.current = '';
@@ -62,7 +89,7 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
     rec.maxAlternatives = 1;
     activeRef.current = rec;
 
-    rec.onresult = (e: any) => {
+    rec.onresult = (e: SpeechRecognitionEvent) => {
       let full = '';
       for (let i = 0; i < e.results.length; i++) full += e.results[i][0].transcript;
       full = full.trim();
@@ -97,7 +124,7 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
       }
     };
 
-    rec.onerror = (e: any) => {
+    rec.onerror = (e: SpeechRecognitionErrorEvent) => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
         setError('Mic denied — click the lock icon in the address bar → allow Microphone');
         updateState('idle');
@@ -118,17 +145,22 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
 
     try {
       rec.start();
-    } catch (err: any) {
-      setError(`Could not start mic: ${err.message}`);
+    } catch (err: unknown) {
+      setError(`Could not start mic: ${err instanceof Error ? err.message : String(err)}`);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [triggerWord]);
 
   const start = useCallback(async () => {
-    const SR =
+    const w2 =
       typeof window !== 'undefined'
-        ? (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+        ? (window as Window & {
+            SpeechRecognition?: SpeechRecognitionConstructor;
+            webkitSpeechRecognition?: SpeechRecognitionConstructor;
+          })
         : null;
+    const SR: SpeechRecognitionConstructor | undefined =
+      w2?.SpeechRecognition ?? w2?.webkitSpeechRecognition;
     if (!SR) {
       updateState('unsupported');
       setError('Speech recognition not supported — use Chrome or Edge');
@@ -143,13 +175,15 @@ export function useVoiceActivation(onCommand: (text: string) => void, triggerWor
         stream.getTracks().forEach(t => t.stop());
         permissionGranted.current = true;
         await new Promise(r => setTimeout(r, 300));
-      } catch (err: any) {
-        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      } catch (err: unknown) {
+        const name = err instanceof Error ? err.name : '';
+        const msg = err instanceof Error ? err.message : String(err);
+        if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
           setError('Mic blocked — click the lock icon in the address bar → allow Microphone');
-        } else if (err.name === 'NotFoundError') {
+        } else if (name === 'NotFoundError') {
           setError('No microphone found — plug in a mic and try again');
         } else {
-          setError(`Mic error: ${err.message}`);
+          setError(`Mic error: ${msg}`);
         }
         updateState('idle');
         return;

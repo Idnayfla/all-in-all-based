@@ -1,4 +1,4 @@
-# Based — Changelog
+Based — Changelog
 
 User-facing record of what shipped on beta.getbased.dev.
 

@@ -1,6 +1,7 @@
 'use client';
 import dynamic from 'next/dynamic';
 import { useRef, useState } from 'react';
+import type { editor } from 'monaco-editor';
 import { FileNode } from '@/app/page';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
@@ -12,7 +13,7 @@ export default function EditorPanel({
   activeFile: FileNode | null;
   onFileUpdate: (f: FileNode) => void;
 }) {
-  const editorRef = useRef<any>(null);
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const [copied, setCopied] = useState(false);
   const [wordWrap, setWordWrap] = useState<'off' | 'on'>('off');
 

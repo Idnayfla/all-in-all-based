@@ -405,7 +405,7 @@ export default function ChatPanel({
         ...prev.slice(0, -1),
         { role: 'assistant', content: [{ type: 'generated-image', url: data.url, prompt }] },
       ]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setMessages(prev => [
         ...prev.slice(0, -1),
         {
@@ -416,7 +416,7 @@ export default function ChatPanel({
               message:
                 'Image generation failed. Try rephrasing your prompt — if it keeps happening, tap Report.',
               prompt,
-              actualError: err?.message ?? String(err),
+              actualError: err instanceof Error ? err.message : String(err),
             },
           ],
         },
@@ -458,7 +458,7 @@ export default function ChatPanel({
         ...prev.slice(0, -1),
         { role: 'assistant', content: [{ type: 'generated-music', url: data.url, prompt }] },
       ]);
-    } catch (err: any) {
+    } catch {
       setMessages(prev => [
         ...prev.slice(0, -1),
         {
@@ -515,7 +515,7 @@ export default function ChatPanel({
         ...prev.slice(0, -1),
         { role: 'assistant', content: [{ type: 'generated-video', url: data.url, prompt }] },
       ]);
-    } catch (err: any) {
+    } catch {
       setMessages(prev => [
         ...prev.slice(0, -1),
         {
@@ -822,9 +822,11 @@ export default function ChatPanel({
           }
         }
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       setGenProgress(null);
-      if (e?.name === 'AbortError' || e?.message === 'limit') {
+      const eName = e instanceof Error ? e.name : '';
+      const eMsg = e instanceof Error ? e.message : '';
+      if (eName === 'AbortError' || eMsg === 'limit') {
         // AbortError = user clicked Discard; limit = pricing modal already shown — just clean up
         doneHandled = true;
         setMessages(prev => {
@@ -898,7 +900,7 @@ export default function ChatPanel({
           if (memData.memory) {
             window.dispatchEvent(new CustomEvent('memory-updated'));
           }
-        } catch (e) {}
+        } catch {}
       }
     }
   };
@@ -1099,7 +1101,8 @@ export default function ChatPanel({
                 {m.role === 'assistant' &&
                   !(isGenerating && i === messages.length - 1) &&
                   !(
-                    Array.isArray(m.content) && m.content.every((b: any) => b.type === 'error')
+                    Array.isArray(m.content) &&
+                    m.content.every((b: ContentBlock) => b.type === 'error')
                   ) && (
                     <div className="msg-flag-area">
                       {flaggedSet.has(i) ? (
@@ -1142,18 +1145,24 @@ export default function ChatPanel({
                                 const txt =
                                   typeof m.content === 'string'
                                     ? m.content
-                                    : (m.content as any[])
-                                        .filter((b: any) => b.type === 'text')
-                                        .map((b: any) => b.text)
+                                    : (m.content as ContentBlock[])
+                                        .filter((b: ContentBlock) => b.type === 'text')
+                                        .map(
+                                          (b: ContentBlock) =>
+                                            (b as Extract<ContentBlock, { type: 'text' }>).text
+                                        )
                                         .join(' ');
                                 const prev = messages[i - 1];
                                 const userTxt =
                                   prev?.role === 'user'
                                     ? typeof prev.content === 'string'
                                       ? prev.content
-                                      : (prev.content as any[])
-                                          .filter((b: any) => b.type === 'text')
-                                          .map((b: any) => b.text)
+                                      : (prev.content as ContentBlock[])
+                                          .filter((b: ContentBlock) => b.type === 'text')
+                                          .map(
+                                            (b: ContentBlock) =>
+                                              (b as Extract<ContentBlock, { type: 'text' }>).text
+                                          )
                                           .join(' ')
                                     : '';
                                 submitFlag(i, txt, userTxt);

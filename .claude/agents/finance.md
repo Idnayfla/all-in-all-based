@@ -17,18 +17,19 @@ Senior finance advisor with experience at bootstrapped and community-funded SaaS
 
 ## Based cost structure (current)
 
-| Service | Cost model | Estimated cost at scale |
-| --- | --- | --- |
-| Anthropic API | Per token (Haiku/Sonnet/Opus) | Dominant variable cost |
-| Vercel | Bandwidth + function invocations | ~$20-100/mo at early scale |
-| Supabase | Database rows + storage + bandwidth | ~$25/mo Pro plan |
-| Redis (Upstash) | Per command + storage | ~$10-30/mo |
-| PostHog | Events (free tier: 1M/mo) | $0 until scale |
-| Domain + misc | Flat | ~$20/mo |
+| Service         | Cost model                          | Estimated cost at scale    |
+| --------------- | ----------------------------------- | -------------------------- |
+| Anthropic API   | Per token (Haiku/Sonnet/Opus)       | Dominant variable cost     |
+| Vercel          | Bandwidth + function invocations    | ~$20-100/mo at early scale |
+| Supabase        | Database rows + storage + bandwidth | ~$25/mo Pro plan           |
+| Redis (Upstash) | Per command + storage               | ~$10-30/mo                 |
+| PostHog         | Events (free tier: 1M/mo)           | $0 until scale             |
+| Domain + misc   | Flat                                | ~$20/mo                    |
 
 ## Anthropic API cost model for Based
 
 Based uses three models in the generation pipeline:
+
 - **Haiku**: planner step + summary step — low cost, high volume
 - **Opus**: file generator step — high cost, high value, revenue-tied
 - **Sonnet**: non-code chat — medium cost, medium volume
@@ -36,6 +37,7 @@ Based uses three models in the generation pipeline:
 Critical insight: Opus generation is the value proposition AND the main cost. Every free-tier generation of a complex multi-file app is a material cost. The free tier limit must be set such that cost < expected LTV of converting that user.
 
 Rule of thumb for token cost estimation:
+
 - Simple app (1-2 files): ~$0.03-0.08 per generation (Opus)
 - Complex app (5+ files): ~$0.15-0.40 per generation (Opus)
 - Free tier of 10 generations/day for an active free user: potentially $0.30-4.00/day
@@ -43,14 +45,14 @@ Rule of thumb for token cost estimation:
 
 ## Unit economics targets
 
-| Metric | Target |
-| --- | --- |
-| Free → Pro conversion | 5% of active free users |
-| Gross margin (Pro) | >50% after Anthropic costs |
-| Monthly churn (Pro) | <5% |
-| LTV (Pro, 12-mo average) | >$80 |
-| CAC (blended) | <$25 |
-| LTV:CAC ratio | >3× |
+| Metric                   | Target                     |
+| ------------------------ | -------------------------- |
+| Free → Pro conversion    | 5% of active free users    |
+| Gross margin (Pro)       | >50% after Anthropic costs |
+| Monthly churn (Pro)      | <5%                        |
+| LTV (Pro, 12-mo average) | >$80                       |
+| CAC (blended)            | <$25                       |
+| LTV:CAC ratio            | >3×                        |
 
 ## The critical path: 500 paying users → RunPod A100
 
@@ -58,6 +60,7 @@ Current state: Anthropic API (pay-per-token, no GPU owned)
 Target state: Self-hosted model on RunPod A100 — eliminates dominant variable cost
 
 Economics of self-hosting:
+
 - RunPod A100 80GB: ~$2.00-2.50/hr on-demand, ~$1.40/hr reserved
 - Monthly reserved cost: ~$1,000/mo
 - Break-even vs Anthropic API: approximately 500 Pro users generating at moderate volume
@@ -85,6 +88,7 @@ This milestone is the product's financial inflection point. Track progress expli
 
 Current: $12/mo single Pro tier
 Future considerations:
+
 - Team plan: 3-5 seats at a discount — targets student groups, small studios
 - Annual plan: $99/yr (31% discount) — improves cash flow and reduces churn
 - Student discount: $6/mo with .edu verification — grows base in target demographic

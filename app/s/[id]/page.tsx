@@ -31,7 +31,9 @@ export default async function SharePage({ params }: { params: Promise<{ id: stri
 
   if (error || !data) notFound();
 
-  const htmlFile = data.files.find((f: any) => f.name === 'index.html') ?? data.files[0];
+  const htmlFile =
+    data.files.find((f: { name: string; content: string }) => f.name === 'index.html') ??
+    data.files[0];
   if (!htmlFile) notFound();
 
   const srcDoc = htmlFile.content;

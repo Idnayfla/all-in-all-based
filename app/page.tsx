@@ -21,6 +21,7 @@ import ThemeCustomizer, {
   saveThemeLocally,
 } from '@/components/ThemeCustomizer';
 import { supabase } from '@/lib/supabase';
+import type { User } from '@supabase/supabase-js';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
 import { useSwipePanels } from '@/hooks/useSwipePanels';
 import PricingModal from '@/components/PricingModal';
@@ -120,7 +121,7 @@ export default function Home() {
   const [newApiKey, setNewApiKey] = useState<string | null>(null);
   const [apiKeyName, setApiKeyName] = useState('');
   const [apiKeyLoading, setApiKeyLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [authToken, setAuthToken] = useState<string>('');
   const isExplicitSignOut = useRef(false);
@@ -386,7 +387,11 @@ export default function Home() {
   // dev-only console helpers
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development') return;
-    (window as any).__triggerCheckin = () => {
+    const w = window as Window & {
+      __triggerCheckin?: () => void;
+      __simulateInterrupt?: () => void;
+    };
+    w.__triggerCheckin = () => {
       const raw = localStorage.getItem(LAST_PROJECT_KEY);
       if (!raw) {
         console.warn('[checkin] no last project in localStorage');
@@ -396,7 +401,7 @@ export default function Home() {
       setCheckin({ id, name });
     };
     // simulate abrupt exit then reload to test interrupted flow
-    (window as any).__simulateInterrupt = () => {
+    w.__simulateInterrupt = () => {
       const p = currentProjectRef.current;
       if (!p) {
         console.warn('[checkin] no active project');
@@ -409,8 +414,8 @@ export default function Home() {
       console.log('[checkin] interrupted marker set — refresh to trigger check-in');
     };
     return () => {
-      delete (window as any).__triggerCheckin;
-      delete (window as any).__simulateInterrupt;
+      delete w.__triggerCheckin;
+      delete w.__simulateInterrupt;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -882,14 +887,14 @@ export default function Home() {
         setIsSharing(false);
         alert('Share failed: ' + (data.error ?? 'Unknown error'));
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       clearTimeout(timeout);
       setIsSharing(false);
-      if (e?.name === 'AbortError') {
+      if (e instanceof Error && e.name === 'AbortError') {
         alert('Share timed out — check your connection and try again.');
       } else {
         console.error('[share]', e);
-        alert('Share failed: ' + e.message);
+        alert('Share failed: ' + (e instanceof Error ? e.message : String(e)));
       }
     }
   };

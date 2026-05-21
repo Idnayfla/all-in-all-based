@@ -48,18 +48,19 @@ User prompt
 
 ### Known failure modes
 
-| Failure | Stage | Root cause | Fix |
-| --- | --- | --- | --- |
-| Generic output | Planner | `description` field too vague | Richer description with specific UI elements |
-| Truncated files | File Generator | Context window exceeded | Split into smaller files or truncate existing-file context earlier |
-| Broken JSON plan | Planner | Model formatted response incorrectly | Add JSON schema validation + retry with explicit format reminder |
-| Cross-file inconsistency | File Generator | File B doesn't know File A's decisions | Pass File A's generated content as context to File B |
-| Button safety net not injected | sanitizeHTML | Post-processing regex missed edge case | Fix regex in sanitizeHTML, not in the prompt |
-| Audio broken in iframe | File Generator | External CDN URL generated | Prompt rule + sanitizeHTML replacement for known audio patterns |
+| Failure                        | Stage          | Root cause                             | Fix                                                                |
+| ------------------------------ | -------------- | -------------------------------------- | ------------------------------------------------------------------ |
+| Generic output                 | Planner        | `description` field too vague          | Richer description with specific UI elements                       |
+| Truncated files                | File Generator | Context window exceeded                | Split into smaller files or truncate existing-file context earlier |
+| Broken JSON plan               | Planner        | Model formatted response incorrectly   | Add JSON schema validation + retry with explicit format reminder   |
+| Cross-file inconsistency       | File Generator | File B doesn't know File A's decisions | Pass File A's generated content as context to File B               |
+| Button safety net not injected | sanitizeHTML   | Post-processing regex missed edge case | Fix regex in sanitizeHTML, not in the prompt                       |
+| Audio broken in iframe         | File Generator | External CDN URL generated             | Prompt rule + sanitizeHTML replacement for known audio patterns    |
 
 ## Prompt architecture principles
 
 **System prompt hierarchy** (Based):
+
 - `SYSTEM` — governs non-code chat responses (Sonnet)
 - `FILE_GENERATOR_SYSTEM` — governs each file generation call (Opus)
 - `PLANNER_SYSTEM` — governs the planning step (Haiku)
@@ -69,21 +70,23 @@ Rules that must apply to generated code belong in `FILE_GENERATOR_SYSTEM` + `san
 **Structural guarantees via post-processing**: prompt rules for structural output (e.g., "always add defer to scripts") are unreliable under distribution. `sanitizeHTML()` enforces these reliably. This is intentional architecture — not a workaround.
 
 **Context window budgeting**:
+
 - Planner receives: full user prompt + project file list + descriptions (~2K tokens typical)
 - File generator receives: planner description + full target file + 600-char truncated other files
 - At 5+ files, the truncation of other files means cross-file knowledge degrades — plan accordingly
 
 ## Model selection guide
 
-| Step | Model | Rationale |
-| --- | --- | --- |
-| Planner | Haiku | Low-complexity JSON output; fast; cheap |
-| File generator | Opus | Maximum code quality; worth the cost |
-| Summary | Haiku | Simple summarisation; no reasoning required |
-| Non-code chat | Sonnet | Balanced quality/cost for conversational replies |
-| Memory extraction | Haiku | Pattern matching on conversation history; simple |
+| Step              | Model  | Rationale                                        |
+| ----------------- | ------ | ------------------------------------------------ |
+| Planner           | Haiku  | Low-complexity JSON output; fast; cheap          |
+| File generator    | Opus   | Maximum code quality; worth the cost             |
+| Summary           | Haiku  | Simple summarisation; no reasoning required      |
+| Non-code chat     | Sonnet | Balanced quality/cost for conversational replies |
+| Memory extraction | Haiku  | Pattern matching on conversation history; simple |
 
 When to upgrade a step:
+
 - Planner → Sonnet: when planning errors are the bottleneck (e.g., wrong file set chosen)
 - Summary → Sonnet: when summaries feel generic or miss key context (rare)
 - Chat → Opus: never in production (cost prohibitive for conversational volume)
@@ -93,12 +96,14 @@ When to upgrade a step:
 Current: Redis-backed. Haiku extracts facts from conversation history. Retrieved on each new message.
 
 Design principles:
+
 - Extract: entities, preferences, project state — not raw conversation
 - Retrieve: relevant subset, not all memory — avoid context bloat
 - Decay: old memories should be reviewed and pruned — staleness degrades quality
 - Privacy: memory is per-user, isolated — never bleeds between users
 
 Future considerations:
+
 - Semantic search over memories (vector embeddings) for relevance-ranked retrieval
 - Memory confidence scores — some facts are more reliable than others
 - User-visible memory log — "here's what I remember about you" builds trust
@@ -113,6 +118,7 @@ For generation quality regression testing:
 4. **Human review**: 10% sample of production generations weekly — look for subtle quality drift
 
 Metrics:
+
 - Generation success rate (app renders without error)
 - Spec adherence rate (generated app matches what was asked)
 - Cross-file consistency score (do the files work together?)

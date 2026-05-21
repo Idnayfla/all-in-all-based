@@ -1,5 +1,6 @@
 'use client';
 import { useRef, useState, useEffect, useCallback } from 'react';
+import type { FFmpeg } from '@ffmpeg/ffmpeg';
 
 interface TextOverlay {
   id: string;
@@ -22,7 +23,7 @@ export default function VideoEditorPanel() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
-  const ffmpegRef = useRef<any>(null);
+  const ffmpegRef = useRef<FFmpeg | null>(null);
 
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoUrl, setVideoUrl] = useState('');
@@ -570,10 +571,11 @@ export default function VideoEditorPanel() {
       await ff.exec(args);
       setProcStatus('Reading output…');
       const data = await ff.readFile('output.mp4');
-      setExportUrl(URL.createObjectURL(new Blob([data], { type: 'video/mp4' })));
+      const blobData = data instanceof Uint8Array ? data.buffer.slice(0) : data;
+      setExportUrl(URL.createObjectURL(new Blob([blobData as ArrayBuffer], { type: 'video/mp4' })));
       setProcStatus('Done');
-    } catch (err: any) {
-      setProcStatus(`Error: ${err.message}`);
+    } catch (err: unknown) {
+      setProcStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setProcessing(false);
     }

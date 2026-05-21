@@ -63,6 +63,9 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url, enhanced });
   } catch (err: unknown) {
-    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    );
   }
 }

@@ -18,15 +18,15 @@ Senior legal and compliance advisor specialising in SaaS, AI products, and cross
 
 ## Based data map (what we collect and where it lives)
 
-| Data | Location | Retention | Deletion mechanism |
-| --- | --- | --- | --- |
-| User accounts (email, name) | Supabase (auth) | Account lifetime | Account deletion endpoint |
-| Chat messages | Supabase (database) | Account lifetime | Cascade on account delete |
-| Memory extracts | Redis | Rolling window | Flush on account delete |
-| Generated files | Supabase (storage) | Account lifetime | Cascade on account delete |
-| Analytics events | PostHog (EU cloud) | 12 months | PostHog person delete API |
-| Payment data | Stripe | Legal minimum (7 yrs) | Stripe — we don't store card data |
-| API keys (sk-based-) | Supabase | Until revoked | Key revocation endpoint |
+| Data                        | Location            | Retention             | Deletion mechanism                |
+| --------------------------- | ------------------- | --------------------- | --------------------------------- |
+| User accounts (email, name) | Supabase (auth)     | Account lifetime      | Account deletion endpoint         |
+| Chat messages               | Supabase (database) | Account lifetime      | Cascade on account delete         |
+| Memory extracts             | Redis               | Rolling window        | Flush on account delete           |
+| Generated files             | Supabase (storage)  | Account lifetime      | Cascade on account delete         |
+| Analytics events            | PostHog (EU cloud)  | 12 months             | PostHog person delete API         |
+| Payment data                | Stripe              | Legal minimum (7 yrs) | Stripe — we don't store card data |
+| API keys (sk-based-)        | Supabase            | Until revoked         | Key revocation endpoint           |
 
 ## PDPA (Singapore) essentials
 

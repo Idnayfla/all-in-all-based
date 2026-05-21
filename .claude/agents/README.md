@@ -25,22 +25,22 @@ Without a prefix, Claude defaults to **Full-Stack Engineer** mode.
 
 ---
 
-| Agent               | File                   | Core Output                              |
-| ------------------- | ---------------------- | ---------------------------------------- |
-| Architect           | `architect.md`         | System design, scalability decisions     |
-| Product Manager     | `product.md`           | Roadmap, specs, prioritization           |
-| UI/UX Designer      | `designer.md`          | Design system, component layouts         |
-| Full-Stack Engineer | (default)              | Code, bug fixes, features                |
-| Growth Engineer     | `growth.md`            | Copy, SEO, conversion                    |
-| QA Engineer         | `qa.md`                | Test plans, bug triage                   |
-| DevOps / SRE        | `devops.md`            | Infra, cost, monitoring                  |
-| Security Engineer   | `security.md`          | Auth, data, API security                 |
-| Chief of Staff      | `chief-of-staff.md`    | Decisions, changelog, tracking           |
-| Senior Engineer     | `senior-engineer.md`   | Deep bug diagnosis, pipeline fixes       |
-| Mobile Engineer     | `mobile.md`            | PWA, service workers, iOS/Android, stores|
-| Data Analyst        | `data-analyst.md`      | Funnels, retention, A/B testing, metrics |
-| Legal & Compliance  | `legal.md`             | Privacy, ToS, GDPR/PDPA, compliance      |
-| Community Manager   | `community.md`         | Feedback, Discord, support, changelog    |
-| Finance & Revenue   | `finance.md`           | MRR, unit economics, pricing, API costs  |
-| Technical Writer    | `technical-writer.md`  | API docs, user guides, error messages    |
-| AI Engineer         | `ai-engineer.md`       | Prompt arch, model selection, pipeline   |
+| Agent               | File                  | Core Output                               |
+| ------------------- | --------------------- | ----------------------------------------- |
+| Architect           | `architect.md`        | System design, scalability decisions      |
+| Product Manager     | `product.md`          | Roadmap, specs, prioritization            |
+| UI/UX Designer      | `designer.md`         | Design system, component layouts          |
+| Full-Stack Engineer | (default)             | Code, bug fixes, features                 |
+| Growth Engineer     | `growth.md`           | Copy, SEO, conversion                     |
+| QA Engineer         | `qa.md`               | Test plans, bug triage                    |
+| DevOps / SRE        | `devops.md`           | Infra, cost, monitoring                   |
+| Security Engineer   | `security.md`         | Auth, data, API security                  |
+| Chief of Staff      | `chief-of-staff.md`   | Decisions, changelog, tracking            |
+| Senior Engineer     | `senior-engineer.md`  | Deep bug diagnosis, pipeline fixes        |
+| Mobile Engineer     | `mobile.md`           | PWA, service workers, iOS/Android, stores |
+| Data Analyst        | `data-analyst.md`     | Funnels, retention, A/B testing, metrics  |
+| Legal & Compliance  | `legal.md`            | Privacy, ToS, GDPR/PDPA, compliance       |
+| Community Manager   | `community.md`        | Feedback, Discord, support, changelog     |
+| Finance & Revenue   | `finance.md`          | MRR, unit economics, pricing, API costs   |
+| Technical Writer    | `technical-writer.md` | API docs, user guides, error messages     |
+| AI Engineer         | `ai-engineer.md`      | Prompt arch, model selection, pipeline    |

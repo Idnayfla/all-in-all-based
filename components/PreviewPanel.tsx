@@ -66,8 +66,9 @@ export default function PreviewPanel({
       const data = await res.json();
       setOutput(data.output ?? '');
       setStderr(data.stderr ?? '');
-    } catch (err: any) {
-      if (err.name !== 'AbortError') setOutput('Error: Could not execute code.');
+    } catch (err: unknown) {
+      if (!(err instanceof Error && err.name === 'AbortError'))
+        setOutput('Error: Could not execute code.');
     } finally {
       setIsRunning(false);
       abortRef.current = null;

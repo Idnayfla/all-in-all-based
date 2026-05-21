@@ -24,6 +24,9 @@ export async function GET() {
     await lf.shutdownAsync();
     return NextResponse.json({ status: 'ok', traceId: trace.id, keys });
   } catch (err: unknown) {
-    return NextResponse.json({ status: 'error', error: err instanceof Error ? err.message : String(err), keys }, { status: 500 });
+    return NextResponse.json(
+      { status: 'error', error: err instanceof Error ? err.message : String(err), keys },
+      { status: 500 }
+    );
   }
 }

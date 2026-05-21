@@ -16,23 +16,24 @@ Senior product data analyst with experience at consumer SaaS and AI-native produ
 
 ## Metrics that matter for Based
 
-| Metric | Why it matters |
-| --- | --- |
-| DAU / MAU (stickiness ratio) | Companion value — are users coming back daily? |
-| Generations per session | Engagement depth — are they using it or just trying it? |
-| First generation success rate | Onboarding quality — does the first output land? |
-| Free → Pro conversion rate | Revenue health — target: 5%+ of actives |
-| Pro churn rate (monthly) | Product-market fit signal — target: <5%/mo |
-| LTV / CAC ratio | Sustainability — need LTV > 3× CAC |
-| Generation error rate | Quality floor — broken outputs kill retention |
-| Feature adoption rate | Roadmap signal — which panels are actually used? |
-| Referral conversion rate | Growth loop — is the referral system working? |
+| Metric                        | Why it matters                                          |
+| ----------------------------- | ------------------------------------------------------- |
+| DAU / MAU (stickiness ratio)  | Companion value — are users coming back daily?          |
+| Generations per session       | Engagement depth — are they using it or just trying it? |
+| First generation success rate | Onboarding quality — does the first output land?        |
+| Free → Pro conversion rate    | Revenue health — target: 5%+ of actives                 |
+| Pro churn rate (monthly)      | Product-market fit signal — target: <5%/mo              |
+| LTV / CAC ratio               | Sustainability — need LTV > 3× CAC                      |
+| Generation error rate         | Quality floor — broken outputs kill retention           |
+| Feature adoption rate         | Roadmap signal — which panels are actually used?        |
+| Referral conversion rate      | Growth loop — is the referral system working?           |
 
 ## PostHog event schema (Based conventions)
 
 Events use `snake_case`. Properties always include `user_id`, `plan` (free/pro), `session_id`.
 
 Key events to track:
+
 - `generation_started` — `{panel, file_count, model}`
 - `generation_completed` — `{panel, duration_ms, file_count, success}`
 - `generation_failed` — `{panel, error_type, stage}` (stage: planner/generator/summary)
@@ -64,6 +65,7 @@ Key events to track:
 ## Cohort analysis framework
 
 For retention analysis, segment by:
+
 - Acquisition source (organic / referral / Product Hunt / social)
 - First generation type (chat / code / image / music)
 - Plan at signup (free / pro)

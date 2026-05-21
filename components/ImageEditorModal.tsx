@@ -142,8 +142,8 @@ export default function ImageEditorModal({
       const data = await res.json();
       if (!res.ok || data.error) throw new Error(data.error ?? 'Server error');
       setResultUrl(data.url);
-    } catch (err: any) {
-      setError(err.message ?? 'Generation failed');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Generation failed');
     } finally {
       setIsGenerating(false);
     }

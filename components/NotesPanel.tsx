@@ -12,6 +12,7 @@ import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { Extension } from '@tiptap/core';
+import type { CommandProps } from '@tiptap/core';
 
 // ── Custom FontSize extension ─────────────────────────────────────────────────
 const FontSize = Extension.create({
@@ -37,13 +38,13 @@ const FontSize = Extension.create({
     return {
       setFontSize:
         (size: string) =>
-        ({ chain }: any) =>
+        ({ chain }: CommandProps) =>
           chain().setMark('textStyle', { fontSize: size }).run(),
       unsetFontSize:
         () =>
-        ({ chain }: any) =>
+        ({ chain }: CommandProps) =>
           chain().setMark('textStyle', { fontSize: null }).removeEmptyTextStyle().run(),
-    } as any;
+    };
   },
 });
 
@@ -412,7 +413,7 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
   const sel = notes.find(n => n.id === selId) ?? null;
 
   // ── Toolbar helpers ────────────────────────────────────────────────────────
-  const isActive = (name: string, attrs?: Record<string, any>) =>
+  const isActive = (name: string, attrs?: Record<string, unknown>) =>
     editor?.isActive(name, attrs) ?? false;
   const cmd = (fn: () => void) => {
     fn();
@@ -546,7 +547,13 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
                   title="Font size"
                   defaultValue="16px"
                   onChange={e =>
-                    cmd(() => (editor?.chain().focus() as any).setFontSize(e.target.value).run())
+                    cmd(() => {
+                      editor
+                        ?.chain()
+                        .focus()
+                        .setMark('textStyle', { fontSize: e.target.value })
+                        .run();
+                    })
                   }
                 >
                   {FONT_SIZES.map(s => (

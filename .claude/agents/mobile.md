@@ -49,12 +49,14 @@ Senior mobile engineer specialising in progressive web apps and hybrid native bu
 ## App store submission checklist
 
 Apple App Store:
+
 - Privacy manifest (`PrivacyInfo.xcprivacy`) required for API usage declarations
 - Screenshots in 6.9-inch + 6.5-inch + 12.9-inch iPad formats
 - App Review guideline 4.2: apps must have functionality beyond a web wrapper
 - In-app purchase required for any digital goods sold (30% cut — price accordingly)
 
 Google Play:
+
 - Target SDK must be within 1 year of current Android release
 - Data safety form must match actual data collection (Supabase, PostHog, Stripe)
 - 64-bit binary required — Capacitor builds this by default

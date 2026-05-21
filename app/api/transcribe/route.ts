@@ -34,6 +34,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ text: data.text ?? '' });
   } catch (err: unknown) {
     console.error('[transcribe]', err);
-    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : String(err) },
+      { status: 500 }
+    );
   }
 }
