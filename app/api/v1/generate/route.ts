@@ -1,5 +1,5 @@
 // Based Personal API — v1/generate
-// Accepts an API key (sk-based-*) and returns generated files as JSON.
+// Accepts an API key (pk_live_*) and returns generated files as JSON.
 // Pro tier only. Hard cap: 100 calls/month per key.
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -11,9 +11,9 @@ export const maxDuration = 300;
 export async function POST(req: NextRequest) {
   const authHeader = req.headers.get('Authorization') ?? '';
   const apiKey = authHeader.replace('Bearer ', '').trim();
-  if (!apiKey.startsWith('sk-based-')) {
+  if (!apiKey.startsWith('pk_live_')) {
     return NextResponse.json(
-      { error: 'Missing or invalid API key. Pass Authorization: Bearer sk-based-...' },
+      { error: 'Missing or invalid API key. Pass Authorization: Bearer pk_live_...' },
       { status: 401 }
     );
   }

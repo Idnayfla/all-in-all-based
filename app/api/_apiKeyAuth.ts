@@ -64,7 +64,7 @@ export function generateApiKey(): string {
   const raw = Array.from(bytes)
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
-  return `sk-based-${raw}`;
+  return `pk_live_${raw}`;
 }
 
 export async function hashApiKey(key: string): Promise<string> {

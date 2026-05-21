@@ -51,6 +51,7 @@ export default function PricingModal({
 
   const upgrade = async () => {
     track('pro_upgrade_clicked', { reason });
+    (window as Window & { fbq?: (...args: unknown[]) => void }).fbq?.('track', 'InitiateCheckout');
     setLoading(true);
     setError('');
     try {

@@ -157,6 +157,7 @@ export default function Home() {
     id: string;
     name: string;
     fromDevice?: 'mobile' | 'tablet' | 'desktop';
+    error?: string;
   } | null>(null);
   const [aiModel, setAiModelState] = useState<'based' | 'free'>('based');
   const [persona, setPersona] =
@@ -340,6 +341,10 @@ export default function Home() {
     if (typeof window === 'undefined') return;
     const params = new URLSearchParams(window.location.search);
     if (params.get('upgraded') === 'true') {
+      (window as Window & { fbq?: (...args: unknown[]) => void }).fbq?.('track', 'Purchase', {
+        value: 12.0,
+        currency: 'SGD',
+      });
       window.history.replaceState({}, '', window.location.pathname);
       setSubscription(s => ({ ...s, tier: 'pro' }));
     }
@@ -1516,6 +1521,10 @@ export default function Home() {
                 {user && subscription.tier === 'pro' && (
                   <div className="settings-section" style={{ position: 'relative' }}>
                     <label className="settings-label">API Keys</label>
+                    <p className="apikey-migration-notice">
+                      Keys generated before 21 May 2026 used an old format and will not work. Revoke
+                      them and generate a new one.
+                    </p>
                     <div className="apikey-section">
                       {newApiKey && (
                         <div className="apikey-reveal">
@@ -1699,10 +1708,36 @@ export default function Home() {
                     <ProactiveCheckin
                       projectName={checkin.name}
                       fromDevice={checkin.fromDevice}
-                      onContinue={() => {
-                        const project = projects.find(p => p.id === checkin.id);
-                        if (project) loadProject(project);
-                        else setCheckin(null);
+                      error={checkin.error}
+                      onContinue={async () => {
+                        // 1. Check in-memory state (already loaded)
+                        const inState = projects.find(p => p.id === checkin.id);
+                        if (inState) {
+                          loadProject(inState);
+                          return;
+                        }
+                        // 2. Check localStorage cache (available before cloud load)
+                        const cached = loadProjectsCache().find(p => p.id === checkin.id);
+                        if (cached) {
+                          loadProject(cached);
+                          return;
+                        }
+                        // 3. Live fetch — cloud may not have loaded yet when checkin fired
+                        try {
+                          const headers = await getHeaders();
+                          const res = await fetch(`/api/projects/${checkin.id}`, { headers });
+                          if (res.ok) {
+                            const { project } = await res.json();
+                            if (project) {
+                              loadProject(project);
+                              return;
+                            }
+                          }
+                        } catch {}
+                        // 4. Project is truly gone — show error instead of silently dismissing
+                        setCheckin(prev =>
+                          prev ? { ...prev, error: 'That project was deleted.' } : null
+                        );
                       }}
                       onDismiss={() => setCheckin(null)}
                     />

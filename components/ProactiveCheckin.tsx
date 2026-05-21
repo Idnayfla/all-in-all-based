@@ -7,6 +7,7 @@ interface Props {
   onContinue: () => void;
   onDismiss: () => void;
   fromDevice?: 'mobile' | 'tablet' | 'desktop';
+  error?: string;
 }
 
 const DEVICE_LABEL: Record<string, string> = {
@@ -20,6 +21,7 @@ export default function ProactiveCheckin({
   onContinue,
   onDismiss,
   fromDevice,
+  error,
 }: Props) {
   const dismissRef = useRef(onDismiss);
   useEffect(() => {
@@ -46,7 +48,9 @@ export default function ProactiveCheckin({
         </span>
       </div>
       <div className="checkin-body">
-        {fromDevice ? (
+        {error ? (
+          <span className="checkin-error">{error}</span>
+        ) : fromDevice ? (
           <>
             You were on <strong className="checkin-project-name">{DEVICE_LABEL[fromDevice]}</strong>{' '}
             working on <strong className="checkin-project-name">&ldquo;{projectName}&rdquo;</strong>{' '}
@@ -61,11 +65,13 @@ export default function ProactiveCheckin({
         )}
       </div>
       <div className="checkin-actions">
-        <button className="checkin-continue" onClick={onContinue}>
-          Continue →
-        </button>
+        {!error && (
+          <button className="checkin-continue" onClick={onContinue}>
+            Continue →
+          </button>
+        )}
         <button className="checkin-dismiss" onClick={onDismiss}>
-          Not now
+          {error ? 'Dismiss' : 'Not now'}
         </button>
       </div>
       <div className="checkin-timer-bar">

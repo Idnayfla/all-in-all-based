@@ -3,6 +3,17 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
+async function fireCompleteRegistrationIfNew() {
+  const { data } = await supabase.auth.getUser();
+  const createdAt = data?.user?.created_at;
+  if (createdAt && Date.now() - new Date(createdAt).getTime() < 60_000) {
+    (window as Window & { fbq?: (...args: unknown[]) => void }).fbq?.(
+      'track',
+      'CompleteRegistration'
+    );
+  }
+}
+
 export default function AuthCallback() {
   const router = useRouter();
 
@@ -31,7 +42,9 @@ export default function AuthCallback() {
       } = supabase.auth.onAuthStateChange(event => {
         if (!exchangeStarted) return;
         if (event === 'PASSWORD_RECOVERY') go('/auth/reset-password');
-        else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') go('/');
+        else if (event === 'SIGNED_IN') {
+          fireCompleteRegistrationIfNew().finally(() => go('/'));
+        } else if (event === 'TOKEN_REFRESHED') go('/');
       });
 
       exchangeStarted = true;
@@ -43,7 +56,9 @@ export default function AuthCallback() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(event => {
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') go('/');
+      if (event === 'SIGNED_IN') {
+        fireCompleteRegistrationIfNew().finally(() => go('/'));
+      } else if (event === 'TOKEN_REFRESHED') go('/');
     });
 
     supabase.auth.getSession().then(({ data: { session } }) => {

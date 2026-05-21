@@ -5486,6 +5486,10 @@ body {
   color: var(--text);
   font-style: normal;
 }
+.checkin-error {
+  color: var(--text2);
+  font-style: italic;
+}
 .checkin-actions {
   display: flex;
   gap: 8px;
@@ -8281,6 +8285,16 @@ body:has(.beta-banner) .app-root {
 .apikey-create-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+.apikey-migration-notice {
+  font-size: 10px;
+  color: #e8a045;
+  background: rgba(232, 160, 69, 0.08);
+  border: 1px solid rgba(232, 160, 69, 0.2);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin: 0 0 10px;
+  line-height: 1.5;
 }
 .apikey-hint-text {
   font-size: 10px;
