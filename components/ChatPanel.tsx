@@ -1277,7 +1277,14 @@ export default function ChatPanel({
             </motion.div>
           )}
         </AnimatePresence>
-        <div className="chat-input-row">
+        <div
+          className="chat-input-row"
+          onClick={() => {
+            if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+              setMobileInputOpen(true);
+            }
+          }}
+        >
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"

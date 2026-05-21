@@ -2403,9 +2403,39 @@ body {
 
   /* Prevent iOS Safari auto-zoom on input focus (triggered when font-size < 16px) */
   input,
-  textarea,
-  select {
+  select,
+  .mobile-input-textarea {
     font-size: 16px !important;
+  }
+  .chat-textarea {
+    font-size: 14px !important;
+  }
+
+  .chat-input-area {
+    padding: 10px 16px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+
+  .chat-input-row {
+    gap: 6px;
+  }
+
+  .chat-textarea {
+    font-size: 14px !important;
+    padding: 10px 14px;
+    min-height: 40px;
+    max-height: 40px;
+    resize: none;
+    overflow: hidden;
+    cursor: pointer;
+    caret-color: transparent;
+  }
+
+  .send-btn {
+    padding: 0 14px;
+    min-width: 44px;
+    font-size: 16px;
+    letter-spacing: 0;
   }
 
   /* Settings panel: full-width sheet on tablet/phone */
