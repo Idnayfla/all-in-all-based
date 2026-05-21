@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getUserId } from '../_auth';
+import { getUserIdFromApiKey, ApiRateLimitError } from '../_apiKeyAuth';
 
 export const maxDuration = 60;
 
@@ -9,10 +10,25 @@ const client = new Anthropic({
 });
 
 export async function POST(req: NextRequest) {
-  try {
-    await getUserId(req);
-  } catch {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
+
+  if (token.startsWith('pk_live_')) {
+    // Desktop companion: authenticate via API key
+    try {
+      await getUserIdFromApiKey(token);
+    } catch (err) {
+      if (err instanceof ApiRateLimitError) {
+        return NextResponse.json({ error: err.message }, { status: 429 });
+      }
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  } else {
+    // Web CompanionDrawer: authenticate via Supabase JWT
+    try {
+      await getUserId(req);
+    } catch {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
   }
 
   const { messages, memory, screenshot, previewSource, projectName, fileNames } = await req.json();
