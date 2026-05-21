@@ -1145,7 +1145,11 @@ export default function Home() {
                 onClick={() => setShowSettings(s => !s)}
                 title={user.email}
               >
-                {avatarUrl ? <NextImage src={avatarUrl} alt="avatar" width={32} height={32} /> : avatarInitial}
+                {avatarUrl ? (
+                  <NextImage src={avatarUrl} alt="avatar" width={32} height={32} />
+                ) : (
+                  avatarInitial
+                )}
               </button>
             )}
             <div className="header-status">
