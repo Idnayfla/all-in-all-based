@@ -7,7 +7,6 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .from('shares')
     .select('files')
     .eq('id', id)
-    .eq('in_gallery', true)
     .single();
 
   if (!data) return new NextResponse('Not found', { status: 404 });

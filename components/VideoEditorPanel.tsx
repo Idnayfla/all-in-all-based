@@ -19,7 +19,11 @@ const FFMPEG_WASM = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.
 const THUMB_COUNT = 20;
 const SPEEDS = [0.25, 0.5, 0.75, 1, 1.25, 1.5, 2];
 
-export default function VideoEditorPanel() {
+interface VideoEditorPanelProps {
+  authToken?: string;
+}
+
+export default function VideoEditorPanel({ authToken }: VideoEditorPanelProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const timelineRef = useRef<HTMLDivElement>(null);
@@ -451,7 +455,10 @@ export default function VideoEditorPanel() {
     try {
       const res = await fetch('/api/video-command', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify({ command: cmd, duration }),
       });
       const data = await res.json();

@@ -1721,7 +1721,7 @@ export default function Home() {
 
           {/* Creative studio panels — always accessible, no project required */}
           <div className={`panel ${activePanel === 'video' ? 'panel-active' : ''}`}>
-            <VideoEditorPanel />
+            <VideoEditorPanel authToken={authToken} />
           </div>
           <div className={`panel ${activePanel === 'studio' ? 'panel-active' : ''}`}>
             <StudioPanel authToken={authToken} subscriptionTier={subscription.tier} />
