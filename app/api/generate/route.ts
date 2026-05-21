@@ -1157,7 +1157,7 @@ async function callModel(
       try {
         const directModel =
           modelType === 'planner' || modelType === 'summary'
-            ? 'claude-haiku-4-5-20251001'
+            ? 'claude-haiku-4-5'
             : 'claude-sonnet-4-6';
         const res = await client.messages.create({
           model: directModel,
@@ -1187,7 +1187,7 @@ async function callModel(
 
   // Image-containing calls stay on Anthropic (vision required)
   const response = await client.messages.create({
-    model: modelType === 'generator' ? 'claude-opus-4-7' : 'claude-haiku-4-5-20251001',
+    model: modelType === 'generator' ? 'claude-opus-4-7' : 'claude-haiku-4-5',
     max_tokens: modelType === 'generator' ? 16000 : 8000,
     system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
@@ -1536,7 +1536,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
 
           const planGeneration = trace?.generation({
             name: 'planner',
-            model: 'claude-haiku-4-5-20251001',
+            model: 'claude-haiku-4-5',
             input: lastUserMessage,
           });
           const planText = await callModel(

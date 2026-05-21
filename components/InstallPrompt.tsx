@@ -32,8 +32,10 @@ export default function InstallPrompt() {
 
     if (isIOS) {
       setPlatform('ios');
-      const timer = setTimeout(() => setVisible(true), 3000);
-      return () => clearTimeout(timer);
+      timerRef.current = setTimeout(() => setVisible(true), 3000);
+      return () => {
+        if (timerRef.current) clearTimeout(timerRef.current);
+      };
     }
 
     if (isAndroid) {
