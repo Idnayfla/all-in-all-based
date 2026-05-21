@@ -9,6 +9,7 @@ import Script from 'next/script';
 import { Analytics } from '@vercel/analytics/react';
 import BetaBanner from '@/components/BetaBanner';
 import PostHogProvider from '@/components/PostHogProvider';
+import GlobalCompanionBubble from '@/components/GlobalCompanionBubble';
 
 export const metadata: Metadata = {
   title: 'Based — AI Dev Studio',
@@ -88,6 +89,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <PostHogProvider>
             <ErrorBoundary>{children}</ErrorBoundary>
           </PostHogProvider>
+          <GlobalCompanionBubble />
         </ClientOnly>
         <Analytics />
         {/* Meta Pixel */}

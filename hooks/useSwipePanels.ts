@@ -10,7 +10,17 @@ type Panel =
   | 'image'
   | 'notes'
   | '3d';
-const ORDER: Panel[] = ['chat', 'editor', 'preview', 'debug', 'video', 'studio', 'image', 'notes', '3d'];
+const ORDER: Panel[] = [
+  'chat',
+  'editor',
+  'preview',
+  'debug',
+  'video',
+  'studio',
+  'image',
+  'notes',
+  '3d',
+];
 
 export function useSwipePanels(active: Panel, setActive: (p: Panel) => void, enabled: boolean) {
   const startX = useRef(0);

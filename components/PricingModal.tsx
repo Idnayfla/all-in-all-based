@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { track } from '@/lib/posthog';
 
 interface PricingModalProps {
-  reason?: 'generations' | 'projects' | 'upgrade';
+  reason?: 'generations' | 'projects' | 'companion' | 'upgrade';
   generationsUsed?: number;
   projectCount?: number;
   onClose: () => void;

@@ -10,6 +10,7 @@ export default function LaunchSplash() {
   const [state, setState] = useState<SplashState | null>(null);
 
   useEffect(() => {
+    if (window.location.pathname === '/companion') return;
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       (navigator as Navigator & { standalone?: boolean }).standalone === true;
