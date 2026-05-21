@@ -26,7 +26,6 @@ import { supabase } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
 import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
 import { useSwipePanels } from '@/hooks/useSwipePanels';
-import CompanionDrawer, { CMsg } from '@/components/CompanionDrawer';
 import PricingModal from '@/components/PricingModal';
 import LandingPage from '@/components/LandingPage';
 import FeedbackModal from '@/components/FeedbackModal';
@@ -169,13 +168,10 @@ export default function Home() {
     periodStart: null,
     periodEnd: null,
   });
-  const [showCompanion, setShowCompanion] = useState(false);
-  const [isCompanionGenerating, setIsCompanionGenerating] = useState(false);
-  const [companionMessages, setCompanionMessages] = useState<CMsg[]>([]);
   const [showPricing, setShowPricing] = useState(false);
-  const [pricingReason, setPricingReason] = useState<
-    'generations' | 'projects' | 'companion' | 'upgrade'
-  >('upgrade');
+  const [pricingReason, setPricingReason] = useState<'generations' | 'projects' | 'upgrade'>(
+    'upgrade'
+  );
   const [showFeedback, setShowFeedback] = useState(false);
   const [checkin, setCheckin] = useState<{
     id: string;
@@ -1956,38 +1952,6 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
-      <button
-        className={`companion-trigger${showCompanion ? ' companion-trigger--open' : ''}${isCompanionGenerating ? ' companion-trigger--responding' : ''}`}
-        onClick={() => {
-          if (!showCompanion && subscription.tier === 'free') {
-            setPricingReason('companion');
-            setShowPricing(true);
-            return;
-          }
-          setShowCompanion(s => !s);
-        }}
-        aria-label="Open AI Companion"
-      >
-        <span className="companion-trigger-label">B</span>
-        <span className="companion-trigger-ring companion-trigger-ring--1" />
-        <span className="companion-trigger-ring companion-trigger-ring--2" />
-      </button>
-
-      <AnimatePresence>
-        {showCompanion && (
-          <CompanionDrawer
-            memory={globalMemory}
-            files={files}
-            projectName={currentProject?.name}
-            initialMessages={companionMessages}
-            onMessagesChange={setCompanionMessages}
-            onClose={() => setShowCompanion(false)}
-            onGeneratingChange={setIsCompanionGenerating}
-            authToken={authToken}
-          />
-        )}
-      </AnimatePresence>
-
       <AnimatePresence>
         {showPricing && (
           <PricingModal
