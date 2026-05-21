@@ -171,7 +171,6 @@ export default function ChatPanel({
   generationsUsed,
   prefillMessage,
   onProRequired,
-  onReportBug,
   aiModel,
   onGenerationComplete,
   persona = 'based',
@@ -922,6 +921,7 @@ export default function ChatPanel({
         {content.map((block, i) => {
           if (block.type === 'image') {
             return (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 key={i}
                 className="chat-img-thumb"
@@ -939,6 +939,7 @@ export default function ChatPanel({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ type: 'spring', stiffness: 350, damping: 28 }}
               >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img className="generated-image" src={block.url} alt={block.prompt} />
                 <div className="generated-image-prompt">{block.prompt}</div>
                 <div className="generated-image-actions">
@@ -1218,7 +1219,7 @@ export default function ChatPanel({
               <div className="support-nudge-text">
                 <span className="support-nudge-icon">◈</span>
                 <span>
-                  Based runs on community support — API costs add up fast. If it's been useful,
+                  Based runs on community support — API costs add up fast. If it&apos;s been useful,
                   consider backing it.
                 </span>
               </div>
@@ -1268,6 +1269,7 @@ export default function ChatPanel({
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img className="chat-img-thumb" src={pendingImage.previewUrl} alt="pending upload" />
               <button className="img-clear-btn" onClick={clearPendingImage} title="Remove image">
                 ✕

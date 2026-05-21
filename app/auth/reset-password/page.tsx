@@ -1,10 +1,8 @@
 'use client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 
 export default function ResetPassword() {
-  const router = useRouter();
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [loading, setLoading] = useState(false);

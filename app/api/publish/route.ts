@@ -52,9 +52,7 @@ export async function POST(req: NextRequest) {
     for (const [sha, content] of Object.entries(fileContents)) {
       if (deploy.required?.includes(sha)) {
         const fileName =
-          files.find((f: { name: string }) => {
-            return true;
-          })?.name ?? 'index.html';
+          Object.entries(fileMap).find(([, hash]) => hash === sha)?.[0]?.slice(1) ?? 'index.html';
 
         await fetch(`https://api.netlify.com/api/v1/deploys/${deploy.id}/files/${fileName}`, {
           method: 'PUT',
