@@ -25,12 +25,12 @@ export default function FeedbackModal({
     if (!message.trim() || sending) return;
     setSending(true);
     try {
-      await fetch('/api/feedback', {
+      const res = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, email, type }),
       });
-      setDone(true);
+      if (res.ok) setDone(true);
     } finally {
       setSending(false);
     }
