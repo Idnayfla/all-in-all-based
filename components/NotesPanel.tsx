@@ -192,6 +192,8 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
       // Force canvas clear so stale strokes don't persist between notes
       const canvas = canvasRef.current;
       if (canvas) canvas.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
+      // On mobile the sidebar is a fullscreen overlay — dismiss after selecting
+      if (typeof window !== 'undefined' && window.innerWidth <= 640) setSidebarOpen(false);
     },
     [editor]
   );
@@ -434,6 +436,13 @@ export default function NotesPanel({ authToken }: { authToken?: string }) {
       {/* Sidebar */}
       <div className={`notes-sidebar${sidebarOpen ? ' open' : ''}`}>
         <div className="notes-sidebar-top">
+          <button
+            className="notes-sidebar-back"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Back to note"
+          >
+            ← Back
+          </button>
           <button className="notes-new-btn" onClick={createNote}>
             + New Note
           </button>

@@ -10931,6 +10931,17 @@ body:has(.beta-banner) .app-root {
   padding: 10px;
   border-bottom: 1px solid var(--border);
 }
+.notes-sidebar-back {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+  text-align: left;
+}
 .notes-new-btn {
   background: var(--accent);
   color: #000;
@@ -11408,11 +11419,30 @@ body:has(.beta-banner) .app-root {
   .notes-sidebar:not(.open) {
     display: none;
   }
+  .notes-sidebar-back {
+    display: block;
+  }
   .notes-editor-inner {
     padding: 16px;
   }
   .notes-toolbar {
     padding: 4px 6px;
+  }
+}
+
+@media (max-width: 640px) {
+  .image-studio-body {
+    flex-direction: column;
+  }
+  .image-canvas {
+    max-height: 50vw;
+  }
+  .image-right-panel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    max-height: 200px;
+    overflow-y: auto;
   }
 }
 
