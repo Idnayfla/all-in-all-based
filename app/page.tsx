@@ -2043,7 +2043,22 @@ export default function Home() {
 
       <AnimatePresence>
         {showFeedback && (
-          <FeedbackModal userEmail={user?.email} onClose={() => setShowFeedback(false)} />
+          <FeedbackModal
+            userEmail={user?.email}
+            onClose={() => setShowFeedback(false)}
+            conversationContext={(() => {
+              const activeMessages = incognito ? incognitoMessages : messages;
+              const last = activeMessages.slice(-4);
+              if (last.length === 0) return undefined;
+              const lines = [`--- Conversation Snapshot (last ${last.length} messages) ---`];
+              last.forEach(m => {
+                lines.push('');
+                lines.push(m.role === 'user' ? 'USER:' : 'BASED:');
+                lines.push(contentToString(m.content));
+              });
+              return lines.join('\n');
+            })()}
+          />
         )}
       </AnimatePresence>
 

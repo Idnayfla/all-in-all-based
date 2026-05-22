@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const TYPES = [
   { value: 'bug', label: '◈ Bug' },
+  { value: 'wrong_response', label: '✕ Wrong Response' },
   { value: 'suggestion', label: '⬡ Suggestion' },
   { value: 'general', label: '· General' },
 ];
@@ -11,15 +12,18 @@ const TYPES = [
 export default function FeedbackModal({
   onClose,
   userEmail,
+  conversationContext,
 }: {
   onClose: () => void;
   userEmail?: string;
+  conversationContext?: string;
 }) {
   const [type, setType] = useState('general');
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState(userEmail ?? '');
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
+  const [snapshotExpanded, setSnapshotExpanded] = useState(false);
 
   const submit = async () => {
     if (!message.trim() || sending) return;
@@ -28,7 +32,7 @@ export default function FeedbackModal({
       const res = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, email, type }),
+        body: JSON.stringify({ message, email, type, context: conversationContext ?? null }),
       });
       if (res.ok) setDone(true);
     } finally {
@@ -91,6 +95,24 @@ export default function FeedbackModal({
                 rows={5}
                 autoFocus
               />
+
+              {conversationContext && (
+                <div className="feedback-snapshot">
+                  <button
+                    className="feedback-snapshot-toggle"
+                    onClick={() => setSnapshotExpanded(s => !s)}
+                    type="button"
+                  >
+                    ◉ Conversation snapshot attached
+                    <span className="feedback-snapshot-chevron">
+                      {snapshotExpanded ? '▲' : '▼'}
+                    </span>
+                  </button>
+                  {snapshotExpanded && (
+                    <pre className="feedback-snapshot-preview">{conversationContext}</pre>
+                  )}
+                </div>
+              )}
 
               <input
                 className="feedback-email"
