@@ -78,12 +78,19 @@ export default function CompanionOverlayPage() {
     setMessages([...history, { role: 'assistant', content: '' }]);
     setIsGenerating(true);
 
+    // Always fetch a fresh token — the overlay window may load before the
+    // session cookie is fully hydrated, making the cached authToken stale.
+    const {
+      data: { session: freshSession },
+    } = await supabase.auth.getSession();
+    const token = freshSession?.access_token ?? authToken;
+
     try {
       const res = await fetch('/api/companion', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           messages: history.map(m => ({ role: m.role, content: m.content })),

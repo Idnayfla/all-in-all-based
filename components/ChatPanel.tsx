@@ -616,208 +616,214 @@ export default function ChatPanel({
         setMessages(prev => [...prev, { role: 'assistant', content: '... Working' }]);
       });
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
+          buffer += decoder.decode(value, { stream: true });
 
-        let newlineIndex;
-        while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
-          const line = buffer.slice(0, newlineIndex);
-          buffer = buffer.slice(newlineIndex + 1);
+          let newlineIndex;
+          while ((newlineIndex = buffer.indexOf('\n')) !== -1) {
+            const line = buffer.slice(0, newlineIndex);
+            buffer = buffer.slice(newlineIndex + 1);
 
-          if (!line.startsWith('data: ')) continue;
+            if (!line.startsWith('data: ')) continue;
 
-          try {
-            const data = JSON.parse(line.slice(6));
+            try {
+              const data = JSON.parse(line.slice(6));
 
-            if (data.searching === 'web') {
-              setMessages(prev => {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  role: 'assistant',
-                  content: '◈ Searching the web...',
-                };
-                return updated;
-              });
-            }
-
-            if (data.searching === null) {
-              setMessages(prev => {
-                const updated = [...prev];
-                updated[updated.length - 1] = { role: 'assistant', content: '◈ Working...' };
-                return updated;
-              });
-            }
-
-            if (data.retrying) {
-              assistantMsg = '';
-              setMessages(prev => {
-                const updated = [...prev];
-                updated[updated.length - 1] = { role: 'assistant', content: '◈ Retrying...' };
-                return updated;
-              });
-            }
-
-            if (data.plan) {
-              planReceived = true;
-              flushSync(() => {
-                setGenProgress({
-                  files: data.plan,
-                  completed: 0,
-                  total: data.plan.length,
-                  file: '',
-                  chunks: 0,
-                });
-              });
-              const fileNames = (data.plan as { name: string }[]).map(f => f.name).join(', ');
-              setMessages(prev => {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  role: 'assistant',
-                  content: `⟳ Building ${fileNames}…`,
-                };
-                return updated;
-              });
-            }
-
-            if (data.status) {
-              flushSync(() => {
-                setGenProgress(prev =>
-                  prev ? { ...prev, file: data.status.file, chunks: 0 } : null
-                );
-              });
-            }
-
-            if (data.progress) {
-              flushSync(() => {
-                setGenProgress(prev =>
-                  prev ? { ...prev, completed: data.progress.current, chunks: 0 } : null
-                );
-              });
-            }
-
-            if (data.chunk) {
-              window.dispatchEvent(
-                new CustomEvent('debug-event', { detail: { type: 'chunk', data: data.chunk } })
-              );
-              assistantMsg += data.chunk;
-              setGenProgress(prev =>
-                prev && prev.file ? { ...prev, chunks: prev.chunks + 1 } : prev
-              );
-              const hasForge =
-                assistantMsg.includes('<forge_file') || assistantMsg.includes('<forge_type');
-              if (!planReceived && !hasForge) {
+              if (data.searching === 'web') {
                 setMessages(prev => {
                   const updated = [...prev];
                   updated[updated.length - 1] = {
                     role: 'assistant',
-                    content: assistantMsg.trim() || '◈ Working...',
+                    content: '◈ Searching the web...',
                   };
                   return updated;
                 });
-              } else if (hasForge) {
+              }
+
+              if (data.searching === null) {
                 setMessages(prev => {
                   const updated = [...prev];
-                  const last = updated[updated.length - 1];
-                  const c = typeof last?.content === 'string' ? last.content : '';
-                  if (
-                    c &&
-                    !c.startsWith('⟳') &&
-                    !c.startsWith('◈ Searching') &&
-                    c !== '◈ Working...'
-                  ) {
-                    updated[updated.length - 1] = { role: 'assistant', content: '◈ Working...' };
-                  }
+                  updated[updated.length - 1] = { role: 'assistant', content: '◈ Working...' };
                   return updated;
                 });
               }
-            }
 
-            if (data.clarify) {
-              doneHandled = true;
-              setIsGenerating(false);
-              setGenProgress(null);
-              setMessages(prev => {
-                const last = prev[prev.length - 1];
-                const hasText =
-                  typeof last?.content === 'string' &&
-                  last.content.trim() &&
-                  last.content !== '◈ Working...' &&
-                  !last.content.startsWith('⟳') &&
-                  !last.content.startsWith('◈ Searching') &&
-                  !last.content.startsWith('◈ Retrying');
-                const clarifyMsg = {
-                  role: 'assistant' as const,
-                  content: [
-                    { type: 'clarify' as const, question: data.question, options: data.options },
-                  ],
-                };
-                return hasText ? [...prev, clarifyMsg] : [...prev.slice(0, -1), clarifyMsg];
-              });
-            }
-
-            if (data.error) {
-              window.dispatchEvent(
-                new CustomEvent('debug-event', { detail: { type: 'error', data: data.error } })
-              );
-              doneHandled = true;
-              setIsGenerating(false);
-              setGenProgress(null);
-              setMessages(prev => [
-                ...prev.slice(0, -1),
-                { role: 'assistant', content: [{ type: 'error' as const, message: data.error }] },
-              ]);
-            }
-
-            if (data.done) {
-              const resolvedFiles = data.files?.length ? data.files : parseForgeFiles(assistantMsg);
-              window.dispatchEvent(
-                new CustomEvent('debug-event', {
-                  detail: {
-                    type: 'done',
-                    data: JSON.stringify({
-                      filesCount: resolvedFiles.length,
-                      reply: data.reply?.slice(0, 100),
-                    }),
-                  },
-                })
-              );
-              doneHandled = true;
-              setGenProgress(null);
-              setIsGenerating(false);
-              setMessages(prev => [
-                ...prev.slice(0, -1),
-                { role: 'assistant', content: data.reply || '✓ Done — check the editor.' },
-              ]);
-              if (resolvedFiles.length) {
-                onFilesUpdate(resolvedFiles, data.projectType);
-                onGenerationComplete?.();
-                track('generation_complete', {
-                  file_count: resolvedFiles.length,
-                  project_type: data.projectType,
-                  model: data.model,
+              if (data.retrying) {
+                assistantMsg = '';
+                setMessages(prev => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = { role: 'assistant', content: '◈ Retrying...' };
+                  return updated;
                 });
-                const count = parseInt(localStorage.getItem('based_build_count') || '0', 10) + 1;
-                localStorage.setItem('based_build_count', String(count));
-                if (
-                  count >= 3 &&
-                  count % 5 === 0 &&
-                  !localStorage.getItem('based_nudge_dismissed')
-                ) {
-                  setShowSupportNudge(true);
+              }
+
+              if (data.plan) {
+                planReceived = true;
+                flushSync(() => {
+                  setGenProgress({
+                    files: data.plan,
+                    completed: 0,
+                    total: data.plan.length,
+                    file: '',
+                    chunks: 0,
+                  });
+                });
+                const fileNames = (data.plan as { name: string }[]).map(f => f.name).join(', ');
+                setMessages(prev => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = {
+                    role: 'assistant',
+                    content: `⟳ Building ${fileNames}…`,
+                  };
+                  return updated;
+                });
+              }
+
+              if (data.status) {
+                flushSync(() => {
+                  setGenProgress(prev =>
+                    prev ? { ...prev, file: data.status.file, chunks: 0 } : null
+                  );
+                });
+              }
+
+              if (data.progress) {
+                flushSync(() => {
+                  setGenProgress(prev =>
+                    prev ? { ...prev, completed: data.progress.current, chunks: 0 } : null
+                  );
+                });
+              }
+
+              if (data.chunk) {
+                window.dispatchEvent(
+                  new CustomEvent('debug-event', { detail: { type: 'chunk', data: data.chunk } })
+                );
+                assistantMsg += data.chunk;
+                setGenProgress(prev =>
+                  prev && prev.file ? { ...prev, chunks: prev.chunks + 1 } : prev
+                );
+                const hasForge =
+                  assistantMsg.includes('<forge_file') || assistantMsg.includes('<forge_type');
+                if (!planReceived && !hasForge) {
+                  setMessages(prev => {
+                    const updated = [...prev];
+                    updated[updated.length - 1] = {
+                      role: 'assistant',
+                      content: assistantMsg.trim() || '◈ Working...',
+                    };
+                    return updated;
+                  });
+                } else if (hasForge) {
+                  setMessages(prev => {
+                    const updated = [...prev];
+                    const last = updated[updated.length - 1];
+                    const c = typeof last?.content === 'string' ? last.content : '';
+                    if (
+                      c &&
+                      !c.startsWith('⟳') &&
+                      !c.startsWith('◈ Searching') &&
+                      c !== '◈ Working...'
+                    ) {
+                      updated[updated.length - 1] = { role: 'assistant', content: '◈ Working...' };
+                    }
+                    return updated;
+                  });
                 }
               }
-              if (data.suggestions?.length) setLastSuggestions(data.suggestions);
-              else setLastSuggestions([]);
+
+              if (data.clarify) {
+                doneHandled = true;
+                setIsGenerating(false);
+                setGenProgress(null);
+                setMessages(prev => {
+                  const last = prev[prev.length - 1];
+                  const hasText =
+                    typeof last?.content === 'string' &&
+                    last.content.trim() &&
+                    last.content !== '◈ Working...' &&
+                    !last.content.startsWith('⟳') &&
+                    !last.content.startsWith('◈ Searching') &&
+                    !last.content.startsWith('◈ Retrying');
+                  const clarifyMsg = {
+                    role: 'assistant' as const,
+                    content: [
+                      { type: 'clarify' as const, question: data.question, options: data.options },
+                    ],
+                  };
+                  return hasText ? [...prev, clarifyMsg] : [...prev.slice(0, -1), clarifyMsg];
+                });
+              }
+
+              if (data.error) {
+                window.dispatchEvent(
+                  new CustomEvent('debug-event', { detail: { type: 'error', data: data.error } })
+                );
+                doneHandled = true;
+                setIsGenerating(false);
+                setGenProgress(null);
+                setMessages(prev => [
+                  ...prev.slice(0, -1),
+                  { role: 'assistant', content: [{ type: 'error' as const, message: data.error }] },
+                ]);
+              }
+
+              if (data.done) {
+                const resolvedFiles = data.files?.length
+                  ? data.files
+                  : parseForgeFiles(assistantMsg);
+                window.dispatchEvent(
+                  new CustomEvent('debug-event', {
+                    detail: {
+                      type: 'done',
+                      data: JSON.stringify({
+                        filesCount: resolvedFiles.length,
+                        reply: data.reply?.slice(0, 100),
+                      }),
+                    },
+                  })
+                );
+                doneHandled = true;
+                setGenProgress(null);
+                setIsGenerating(false);
+                setMessages(prev => [
+                  ...prev.slice(0, -1),
+                  { role: 'assistant', content: data.reply || '✓ Done — check the editor.' },
+                ]);
+                if (resolvedFiles.length) {
+                  onFilesUpdate(resolvedFiles, data.projectType);
+                  onGenerationComplete?.();
+                  track('generation_complete', {
+                    file_count: resolvedFiles.length,
+                    project_type: data.projectType,
+                    model: data.model,
+                  });
+                  const count = parseInt(localStorage.getItem('based_build_count') || '0', 10) + 1;
+                  localStorage.setItem('based_build_count', String(count));
+                  if (
+                    count >= 3 &&
+                    count % 5 === 0 &&
+                    !localStorage.getItem('based_nudge_dismissed')
+                  ) {
+                    setShowSupportNudge(true);
+                  }
+                }
+                if (data.suggestions?.length) setLastSuggestions(data.suggestions);
+                else setLastSuggestions([]);
+              }
+            } catch (e) {
+              window.dispatchEvent(
+                new CustomEvent('debug-event', { detail: { type: 'parse-error', data: String(e) } })
+              );
             }
-          } catch (e) {
-            window.dispatchEvent(
-              new CustomEvent('debug-event', { detail: { type: 'parse-error', data: String(e) } })
-            );
           }
         }
+      } finally {
+        reader.cancel().catch(() => {});
       }
     } catch (e: unknown) {
       setGenProgress(null);

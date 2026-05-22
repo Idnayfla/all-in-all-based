@@ -17,7 +17,13 @@ You may also set up an animation loop by assigning to renderer.userData.animateF
 Return only executable JS — no markdown, no explanation, no backticks.
 Output ONLY valid JavaScript. No explanations, no markdown, no code fences, no natural language outside of JS comments.
 Never write contractions (don't, can't, won't) outside of JS string literals or /* */ comments.
-If you need to add to an existing scene, always start by clearing it: while(scene.children.length > 0) scene.remove(scene.children[0]);`;
+If you need to add to an existing scene, always start by clearing it: while(scene.children.length > 0) scene.remove(scene.children[0]);
+IMPORTANT — iOS Safari compatibility rules (violations cause "string did not match expected pattern" errors):
+- Never use new URL(), fetch(), or TextureLoader with remote URLs — no network requests
+- Never use new RegExp() with dynamic strings — use only literal regex
+- Use only MeshBasicMaterial, MeshStandardMaterial, MeshPhongMaterial — no ShaderMaterial with custom glsl
+- Colors must be hex numbers (0xff0000) or CSS strings ('red') — never template literals in color args
+- Do not use canvas.toDataURL() or createObjectURL()`;
 
 export async function POST(req: NextRequest) {
   // Auth gate — must be signed in
