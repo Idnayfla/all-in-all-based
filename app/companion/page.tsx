@@ -25,6 +25,7 @@ export default function CompanionOverlayPage() {
     null
   );
   const [captureError, setCaptureError] = useState<string | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sessionId = useRef(String(Date.now()).slice(-4));
@@ -42,11 +43,15 @@ export default function CompanionOverlayPage() {
   }, [messages]);
 
   const close = () => {
-    if (window.electronAPI) {
-      window.electronAPI.hideCompanion();
-    } else {
-      window.close();
-    }
+    setIsClosing(true);
+    setTimeout(() => {
+      if (window.electronAPI) {
+        window.electronAPI.hideCompanion();
+      } else {
+        window.close();
+      }
+      setIsClosing(false);
+    }, 260);
   };
 
   const flashError = (msg: string) => {
@@ -78,12 +83,33 @@ export default function CompanionOverlayPage() {
     setMessages([...history, { role: 'assistant', content: '' }]);
     setIsGenerating(true);
 
+    // getUser() triggers a server-side token refresh if the access token is
+    // expired — getSession() alone can return a stale cached token.
+    await supabase.auth.getUser();
+    const {
+      data: { session: freshSession },
+    } = await supabase.auth.getSession();
+    const token = freshSession?.access_token ?? authToken;
+
+    if (!token) {
+      setMessages(prev => {
+        const next = [...prev];
+        next[next.length - 1] = {
+          ...next[next.length - 1],
+          content: '✕ Not signed in. Please open Based and sign in first.',
+        };
+        return next;
+      });
+      setIsGenerating(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/companion', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           messages: history.map(m => ({ role: m.role, content: m.content })),
@@ -91,7 +117,10 @@ export default function CompanionOverlayPage() {
         }),
       });
 
-      if (!res.ok || !res.body) throw new Error('failed');
+      if (!res.ok || !res.body) {
+        if (res.status === 401) throw new Error('session-expired');
+        throw new Error('failed');
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -127,10 +156,16 @@ export default function CompanionOverlayPage() {
           }
         }
       }
-    } catch {
+    } catch (err) {
+      const isExpired = err instanceof Error && err.message === 'session-expired';
       setMessages(prev => {
         const next = [...prev];
-        next[next.length - 1] = { ...next[next.length - 1], content: '✕ Failed to connect.' };
+        next[next.length - 1] = {
+          ...next[next.length - 1],
+          content: isExpired
+            ? '✕ Session expired. Please sign in again in Based.'
+            : '✕ Failed to connect.',
+        };
         return next;
       });
     } finally {
@@ -139,7 +174,7 @@ export default function CompanionOverlayPage() {
   };
 
   return (
-    <div className="companion-overlay-root">
+    <div className={`companion-overlay-root${isClosing ? ' companion-overlay--closing' : ''}`}>
       <div className="companion-overlay-header">
         <span className="companion-logo">⬡</span>
         <span className="companion-title">BASED</span>

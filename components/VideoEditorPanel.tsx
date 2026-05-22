@@ -317,7 +317,8 @@ export default function VideoEditorPanel({ authToken }: VideoEditorPanelProps) {
     const c = canvasRef.current;
     if (!v || !c) return;
     let raf = 0;
-    const draw = () => {
+
+    const drawFrame = () => {
       const vw = v.videoWidth || v.offsetWidth;
       const vh = v.videoHeight || v.offsetHeight;
       if (c.width !== vw || c.height !== vh) {
@@ -350,10 +351,35 @@ export default function VideoEditorPanel({ authToken }: VideoEditorPanelProps) {
           }
           ctx.restore();
         });
-      raf = requestAnimationFrame(draw);
     };
-    draw();
-    return () => cancelAnimationFrame(raf);
+
+    // Only run rAF loop while playing — pause = static frame, no GPU drain
+    const onPlay = () => {
+      const loop = () => {
+        drawFrame();
+        raf = requestAnimationFrame(loop);
+      };
+      raf = requestAnimationFrame(loop);
+    };
+    const onPause = () => {
+      cancelAnimationFrame(raf);
+      raf = 0;
+      drawFrame();
+    };
+
+    v.addEventListener('play', onPlay);
+    v.addEventListener('pause', onPause);
+    v.addEventListener('seeked', drawFrame);
+
+    drawFrame();
+    if (!v.paused) onPlay();
+
+    return () => {
+      cancelAnimationFrame(raf);
+      v.removeEventListener('play', onPlay);
+      v.removeEventListener('pause', onPause);
+      v.removeEventListener('seeked', drawFrame);
+    };
   }, [overlays, selOverlay]);
 
   // ── Canvas click/drag: select and reposition text overlays ────────────────

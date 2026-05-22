@@ -37,6 +37,7 @@ import NotesPanel from '@/components/NotesPanel';
 import ThreeDStudio from '@/components/ThreeDStudio';
 import ProactiveCheckin from '@/components/ProactiveCheckin';
 import WallpaperCropper from '@/components/WallpaperCropper';
+import TipsGuide from '@/components/TipsGuide';
 import { track, identifyUser } from '@/lib/posthog';
 
 export interface FileNode {
@@ -108,6 +109,7 @@ export default function Home() {
   const [shareUrl, setShareUrl] = useState('');
   const [shareId, setShareId] = useState('');
   const [isSharing, setIsSharing] = useState(false);
+  const [showMoreTabs, setShowMoreTabs] = useState(false);
   const [showGalleryPublish, setShowGalleryPublish] = useState(false);
   const [galleryAuthorName, setGalleryAuthorName] = useState('');
   const [galleryPublished, setGalleryPublished] = useState(false);
@@ -1005,11 +1007,13 @@ export default function Home() {
         </div>
         <nav className="header-nav">
           <div className="tab-switcher">
+            {/* Primary tabs — always visible */}
             <button
               className={`tab-btn ${activePanel === 'chat' ? 'active' : ''}`}
               onClick={() => {
                 setActivePanel('chat');
                 setShowSettings(false);
+                setShowMoreTabs(false);
               }}
             >
               Chat
@@ -1019,6 +1023,7 @@ export default function Home() {
               onClick={() => {
                 setActivePanel('editor');
                 setShowSettings(false);
+                setShowMoreTabs(false);
               }}
             >
               Editor
@@ -1028,12 +1033,14 @@ export default function Home() {
               onClick={() => {
                 setActivePanel('preview');
                 setShowSettings(false);
+                setShowMoreTabs(false);
               }}
             >
               Preview
             </button>
+            {/* Secondary tabs — hidden on mobile, shown in More drawer */}
             <button
-              className={`tab-btn ${activePanel === 'video' ? 'active' : ''}`}
+              className={`tab-btn tab-btn-secondary ${activePanel === 'video' ? 'active' : ''}`}
               onClick={() => {
                 setActivePanel('video');
                 setShowSettings(false);
@@ -1042,7 +1049,7 @@ export default function Home() {
               Video
             </button>
             <button
-              className={`tab-btn ${activePanel === 'studio' ? 'active' : ''}`}
+              className={`tab-btn tab-btn-secondary ${activePanel === 'studio' ? 'active' : ''}`}
               onClick={() => {
                 setActivePanel('studio');
                 setShowSettings(false);
@@ -1051,7 +1058,7 @@ export default function Home() {
               Studio
             </button>
             <button
-              className={`tab-btn ${activePanel === 'image' ? 'active' : ''}`}
+              className={`tab-btn tab-btn-secondary ${activePanel === 'image' ? 'active' : ''}`}
               onClick={() => {
                 setActivePanel('image');
                 setShowSettings(false);
@@ -1060,7 +1067,7 @@ export default function Home() {
               Image
             </button>
             <button
-              className={`tab-btn ${activePanel === 'notes' ? 'active' : ''}`}
+              className={`tab-btn tab-btn-secondary ${activePanel === 'notes' ? 'active' : ''}`}
               onClick={() => {
                 setActivePanel('notes');
                 setShowSettings(false);
@@ -1069,7 +1076,7 @@ export default function Home() {
               Notes
             </button>
             <button
-              className={`tab-btn ${activePanel === '3d' ? 'active' : ''}`}
+              className={`tab-btn tab-btn-secondary ${activePanel === '3d' ? 'active' : ''}`}
               onClick={() => {
                 setActivePanel('3d');
                 setShowSettings(false);
@@ -1078,7 +1085,7 @@ export default function Home() {
               3D
             </button>
             <button
-              className={`tab-btn tab-btn-debug ${activePanel === 'debug' ? 'active' : ''}`}
+              className={`tab-btn tab-btn-debug tab-btn-secondary ${activePanel === 'debug' ? 'active' : ''}`}
               onClick={() => {
                 setActivePanel('debug');
                 setShowSettings(false);
@@ -1086,6 +1093,26 @@ export default function Home() {
               title="Debug stream"
             >
               ◈
+            </button>
+            {/* More toggle — only visible on mobile */}
+            <button
+              className={`tab-btn tab-btn-more${showMoreTabs ? ' active' : ''}${['video', 'studio', 'image', 'notes', '3d', 'debug'].includes(activePanel) ? ' tab-btn-more--highlight' : ''}`}
+              onClick={() => setShowMoreTabs(s => !s)}
+              title="More tools"
+            >
+              {['video', 'studio', 'image', 'notes', '3d', 'debug'].includes(activePanel)
+                ? ((
+                    {
+                      video: 'Video',
+                      studio: 'Studio',
+                      image: 'Image',
+                      notes: 'Notes',
+                      '3d': '3D',
+                      debug: '◈',
+                    } as Record<string, string>
+                  )[activePanel] ?? 'More')
+                : 'More'}
+              <span className="tab-more-chevron">{showMoreTabs ? '▲' : '▼'}</span>
             </button>
           </div>
           <div className="header-controls">
@@ -1192,6 +1219,48 @@ export default function Home() {
           </div>
         </nav>
       </header>
+
+      {/* More-tabs drawer — mobile only */}
+      {showMoreTabs && (
+        <div className="more-tabs-backdrop" onClick={() => setShowMoreTabs(false)} />
+      )}
+      <div className={`more-tabs-drawer${showMoreTabs ? ' more-tabs-drawer--open' : ''}`}>
+        <div className="more-tabs-header">
+          <span className="more-tabs-title">◈ Tools</span>
+          <button className="more-tabs-close" onClick={() => setShowMoreTabs(false)}>
+            ✕
+          </button>
+        </div>
+        {(
+          [
+            { id: 'video', label: 'Video', icon: '▶', desc: 'Edit & generate clips' },
+            { id: 'studio', label: 'Studio', icon: '⬡', desc: 'AI art generation' },
+            { id: 'image', label: 'Image', icon: '◉', desc: 'Edit & generate images' },
+            { id: 'notes', label: 'Notes', icon: '◈', desc: 'Sync your notes' },
+            { id: '3d', label: '3D Studio', icon: '⊙', desc: 'Three.js scene builder' },
+          ] as const
+        ).map(t => (
+          <button
+            key={t.id}
+            className={`more-tabs-item${activePanel === t.id ? ' active' : ''}`}
+            onClick={() => {
+              setActivePanel(t.id as typeof activePanel);
+              setShowSettings(false);
+              setShowMoreTabs(false);
+            }}
+          >
+            <span className="more-tabs-item-icon">{t.icon}</span>
+            <span className="more-tabs-item-label">
+              <span className="more-tabs-item-name">{t.label}</span>
+              <span className="more-tabs-item-desc">{t.desc}</span>
+            </span>
+            {activePanel === t.id && <span className="more-tabs-item-check">◈</span>}
+          </button>
+        ))}
+      </div>
+
+      {/* Tips guide for new users */}
+      <TipsGuide />
 
       <div className="app-body">
         <SidebarTrigger
@@ -1974,7 +2043,22 @@ export default function Home() {
 
       <AnimatePresence>
         {showFeedback && (
-          <FeedbackModal userEmail={user?.email} onClose={() => setShowFeedback(false)} />
+          <FeedbackModal
+            userEmail={user?.email}
+            onClose={() => setShowFeedback(false)}
+            conversationContext={(() => {
+              const activeMessages = incognito ? incognitoMessages : messages;
+              const last = activeMessages.slice(-4);
+              if (last.length === 0) return undefined;
+              const lines = [`--- Conversation Snapshot (last ${last.length} messages) ---`];
+              last.forEach(m => {
+                lines.push('');
+                lines.push(m.role === 'user' ? 'USER:' : 'BASED:');
+                lines.push(contentToString(m.content));
+              });
+              return lines.join('\n');
+            })()}
+          />
         )}
       </AnimatePresence>
 
