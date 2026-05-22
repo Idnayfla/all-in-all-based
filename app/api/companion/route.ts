@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
             { status: 429 }
           );
         }
-        await supabaseAdmin.from('companion_usage').insert({ user_id: jwtUserId });
+        void supabaseAdmin.from('companion_usage').insert({ user_id: jwtUserId });
       }
     } catch {
       // If companion_usage table doesn't exist yet, allow the request through

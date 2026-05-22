@@ -176,6 +176,8 @@ export default function Home() {
     'upgrade'
   );
   const [showFeedback, setShowFeedback] = useState(false);
+  const [syncingSubscription, setSyncingSubscription] = useState(false);
+  const [syncLabel, setSyncLabel] = useState<'idle' | 'syncing' | 'synced' | 'failed'>('idle');
   const [checkin, setCheckin] = useState<{
     id: string;
     name: string;
@@ -1614,35 +1616,59 @@ export default function Home() {
                     )}
                     <button
                       className="plan-resync-btn"
+                      disabled={syncingSubscription}
                       onClick={async () => {
-                        const headers = await getHeaders();
-                        const res = await fetch('/api/stripe/sync', { method: 'POST', headers });
-                        if (res.ok) {
-                          const settingsRes = await fetch('/api/settings', { headers });
-                          if (settingsRes.ok) {
-                            const {
-                              subscriptionTier,
-                              subscriptionStatus,
-                              generationsUsed,
-                              subscriptionPeriodStart,
-                              subscriptionPeriodEnd,
-                            } = await settingsRes.json();
-                            const tier = subscriptionTier ?? 'free';
-                            setSubscription({
-                              tier,
-                              status: subscriptionStatus ?? 'active',
-                              generationsUsed: generationsUsed ?? 0,
-                              periodStart: subscriptionPeriodStart ?? null,
-                              periodEnd: subscriptionPeriodEnd ?? null,
-                            });
-                            try {
-                              localStorage.setItem('based_sub_tier', tier);
-                            } catch {}
+                        setSyncingSubscription(true);
+                        setSyncLabel('syncing');
+                        try {
+                          const headers = await getHeaders();
+                          const res = await fetch('/api/stripe/sync', { method: 'POST', headers });
+                          if (res.ok) {
+                            const settingsRes = await fetch('/api/settings', { headers });
+                            if (settingsRes.ok) {
+                              const {
+                                subscriptionTier,
+                                subscriptionStatus,
+                                generationsUsed,
+                                subscriptionPeriodStart,
+                                subscriptionPeriodEnd,
+                              } = await settingsRes.json();
+                              const tier = subscriptionTier ?? 'free';
+                              setSubscription({
+                                tier,
+                                status: subscriptionStatus ?? 'active',
+                                generationsUsed: generationsUsed ?? 0,
+                                periodStart: subscriptionPeriodStart ?? null,
+                                periodEnd: subscriptionPeriodEnd ?? null,
+                              });
+                              try {
+                                localStorage.setItem('based_sub_tier', tier);
+                              } catch {}
+                              setSyncLabel('synced');
+                              setTimeout(() => setSyncLabel('idle'), 2000);
+                            } else {
+                              setSyncLabel('failed');
+                              setTimeout(() => setSyncLabel('idle'), 3000);
+                            }
+                          } else {
+                            setSyncLabel('failed');
+                            setTimeout(() => setSyncLabel('idle'), 3000);
                           }
+                        } catch {
+                          setSyncLabel('failed');
+                          setTimeout(() => setSyncLabel('idle'), 3000);
+                        } finally {
+                          setSyncingSubscription(false);
                         }
                       }}
                     >
-                      ↻ Re-sync subscription
+                      {syncLabel === 'syncing'
+                        ? 'Syncing…'
+                        : syncLabel === 'synced'
+                          ? 'Synced ✓'
+                          : syncLabel === 'failed'
+                            ? 'Failed — try again'
+                            : '↻ Re-sync subscription'}
                     </button>
                   </div>
                 )}

@@ -199,10 +199,15 @@ export default function CompanionDrawer({
   return (
     <motion.div
       className="companion-drawer"
-      initial={isMobile ? { y: '-100%', opacity: 0 } : { x: 320, opacity: 0 }}
-      animate={isMobile ? { y: 0, opacity: 1 } : { x: 0, opacity: 1 }}
-      exit={isMobile ? { y: '-100%', opacity: 0 } : { x: 320, opacity: 0 }}
-      transition={{ type: 'spring', stiffness: 380, damping: 34 }}
+      style={isMobile ? undefined : { transformOrigin: 'bottom right' }}
+      initial={isMobile ? { y: '-100%', opacity: 0 } : { opacity: 0, scale: 0.85, x: 40, y: 40 }}
+      animate={isMobile ? { y: 0, opacity: 1 } : { opacity: 1, scale: 1, x: 0, y: 0 }}
+      exit={isMobile ? { y: '-100%', opacity: 0 } : { opacity: 0, scale: 0.85, x: 40, y: 40 }}
+      transition={
+        isMobile
+          ? { type: 'spring', stiffness: 380, damping: 34 }
+          : { duration: 0.2, ease: 'easeIn' }
+      }
     >
       <div className="companion-header">
         <span className="companion-logo">⬡</span>

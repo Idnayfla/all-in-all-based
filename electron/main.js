@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, Menu, globalShortcut, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, shell, Menu, globalShortcut, ipcMain, screen, session } = require('electron');
 const path = require('path');
 
 const APP_URL = 'https://getbased.dev';
@@ -87,6 +87,11 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Allow getDisplayMedia / screen capture in renderer windows
+  session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => {
+    callback({ video: { mandatory: { chromeMediaSource: 'screen' } } });
+  });
+
   createWindow();
   createOverlayWindow();
 
