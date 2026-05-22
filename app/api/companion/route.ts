@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
-import { getUserId } from '../_auth';
+import { getUserId, supabaseAdmin } from '../_auth';
 import { getUserIdFromApiKey, ApiRateLimitError } from '../_apiKeyAuth';
 
 export const maxDuration = 60;
@@ -9,11 +9,38 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || process.env.APP_ANTHROPIC_API_KEY,
 });
 
+// Required Supabase migration (run once in dashboard):
+// create table if not exists companion_usage (
+//   id uuid default gen_random_uuid() primary key,
+//   user_id uuid not null references auth.users(id) on delete cascade,
+//   created_at timestamptz default now() not null
+// );
+// create index on companion_usage (user_id, created_at);
+
+const FREE_DAILY_LIMIT = 5;
+
+async function getEffectiveTier(userId: string): Promise<'free' | 'pro'> {
+  const { data } = await supabaseAdmin
+    .from('user_settings')
+    .select('subscription_tier, subscription_status, pro_bonus_expires_at')
+    .eq('user_id', userId)
+    .single();
+  const paidTier = (data?.subscription_tier ?? 'free') as 'free' | 'pro';
+  const subStatus = data?.subscription_status ?? 'active';
+  const isCanceled = subStatus === 'canceled' || subStatus === 'cancelled';
+  const bonusExpiresAt = data?.pro_bonus_expires_at as string | null;
+  const hasBonusPro = !!bonusExpiresAt && new Date(bonusExpiresAt) > new Date();
+  const alwaysPro = process.env.ALWAYS_PRO === 'true';
+  return alwaysPro || (paidTier === 'pro' && !isCanceled) || hasBonusPro ? 'pro' : 'free';
+}
+
 export async function POST(req: NextRequest) {
   const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '').trim();
 
+  let jwtUserId: string | null = null;
+
   if (token.startsWith('pk_live_')) {
-    // Desktop companion: authenticate via API key
+    // Desktop companion: authenticate via API key (no daily limit)
     try {
       await getUserIdFromApiKey(token);
     } catch (err) {
@@ -23,11 +50,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
   } else {
-    // Web CompanionDrawer: authenticate via Supabase JWT
+    // Web/Electron companion: authenticate via Supabase JWT
     try {
-      await getUserId(req);
+      jwtUserId = await getUserId(req);
     } catch {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
+  // Free-tier daily gate for JWT users
+  if (jwtUserId) {
+    try {
+      const tier = await getEffectiveTier(jwtUserId);
+      if (tier === 'free') {
+        const todayStart = new Date();
+        todayStart.setUTCHours(0, 0, 0, 0);
+        const { count } = await supabaseAdmin
+          .from('companion_usage')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', jwtUserId)
+          .gte('created_at', todayStart.toISOString());
+        if ((count ?? 0) >= FREE_DAILY_LIMIT) {
+          return NextResponse.json(
+            { error: 'free_limit_reached', limit: FREE_DAILY_LIMIT },
+            { status: 429 }
+          );
+        }
+        await supabaseAdmin.from('companion_usage').insert({ user_id: jwtUserId });
+      }
+    } catch {
+      // If companion_usage table doesn't exist yet, allow the request through
+      // (migration pending — run the SQL comment at the top of this file)
     }
   }
 

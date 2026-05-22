@@ -625,10 +625,12 @@ PDF (single page or multi-page reports):
 EXCEL / Spreadsheet:
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([['Name','Score'],['Alice',95],['Bob',87]]);
+  // ALWAYS export from the live DOM table — captures user edits to cells:
+  const ws = XLSX.utils.table_to_sheet(document.getElementById('table'));
+  // Only use aoa_to_sheet for purely generated/static data with no user-editable cells:
+  // const ws = XLSX.utils.aoa_to_sheet([['Name','Score'],['Alice',95],['Bob',87]]);
   XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
   XLSX.writeFile(wb, 'output.xlsx');
-  // From HTML table: const ws = XLSX.utils.table_to_sheet(document.getElementById('table'));
 
 POWERPOINT / Slides:
   <script src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>

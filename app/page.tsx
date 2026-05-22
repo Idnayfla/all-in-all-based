@@ -38,6 +38,7 @@ import ThreeDStudio from '@/components/ThreeDStudio';
 import ProactiveCheckin from '@/components/ProactiveCheckin';
 import WallpaperCropper from '@/components/WallpaperCropper';
 import TipsGuide from '@/components/TipsGuide';
+import SpecPanel from '@/components/SpecPanel';
 import { track, identifyUser } from '@/lib/posthog';
 
 export interface FileNode {
@@ -99,7 +100,7 @@ export default function Home() {
   const [incognito, setIncognito] = useState(false);
   const [incognitoMessages, setIncognitoMessages] = useState<Message[]>([]);
   const [activePanel, setActivePanel] = useState<
-    'chat' | 'editor' | 'preview' | 'debug' | 'video' | 'studio' | 'image' | 'notes' | '3d'
+    'chat' | 'editor' | 'preview' | 'debug' | 'video' | 'studio' | 'image' | 'notes' | '3d' | 'spec'
   >('chat');
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
@@ -537,7 +538,18 @@ export default function Home() {
     ]);
     if (projectsRes.ok) {
       const { projects } = await projectsRes.json();
-      const list = projects ?? [];
+      const rawList: Project[] = projects ?? [];
+      // Guard: if the active project has messages not yet flushed to the server
+      // (auto-save is fire-and-forget), keep the in-memory version so a focus
+      // event can't clobber unsaved history.
+      const currentP = currentProjectRef.current;
+      const list = currentP
+        ? rawList.map(p =>
+            p.id === currentP.id && currentP.messages.length > p.messages.length
+              ? { ...p, messages: currentP.messages, files: currentP.files }
+              : p
+          )
+        : rawList;
       setProjects(list);
       saveProjectsCache(list);
     } else {
@@ -686,6 +698,19 @@ export default function Home() {
         }
       }
       if (event === 'SIGNED_OUT') {
+        // Always clear the stale tier cache so a different account signing in
+        // next doesn't inherit the previous account's Pro status.
+        try {
+          localStorage.removeItem('based_sub_tier');
+        } catch {}
+        setSubscription({
+          tier: 'free',
+          status: 'active',
+          generationsUsed: 0,
+          periodStart: null,
+          periodEnd: null,
+        });
+
         if (isExplicitSignOut.current) {
           // User clicked Sign Out — clear everything
           isExplicitSignOut.current = false;
@@ -1096,11 +1121,11 @@ export default function Home() {
             </button>
             {/* More toggle — only visible on mobile */}
             <button
-              className={`tab-btn tab-btn-more${showMoreTabs ? ' active' : ''}${['video', 'studio', 'image', 'notes', '3d', 'debug'].includes(activePanel) ? ' tab-btn-more--highlight' : ''}`}
+              className={`tab-btn tab-btn-more${showMoreTabs ? ' active' : ''}${['video', 'studio', 'image', 'notes', '3d', 'debug', 'spec'].includes(activePanel) ? ' tab-btn-more--highlight' : ''}`}
               onClick={() => setShowMoreTabs(s => !s)}
               title="More tools"
             >
-              {['video', 'studio', 'image', 'notes', '3d', 'debug'].includes(activePanel)
+              {['video', 'studio', 'image', 'notes', '3d', 'debug', 'spec'].includes(activePanel)
                 ? ((
                     {
                       video: 'Video',
@@ -1109,6 +1134,7 @@ export default function Home() {
                       notes: 'Notes',
                       '3d': '3D',
                       debug: '◈',
+                      spec: 'Spec',
                     } as Record<string, string>
                   )[activePanel] ?? 'More')
                 : 'More'}
@@ -1238,6 +1264,7 @@ export default function Home() {
             { id: 'image', label: 'Image', icon: '◉', desc: 'Edit & generate images' },
             { id: 'notes', label: 'Notes', icon: '◈', desc: 'Sync your notes' },
             { id: '3d', label: '3D Studio', icon: '⊙', desc: 'Three.js scene builder' },
+            { id: 'spec', label: 'Spec', icon: '◈', desc: 'Requirements & SRS generator' },
           ] as const
         ).map(t => (
           <button
@@ -1809,12 +1836,24 @@ export default function Home() {
           <div className={`panel ${activePanel === '3d' ? 'panel-active' : ''}`}>
             <ThreeDStudio />
           </div>
+          <div className={`panel ${activePanel === 'spec' ? 'panel-active' : ''}`}>
+            <SpecPanel
+              authToken={authToken}
+              currentProject={currentProject}
+              subscriptionTier={subscription.tier}
+              onBuildFromSpec={prompt => {
+                setPendingPrompt(prompt);
+                setActivePanel('chat');
+              }}
+            />
+          </div>
 
           {activePanel !== 'video' &&
             activePanel !== 'studio' &&
             activePanel !== 'image' &&
             activePanel !== 'notes' &&
             activePanel !== '3d' &&
+            activePanel !== 'spec' &&
             (incognito ? (
               <div className="panel panel-active">
                 <div className="incognito-banner">
@@ -1960,6 +1999,7 @@ export default function Home() {
                           | 'image'
                           | 'notes'
                           | '3d'
+                          | 'spec'
                       )
                     }
                   />
