@@ -142,6 +142,14 @@ app.whenReady().then(() => {
     overlayWin?.hide();
     bubbleWin?.webContents.send('companion-bubble:state', 'closed');
   });
+  ipcMain.on('companion:hide-for-capture', () => {
+    overlayWin?.hide();
+    bubbleWin?.hide();
+  });
+  ipcMain.on('companion:show-after-capture', () => {
+    overlayWin?.show();
+    bubbleWin?.show();
+  });
   ipcMain.on('companion-bubble:click', () => toggleOverlay());
 
   app.on('activate', () => {

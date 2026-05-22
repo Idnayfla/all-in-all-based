@@ -6,7 +6,11 @@ import { captureScreen, isScreenCaptureSupported } from '@/hooks/useScreenCaptur
 
 declare global {
   interface Window {
-    electronAPI?: { hideCompanion: () => void };
+    electronAPI?: {
+      hideCompanion: () => void;
+      hideForCapture: () => void;
+      showAfterCapture: () => void;
+    };
   }
 }
 
@@ -73,7 +77,10 @@ export default function CompanionOverlayPage() {
   };
 
   const handleScreen = async () => {
+    window.electronAPI?.hideForCapture();
+    await new Promise<void>(resolve => setTimeout(resolve, 220));
     const dataUrl = await captureScreen();
+    window.electronAPI?.showAfterCapture();
     if (!dataUrl) {
       flashError('Screen share cancelled');
       return;
@@ -89,7 +96,10 @@ export default function CompanionOverlayPage() {
 
     // Auto-capture screen when message implies screen intent and no capture is already attached
     if (!cap && SCREEN_INTENT.test(text)) {
+      window.electronAPI?.hideForCapture();
+      await new Promise<void>(resolve => setTimeout(resolve, 220));
       const dataUrl = await captureScreen();
+      window.electronAPI?.showAfterCapture();
       if (dataUrl) cap = { source: dataUrl, thumb: dataUrl };
     }
 
