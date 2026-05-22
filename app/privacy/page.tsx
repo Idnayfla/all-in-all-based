@@ -179,7 +179,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2>8b. Anthropic Data Handling</h2>
+          <h2>9. Anthropic Data Handling</h2>
           <p>
             Your prompts are sent to Anthropic to generate responses. Anthropic processes them under
             their own{' '}
@@ -196,7 +196,7 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2>9. Changes to This Policy</h2>
+          <h2>10. Changes to This Policy</h2>
           <p>
             We may update this policy from time to time. Material changes will be communicated by
             email before they take effect.

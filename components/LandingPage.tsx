@@ -490,6 +490,10 @@ export default function LandingPage({ onSignIn }: Props) {
         <a href="/privacy" className="landing-footer-link">
           Privacy
         </a>
+        <span className="landing-footer-sep">·</span>
+        <a href="/refund" className="landing-footer-link">
+          Refund
+        </a>
       </footer>
     </div>
   );

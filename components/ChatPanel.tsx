@@ -654,6 +654,17 @@ export default function ChatPanel({
                 });
               }
 
+              if (data.searching === 'crowd') {
+                setMessages(prev => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = {
+                    role: 'assistant',
+                    content: '◈ Checking crowd levels...',
+                  };
+                  return updated;
+                });
+              }
+
               if (data.searching === null) {
                 setMessages(prev => {
                   const updated = [...prev];

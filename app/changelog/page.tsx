@@ -340,6 +340,10 @@ export default function ChangelogPage() {
         <Link href="/privacy" className="cl-footer-link">
           Privacy
         </Link>
+        <span className="cl-footer-sep">·</span>
+        <Link href="/refund" className="cl-footer-link">
+          Refund
+        </Link>
       </footer>
     </div>
   );

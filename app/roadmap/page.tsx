@@ -253,6 +253,10 @@ export default function RoadmapPage() {
         <Link href="/privacy" className="rm-footer-link">
           Privacy
         </Link>
+        <span className="rm-footer-sep">·</span>
+        <Link href="/refund" className="rm-footer-link">
+          Refund
+        </Link>
       </footer>
     </div>
   );
