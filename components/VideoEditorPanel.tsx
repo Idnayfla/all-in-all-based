@@ -59,6 +59,13 @@ export default function VideoEditorPanel({ authToken }: VideoEditorPanelProps) {
   const [aiProcessing, setAiProcessing] = useState(false);
   const [aiMessage, setAiMessage] = useState('');
 
+  // Higgsfield DOP image-to-video
+  const [hfImageUrl, setHfImageUrl] = useState('');
+  const [hfPrompt, setHfPrompt] = useState('');
+  const [hfModel, setHfModel] = useState<'dop-lite' | 'dop-turbo' | 'dop-preview'>('dop-lite');
+  const [hfProcessing, setHfProcessing] = useState(false);
+  const [hfError, setHfError] = useState('');
+
   // Full undo stack: overlays + trim + speed
   interface UndoSnap {
     overlays: TextOverlay[];
@@ -553,6 +560,40 @@ export default function VideoEditorPanel({ authToken }: VideoEditorPanelProps) {
     }
   };
 
+  // ── Higgsfield DOP image-to-video ─────────────────────────────────────────
+  const applyHiggsfield = async () => {
+    if (!hfImageUrl.trim() || !hfPrompt.trim()) return;
+    setHfProcessing(true);
+    setHfError('');
+    try {
+      const res = await fetch('/api/higgsfield/video', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({
+          imageUrl: hfImageUrl.trim(),
+          prompt: hfPrompt.trim(),
+          model: hfModel,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      // Load the returned video URL directly into the editor
+      const response = await fetch(data.url);
+      const blob = await response.blob();
+      const file = new File([blob], 'higgsfield-dop.mp4', { type: 'video/mp4' });
+      loadVideo(file);
+      setHfImageUrl('');
+      setHfPrompt('');
+    } catch (err: unknown) {
+      setHfError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setHfProcessing(false);
+    }
+  };
+
   // ── FFmpeg export ─────────────────────────────────────────────────────────
   const exportVideo = async () => {
     if (!videoFile) return;
@@ -655,6 +696,71 @@ export default function VideoEditorPanel({ authToken }: VideoEditorPanelProps) {
             }}
           />
         </div>
+
+        {/* Higgsfield DOP — generate video from image without uploading first */}
+        <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
+          <div className="ve-side-title" style={{ marginBottom: 8 }}>
+            ◈ Higgsfield DOP — image to video
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <input
+              className="ve-input"
+              placeholder="Image URL…"
+              value={hfImageUrl}
+              onClick={e => e.stopPropagation()}
+              onChange={e => {
+                setHfImageUrl(e.target.value);
+                setHfError('');
+              }}
+            />
+            <input
+              className="ve-input"
+              placeholder="Motion prompt…"
+              value={hfPrompt}
+              onClick={e => e.stopPropagation()}
+              onChange={e => {
+                setHfPrompt(e.target.value);
+                setHfError('');
+              }}
+              onKeyDown={e => {
+                e.stopPropagation();
+                if (e.key === 'Enter' && !hfProcessing) applyHiggsfield();
+              }}
+            />
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['dop-lite', 'dop-turbo', 'dop-preview'] as const).map(m => (
+                <button
+                  key={m}
+                  className={`ve-btn ve-btn-sm${hfModel === m ? ' ve-btn-primary' : ''}`}
+                  style={{ flex: 1, fontSize: 10 }}
+                  onClick={e => {
+                    e.stopPropagation();
+                    setHfModel(m);
+                  }}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+            <button
+              className="ve-btn ve-btn-primary"
+              onClick={e => {
+                e.stopPropagation();
+                applyHiggsfield();
+              }}
+              disabled={hfProcessing || !hfImageUrl.trim() || !hfPrompt.trim()}
+            >
+              {hfProcessing ? '◈ Generating…' : '◈ Generate video'}
+            </button>
+            {hfError && (
+              <div
+                style={{ fontSize: 11, color: 'var(--error, #f87171)', wordBreak: 'break-word' }}
+              >
+                {hfError}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     );
 
@@ -747,6 +853,58 @@ export default function VideoEditorPanel({ authToken }: VideoEditorPanelProps) {
                 </button>
               </div>
             ))}
+          </div>
+
+          {/* Higgsfield DOP */}
+          <div className="ve-side-title" style={{ marginTop: 12 }}>
+            ◈ Higgsfield DOP
+          </div>
+          <div style={{ padding: '0 12px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <input
+              className="ve-input"
+              placeholder="Image URL…"
+              value={hfImageUrl}
+              onChange={e => {
+                setHfImageUrl(e.target.value);
+                setHfError('');
+              }}
+            />
+            <input
+              className="ve-input"
+              placeholder="Motion prompt…"
+              value={hfPrompt}
+              onChange={e => {
+                setHfPrompt(e.target.value);
+                setHfError('');
+              }}
+              onKeyDown={e => e.key === 'Enter' && !hfProcessing && applyHiggsfield()}
+            />
+            <div style={{ display: 'flex', gap: 4 }}>
+              {(['dop-lite', 'dop-turbo', 'dop-preview'] as const).map(m => (
+                <button
+                  key={m}
+                  className={`ve-btn ve-btn-sm${hfModel === m ? ' ve-btn-primary' : ''}`}
+                  style={{ flex: 1, fontSize: 10 }}
+                  onClick={() => setHfModel(m)}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+            <button
+              className="ve-btn ve-btn-primary"
+              onClick={applyHiggsfield}
+              disabled={hfProcessing || !hfImageUrl.trim() || !hfPrompt.trim()}
+            >
+              {hfProcessing ? '◈ Generating…' : '◈ Generate video'}
+            </button>
+            {hfError && (
+              <div
+                style={{ fontSize: 11, color: 'var(--error, #f87171)', wordBreak: 'break-word' }}
+              >
+                {hfError}
+              </div>
+            )}
           </div>
 
           {sel && (
