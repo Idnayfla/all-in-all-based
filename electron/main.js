@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, Menu, globalShortcut, ipcMain, screen, session } = require('electron');
+const { app, BrowserWindow, shell, Menu, globalShortcut, ipcMain, screen, session, desktopCapturer } = require('electron');
 const path = require('path');
 
 const APP_URL = 'https://getbased.dev';
@@ -123,7 +123,10 @@ function createWindow() {
 app.whenReady().then(() => {
   // Allow getDisplayMedia / screen capture in all sessions (default + named partition)
   const grantScreenCapture = (_request, callback) => {
-    callback({ video: { mandatory: { chromeMediaSource: 'screen' } } });
+    desktopCapturer
+      .getSources({ types: ['screen'] })
+      .then(sources => callback({ video: sources[0] }))
+      .catch(() => callback({}));
   };
   session.defaultSession.setDisplayMediaRequestHandler(grantScreenCapture);
   session.fromPartition('persist:based').setDisplayMediaRequestHandler(grantScreenCapture);
