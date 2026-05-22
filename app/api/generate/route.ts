@@ -2,7 +2,7 @@
 import * as Sentry from '@sentry/nextjs';
 import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '../_auth';
-import { searchWeb } from '@/lib/tavily';
+import { searchWeb, exaSearch } from '@/lib/tavily';
 import { getWeather } from '@/lib/weather';
 import { getCrowdInfo } from '@/lib/crowd';
 import { getTrafficInfo } from '@/lib/traffic';
@@ -236,6 +236,36 @@ async function streamGroqCollecting(
     return accumulated;
   }
   throw new Error('Groq rate limit — try again in a moment.');
+}
+
+// groqPlanner — fast structured JSON planner using Groq's llama-3.3-70b-versatile.
+// Used as the primary planner when GROQ_API_KEY is set; falls back to the existing
+// Haiku path if Groq is unavailable or the key is absent.
+async function groqPlanner(systemText: string, userText: string): Promise<string> {
+  const res = await fetch(GROQ_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: [
+        { role: 'system', content: systemText },
+        { role: 'user', content: userText },
+      ],
+      stream: false,
+      max_tokens: 300,
+    }),
+  });
+  if (res.status === 429) {
+    const retryAfter = Math.min(parseInt(res.headers.get('retry-after') ?? '5', 10), 15);
+    await new Promise(r => setTimeout(r, retryAfter * 1000));
+    throw new Error(`Groq rate limited — retry after ${retryAfter}s`);
+  }
+  if (!res.ok) throw new Error(`Groq planner ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  return (data.choices?.[0]?.message?.content as string | undefined) ?? '';
 }
 
 const SYSTEM = `You are Based — a sharp, direct AI that can do anything: answer questions, do math, analyse data, write, explain, plan, AND build fully working web apps, games, dashboards, and tools.
@@ -1424,6 +1454,7 @@ export async function POST(req: NextRequest) {
           // Step 0: Real-time context gathering
           let realtimeContext = '';
           if (
+            process.env.EXA_API_KEY ||
             process.env.TAVILY_API_KEY ||
             process.env.OPENWEATHER_API_KEY ||
             process.env.LTA_DATAMALL_API_KEY
@@ -1437,11 +1468,19 @@ export async function POST(req: NextRequest) {
               const match = needsCheck.match(/\{[\s\S]*\}/);
               if (match) {
                 const needs = JSON.parse(match[0]);
-                if (needs.needsSearch && process.env.TAVILY_API_KEY && needs.searchQuery) {
+                if (
+                  needs.needsSearch &&
+                  (process.env.EXA_API_KEY || process.env.TAVILY_API_KEY) &&
+                  needs.searchQuery
+                ) {
                   controller.enqueue(
                     encoder.encode(`data: ${JSON.stringify({ searching: 'web' })}\n\n`)
                   );
-                  const results = await searchWeb(needs.searchQuery);
+                  const exaResults = process.env.EXA_API_KEY
+                    ? await exaSearch(needs.searchQuery)
+                    : null;
+                  const results =
+                    exaResults !== null ? exaResults : await searchWeb(needs.searchQuery);
                   if (results)
                     realtimeContext += `\nWEB SEARCH for "${needs.searchQuery}":\n${results}`;
                   controller.enqueue(
@@ -1565,17 +1604,40 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                 ]
               : lastUserMessage + existingFilesContext;
 
+          // Use Groq as the primary planner when the key is set and there are no images
+          // (images require Anthropic vision — Groq does not support multimodal input here).
+          // Falls back to the existing callModel / Haiku path if Groq is unavailable.
+          const useGroqPlanner = !!process.env.GROQ_API_KEY && imageBlocks.length === 0;
+          const plannerModel = useGroqPlanner ? GROQ_MODEL : 'claude-haiku-4-5';
           const planGeneration = trace?.generation({
             name: 'planner',
-            model: 'claude-haiku-4-5',
+            model: plannerModel,
             input: lastUserMessage,
           });
-          const planText = await callModel(
-            plannerPromptContent,
-            PLANNER_SYSTEM_BLOCKS,
-            'planner',
-            usingFreeModel ? 'free' : 'based'
-          );
+          let planText: string;
+          if (useGroqPlanner) {
+            try {
+              planText = await groqPlanner(PLANNER_SYSTEM, lastUserMessage + existingFilesContext);
+            } catch (groqErr: unknown) {
+              console.warn(
+                '[groqPlanner] Groq failed, falling back to Haiku:',
+                groqErr instanceof Error ? groqErr.message : String(groqErr)
+              );
+              planText = await callModel(
+                plannerPromptContent,
+                PLANNER_SYSTEM_BLOCKS,
+                'planner',
+                usingFreeModel ? 'free' : 'based'
+              );
+            }
+          } else {
+            planText = await callModel(
+              plannerPromptContent,
+              PLANNER_SYSTEM_BLOCKS,
+              'planner',
+              usingFreeModel ? 'free' : 'based'
+            );
+          }
           planGeneration?.end({
             output: planText.slice(0, 500),
             usage: {
