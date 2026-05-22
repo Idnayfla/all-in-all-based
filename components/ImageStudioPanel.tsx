@@ -18,6 +18,7 @@ interface Filters {
 
 type Tool = 'brush' | 'eraser' | 'fill' | 'mask' | 'text' | 'eyedropper';
 type AiMode = 'generate' | 'transform' | 'inpaint';
+type ImageProvider = 'fal' | 'higgsfield';
 
 const W = 800;
 const H = 600;
@@ -64,6 +65,7 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiMode, setAiMode] = useState<AiMode>('generate');
+  const [imageProvider, setImageProvider] = useState<ImageProvider>('fal');
   const [generating, setGenerating] = useState(false);
   const [status, setStatus] = useState('');
   const [activeTab, setActiveTab] = useState<'tools' | 'layers' | 'filters' | 'ai'>('tools');
@@ -423,7 +425,8 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
       };
 
       if (aiMode === 'generate') {
-        const res = await fetch('/api/image', {
+        const endpoint = imageProvider === 'higgsfield' ? '/api/higgsfield/image' : '/api/image';
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: authHeaders,
           body: JSON.stringify({ prompt: aiPrompt }),
@@ -914,8 +917,32 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
                 ))}
               </div>
 
+              {aiMode === 'generate' && (
+                <div className="image-ai-mode-row" style={{ marginTop: 6 }}>
+                  {(
+                    [
+                      { id: 'fal', label: 'Flux (fal)' },
+                      { id: 'higgsfield', label: 'Higgsfield Soul' },
+                    ] as { id: ImageProvider; label: string }[]
+                  ).map(p => (
+                    <button
+                      key={p.id}
+                      className={`image-ai-mode-btn${imageProvider === p.id ? ' active' : ''}`}
+                      onClick={() => setImageProvider(p.id)}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className="image-ai-desc">
-                {aiMode === 'generate' && 'Describe an image to create on a new layer.'}
+                {aiMode === 'generate' &&
+                  imageProvider === 'higgsfield' &&
+                  'Higgsfield Soul — cinematic 2048×1152 image on a new layer.'}
+                {aiMode === 'generate' &&
+                  imageProvider === 'fal' &&
+                  'Describe an image to create on a new layer.'}
                 {aiMode === 'transform' && 'Describe how to transform the current canvas.'}
                 {aiMode === 'inpaint' && 'Paint a mask, then describe what to place there.'}
               </div>
@@ -945,7 +972,9 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
                 {generating
                   ? 'Working…'
                   : aiMode === 'generate'
-                    ? '◈ Generate'
+                    ? imageProvider === 'higgsfield'
+                      ? '◈ Generate (Higgsfield)'
+                      : '◈ Generate'
                     : aiMode === 'transform'
                       ? '◈ Transform'
                       : '◈ Inpaint'}
