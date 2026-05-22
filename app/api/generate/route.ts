@@ -19,7 +19,7 @@ const PANTHEON_URL = process.env.PANTHEON_API_URL ?? 'https://pantheon-api.verce
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const CEREBRAS_URL = 'https://api.cerebras.ai/v1/chat/completions';
-const CEREBRAS_MODEL = 'llama-3.3-70b';
+const CEREBRAS_MODEL = 'gpt-oss-120b';
 
 function friendlyError(e: unknown): string {
   const raw: string = (e instanceof Error ? e.message : null) ?? String(e);
