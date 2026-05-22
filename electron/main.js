@@ -155,6 +155,32 @@ app.whenReady().then(() => {
     overlayWin?.show();
     bubbleWin?.show();
   });
+
+  // Screen capture entirely in the main process — avoids the buffered-video-frame
+  // timing issue that occurs when getDisplayMedia is called from the renderer.
+  // desktopCapturer.getSources() takes a fresh snapshot at call time, so the
+  // 300 ms settle delay after hiding is sufficient.
+  ipcMain.handle('companion:capture-screen', async () => {
+    try {
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const { width, height } = primaryDisplay.size;
+      const maxW = 1280;
+      const thumbW = Math.min(width, maxW);
+      const thumbH = Math.round((height * thumbW) / width);
+
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width: thumbW, height: thumbH },
+      });
+
+      if (!sources.length) return null;
+      const nativeImg = sources[0].thumbnail;
+      const jpegBuf = nativeImg.toJPEG(75);
+      return 'data:image/jpeg;base64,' + jpegBuf.toString('base64');
+    } catch {
+      return null;
+    }
+  });
   ipcMain.on('companion-bubble:click', () => toggleOverlay());
 
   app.on('activate', () => {
