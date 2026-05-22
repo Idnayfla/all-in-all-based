@@ -83,19 +83,33 @@ export default function CompanionOverlayPage() {
     setMessages([...history, { role: 'assistant', content: '' }]);
     setIsGenerating(true);
 
-    // Always fetch a fresh token — the overlay window may load before the
-    // session cookie is fully hydrated, making the cached authToken stale.
+    // getUser() triggers a server-side token refresh if the access token is
+    // expired — getSession() alone can return a stale cached token.
+    await supabase.auth.getUser();
     const {
       data: { session: freshSession },
     } = await supabase.auth.getSession();
     const token = freshSession?.access_token ?? authToken;
+
+    if (!token) {
+      setMessages(prev => {
+        const next = [...prev];
+        next[next.length - 1] = {
+          ...next[next.length - 1],
+          content: '✕ Not signed in. Please open Based and sign in first.',
+        };
+        return next;
+      });
+      setIsGenerating(false);
+      return;
+    }
 
     try {
       const res = await fetch('/api/companion', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           messages: history.map(m => ({ role: m.role, content: m.content })),
@@ -103,7 +117,10 @@ export default function CompanionOverlayPage() {
         }),
       });
 
-      if (!res.ok || !res.body) throw new Error('failed');
+      if (!res.ok || !res.body) {
+        if (res.status === 401) throw new Error('session-expired');
+        throw new Error('failed');
+      }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -139,10 +156,16 @@ export default function CompanionOverlayPage() {
           }
         }
       }
-    } catch {
+    } catch (err) {
+      const isExpired = err instanceof Error && err.message === 'session-expired';
       setMessages(prev => {
         const next = [...prev];
-        next[next.length - 1] = { ...next[next.length - 1], content: '✕ Failed to connect.' };
+        next[next.length - 1] = {
+          ...next[next.length - 1],
+          content: isExpired
+            ? '✕ Session expired. Please sign in again in Based.'
+            : '✕ Failed to connect.',
+        };
         return next;
       });
     } finally {
