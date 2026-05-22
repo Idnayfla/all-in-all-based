@@ -1,8 +1,9 @@
 const { app, BrowserWindow, shell, Menu, globalShortcut, ipcMain, screen, session, desktopCapturer } = require('electron');
 const path = require('path');
 
-const APP_URL = 'https://getbased.dev';
-const OVERLAY_URL = 'https://getbased.dev/companion';
+const DEV_MODE = process.env.ELECTRON_DEV === 'true' || process.env.NODE_ENV === 'development';
+const APP_URL = DEV_MODE ? 'http://localhost:3000' : 'https://getbased.dev';
+const OVERLAY_URL = DEV_MODE ? 'http://localhost:3000/companion' : 'https://getbased.dev/companion';
 
 let win = null;
 let overlayWin = null;
