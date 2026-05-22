@@ -42,6 +42,7 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
     if (body.files !== undefined) updates.files = body.files;
     if (body.messages !== undefined) updates.messages = body.messages;
     if (body.memory !== undefined) updates.memory = body.memory;
+    if (body.spec !== undefined) updates.spec = body.spec;
     if (Object.keys(updates).length === 0) return NextResponse.json({ success: true });
     const { error } = await supabaseAdmin
       .from('projects')
