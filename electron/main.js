@@ -3,8 +3,10 @@ const path = require('path');
 
 const APP_URL = 'https://getbased.dev';
 const OVERLAY_URL = 'https://getbased.dev/companion';
+const BUBBLE_URL = 'https://getbased.dev/companion-bubble';
 
 let overlayWin = null;
+let bubbleWin = null;
 let isQuitting = false;
 
 function createOverlayWindow() {
@@ -39,13 +41,42 @@ function createOverlayWindow() {
   });
 }
 
+function createBubbleWindow() {
+  const { workAreaSize } = screen.getPrimaryDisplay();
+  bubbleWin = new BrowserWindow({
+    width: 88,
+    height: 88,
+    x: workAreaSize.width - 104,
+    y: workAreaSize.height - 104,
+    alwaysOnTop: true,
+    frame: false,
+    transparent: true,
+    skipTaskbar: true,
+    resizable: false,
+    show: false,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      partition: 'persist:based',
+      preload: path.join(__dirname, 'bubble-preload.js'),
+    },
+  });
+  bubbleWin.loadURL(BUBBLE_URL);
+  bubbleWin.once('ready-to-show', () => bubbleWin.show());
+  bubbleWin.on('close', e => {
+    if (!isQuitting) e.preventDefault();
+  });
+}
+
 function toggleOverlay() {
   if (!overlayWin) return;
   if (overlayWin.isVisible()) {
     overlayWin.hide();
+    bubbleWin?.webContents.send('companion-bubble:state', 'closed');
   } else {
     overlayWin.show();
     overlayWin.focus();
+    bubbleWin?.webContents.send('companion-bubble:state', 'open');
   }
 }
 
@@ -80,6 +111,10 @@ function createWindow() {
       overlayWin.destroy();
       overlayWin = null;
     }
+    if (bubbleWin) {
+      bubbleWin.destroy();
+      bubbleWin = null;
+    }
   });
 
   win.loadURL(APP_URL);
@@ -94,11 +129,16 @@ app.whenReady().then(() => {
 
   createWindow();
   createOverlayWindow();
+  createBubbleWindow();
 
   // Ctrl+Shift+Space (Win/Linux) / Cmd+Shift+Space (Mac) toggles the overlay
   globalShortcut.register('CommandOrControl+Shift+Space', toggleOverlay);
 
-  ipcMain.on('companion:hide', () => overlayWin?.hide());
+  ipcMain.on('companion:hide', () => {
+    overlayWin?.hide();
+    bubbleWin?.webContents.send('companion-bubble:state', 'closed');
+  });
+  ipcMain.on('companion-bubble:click', () => toggleOverlay());
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

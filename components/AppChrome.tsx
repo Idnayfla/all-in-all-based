@@ -11,7 +11,7 @@ import ServiceWorkerInit from './ServiceWorkerInit';
 import PostHogProvider from './PostHogProvider';
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isCompanion = pathname === '/companion';
+  const isCompanion = pathname === '/companion' || pathname === '/companion-bubble';
 
   if (isCompanion) {
     return <ErrorBoundary>{children}</ErrorBoundary>;

@@ -12270,6 +12270,64 @@ body:has(.beta-banner) .app-root {
   margin: 0;
 }
 
+/* ── Desktop companion bubble (Electron always-visible window) ── */
+.desktop-bubble-root {
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.desktop-bubble-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.5);
+  position: relative;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+  outline: none;
+}
+
+.desktop-bubble-btn--open {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow: 0 4px 24px rgba(124, 58, 237, 0.8);
+}
+
+.desktop-bubble-label {
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+  font-family: 'Syne', sans-serif;
+  pointer-events: none;
+}
+
+.desktop-bubble-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid rgba(124, 58, 237, 0.5);
+  pointer-events: none;
+}
+
+.desktop-bubble-ring--1 {
+  inset: -8px;
+}
+
+.desktop-bubble-ring--2 {
+  inset: -16px;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    SPEC PANEL
    ═══════════════════════════════════════════════════════════════ */
