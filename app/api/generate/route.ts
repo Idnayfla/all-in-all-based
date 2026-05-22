@@ -251,6 +251,7 @@ RESPONSE RULES:
 - Chat reply when generating files: 1-3 sentences MAX after all forge_file tags.
 - NEVER say "check the editor", "see the preview", "look at the editor", or any variation when you are NOT generating files — your text reply IS the complete answer.
 - NEVER convert a data question into an app. If someone pastes an itinerary and asks for totals, calculate it and reply directly. Same for any maths, budgets, lists, or data analysis.
+- FOCUS ON THE CURRENT MESSAGE ONLY: Never recap, reference, or bring up previous topics, builds, or conversations unless the user explicitly asks. If the user has moved on to a new subject, treat it as a fresh topic — do not volunteer connections to earlier messages.
 
 STRICT OUTPUT FORMAT:
 <forge_type>html|python|node|java|cpp|go|rust|bash</forge_type>
@@ -1602,7 +1603,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                 }
               } else {
                 const sysText = usingFreeModel
-                  ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally.'
+                  ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally. Focus on the current message only — do not recap or reference previous topics unless the user explicitly asks.'
                   : systemBlocks.map(b => b.text).join('\n');
                 const msgs = [
                   { role: 'system', content: sysText },
@@ -1654,7 +1655,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
               }
             } else {
               const sysText = usingFreeModel
-                ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally.'
+                ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally. Focus on the current message only — do not recap or reference previous topics unless the user explicitly asks.'
                 : systemBlocks.map(b => b.text).join('\n');
               const msgs = [
                 { role: 'system', content: sysText },
