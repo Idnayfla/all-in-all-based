@@ -30,6 +30,7 @@ export default function CompanionOverlayPage() {
   const [input, setInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [authToken, setAuthToken] = useState('');
+  const [authReady, setAuthReady] = useState(false);
   const [pendingCapture, setPendingCapture] = useState<{ source: string; thumb: string } | null>(
     null
   );
@@ -43,6 +44,7 @@ export default function CompanionOverlayPage() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setAuthToken(session?.access_token ?? '');
+      setAuthReady(true);
     });
     textareaRef.current?.focus();
 
@@ -103,14 +105,19 @@ export default function CompanionOverlayPage() {
 
     // Auto-capture screen when message implies screen intent and no capture is already attached
     if (!cap && SCREEN_INTENT.test(text)) {
-      window.electronAPI?.hideForCapture();
-      // 300 ms settle — same reasoning as handleScreen above
-      await new Promise<void>(resolve => setTimeout(resolve, 300));
-      const dataUrl = window.electronAPI?.captureScreenMain
-        ? await window.electronAPI.captureScreenMain()
-        : await captureScreen();
-      window.electronAPI?.showAfterCapture();
-      if (dataUrl) cap = { source: dataUrl, thumb: dataUrl };
+      try {
+        window.electronAPI?.hideForCapture();
+        // 300 ms settle — same reasoning as handleScreen above
+        await new Promise<void>(resolve => setTimeout(resolve, 300));
+        const dataUrl = window.electronAPI?.captureScreenMain
+          ? await window.electronAPI.captureScreenMain()
+          : await captureScreen();
+        window.electronAPI?.showAfterCapture();
+        if (dataUrl) cap = { source: dataUrl, thumb: dataUrl };
+      } catch {
+        // Capture failure is non-fatal — proceed without screenshot
+        window.electronAPI?.showAfterCapture();
+      }
     }
 
     const userMsg: Msg = { role: 'user', content: text, captureThumb: cap?.thumb };
@@ -123,28 +130,28 @@ export default function CompanionOverlayPage() {
     setMessages([...history, { role: 'assistant', content: '' }]);
     setIsGenerating(true);
 
-    // getUser() triggers a server-side token refresh if the access token is
-    // expired — getSession() alone can return a stale cached token.
-    await supabase.auth.getUser();
-    const {
-      data: { session: freshSession },
-    } = await supabase.auth.getSession();
-    const token = freshSession?.access_token ?? authToken;
-
-    if (!token) {
-      setMessages(prev => {
-        const next = [...prev];
-        next[next.length - 1] = {
-          ...next[next.length - 1],
-          content: '✕ Not signed in. Please open Based and sign in first.',
-        };
-        return next;
-      });
-      setIsGenerating(false);
-      return;
-    }
-
     try {
+      // getUser() triggers a server-side token refresh if the access token is
+      // expired — getSession() alone can return a stale cached token.
+      // Both calls are inside try so any network error reaches finally and clears isGenerating.
+      await supabase.auth.getUser();
+      const {
+        data: { session: freshSession },
+      } = await supabase.auth.getSession();
+      const token = freshSession?.access_token ?? authToken;
+
+      if (!token) {
+        setMessages(prev => {
+          const next = [...prev];
+          next[next.length - 1] = {
+            ...next[next.length - 1],
+            content: '✕ Not signed in. Please open Based and sign in first.',
+          };
+          return next;
+        });
+        return;
+      }
+
       const res = await fetch('/api/companion', {
         method: 'POST',
         headers: {
@@ -255,7 +262,8 @@ export default function CompanionOverlayPage() {
       </div>
 
       <div className="companion-messages">
-        {!authToken && (
+        {!authReady && <div className="companion-auth-notice">◈ Connecting…</div>}
+        {authReady && !authToken && (
           <div className="companion-auth-notice">
             ◈ Sign in to Based first, then open the companion.
           </div>
