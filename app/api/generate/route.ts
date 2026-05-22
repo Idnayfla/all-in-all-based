@@ -18,6 +18,8 @@ const PANTHEON_KEY = process.env.PANTHEON_API_KEY ?? process.env.PANTHEON_OWNER_
 const PANTHEON_URL = process.env.PANTHEON_API_URL ?? 'https://pantheon-api.vercel.app';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const CEREBRAS_URL = 'https://api.cerebras.ai/v1/chat/completions';
+const CEREBRAS_MODEL = 'llama-3.3-70b';
 
 function friendlyError(e: unknown): string {
   const raw: string = (e instanceof Error ? e.message : null) ?? String(e);
@@ -264,6 +266,33 @@ async function groqPlanner(systemText: string, userText: string): Promise<string
     throw new Error(`Groq rate limited — retry after ${retryAfter}s`);
   }
   if (!res.ok) throw new Error(`Groq planner ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  return (data.choices?.[0]?.message?.content as string | undefined) ?? '';
+}
+
+// cerebrasPlanner — second-tier fast planner (~2,600 tok/s, 1M tok/day free).
+// Used as fallback when Groq fails or is rate-limited.
+async function cerebrasPlanner(systemText: string, userText: string): Promise<string> {
+  const res = await fetch(CEREBRAS_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${process.env.CEREBRAS_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: CEREBRAS_MODEL,
+      messages: [
+        { role: 'system', content: systemText },
+        { role: 'user', content: userText },
+      ],
+      stream: false,
+      max_tokens: 300,
+    }),
+  });
+  if (res.status === 429) {
+    throw new Error('Cerebras rate limited');
+  }
+  if (!res.ok) throw new Error(`Cerebras planner ${res.status}: ${await res.text()}`);
   const data = await res.json();
   return (data.choices?.[0]?.message?.content as string | undefined) ?? '';
 }
@@ -1604,11 +1633,15 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                 ]
               : lastUserMessage + existingFilesContext;
 
-          // Use Groq as the primary planner when the key is set and there are no images
-          // (images require Anthropic vision — Groq does not support multimodal input here).
-          // Falls back to the existing callModel / Haiku path if Groq is unavailable.
+          // Planner chain: Groq (primary, fastest) → Cerebras (second, if Groq fails) → Haiku (final).
+          // Images skip fast planners — Anthropic vision is required for multimodal input.
           const useGroqPlanner = !!process.env.GROQ_API_KEY && imageBlocks.length === 0;
-          const plannerModel = useGroqPlanner ? GROQ_MODEL : 'claude-haiku-4-5';
+          const useCerebrasPlanner = !!process.env.CEREBRAS_API_KEY && imageBlocks.length === 0;
+          const plannerModel = useGroqPlanner
+            ? GROQ_MODEL
+            : useCerebrasPlanner
+              ? CEREBRAS_MODEL
+              : 'claude-haiku-4-5';
           const planGeneration = trace?.generation({
             name: 'planner',
             model: plannerModel,
@@ -1620,8 +1653,46 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
               planText = await groqPlanner(PLANNER_SYSTEM, lastUserMessage + existingFilesContext);
             } catch (groqErr: unknown) {
               console.warn(
-                '[groqPlanner] Groq failed, falling back to Haiku:',
+                '[groqPlanner] Groq failed, trying Cerebras:',
                 groqErr instanceof Error ? groqErr.message : String(groqErr)
+              );
+              if (useCerebrasPlanner) {
+                try {
+                  planText = await cerebrasPlanner(
+                    PLANNER_SYSTEM,
+                    lastUserMessage + existingFilesContext
+                  );
+                } catch (cerebrasErr: unknown) {
+                  console.warn(
+                    '[cerebrasPlanner] Cerebras failed, falling back to Haiku:',
+                    cerebrasErr instanceof Error ? cerebrasErr.message : String(cerebrasErr)
+                  );
+                  planText = await callModel(
+                    plannerPromptContent,
+                    PLANNER_SYSTEM_BLOCKS,
+                    'planner',
+                    usingFreeModel ? 'free' : 'based'
+                  );
+                }
+              } else {
+                planText = await callModel(
+                  plannerPromptContent,
+                  PLANNER_SYSTEM_BLOCKS,
+                  'planner',
+                  usingFreeModel ? 'free' : 'based'
+                );
+              }
+            }
+          } else if (useCerebrasPlanner) {
+            try {
+              planText = await cerebrasPlanner(
+                PLANNER_SYSTEM,
+                lastUserMessage + existingFilesContext
+              );
+            } catch (cerebrasErr: unknown) {
+              console.warn(
+                '[cerebrasPlanner] Cerebras failed, falling back to Haiku:',
+                cerebrasErr instanceof Error ? cerebrasErr.message : String(cerebrasErr)
               );
               planText = await callModel(
                 plannerPromptContent,
