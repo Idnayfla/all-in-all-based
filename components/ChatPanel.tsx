@@ -665,6 +665,17 @@ export default function ChatPanel({
                 });
               }
 
+              if (data.searching === 'traffic') {
+                setMessages(prev => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = {
+                    role: 'assistant',
+                    content: '◈ Checking traffic conditions...',
+                  };
+                  return updated;
+                });
+              }
+
               if (data.searching === null) {
                 setMessages(prev => {
                   const updated = [...prev];

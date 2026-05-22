@@ -121,10 +121,12 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  // Allow getDisplayMedia / screen capture in renderer windows
-  session.defaultSession.setDisplayMediaRequestHandler((_request, callback) => {
+  // Allow getDisplayMedia / screen capture in all sessions (default + named partition)
+  const grantScreenCapture = (_request, callback) => {
     callback({ video: { mandatory: { chromeMediaSource: 'screen' } } });
-  });
+  };
+  session.defaultSession.setDisplayMediaRequestHandler(grantScreenCapture);
+  session.fromPartition('persist:based').setDisplayMediaRequestHandler(grantScreenCapture);
 
   createWindow();
   createOverlayWindow();
