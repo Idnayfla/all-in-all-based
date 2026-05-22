@@ -781,6 +781,8 @@ body {
   animation:
     float 3s ease-in-out infinite,
     glowPulse 3s ease-in-out infinite;
+  pointer-events: none;
+  cursor: default;
 }
 .chat-empty-title {
   font-family: var(--font-mono);

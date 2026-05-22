@@ -286,10 +286,20 @@ export default function ChatPanel({
           const res = await fetch('/api/transcribe', { method: 'POST', body: form });
           const { text } = await res.json();
           if (text?.trim()) {
-            setInput(text.trim());
-            setTimeout(() => {
-              if (!isGenerating) send(text.trim());
-            }, 200);
+            // Insert at cursor (Wispr Flow behaviour) — user reviews before sending
+            const ta = textareaRef.current;
+            if (ta) {
+              const start = ta.selectionStart ?? ta.value.length;
+              const end = ta.selectionEnd ?? ta.value.length;
+              const next = ta.value.slice(0, start) + text.trim() + ta.value.slice(end);
+              setInput(next);
+              setTimeout(() => {
+                ta.setSelectionRange(start + text.trim().length, start + text.trim().length);
+                ta.focus();
+              }, 0);
+            } else {
+              setInput(prev => (prev ? prev + ' ' + text.trim() : text.trim()));
+            }
           }
         } catch {
           // silently fail — user can type manually
@@ -1299,7 +1309,7 @@ export default function ChatPanel({
           <button
             className="upload-btn"
             onClick={() => fileInputRef.current?.click()}
-            disabled={isGenerating || generationMode === 'chat'}
+            disabled={isGenerating}
             title="Attach image"
           >
             ◆

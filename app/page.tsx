@@ -538,7 +538,18 @@ export default function Home() {
     ]);
     if (projectsRes.ok) {
       const { projects } = await projectsRes.json();
-      const list = projects ?? [];
+      const rawList: Project[] = projects ?? [];
+      // Guard: if the active project has messages not yet flushed to the server
+      // (auto-save is fire-and-forget), keep the in-memory version so a focus
+      // event can't clobber unsaved history.
+      const currentP = currentProjectRef.current;
+      const list = currentP
+        ? rawList.map(p =>
+            p.id === currentP.id && currentP.messages.length > p.messages.length
+              ? { ...p, messages: currentP.messages, files: currentP.files }
+              : p
+          )
+        : rawList;
       setProjects(list);
       saveProjectsCache(list);
     } else {
