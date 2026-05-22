@@ -4,6 +4,7 @@ const path = require('path');
 const APP_URL = 'https://getbased.dev';
 const OVERLAY_URL = 'https://getbased.dev/companion';
 
+let win = null;
 let overlayWin = null;
 let bubbleWin = null;
 let isQuitting = false;
@@ -80,7 +81,7 @@ function toggleOverlay() {
 }
 
 function createWindow() {
-  const win = new BrowserWindow({
+  win = new BrowserWindow({
     width: 1280,
     height: 820,
     minWidth: 800,
@@ -121,7 +122,13 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  // Allow getDisplayMedia / screen capture in all sessions (default + named partition)
+  createWindow();
+  createOverlayWindow();
+  createBubbleWindow();
+
+  // Allow getDisplayMedia / screen capture in all sessions (default + named partition).
+  // Registered AFTER windows are created so the 'persist:based' session object is fully
+  // initialised with its webContents — avoids the handler being lost on first launch.
   const grantScreenCapture = (_request, callback) => {
     desktopCapturer
       .getSources({ types: ['screen'] })
@@ -131,10 +138,6 @@ app.whenReady().then(() => {
   session.defaultSession.setDisplayMediaRequestHandler(grantScreenCapture);
   session.fromPartition('persist:based').setDisplayMediaRequestHandler(grantScreenCapture);
 
-  createWindow();
-  createOverlayWindow();
-  createBubbleWindow();
-
   // Ctrl+Shift+Space (Win/Linux) / Cmd+Shift+Space (Mac) toggles the overlay
   globalShortcut.register('CommandOrControl+Shift+Space', toggleOverlay);
 
@@ -143,10 +146,12 @@ app.whenReady().then(() => {
     bubbleWin?.webContents.send('companion-bubble:state', 'closed');
   });
   ipcMain.on('companion:hide-for-capture', () => {
+    win?.hide();
     overlayWin?.hide();
     bubbleWin?.hide();
   });
   ipcMain.on('companion:show-after-capture', () => {
+    win?.show();
     overlayWin?.show();
     bubbleWin?.show();
   });
