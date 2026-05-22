@@ -25,6 +25,7 @@ export default function CompanionOverlayPage() {
     null
   );
   const [captureError, setCaptureError] = useState<string | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sessionId = useRef(String(Date.now()).slice(-4));
@@ -42,11 +43,15 @@ export default function CompanionOverlayPage() {
   }, [messages]);
 
   const close = () => {
-    if (window.electronAPI) {
-      window.electronAPI.hideCompanion();
-    } else {
-      window.close();
-    }
+    setIsClosing(true);
+    setTimeout(() => {
+      if (window.electronAPI) {
+        window.electronAPI.hideCompanion();
+      } else {
+        window.close();
+      }
+      setIsClosing(false);
+    }, 260);
   };
 
   const flashError = (msg: string) => {
@@ -146,7 +151,7 @@ export default function CompanionOverlayPage() {
   };
 
   return (
-    <div className="companion-overlay-root">
+    <div className={`companion-overlay-root${isClosing ? ' companion-overlay--closing' : ''}`}>
       <div className="companion-overlay-header">
         <span className="companion-logo">⬡</span>
         <span className="companion-title">BASED</span>
