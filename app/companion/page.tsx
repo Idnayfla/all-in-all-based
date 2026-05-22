@@ -137,6 +137,22 @@ export default function CompanionOverlayPage() {
         }),
       });
 
+      if (res.status === 429) {
+        let limitMsg = '⬡ Daily limit reached. Upgrade to Pro for unlimited access → getbased.dev';
+        try {
+          const data = (await res.json()) as { error?: string; limit?: number };
+          if (data.error === 'free_limit_reached') {
+            limitMsg = `⬡ You've used your ${data.limit ?? 5} free companion messages today. Upgrade to Pro for unlimited access → getbased.dev`;
+          }
+        } catch {}
+        setMessages(prev => {
+          const next = [...prev];
+          next[next.length - 1] = { ...next[next.length - 1], content: limitMsg };
+          return next;
+        });
+        return;
+      }
+
       if (!res.ok || !res.body) {
         if (res.status === 401) throw new Error('session-expired');
         throw new Error('failed');

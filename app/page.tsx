@@ -686,6 +686,19 @@ export default function Home() {
         }
       }
       if (event === 'SIGNED_OUT') {
+        // Always clear the stale tier cache so a different account signing in
+        // next doesn't inherit the previous account's Pro status.
+        try {
+          localStorage.removeItem('based_sub_tier');
+        } catch {}
+        setSubscription({
+          tier: 'free',
+          status: 'active',
+          generationsUsed: 0,
+          periodStart: null,
+          periodEnd: null,
+        });
+
         if (isExplicitSignOut.current) {
           // User clicked Sign Out — clear everything
           isExplicitSignOut.current = false;
