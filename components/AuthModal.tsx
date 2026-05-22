@@ -210,6 +210,29 @@ export default function AuthModal({ defaultTab = 'signin', onClose }: Props) {
                 Forgot password?
               </button>
             )}
+            {tab === 'signup' && (
+              <p className="auth-consent">
+                By creating an account you agree to our{' '}
+                <a
+                  href="/terms"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="auth-consent-link"
+                >
+                  Terms
+                </a>{' '}
+                and{' '}
+                <a
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="auth-consent-link"
+                >
+                  Privacy Policy
+                </a>
+                .
+              </p>
+            )}
           </form>
         )}
       </motion.div>

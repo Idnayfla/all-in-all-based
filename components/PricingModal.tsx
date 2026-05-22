@@ -148,6 +148,22 @@ export default function PricingModal({
           </button>
         )}
         <p className="pricing-note">Cancel anytime. Powered by Stripe.</p>
+        <p className="pricing-legal">
+          By upgrading you agree to our{' '}
+          <a href="/terms" target="_blank" rel="noopener noreferrer" className="pricing-legal-link">
+            Terms
+          </a>{' '}
+          and{' '}
+          <a
+            href="/refund"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="pricing-legal-link"
+          >
+            Refund Policy
+          </a>
+          .
+        </p>
       </motion.div>
     </motion.div>
   );

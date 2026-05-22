@@ -482,6 +482,14 @@ export default function LandingPage({ onSignIn }: Props) {
         >
           ◈ Support
         </a>
+        <span className="landing-footer-sep">·</span>
+        <a href="/terms" className="landing-footer-link">
+          Terms
+        </a>
+        <span className="landing-footer-sep">·</span>
+        <a href="/privacy" className="landing-footer-link">
+          Privacy
+        </a>
       </footer>
     </div>
   );

@@ -245,6 +245,14 @@ export default function RoadmapPage() {
         >
           ◈ Ko-fi
         </a>
+        <span className="rm-footer-sep">·</span>
+        <Link href="/terms" className="rm-footer-link">
+          Terms
+        </Link>
+        <span className="rm-footer-sep">·</span>
+        <Link href="/privacy" className="rm-footer-link">
+          Privacy
+        </Link>
       </footer>
     </div>
   );

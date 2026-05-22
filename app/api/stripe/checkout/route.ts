@@ -36,6 +36,12 @@ export async function POST(req: NextRequest) {
       mode: 'subscription',
       success_url: `${origin}?upgraded=true`,
       cancel_url: origin,
+      consent_collection: { terms_of_service: 'required' },
+      custom_text: {
+        terms_of_service_acceptance: {
+          message: `I agree to the [Terms of Service](${origin}/terms) and [Refund Policy](${origin}/refund).`,
+        },
+      },
     });
 
     return NextResponse.json({ url: session.url });

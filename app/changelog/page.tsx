@@ -332,6 +332,14 @@ export default function ChangelogPage() {
         >
           ◈ Ko-fi
         </a>
+        <span className="cl-footer-sep">·</span>
+        <Link href="/terms" className="cl-footer-link">
+          Terms
+        </Link>
+        <span className="cl-footer-sep">·</span>
+        <Link href="/privacy" className="cl-footer-link">
+          Privacy
+        </Link>
       </footer>
     </div>
   );
