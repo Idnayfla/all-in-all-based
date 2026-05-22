@@ -1274,13 +1274,16 @@ async function streamText(
   if (hasOwnKey) {
     try {
       const systemMsg = messages.find(m => m.role === 'system');
-      const userMsg = messages.find(m => m.role === 'user');
+      const conversationMessages = messages.filter(m => m.role !== 'system');
       let accumulated = '';
       const stream = client.messages.stream({
         model: 'claude-opus-4-7',
         max_tokens: maxTokens,
         system: systemMsg?.content ?? '',
-        messages: [{ role: 'user', content: userMsg?.content ?? '' }],
+        messages: conversationMessages.map(m => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        })),
       });
       for await (const chunk of stream) {
         if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
