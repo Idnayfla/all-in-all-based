@@ -3,7 +3,6 @@ const path = require('path');
 
 const APP_URL = 'https://getbased.dev';
 const OVERLAY_URL = 'https://getbased.dev/companion';
-const BUBBLE_URL = 'https://getbased.dev/companion-bubble';
 
 let overlayWin = null;
 let bubbleWin = null;
@@ -61,7 +60,7 @@ function createBubbleWindow() {
       preload: path.join(__dirname, 'bubble-preload.js'),
     },
   });
-  bubbleWin.loadURL(BUBBLE_URL);
+  bubbleWin.loadFile(path.join(__dirname, 'bubble.html'));
   bubbleWin.once('ready-to-show', () => bubbleWin.show());
   bubbleWin.on('close', e => {
     if (!isQuitting) e.preventDefault();
