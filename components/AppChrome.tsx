@@ -9,8 +9,6 @@ import LaunchSplash from './LaunchSplash';
 import InstallPrompt from './InstallPrompt';
 import ServiceWorkerInit from './ServiceWorkerInit';
 import PostHogProvider from './PostHogProvider';
-import GlobalCompanionBubble from './GlobalCompanionBubble';
-
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isCompanion = pathname === '/companion';
@@ -28,7 +26,6 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
       <PostHogProvider>
         <ErrorBoundary>{children}</ErrorBoundary>
       </PostHogProvider>
-      <GlobalCompanionBubble />
       <Analytics />
       {/* Meta Pixel */}
       <Script
