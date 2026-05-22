@@ -241,11 +241,32 @@ export default function ChatPanel({
     'Broke existing code',
   ];
 
-  const submitFlag = async (msgIdx: number, msgContent: string, userPrompt: string) => {
+  const submitFlag = async (msgIdx: number, _msgContent: string, _userPrompt: string) => {
     if (flagSending) return;
     setFlagSending(true);
     const body = [flagReason, flagText.trim()].filter(Boolean).join(' — ') || 'Not what I expected';
-    const context = `INPUT: ${userPrompt.slice(0, 300)}\n\nOUTPUT: ${msgContent.slice(0, 400)}`;
+    const recentMsgs = messages.slice(-10);
+    const startIdx = messages.length - recentMsgs.length;
+    const context =
+      recentMsgs.length > 0
+        ? recentMsgs
+            .map((m, relIdx) => {
+              const absIdx = startIdx + relIdx;
+              const text =
+                typeof m.content === 'string'
+                  ? m.content
+                  : (m.content as Array<{ type: string; text?: string }>)
+                      .filter(b => b.type === 'text')
+                      .map(b => b.text ?? '')
+                      .join('');
+              if (m.role === 'user') {
+                return `YOU\n${text}`;
+              }
+              const reaction = flaggedSet.has(absIdx) ? '\n\n⊙ Not what I expected' : '';
+              return `BASED\n${text}${reaction}`;
+            })
+            .join('\n\n')
+        : '';
     try {
       await fetch('/api/feedback', {
         method: 'POST',
@@ -1036,12 +1057,13 @@ export default function ChatPanel({
                       if (reportingInFlight.current.has(reportKey)) return;
                       reportingInFlight.current.add(reportKey);
                       setReportedErrors(prev => new Set(prev).add(reportKey));
-                      const recentMsgs = messages.slice(-5);
+                      const recentMsgs = messages.slice(-10);
+                      const snapStartIdx = messages.length - recentMsgs.length;
                       const chatSnapshot =
                         recentMsgs.length > 0
-                          ? [
-                              `--- Recent conversation (last ${recentMsgs.length} messages) ---`,
-                              ...recentMsgs.map(m => {
+                          ? recentMsgs
+                              .map((m, relIdx) => {
+                                const absIdx = snapStartIdx + relIdx;
                                 const text =
                                   typeof m.content === 'string'
                                     ? m.content
@@ -1049,9 +1071,15 @@ export default function ChatPanel({
                                         .filter(b => b.type === 'text')
                                         .map(b => b.text ?? '')
                                         .join('');
-                                return `${m.role === 'user' ? 'USER' : 'BASED'}: ${text}`;
-                              }),
-                            ].join('\n')
+                                if (m.role === 'user') {
+                                  return `YOU\n${text}`;
+                                }
+                                const reaction = flaggedSet.has(absIdx)
+                                  ? '\n\n⊙ Not what I expected'
+                                  : '';
+                                return `BASED\n${text}${reaction}`;
+                              })
+                              .join('\n\n')
                           : '';
                       const errorDetail = [
                         block.prompt ? `PROMPT: ${block.prompt}` : null,
