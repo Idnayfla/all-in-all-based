@@ -16,6 +16,9 @@ interface Msg {
   captureThumb?: string;
 }
 
+const SCREEN_INTENT =
+  /\b(screen|this|what'?s (on|here)|solve this|answer this|what do you see|help me with this|what is this)\b/i;
+
 export default function CompanionOverlayPage() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
@@ -36,6 +39,16 @@ export default function CompanionOverlayPage() {
       setAuthToken(session?.access_token ?? '');
     });
     textareaRef.current?.focus();
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(event => {
+      if (event === 'SIGNED_OUT') {
+        setMessages([]);
+        setAuthToken('');
+      }
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -72,7 +85,14 @@ export default function CompanionOverlayPage() {
     const text = input.trim();
     if (!text || isGenerating) return;
 
-    const cap = pendingCapture;
+    let cap = pendingCapture;
+
+    // Auto-capture screen when message implies screen intent and no capture is already attached
+    if (!cap && SCREEN_INTENT.test(text)) {
+      const dataUrl = await captureScreen();
+      if (dataUrl) cap = { source: dataUrl, thumb: dataUrl };
+    }
+
     const userMsg: Msg = { role: 'user', content: text, captureThumb: cap?.thumb };
 
     setInput('');
