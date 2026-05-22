@@ -12214,6 +12214,7 @@ body:has(.beta-banner) .app-root {
   box-shadow: var(--shadow-lg), var(--shadow-accent);
   overflow: hidden;
   z-index: 99999;
+  transform-origin: bottom right;
   animation: overlay-slide-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .companion-overlay--closing {
@@ -12222,21 +12223,21 @@ body:has(.beta-banner) .app-root {
 @keyframes overlay-slide-in {
   from {
     opacity: 0;
-    transform: translateX(100%) scale(0.94);
+    transform: scale(0.85) translate(40px, 40px);
   }
   to {
     opacity: 1;
-    transform: translateX(0) scale(1);
+    transform: scale(1) translate(0, 0);
   }
 }
 @keyframes overlay-slide-out {
   from {
     opacity: 1;
-    transform: translateX(0) scale(1);
+    transform: scale(1) translate(0, 0);
   }
   to {
     opacity: 0;
-    transform: translateX(100%) scale(0.94);
+    transform: scale(0.82) translate(40px, 40px);
   }
 }
 
@@ -12268,6 +12269,76 @@ body:has(.beta-banner) .app-root {
 
 .companion-overlay-empty p {
   margin: 0;
+}
+
+.companion-auth-notice {
+  margin: var(--sp-3) var(--sp-3) 0;
+  padding: var(--sp-2) var(--sp-3);
+  background: color-mix(in srgb, var(--warning, #f59e0b) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning, #f59e0b) 35%, transparent);
+  border-radius: var(--radius-sm);
+  color: var(--text2);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+}
+
+/* ── Desktop companion bubble (Electron always-visible window) ── */
+.desktop-bubble-root {
+  width: 100vw;
+  height: 100vh;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.desktop-bubble-btn {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.5);
+  position: relative;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+  outline: none;
+}
+
+.desktop-bubble-btn--open {
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  box-shadow: 0 4px 24px rgba(124, 58, 237, 0.8);
+}
+
+.desktop-bubble-label {
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  position: relative;
+  z-index: 1;
+  line-height: 1;
+  font-family: 'Syne', sans-serif;
+  pointer-events: none;
+}
+
+.desktop-bubble-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid rgba(124, 58, 237, 0.5);
+  pointer-events: none;
+}
+
+.desktop-bubble-ring--1 {
+  inset: -8px;
+}
+
+.desktop-bubble-ring--2 {
+  inset: -16px;
 }
 
 /* ═══════════════════════════════════════════════════════════════

@@ -17,7 +17,15 @@ const eslintConfig = defineConfig([
     },
   },
   prettier, // must be last — disables ESLint rules that conflict with Prettier
-  globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts', 'electron/**', 'public/**']),
+  globalIgnores([
+    '.next/**',
+    'out/**',
+    'build/**',
+    'next-env.d.ts',
+    'electron/**',
+    'public/**',
+    '.claude/worktrees/**',
+  ]),
 ]);
 
 export default eslintConfig;

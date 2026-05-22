@@ -38,16 +38,23 @@ export async function captureScreen(): Promise<string | null> {
     });
     await video.play();
 
+    const MAX_W = 1280;
+    let w = video.videoWidth;
+    let h = video.videoHeight;
+    if (w > MAX_W) {
+      h = Math.round((h * MAX_W) / w);
+      w = MAX_W;
+    }
+
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext('2d')!;
-    ctx.drawImage(video, 0, 0);
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d')!.drawImage(video, 0, 0, w, h);
 
     stream.getTracks().forEach(t => t.stop());
     video.srcObject = null;
 
-    return canvas.toDataURL('image/png');
+    return canvas.toDataURL('image/jpeg', 0.75);
   } catch {
     return null;
   }

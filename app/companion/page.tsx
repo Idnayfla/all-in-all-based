@@ -6,7 +6,13 @@ import { captureScreen, isScreenCaptureSupported } from '@/hooks/useScreenCaptur
 
 declare global {
   interface Window {
-    electronAPI?: { hideCompanion: () => void };
+    electronAPI?: {
+      hideCompanion: () => void;
+      hideForCapture: () => void;
+      showAfterCapture: () => void;
+      /** Captures the screen in the main process; returns a data-URL or null. */
+      captureScreenMain: () => Promise<string | null>;
+    };
   }
 }
 
@@ -73,7 +79,15 @@ export default function CompanionOverlayPage() {
   };
 
   const handleScreen = async () => {
-    const dataUrl = await captureScreen();
+    window.electronAPI?.hideForCapture();
+    // 300 ms lets the Windows DWM compositor repaint before desktopCapturer
+    // grabs a fresh snapshot in the main process.  The old getDisplayMedia path
+    // used a buffered video stream which could contain frames from before hide.
+    await new Promise<void>(resolve => setTimeout(resolve, 300));
+    const dataUrl = window.electronAPI?.captureScreenMain
+      ? await window.electronAPI.captureScreenMain()
+      : await captureScreen();
+    window.electronAPI?.showAfterCapture();
     if (!dataUrl) {
       flashError('Screen share cancelled');
       return;
@@ -89,7 +103,13 @@ export default function CompanionOverlayPage() {
 
     // Auto-capture screen when message implies screen intent and no capture is already attached
     if (!cap && SCREEN_INTENT.test(text)) {
-      const dataUrl = await captureScreen();
+      window.electronAPI?.hideForCapture();
+      // 300 ms settle — same reasoning as handleScreen above
+      await new Promise<void>(resolve => setTimeout(resolve, 300));
+      const dataUrl = window.electronAPI?.captureScreenMain
+        ? await window.electronAPI.captureScreenMain()
+        : await captureScreen();
+      window.electronAPI?.showAfterCapture();
       if (dataUrl) cap = { source: dataUrl, thumb: dataUrl };
     }
 
@@ -235,6 +255,11 @@ export default function CompanionOverlayPage() {
       </div>
 
       <div className="companion-messages">
+        {!authToken && (
+          <div className="companion-auth-notice">
+            ◈ Sign in to Based first, then open the companion.
+          </div>
+        )}
         {messages.length === 0 && (
           <div className="companion-overlay-empty">
             <span style={{ fontSize: '2rem' }}>⬡</span>

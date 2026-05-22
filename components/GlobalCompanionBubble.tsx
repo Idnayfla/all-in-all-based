@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import CompanionDrawer, { CMsg } from './CompanionDrawer';
 import PricingModal from './PricingModal';
@@ -35,7 +35,7 @@ export default function GlobalCompanionBubble() {
 
   return (
     <>
-      <button
+      <motion.button
         className={`companion-trigger${showCompanion ? ' companion-trigger--open' : ''}${isCompanionGenerating ? ' companion-trigger--responding' : ''}`}
         onClick={() => {
           if (!showCompanion && !isPro) {
@@ -45,11 +45,35 @@ export default function GlobalCompanionBubble() {
           setShowCompanion(s => !s);
         }}
         aria-label="Open AI Companion"
+        animate={{ scale: [1, 1.06, 1] }}
+        transition={{
+          duration: isCompanionGenerating ? 0.8 : 3,
+          repeat: Infinity,
+          ease: 'easeInOut',
+        }}
       >
         <span className="companion-trigger-label">B</span>
-        <span className="companion-trigger-ring companion-trigger-ring--1" />
-        <span className="companion-trigger-ring companion-trigger-ring--2" />
-      </button>
+        <motion.span
+          className="companion-trigger-ring companion-trigger-ring--1"
+          animate={{ opacity: [0.4, 0.8, 0.4] }}
+          transition={{
+            duration: isCompanionGenerating ? 0.8 : 3,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: 0,
+          }}
+        />
+        <motion.span
+          className="companion-trigger-ring companion-trigger-ring--2"
+          animate={{ opacity: [0.4, 0.8, 0.4] }}
+          transition={{
+            duration: isCompanionGenerating ? 0.8 : 3,
+            repeat: Infinity,
+            ease: 'easeInOut',
+            delay: 0.4,
+          }}
+        />
+      </motion.button>
 
       <AnimatePresence>
         {showCompanion && (

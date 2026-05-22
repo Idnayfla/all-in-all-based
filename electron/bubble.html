@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 88px;
+        height: 88px;
+        background: transparent;
+        overflow: hidden;
+      }
+      .root {
+        width: 88px;
+        height: 88px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: transparent;
+        -webkit-app-region: drag;
+      }
+      .btn {
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #7c3aed, #4f46e5);
+        border: none;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 20px rgba(124, 58, 237, 0.5);
+        position: relative;
+        -webkit-app-region: no-drag;
+        outline: none;
+        animation: breathe 3s ease-in-out infinite;
+        transition: background 0.3s, box-shadow 0.3s;
+      }
+      .btn.open {
+        background: linear-gradient(135deg, #4f46e5, #7c3aed);
+        box-shadow: 0 4px 28px rgba(124, 58, 237, 0.9);
+        animation: breathe-fast 1s ease-in-out infinite;
+      }
+      .label {
+        font-size: 15px;
+        font-weight: 800;
+        color: #fff;
+        position: relative;
+        z-index: 1;
+        line-height: 1;
+        font-family: monospace;
+        pointer-events: none;
+        user-select: none;
+      }
+      .ring {
+        position: absolute;
+        border-radius: 50%;
+        border: 1.5px solid rgba(124, 58, 237, 0.5);
+        pointer-events: none;
+      }
+      .ring-1 {
+        inset: -8px;
+        animation: ring-pulse 3s ease-in-out infinite;
+      }
+      .ring-2 {
+        inset: -16px;
+        animation: ring-pulse 3s ease-in-out infinite 0.4s;
+      }
+      .btn.open .ring-1 {
+        animation: ring-pulse 1s ease-in-out infinite;
+      }
+      .btn.open .ring-2 {
+        animation: ring-pulse 1s ease-in-out infinite 0.4s;
+      }
+      @keyframes breathe {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.06);
+        }
+      }
+      @keyframes breathe-fast {
+        0%,
+        100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.09);
+        }
+      }
+      @keyframes ring-pulse {
+        0%,
+        100% {
+          opacity: 0.4;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.8;
+          transform: scale(1.1);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="root">
+      <button class="btn" id="btn">
+        <span class="label">B&gt;</span>
+        <span class="ring ring-1"></span>
+        <span class="ring ring-2"></span>
+      </button>
+    </div>
+    <script>
+      document.getElementById('btn').addEventListener('click', () => {
+        window.bubbleAPI?.toggle();
+      });
+      window.bubbleAPI?.onStateChange(state => {
+        document.getElementById('btn').className = state === 'open' ? 'btn open' : 'btn';
+      });
+    </script>
+  </body>
+</html>
