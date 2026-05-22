@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { supabaseAdmin } from '../_auth';
 import { searchWeb } from '@/lib/tavily';
 import { getWeather } from '@/lib/weather';
+import { getCrowdInfo } from '@/lib/crowd';
 import { createLangfuseClient } from '@/lib/langfuse';
 
 export const maxDuration = 300;
@@ -1421,10 +1422,14 @@ export async function POST(req: NextRequest) {
         try {
           // Step 0: Real-time context gathering
           let realtimeContext = '';
-          if (process.env.TAVILY_API_KEY || process.env.OPENWEATHER_API_KEY) {
+          if (
+            process.env.TAVILY_API_KEY ||
+            process.env.OPENWEATHER_API_KEY ||
+            process.env.LTA_DATAMALL_API_KEY
+          ) {
             try {
               const needsCheck = await callModel(
-                `User request: "${lastUserMessage}"\n\nDoes this need real-time external data? Reply with JSON only:\n{"needsSearch":boolean,"needsWeather":boolean,"searchQuery":"...","weatherLocation":"..."}`,
+                `User request: "${lastUserMessage}"\n\nDoes this need real-time external data? Reply with JSON only:\n{"needsSearch":boolean,"needsWeather":boolean,"needsCrowd":boolean,"searchQuery":"...","weatherLocation":"...","crowdLocation":"..."}`,
                 'Reply with only valid JSON. No markdown.',
                 'planner'
               );
@@ -1448,6 +1453,17 @@ export async function POST(req: NextRequest) {
                     const weather = await getWeather(loc);
                     if (weather) realtimeContext += `\nCURRENT WEATHER:\n${weather}`;
                   }
+                }
+                if (needs.needsCrowd && needs.crowdLocation) {
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ searching: 'crowd' })}\n\n`)
+                  );
+                  const crowdData = await getCrowdInfo(needs.crowdLocation);
+                  if (crowdData)
+                    realtimeContext += `\nCROWD DATA for "${needs.crowdLocation}":\n${crowdData}`;
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ searching: null })}\n\n`)
+                  );
                 }
               }
             } catch {
