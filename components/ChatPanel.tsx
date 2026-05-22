@@ -1014,13 +1014,32 @@ export default function ChatPanel({
                       if (reportingInFlight.current.has(reportKey)) return;
                       reportingInFlight.current.add(reportKey);
                       setReportedErrors(prev => new Set(prev).add(reportKey));
-                      const context =
-                        [
-                          block.prompt ? `PROMPT: ${block.prompt}` : null,
-                          block.actualError ? `ACTUAL ERROR: ${block.actualError}` : null,
-                        ]
-                          .filter(Boolean)
-                          .join('\n') || block.message;
+                      const recentMsgs = messages.slice(-5);
+                      const chatSnapshot =
+                        recentMsgs.length > 0
+                          ? [
+                              `--- Recent conversation (last ${recentMsgs.length} messages) ---`,
+                              ...recentMsgs.map(m => {
+                                const text =
+                                  typeof m.content === 'string'
+                                    ? m.content
+                                    : (m.content as Array<{ type: string; text?: string }>)
+                                        .filter(b => b.type === 'text')
+                                        .map(b => b.text ?? '')
+                                        .join('');
+                                return `${m.role === 'user' ? 'USER' : 'BASED'}: ${text}`;
+                              }),
+                            ].join('\n')
+                          : '';
+                      const errorDetail = [
+                        block.prompt ? `PROMPT: ${block.prompt}` : null,
+                        block.actualError ? `ACTUAL ERROR: ${block.actualError}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join('\n');
+                      const context = [chatSnapshot, errorDetail || block.message]
+                        .filter(Boolean)
+                        .join('\n\n');
                       await fetch('/api/feedback', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
