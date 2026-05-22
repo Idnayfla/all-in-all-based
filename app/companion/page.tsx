@@ -23,7 +23,7 @@ interface Msg {
 }
 
 const SCREEN_INTENT =
-  /\b(screen|this|what'?s (on|here)|solve this|answer this|what do you see|help me with this|what is this)\b/i;
+  /\b(screen|what'?s (on|here)|solve this|answer this|what do you see|help me with this|what is this)\b/i;
 
 export default function CompanionOverlayPage() {
   const [messages, setMessages] = useState<Msg[]>([]);
