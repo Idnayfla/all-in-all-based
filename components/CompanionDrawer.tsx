@@ -138,7 +138,9 @@ export default function CompanionDrawer({
           ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
         body: JSON.stringify({
-          messages: history.map(m => ({ role: m.role, content: m.content })),
+          messages: history
+            .filter(m => m.content?.trim())
+            .map(m => ({ role: m.role, content: m.content })),
           memory,
           projectName,
           fileNames: files.map(f => f.name),
@@ -181,6 +183,15 @@ export default function CompanionDrawer({
           } catch {}
         }
       }
+      // Stream closed with no text — surface an error rather than leaving a blank message
+      setMessages(prev => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last?.role === 'assistant' && !last.content?.trim()) {
+          next[next.length - 1] = { ...last, content: '✕ Failed to get a response.' };
+        }
+        return next;
+      });
     } catch {
       setMessages(prev => {
         const next = [...prev];

@@ -159,7 +159,9 @@ export default function CompanionOverlayPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          messages: history.map(m => ({ role: m.role, content: m.content })),
+          messages: history
+            .filter(m => m.content?.trim())
+            .map(m => ({ role: m.role, content: m.content })),
           ...(cap ? { screenshot: cap.source } : {}),
         }),
       });
@@ -219,6 +221,14 @@ export default function CompanionOverlayPage() {
           }
         }
       }
+      setMessages(prev => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last?.role === 'assistant' && !last.content?.trim()) {
+          next[next.length - 1] = { ...last, content: '✕ Failed to connect.' };
+        }
+        return next;
+      });
     } catch (err) {
       const isExpired = err instanceof Error && err.message === 'session-expired';
       setMessages(prev => {
