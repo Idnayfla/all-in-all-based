@@ -183,7 +183,11 @@ export default function LandingPage() {
               anything — it sees your screen, knows your context, and picks up exactly where you
               left off. Not a tab. Not a shortcut. A presence.
             </p>
-            <a href="#download" className={styles.companionDownloadBtn}>
+            <a
+              href="https://github.com/Idnayfla/all-in-all-based/releases/download/v0.1.0/Based.Setup.0.1.0.exe"
+              className={styles.companionDownloadBtn}
+              download
+            >
               Download for Windows&nbsp;&#8594;
             </a>
             <span className={styles.companionDownloadNote}>
