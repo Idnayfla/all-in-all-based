@@ -43,6 +43,8 @@ export default function CompanionDrawer({
   }, [messages]);
   const [input, setInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [slowWarning, setSlowWarning] = useState(false);
+  const slowWarningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pendingCapture, setPendingCapture] = useState<{
     label: string;
     source: string;
@@ -129,6 +131,8 @@ export default function CompanionDrawer({
     setMessages([...history, { role: 'assistant', content: '' }]);
     setIsGenerating(true);
     onGeneratingChange(true);
+    setSlowWarning(false);
+    slowWarningTimerRef.current = setTimeout(() => setSlowWarning(true), 15000);
 
     try {
       const res = await fetch('/api/companion', {
@@ -202,6 +206,11 @@ export default function CompanionDrawer({
         return next;
       });
     } finally {
+      if (slowWarningTimerRef.current) {
+        clearTimeout(slowWarningTimerRef.current);
+        slowWarningTimerRef.current = null;
+      }
+      setSlowWarning(false);
       setIsGenerating(false);
       onGeneratingChange(false);
     }
@@ -262,6 +271,12 @@ export default function CompanionDrawer({
                 <span className="companion-cursor" />
               )}
             </div>
+            {msg.role === 'assistant' &&
+              isGenerating &&
+              i === messages.length - 1 &&
+              slowWarning && (
+                <div className="slow-warning">◈ Taking longer than usual — still working...</div>
+              )}
           </div>
         ))}
         <div ref={bottomRef} />
