@@ -88,10 +88,12 @@ export default function CompanionOverlayPage() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(event => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         setMessages([]);
         setAuthToken('');
+      } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
+        setAuthToken(session.access_token);
       }
     });
     return () => subscription.unsubscribe();
