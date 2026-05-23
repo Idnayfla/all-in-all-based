@@ -121,30 +121,40 @@ function createWindow() {
   Menu.setApplicationMenu(null);
 }
 
+// Rewrite any www.getbased.dev URL to the apex domain.
+// Used by the will-redirect handler on each webContents.
+function stripWww(url) {
+  return url.replace(/^https:\/\/www\.getbased\.dev/, 'https://getbased.dev');
+}
+
+// Attach will-redirect + will-navigate listeners to a webContents so that any
+// redirect chain involving www.getbased.dev is cancelled and reloaded at the
+// apex domain. This is more reliable than webRequest.onBeforeRequest because
+// it fires for every redirect hop before Chromium follows it, preventing
+// ERR_TOO_MANY_REDIRECTS caused by Vercel's www ↔ apex redirect config.
+function fixWwwRedirects(webContents) {
+  webContents.on('will-redirect', (event, url) => {
+    if (url.startsWith('https://www.getbased.dev')) {
+      event.preventDefault();
+      webContents.loadURL(stripWww(url));
+    }
+  });
+  webContents.on('will-navigate', (event, url) => {
+    if (url.startsWith('https://www.getbased.dev')) {
+      event.preventDefault();
+      webContents.loadURL(stripWww(url));
+    }
+  });
+}
+
 app.whenReady().then(async () => {
-  // ── Fix: strip any cached www.getbased.dev → getbased.dev 301 redirects ──
-  // Electron/Chromium caches permanent (301) redirects indefinitely. If the
-  // persist:based session ever received a www→apex 301 it will replay it on
-  // every subsequent request, creating an ERR_TOO_MANY_REDIRECTS loop when
-  // Vercel then redirects www back to apex.
-  // Clear the cache once on startup to flush stale redirect entries, then
-  // intercept any future www navigations and rewrite them to the apex domain.
-  const basedSession = session.fromPartition('persist:based');
-  await basedSession.clearCache();
-
-  // Belt-and-suspenders: rewrite www.getbased.dev → getbased.dev at the
-  // network layer so the loop can never happen even if the cache refills.
-  const wwwFilter = { urls: ['https://www.getbased.dev/*'] };
-  basedSession.webRequest.onBeforeRequest(wwwFilter, ({ url }, callback) => {
-    callback({ redirectURL: url.replace('https://www.getbased.dev', 'https://getbased.dev') });
-  });
-  session.defaultSession.webRequest.onBeforeRequest(wwwFilter, ({ url }, callback) => {
-    callback({ redirectURL: url.replace('https://www.getbased.dev', 'https://getbased.dev') });
-  });
-
   createWindow();
   createOverlayWindow();
   createBubbleWindow();
+
+  // Attach www-redirect fix to all windows after creation.
+  if (win) fixWwwRedirects(win.webContents);
+  if (overlayWin) fixWwwRedirects(overlayWin.webContents);
 
   // Allow getDisplayMedia / screen capture in all sessions (default + named partition).
   // Registered AFTER windows are created so the 'persist:based' session object is fully
