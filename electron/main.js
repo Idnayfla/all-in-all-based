@@ -1,5 +1,6 @@
 const { app, BrowserWindow, shell, Menu, globalShortcut, ipcMain, screen, session, desktopCapturer } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 const APP_URL = 'https://www.getbased.dev';
 const OVERLAY_URL = 'https://www.getbased.dev/companion';
@@ -8,6 +9,22 @@ let win = null;
 let overlayWin = null;
 let bubbleWin = null;
 let isQuitting = false;
+
+const BUBBLE_POS_FILE = () => path.join(app.getPath('userData'), 'bubble-position.json');
+
+function loadBubblePosition(defaultX, defaultY) {
+  try {
+    const data = JSON.parse(fs.readFileSync(BUBBLE_POS_FILE(), 'utf8'));
+    if (typeof data.x === 'number' && typeof data.y === 'number') return { x: data.x, y: data.y };
+  } catch {}
+  return { x: defaultX, y: defaultY };
+}
+
+function saveBubblePosition() {
+  if (!bubbleWin) return;
+  const [x, y] = bubbleWin.getPosition();
+  try { fs.writeFileSync(BUBBLE_POS_FILE(), JSON.stringify({ x, y })); } catch {}
+}
 
 function createOverlayWindow() {
   const { workAreaSize } = screen.getPrimaryDisplay();
@@ -43,11 +60,14 @@ function createOverlayWindow() {
 
 function createBubbleWindow() {
   const { workAreaSize } = screen.getPrimaryDisplay();
+  const defaultX = workAreaSize.width - 104;
+  const defaultY = workAreaSize.height - 104;
+  const pos = loadBubblePosition(defaultX, defaultY);
   bubbleWin = new BrowserWindow({
     width: 88,
     height: 88,
-    x: workAreaSize.width - 104,
-    y: workAreaSize.height - 104,
+    x: pos.x,
+    y: pos.y,
     alwaysOnTop: true,
     frame: false,
     transparent: true,
@@ -63,6 +83,7 @@ function createBubbleWindow() {
   });
   bubbleWin.loadFile(path.join(__dirname, 'bubble.html'));
   bubbleWin.once('ready-to-show', () => bubbleWin.show());
+  bubbleWin.on('moved', saveBubblePosition);
   bubbleWin.on('close', e => {
     if (!isQuitting) e.preventDefault();
   });
@@ -197,6 +218,18 @@ app.whenReady().then(async () => {
     }
   });
   ipcMain.on('companion-bubble:click', () => toggleOverlay());
+
+  let savePosTimer = null;
+  ipcMain.on('companion-bubble:move-delta', (_, dx, dy) => {
+    if (!bubbleWin) return;
+    const [x, y] = bubbleWin.getPosition();
+    const { workAreaSize } = screen.getPrimaryDisplay();
+    const newX = Math.max(0, Math.min(x + dx, workAreaSize.width - 88));
+    const newY = Math.max(0, Math.min(y + dy, workAreaSize.height - 88));
+    bubbleWin.setPosition(newX, newY);
+    if (savePosTimer) clearTimeout(savePosTimer);
+    savePosTimer = setTimeout(saveBubblePosition, 500);
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
