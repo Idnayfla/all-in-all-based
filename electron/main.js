@@ -1,8 +1,8 @@
 const { app, BrowserWindow, shell, Menu, globalShortcut, ipcMain, screen, session, desktopCapturer } = require('electron');
 const path = require('path');
 
-const APP_URL = 'https://getbased.dev';
-const OVERLAY_URL = 'https://getbased.dev/companion';
+const APP_URL = 'https://www.getbased.dev';
+const OVERLAY_URL = 'https://www.getbased.dev/companion';
 
 let win = null;
 let overlayWin = null;
@@ -121,7 +121,20 @@ function createWindow() {
   Menu.setApplicationMenu(null);
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  // Set a Chrome-like User-Agent on the persist:based session before any window
+  // loads a URL. Electron's default UA contains "Electron/x.x.x" which Vercel's
+  // bot-protection layer blocks with a 403. Spoofing a standard Chrome UA prevents
+  // that while keeping all session cookies and auth tokens intact.
+  const CHROME_UA =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+  const basedSession = session.fromPartition('persist:based');
+  basedSession.setUserAgent(CHROME_UA);
+
+  // Clear cached 301/302 redirects once on startup so stale www. ↔ apex
+  // redirect chains never accumulate. Does not wipe cookies or auth tokens.
+  await basedSession.clearCache();
+
   createWindow();
   createOverlayWindow();
   createBubbleWindow();

@@ -1,12 +1,4 @@
 {
-  "redirects": [
-    {
-      "source": "/(.*)",
-      "has": [{ "type": "host", "value": "www.getbased.dev" }],
-      "destination": "https://getbased.dev/$1",
-      "permanent": true
-    }
-  ],
   "headers": [
     {
       "source": "/_next/static/(.*)",
