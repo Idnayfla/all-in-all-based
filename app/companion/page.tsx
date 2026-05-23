@@ -215,10 +215,10 @@ export default function CompanionOverlayPage() {
     const fetchTimeoutId = setTimeout(() => abortController.abort(), 30000);
 
     try {
-      // Fix A: wrap supabase auth calls in a 5 s timeout.
-      // Without this, getUser() can stall forever on a network blip while
-      // isGenerating=true, silently dropping every follow-up message.
-      await withTimeout(supabase.auth.getUser(), 5000);
+      // getSession() reads from localStorage — no network call needed.
+      // getUser() was previously called here to trigger a token refresh, but it
+      // makes a network round-trip to Supabase that can fail or timeout in
+      // Electron, causing spurious "Failed to connect." errors. Removed.
       const {
         data: { session: freshSession },
       } = (await withTimeout(supabase.auth.getSession(), 5000)) as Awaited<
@@ -317,26 +317,33 @@ export default function CompanionOverlayPage() {
           }
         }
       }
-      // Only show "Failed to connect" if the server explicitly sent an error event
-      // or the response came back empty with no content at all.
+      // Only show an error message if the server explicitly sent an error event.
+      // Show the actual error text when it's short and meaningful so failures
+      // are debuggable; fall back to a generic message for long/technical strings.
       if (streamError) {
+        const errorDisplay = streamError.toLowerCase().includes('unauthorized')
+          ? '✕ Session expired — sign in again in Based.'
+          : streamError.length <= 80
+            ? `✕ ${streamError}`
+            : '✕ Failed to connect.';
         setMessages(prev => {
           const next = [...prev];
-          next[next.length - 1] = { ...next[next.length - 1], content: '✕ Failed to connect.' };
+          next[next.length - 1] = { ...next[next.length - 1], content: errorDisplay };
           return next;
         });
       }
     } catch (err) {
       const isExpired = err instanceof Error && err.message === 'session-expired';
       const isAborted = err instanceof Error && err.name === 'AbortError';
+      const isTimeout = err instanceof Error && err.message === 'timeout';
       setMessages(prev => {
         const next = [...prev];
         next[next.length - 1] = {
           ...next[next.length - 1],
           content: isExpired
             ? '✕ Session expired. Please sign in again in Based.'
-            : isAborted
-              ? '✕ Request timed out. Please try again.'
+            : isAborted || isTimeout
+              ? '✕ Connection timed out. Check your internet.'
               : '✕ Failed to connect.',
         };
         return next;
