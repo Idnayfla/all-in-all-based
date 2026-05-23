@@ -30,7 +30,7 @@
         border-radius: 50%;
         background: linear-gradient(135deg, #7c3aed, #4f46e5);
         border: none;
-        cursor: pointer;
+        cursor: grab;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -39,12 +39,22 @@
         -webkit-app-region: no-drag;
         outline: none;
         animation: breathe 3s ease-in-out infinite;
-        transition: background 0.3s, box-shadow 0.3s;
+        transition:
+          background 0.3s,
+          box-shadow 0.3s;
+        user-select: none;
+      }
+      .btn.dragging {
+        cursor: grabbing;
+        animation: none;
       }
       .btn.open {
         background: linear-gradient(135deg, #4f46e5, #7c3aed);
         box-shadow: 0 4px 28px rgba(124, 58, 237, 0.9);
         animation: breathe-fast 1s ease-in-out infinite;
+      }
+      .btn.open.dragging {
+        animation: none;
       }
       .label {
         font-size: 15px;
@@ -63,12 +73,13 @@
         border: 1.5px solid rgba(124, 58, 237, 0.5);
         pointer-events: none;
       }
+      /* Reduced inset so rings stay within the 88px window frame */
       .ring-1 {
-        inset: -8px;
+        inset: -6px;
         animation: ring-pulse 3s ease-in-out infinite;
       }
       .ring-2 {
-        inset: -16px;
+        inset: -12px;
         animation: ring-pulse 3s ease-in-out infinite 0.4s;
       }
       .btn.open .ring-1 {
@@ -76,6 +87,10 @@
       }
       .btn.open .ring-2 {
         animation: ring-pulse 1s ease-in-out infinite 0.4s;
+      }
+      .btn.dragging .ring-1,
+      .btn.dragging .ring-2 {
+        opacity: 0;
       }
       @keyframes breathe {
         0%,
@@ -102,8 +117,8 @@
           transform: scale(1);
         }
         50% {
-          opacity: 0.8;
-          transform: scale(1.1);
+          opacity: 0.7;
+          transform: scale(1.05);
         }
       }
     </style>
@@ -117,11 +132,43 @@
       </button>
     </div>
     <script>
-      document.getElementById('btn').addEventListener('click', () => {
-        window.bubbleAPI?.toggle();
+      const btn = document.getElementById('btn');
+      let dragStart = null;
+      let isDragging = false;
+
+      btn.addEventListener('mousedown', e => {
+        dragStart = { x: e.screenX, y: e.screenY };
+        isDragging = false;
+        e.preventDefault();
       });
+
+      window.addEventListener('mousemove', e => {
+        if (!dragStart) return;
+        const dx = e.screenX - dragStart.x;
+        const dy = e.screenY - dragStart.y;
+        if (!isDragging && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+          isDragging = true;
+          btn.classList.add('dragging');
+        }
+        if (isDragging) {
+          window.bubbleAPI?.moveDelta(dx, dy);
+          dragStart.x = e.screenX;
+          dragStart.y = e.screenY;
+        }
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (dragStart && !isDragging) {
+          window.bubbleAPI?.toggle();
+        }
+        dragStart = null;
+        isDragging = false;
+        btn.classList.remove('dragging');
+      });
+
       window.bubbleAPI?.onStateChange(state => {
-        document.getElementById('btn').className = state === 'open' ? 'btn open' : 'btn';
+        const isOpen = state === 'open';
+        btn.classList.toggle('open', isOpen);
       });
     </script>
   </body>
