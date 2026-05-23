@@ -158,13 +158,15 @@ app.whenReady().then(async () => {
     overlayWin?.hide();
     bubbleWin?.webContents.send('companion-bubble:state', 'closed');
   });
+  let mainWinWasVisible = false;
   ipcMain.on('companion:hide-for-capture', () => {
-    win?.hide();
+    mainWinWasVisible = win?.isVisible() ?? false;
+    if (mainWinWasVisible) win?.hide();
     overlayWin?.hide();
     bubbleWin?.hide();
   });
   ipcMain.on('companion:show-after-capture', () => {
-    win?.show();
+    if (mainWinWasVisible) win?.show();
     overlayWin?.show();
     bubbleWin?.show();
   });
