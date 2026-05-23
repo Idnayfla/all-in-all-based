@@ -45,6 +45,7 @@ export default function CompanionDrawer({
   const [isGenerating, setIsGenerating] = useState(false);
   const [slowWarning, setSlowWarning] = useState(false);
   const slowWarningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hardResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pendingCapture, setPendingCapture] = useState<{
     label: string;
     source: string;
@@ -132,7 +133,28 @@ export default function CompanionDrawer({
     setIsGenerating(true);
     onGeneratingChange(true);
     setSlowWarning(false);
+
+    // Fix F: slow warning after 15 s
     slowWarningTimerRef.current = setTimeout(() => setSlowWarning(true), 15000);
+
+    // Fix E: hard-reset safety net — force-unlock if still generating after 45 s
+    hardResetTimerRef.current = setTimeout(() => {
+      setIsGenerating(false);
+      onGeneratingChange(false);
+      setSlowWarning(false);
+      setMessages(prev => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last?.role === 'assistant' && !last.content?.trim()) {
+          next[next.length - 1] = { ...last, content: '✕ Request timed out. Please try again.' };
+        }
+        return next;
+      });
+    }, 45000);
+
+    // Fix C: AbortController cancels the fetch + stream after 30 s
+    const abortController = new AbortController();
+    const fetchTimeoutId = setTimeout(() => abortController.abort(), 30000);
 
     try {
       const res = await fetch('/api/companion', {
@@ -151,6 +173,7 @@ export default function CompanionDrawer({
           ...(cap?.isScreenshot ? { screenshot: cap.source } : {}),
           ...(!cap?.isScreenshot && cap ? { previewSource: cap.source } : {}),
         }),
+        signal: abortController.signal,
       });
 
       if (!res.ok || !res.body) throw new Error('Request failed');
@@ -196,19 +219,27 @@ export default function CompanionDrawer({
         }
         return next;
       });
-    } catch {
+    } catch (err) {
+      const isAborted = err instanceof Error && err.name === 'AbortError';
       setMessages(prev => {
         const next = [...prev];
         next[next.length - 1] = {
           ...next[next.length - 1],
-          content: '✕ Failed to get a response.',
+          content: isAborted
+            ? '✕ Request timed out. Please try again.'
+            : '✕ Failed to get a response.',
         };
         return next;
       });
     } finally {
+      clearTimeout(fetchTimeoutId);
       if (slowWarningTimerRef.current) {
         clearTimeout(slowWarningTimerRef.current);
         slowWarningTimerRef.current = null;
+      }
+      if (hardResetTimerRef.current) {
+        clearTimeout(hardResetTimerRef.current);
+        hardResetTimerRef.current = null;
       }
       setSlowWarning(false);
       setIsGenerating(false);

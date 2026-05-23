@@ -4,6 +4,15 @@ import { useRef, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { captureScreen, isScreenCaptureSupported } from '@/hooks/useScreenCapture';
 
+/** Races a promise against a timeout; rejects with Error('timeout') if ms elapses first. */
+const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
+  Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('timeout')), ms)
+    ),
+  ]);
+
 declare global {
   interface Window {
     electronAPI?: {
@@ -36,6 +45,9 @@ export default function CompanionOverlayPage() {
   );
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
+  const [slowWarning, setSlowWarning] = useState(false);
+  const slowWarningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hardResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sessionId = useRef(String(Date.now()).slice(-4));
@@ -57,6 +69,14 @@ export default function CompanionOverlayPage() {
       }
     });
     return () => subscription.unsubscribe();
+  }, []);
+
+  // Clear any pending timers when the overlay unmounts
+  useEffect(() => {
+    return () => {
+      if (slowWarningTimerRef.current) clearTimeout(slowWarningTimerRef.current);
+      if (hardResetTimerRef.current) clearTimeout(hardResetTimerRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -86,8 +106,13 @@ export default function CompanionOverlayPage() {
     // grabs a fresh snapshot in the main process.  The old getDisplayMedia path
     // used a buffered video stream which could contain frames from before hide.
     await new Promise<void>(resolve => setTimeout(resolve, 300));
+    // Fix B: wrap captureScreenMain in a 5s timeout so a stalled IPC call
+    // cannot freeze the UI indefinitely.
     const dataUrl = window.electronAPI?.captureScreenMain
-      ? await window.electronAPI.captureScreenMain()
+      ? await Promise.race([
+          window.electronAPI.captureScreenMain(),
+          new Promise<null>(resolve => setTimeout(() => resolve(null), 5000)),
+        ])
       : await captureScreen();
     window.electronAPI?.showAfterCapture();
     if (!dataUrl) {
@@ -109,8 +134,12 @@ export default function CompanionOverlayPage() {
         window.electronAPI?.hideForCapture();
         // 300 ms settle — same reasoning as handleScreen above
         await new Promise<void>(resolve => setTimeout(resolve, 300));
+        // Fix B: 5s timeout so a stalled IPC call doesn't block send() forever
         const dataUrl = window.electronAPI?.captureScreenMain
-          ? await window.electronAPI.captureScreenMain()
+          ? await Promise.race([
+              window.electronAPI.captureScreenMain(),
+              new Promise<null>(resolve => setTimeout(() => resolve(null), 5000)),
+            ])
           : await captureScreen();
         window.electronAPI?.showAfterCapture();
         if (dataUrl) cap = { source: dataUrl, thumb: dataUrl };
@@ -129,15 +158,40 @@ export default function CompanionOverlayPage() {
     const history = [...messages, userMsg];
     setMessages([...history, { role: 'assistant', content: '' }]);
     setIsGenerating(true);
+    setSlowWarning(false);
+
+    // Fix F: slow warning visible after 15 s
+    slowWarningTimerRef.current = setTimeout(() => setSlowWarning(true), 15000);
+
+    // Fix E: hard-reset safety net — if isGenerating is still true after 45 s,
+    // force it false so the UI never stays permanently locked.
+    hardResetTimerRef.current = setTimeout(() => {
+      setIsGenerating(false);
+      setSlowWarning(false);
+      setMessages(prev => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last?.role === 'assistant' && !last.content?.trim()) {
+          next[next.length - 1] = { ...last, content: '✕ Request timed out. Please try again.' };
+        }
+        return next;
+      });
+    }, 45000);
+
+    // Fix C: AbortController so the fetch + stream are cancelled after 30 s
+    const abortController = new AbortController();
+    const fetchTimeoutId = setTimeout(() => abortController.abort(), 30000);
 
     try {
-      // getUser() triggers a server-side token refresh if the access token is
-      // expired — getSession() alone can return a stale cached token.
-      // Both calls are inside try so any network error reaches finally and clears isGenerating.
-      await supabase.auth.getUser();
+      // Fix A: wrap supabase auth calls in a 5 s timeout.
+      // Without this, getUser() can stall forever on a network blip while
+      // isGenerating=true, silently dropping every follow-up message.
+      await withTimeout(supabase.auth.getUser(), 5000);
       const {
         data: { session: freshSession },
-      } = await supabase.auth.getSession();
+      } = (await withTimeout(supabase.auth.getSession(), 5000)) as Awaited<
+        ReturnType<typeof supabase.auth.getSession>
+      >;
       const token = freshSession?.access_token ?? authToken;
 
       if (!token) {
@@ -152,6 +206,7 @@ export default function CompanionOverlayPage() {
         return;
       }
 
+      // Fix C: pass the abort signal so a 30 s stall aborts the request
       const res = await fetch('/api/companion', {
         method: 'POST',
         headers: {
@@ -164,6 +219,7 @@ export default function CompanionOverlayPage() {
             .map(m => ({ role: m.role, content: m.content })),
           ...(cap ? { screenshot: cap.source } : {}),
         }),
+        signal: abortController.signal,
       });
 
       if (res.status === 429) {
@@ -231,17 +287,30 @@ export default function CompanionOverlayPage() {
       });
     } catch (err) {
       const isExpired = err instanceof Error && err.message === 'session-expired';
+      const isAborted = err instanceof Error && err.name === 'AbortError';
       setMessages(prev => {
         const next = [...prev];
         next[next.length - 1] = {
           ...next[next.length - 1],
           content: isExpired
             ? '✕ Session expired. Please sign in again in Based.'
-            : '✕ Failed to connect.',
+            : isAborted
+              ? '✕ Request timed out. Please try again.'
+              : '✕ Failed to connect.',
         };
         return next;
       });
     } finally {
+      clearTimeout(fetchTimeoutId);
+      if (slowWarningTimerRef.current) {
+        clearTimeout(slowWarningTimerRef.current);
+        slowWarningTimerRef.current = null;
+      }
+      if (hardResetTimerRef.current) {
+        clearTimeout(hardResetTimerRef.current);
+        hardResetTimerRef.current = null;
+      }
+      setSlowWarning(false);
       setIsGenerating(false);
     }
   };
@@ -300,6 +369,13 @@ export default function CompanionOverlayPage() {
                 <span className="companion-cursor" />
               )}
             </div>
+            {/* Fix F: slow warning shown after 15 s */}
+            {msg.role === 'assistant' &&
+              isGenerating &&
+              i === messages.length - 1 &&
+              slowWarning && (
+                <div className="slow-warning">◈ Taking longer than usual — still working...</div>
+              )}
           </div>
         ))}
         <div ref={bottomRef} />
