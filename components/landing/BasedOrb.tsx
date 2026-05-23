@@ -14,7 +14,7 @@ const basedMat = new THREE.MeshPhysicalMaterial({
   emissiveIntensity: 0.4,
   metalness: 0.95,
   roughness: 0.05,
-  reflectivity: 0.1,
+  reflectivity: 0.8,
   iridescence: 1.0,
   iridescenceIOR: 1.4,
 });
@@ -78,7 +78,7 @@ export default function BasedOrb() {
       <ambientLight intensity={0.08} />
 
       <Suspense fallback={<FallbackSphere />}>
-        <Environment preset="night" background={false} />
+        <Environment preset="city" background={false} />
         <Sphere />
       </Suspense>
     </Canvas>
