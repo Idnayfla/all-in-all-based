@@ -2,18 +2,21 @@
 
 import { useRef, useEffect, useMemo, Suspense } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { useGLTF } from '@react-three/drei';
+import { useGLTF, Environment } from '@react-three/drei';
 import * as THREE from 'three';
 
 // Preload so there's no pop when the component mounts
 useGLTF.preload('/models/abstract_geometric_sphere.glb');
 
-const basedMat = new THREE.MeshStandardMaterial({
+const basedMat = new THREE.MeshPhysicalMaterial({
   color: new THREE.Color('#7c6af7'),
   emissive: new THREE.Color('#2a1d9e'),
-  emissiveIntensity: 0.5,
-  metalness: 0.94,
-  roughness: 0.04,
+  emissiveIntensity: 0.4,
+  metalness: 0.95,
+  roughness: 0.05,
+  reflectivity: 0.1,
+  iridescence: 1.0,
+  iridescenceIOR: 1.4,
 });
 
 function Sphere() {
@@ -62,7 +65,7 @@ function FallbackSphere() {
 export default function BasedOrb() {
   return (
     <Canvas
-      camera={{ position: [0, 0, 5], fov: 40 }}
+      camera={{ position: [0, 0, 17], fov: 25 }}
       gl={{ alpha: true, antialias: true }}
       style={{ background: 'transparent' }}
     >
@@ -75,6 +78,7 @@ export default function BasedOrb() {
       <ambientLight intensity={0.08} />
 
       <Suspense fallback={<FallbackSphere />}>
+        <Environment preset="night" background={false} />
         <Sphere />
       </Suspense>
     </Canvas>
