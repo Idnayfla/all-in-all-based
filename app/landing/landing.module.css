@@ -86,11 +86,12 @@
 
 .hero {
   min-height: 100vh;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   align-items: center;
-  padding: 0 0 0 8vw;
   position: relative;
   overflow: hidden;
+  padding: 0;
 }
 
 /* Ensure content sits above video */
@@ -99,49 +100,28 @@
   flex-direction: column;
   position: relative;
   z-index: 2;
-  max-width: 44vw;
+  padding: 0 6vw 0 10vw;
 }
 
 .orbWrap {
-  position: absolute;
+  position: relative;
+  width: 100%;
+  height: 100vh;
   z-index: 1;
+  pointer-events: none;
 }
 
 .lang {
   position: absolute;
-  z-index: 1;
-}
-
-/* 3D orb — fills the entire right half, edge-to-edge */
-.orbWrap {
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 48vw;
-  height: 100%;
-  max-width: none;
-  max-height: none;
-  transform: none;
-  pointer-events: none;
-}
-
-/* Smooth left-edge fade so text and orb blend seamlessly */
-.orbWrap::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to right, #08070e 0%, transparent 40%);
   z-index: 2;
-  pointer-events: none;
 }
 
 /* Gold editorial rule above headline */
 .heroRule {
   width: 2.4rem;
   height: 1px;
-  background: rgba(201, 168, 124, 0.5);
+  background: rgba(201, 168, 124, 0.6);
   margin-bottom: 2rem;
-  flex-shrink: 0;
 }
 
 /* Clip wrapper — the slide-up reveal plays inside this mask */
@@ -152,7 +132,7 @@
 
 .line {
   font-family: 'Humane', var(--font-display, sans-serif);
-  font-size: clamp(48px, 6vw, 96px);
+  font-size: clamp(44px, 5.2vw, 88px);
   font-weight: 900;
   line-height: 0.9;
   letter-spacing: 0.01em;
@@ -212,9 +192,9 @@
 /* ── Decorative labels ─────────────────────────────────────── */
 
 .tagline {
-  margin-top: 2.4rem;
+  margin-top: 2.8rem;
   font-family: var(--font-ui, system-ui);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 400;
   letter-spacing: 0.06em;
   color: #c9a87c;
@@ -230,9 +210,8 @@
 }
 
 .lang {
-  right: 5.5vw;
-  top: 50%;
-  transform: translateY(-50%);
+  left: 10vw;
+  bottom: 6vh;
   font-family: var(--font-ui, system-ui);
   font-size: 11px;
   font-weight: 300;
@@ -402,24 +381,16 @@
 
 @media (max-width: 600px) {
   .hero {
-    padding: 0 7vw 18vh 7vw;
-    align-items: flex-end;
+    grid-template-columns: 1fr;
+    padding: 20vh 7vw 10vh;
   }
 
   .headlineBlock {
-    max-width: none;
+    padding: 0;
   }
 
   .orbWrap {
-    right: 0;
-    top: 0;
-    width: 100%;
-    height: 50vh;
-    opacity: 0.35;
-  }
-
-  .orbWrap::before {
-    background: linear-gradient(to bottom, transparent 0%, #08070e 70%);
+    display: none;
   }
 
   .heroRule {
@@ -427,10 +398,8 @@
   }
 
   .lang {
-    right: 7vw;
-    top: auto;
-    bottom: 18vh;
-    transform: none;
+    left: 7vw;
+    bottom: 6vh;
   }
 
   .nav {
