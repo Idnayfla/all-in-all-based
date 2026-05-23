@@ -82,7 +82,7 @@ export default function SplashScreen({ onDone }: Props) {
         const a = p.progress > 0.85 ? ((1 - p.progress) / 0.15) * p.alpha : p.alpha;
         ctx.beginPath();
         ctx.arc(px, py, p.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(124,106,247,${(a * 0.8).toFixed(3)})`;
+        ctx.fillStyle = `rgba(201,168,124,${(a * 0.8).toFixed(3)})`;
         ctx.fill();
       }
       raf = requestAnimationFrame(animate);
@@ -173,11 +173,11 @@ export default function SplashScreen({ onDone }: Props) {
       <div className="splash-center">
         <div className="splash-ring-wrap" style={{ position: 'relative' }}>
           <div className={`splash-ring${ringPulse ? ' pulse' : ''}`} />
-          <div className={`splash-mark${logoIn ? ' visible' : ''}`}>B&gt;</div>
+          <div className={`splash-mark${logoIn ? ' visible' : ''}`}>⬡</div>
         </div>
-        <div className={`splash-tagline${taglineIn ? ' visible' : ''}`}>All in All Based</div>
+        <div className={`splash-tagline${taglineIn ? ' visible' : ''}`}>based.</div>
         <div className={`splash-sub${subIn ? ' visible' : ''}`}>
-          Describe it. Based builds it. Ships in seconds.
+          your overly attached companion ai.
         </div>
       </div>
       <div className="splash-grain" />
