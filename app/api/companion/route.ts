@@ -4,6 +4,9 @@ import { getUserId, supabaseAdmin } from '../_auth';
 import { getUserIdFromApiKey, ApiRateLimitError } from '../_apiKeyAuth';
 
 export const maxDuration = 60;
+// Screenshots sent from the desktop companion can be several MB as base64.
+// Raise the per-route body size limit to 20 MB so they are not rejected.
+export const maxBodySize = '20mb';
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || process.env.APP_ANTHROPIC_API_KEY,
@@ -84,7 +87,28 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const { messages, memory, screenshot, previewSource, projectName, fileNames } = await req.json();
+  let body: {
+    messages?: unknown;
+    memory?: unknown;
+    screenshot?: unknown;
+    previewSource?: unknown;
+    projectName?: unknown;
+    fileNames?: unknown;
+  };
+  try {
+    body = (await req.json()) as typeof body;
+  } catch {
+    return NextResponse.json({ error: 'Invalid or oversized request body' }, { status: 400 });
+  }
+
+  const { messages, memory, screenshot, previewSource, projectName, fileNames } = body as {
+    messages: Array<{ role: string; content: string }>;
+    memory?: string;
+    screenshot?: string;
+    previewSource?: string;
+    projectName?: string;
+    fileNames?: string[];
+  };
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: 'messages required' }, { status: 400 });
@@ -159,8 +183,12 @@ export async function POST(req: NextRequest) {
             );
           }
         }
-      } catch {
-        // fall through to finally
+      } catch (err) {
+        // Signal the client that the stream failed so it can show a proper error
+        // instead of silently receiving an empty [DONE] and showing "Failed to connect."
+        const reason =
+          err instanceof Error && err.message ? err.message.slice(0, 200) : 'stream_failed';
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: reason })}\n\n`));
       } finally {
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();

@@ -8,10 +8,42 @@ import { captureScreen, isScreenCaptureSupported } from '@/hooks/useScreenCaptur
 const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
   Promise.race([
     promise,
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('timeout')), ms)
-    ),
+    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
   ]);
+
+/**
+ * Compresses a screenshot data URL to JPEG at reduced resolution so that
+ * the base64 payload stays well under the 20 MB server body limit.
+ * Returns the original string unchanged if Canvas is unavailable.
+ */
+async function compressScreenshot(dataUrl: string): Promise<string> {
+  try {
+    const MAX_WIDTH = 1280;
+    const QUALITY = 0.75;
+    return await new Promise<string>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = img.width > MAX_WIDTH ? MAX_WIDTH / img.width : 1;
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(dataUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', QUALITY));
+      };
+      img.onerror = () => reject(new Error('img load failed'));
+      img.src = dataUrl;
+    });
+  } catch {
+    return dataUrl;
+  }
+}
 
 declare global {
   interface Window {
@@ -206,6 +238,9 @@ export default function CompanionOverlayPage() {
         return;
       }
 
+      // Compress screenshot before sending to stay under the server body limit
+      const screenshotPayload = cap ? await compressScreenshot(cap.source) : undefined;
+
       // Fix C: pass the abort signal so a 30 s stall aborts the request
       const res = await fetch('/api/companion', {
         method: 'POST',
@@ -217,7 +252,7 @@ export default function CompanionOverlayPage() {
           messages: history
             .filter(m => m.content?.trim())
             .map(m => ({ role: m.role, content: m.content })),
-          ...(cap ? { screenshot: cap.source } : {}),
+          ...(screenshotPayload ? { screenshot: screenshotPayload } : {}),
         }),
         signal: abortController.signal,
       });
@@ -247,6 +282,7 @@ export default function CompanionOverlayPage() {
       const decoder = new TextDecoder();
       let buf = '';
       let streamDone = false;
+      let streamError: string | null = null;
 
       while (!streamDone) {
         const { done, value } = await reader.read();
@@ -262,29 +298,34 @@ export default function CompanionOverlayPage() {
             break;
           }
           try {
-            const { text: chunk } = JSON.parse(raw);
-            if (chunk)
+            const parsed = JSON.parse(raw) as { text?: string; error?: string };
+            if (parsed.error) {
+              // Server signalled a stream failure — record it and let [DONE] close the loop
+              streamError = parsed.error;
+            } else if (parsed.text) {
               setMessages(prev => {
                 const next = [...prev];
                 next[next.length - 1] = {
                   ...next[next.length - 1],
-                  content: next[next.length - 1].content + chunk,
+                  content: next[next.length - 1].content + parsed.text,
                 };
                 return next;
               });
+            }
           } catch {
             // malformed SSE chunk — skip
           }
         }
       }
-      setMessages(prev => {
-        const next = [...prev];
-        const last = next[next.length - 1];
-        if (last?.role === 'assistant' && !last.content?.trim()) {
-          next[next.length - 1] = { ...last, content: '✕ Failed to connect.' };
-        }
-        return next;
-      });
+      // Only show "Failed to connect" if the server explicitly sent an error event
+      // or the response came back empty with no content at all.
+      if (streamError) {
+        setMessages(prev => {
+          const next = [...prev];
+          next[next.length - 1] = { ...next[next.length - 1], content: '✕ Failed to connect.' };
+          return next;
+        });
+      }
     } catch (err) {
       const isExpired = err instanceof Error && err.message === 'session-expired';
       const isAborted = err instanceof Error && err.name === 'AbortError';
