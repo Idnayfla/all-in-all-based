@@ -1,8 +1,8 @@
 const { app, BrowserWindow, shell, Menu, globalShortcut, ipcMain, screen, session, desktopCapturer } = require('electron');
 const path = require('path');
 
-const APP_URL = 'https://getbased.dev';
-const OVERLAY_URL = 'https://getbased.dev/companion';
+const APP_URL = 'https://www.getbased.dev';
+const OVERLAY_URL = 'https://www.getbased.dev/companion';
 
 let win = null;
 let overlayWin = null;
@@ -134,16 +134,6 @@ app.whenReady().then(async () => {
   // Clear cached 301/302 redirects once on startup so stale www. ↔ apex
   // redirect chains never accumulate. Does not wipe cookies or auth tokens.
   await basedSession.clearCache();
-
-  // Rewrite any www.getbased.dev request to apex domain before it hits the network.
-  // Vercel's domain config can produce a www ↔ apex redirect loop; intercepting here
-  // breaks it client-side regardless of server configuration.
-  basedSession.webRequest.onBeforeRequest(
-    { urls: ['https://www.getbased.dev/*'] },
-    (details, callback) => {
-      callback({ redirectURL: details.url.replace('https://www.getbased.dev', 'https://getbased.dev') });
-    }
-  );
 
   createWindow();
   createOverlayWindow();
