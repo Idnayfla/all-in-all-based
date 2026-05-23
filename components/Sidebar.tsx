@@ -166,21 +166,6 @@ export default function Sidebar({
           )}
         </div>
       </div>
-      {/* Companion download banner */}
-      <a
-        className="sidebar-companion-banner"
-        href="https://github.com/Idnayfla/all-in-all-based/releases/download/v0.1.0/Based.Setup.0.1.0.exe"
-        download
-        title="Download the Based Desktop Companion for Windows"
-      >
-        <span className="sidebar-companion-icon">⬡</span>
-        <span className="sidebar-companion-text">
-          <span className="sidebar-companion-label">Desktop Companion</span>
-          <span className="sidebar-companion-sub">Windows · Free download</span>
-        </span>
-        <span className="sidebar-companion-arrow">↓</span>
-      </a>
-
       {pendingDeleteId &&
         (() => {
           const target = projects.find(p => p.id === pendingDeleteId);

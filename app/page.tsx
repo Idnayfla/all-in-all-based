@@ -1188,6 +1188,14 @@ export default function Home() {
             >
               ◉
             </button>
+            <a
+              href="https://github.com/Idnayfla/all-in-all-based/releases/download/v0.1.0/Based.Setup.0.1.0.exe"
+              className="companion-header-btn"
+              download
+              title="Download the Based Desktop Companion for Windows"
+            >
+              ↓ Get App
+            </a>
             <button
               className="feedback-header-btn"
               onClick={() => setShowFeedback(true)}
