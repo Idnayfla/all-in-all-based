@@ -4,6 +4,17 @@ User-facing record of what shipped on beta.getbased.dev.
 
 ---
 
+## [Beta] 2026-05-23 — Windows Floating Companion
+
+### Added
+
+- **Desktop companion overlay** — Based now runs as a floating Electron overlay on Windows, sitting above every app, always visible, always ready. No more switching windows to talk to your AI
+- **Draggable B> bubble** — the companion's entry point is a pulsing B> bubble you can drag anywhere on screen. Position is saved and restored between sessions
+- **Screen capture on demand** — ask "what's on my screen?" and Based takes a screenshot of whatever is visible and analyses it — useful for debugging errors, reading documents, or understanding any UI without copy-pasting
+- **Persistent session** — the companion authenticates via your Based account automatically. Your memory and context carry over from the web app
+
+---
+
 ## [Beta] 2026-05-21 — API Keys, Persona Settings & Stability
 
 ### Added

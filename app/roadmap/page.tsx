@@ -56,6 +56,10 @@ const SHIPPED = [
     label: 'Music Studio',
     desc: 'Full DAW in your browser — 12 instruments, drum sequencer, voice recording, effects rack.',
   },
+  {
+    label: 'Windows Floating Companion',
+    desc: 'Always-on-top Electron overlay. Draggable bubble, screen capture, chat without switching windows.',
+  },
 ];
 
 const NEXT = [
@@ -78,10 +82,6 @@ const NEXT = [
   {
     label: 'Mobile PWA',
     desc: 'Add to home screen on iOS and Android. Feels native, no App Store required.',
-  },
-  {
-    label: 'Windows Floating Companion',
-    desc: 'Electron overlay that floats above every window. Screen-aware, voice-ready.',
   },
 ];
 
@@ -188,11 +188,11 @@ export default function RoadmapPage() {
         </div>
         <div className="rm-stats-row">
           <div className="rm-stat">
-            <span className="rm-stat-num">16</span>
+            <span className="rm-stat-num">17</span>
             <span className="rm-stat-label">Features shipped</span>
           </div>
           <div className="rm-stat">
-            <span className="rm-stat-num">5</span>
+            <span className="rm-stat-num">4</span>
             <span className="rm-stat-label">Coming next</span>
           </div>
           <div className="rm-stat">

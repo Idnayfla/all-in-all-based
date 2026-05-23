@@ -170,6 +170,22 @@ export default function LandingPage() {
           ))}
         </section>
 
+        {/* ── COMPANION CALLOUT ────────────────────────────────── */}
+        <section className={styles.companionSection}>
+          <ScrollReveal y={24}>
+            <p className={styles.companionEyebrow}>Windows Desktop Companion</p>
+            <h2 className={styles.companionHeadline}>ALWAYS THERE</h2>
+            <p className={styles.companionSub}>
+              Based floats above your desktop — so you never have to find it.
+            </p>
+            <p className={styles.companionBody}>
+              The companion lives on top of every app you have open. Drag it anywhere, ask it
+              anything — it sees your screen, knows your context, and picks up exactly where you
+              left off. Not a tab. Not a shortcut. A presence.
+            </p>
+          </ScrollReveal>
+        </section>
+
         {/* ── STICKY QUOTE ─────────────────────────────────────── */}
         <div ref={stickyRef} className={styles.stickyContainer}>
           <div className={styles.stickyInner}>
