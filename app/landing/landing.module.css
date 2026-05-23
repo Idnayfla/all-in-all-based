@@ -290,6 +290,52 @@
   margin-top: auto;
 }
 
+/* ── Companion callout ─────────────────────────────────────── */
+
+.companionSection {
+  padding: 10rem 10vw;
+  border-top: 1px solid rgba(201, 168, 124, 0.1);
+}
+
+.companionEyebrow {
+  font-family: var(--font-ui, system-ui);
+  font-size: 10px;
+  font-weight: 300;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(201, 168, 124, 0.55);
+  margin: 0 0 1.6rem;
+}
+
+.companionHeadline {
+  font-family: 'Humane', var(--font-display, sans-serif);
+  font-size: clamp(56px, 7vw, 112px);
+  font-weight: 900;
+  line-height: 0.9;
+  text-transform: uppercase;
+  color: #ede8d0;
+  margin: 0 0 1.6rem;
+}
+
+.companionSub {
+  font-family: var(--font-ui, system-ui);
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: #c9a87c;
+  margin: 0 0 1.2rem;
+}
+
+.companionBody {
+  font-family: var(--font-ui, system-ui);
+  font-size: 13px;
+  font-weight: 300;
+  line-height: 1.8;
+  color: rgba(237, 232, 208, 0.55);
+  max-width: 48ch;
+  margin: 0;
+}
+
 /* ── Sticky quote (pattern 4) ──────────────────────────────── */
 
 .stickyContainer {
