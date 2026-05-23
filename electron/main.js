@@ -148,6 +148,14 @@ function fixWwwRedirects(webContents) {
 }
 
 app.whenReady().then(async () => {
+  // Set a Chrome-like User-Agent on the persist:based session before any window
+  // loads a URL. Electron's default UA contains "Electron/x.x.x" which Vercel's
+  // bot-protection layer blocks with a 403. Spoofing a standard Chrome UA prevents
+  // that while keeping all session cookies and auth tokens intact.
+  const CHROME_UA =
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+  session.fromPartition('persist:based').setUserAgent(CHROME_UA);
+
   createWindow();
   createOverlayWindow();
   createBubbleWindow();
