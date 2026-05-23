@@ -1,0 +1,32 @@
+.root {
+  width: 100%;
+  overflow: hidden;
+  border-top: 1px solid rgba(201, 168, 124, 0.15);
+  border-bottom: 1px solid rgba(201, 168, 124, 0.15);
+  padding: 18px 0;
+  background: #08070e;
+  cursor: default;
+  user-select: none;
+}
+
+.track {
+  display: flex;
+  gap: 0;
+  width: max-content;
+}
+
+.item {
+  font-family: 'Humane', sans-serif;
+  font-size: clamp(22px, 3.2vw, 48px);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(237, 232, 208, 0.22);
+  padding: 0 2.5vw;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.root:hover .item {
+  color: rgba(201, 168, 124, 0.55);
+}

@@ -29,6 +29,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <head>
         <Script src="/no-docwrite.js" strategy="beforeInteractive" />
+        {/* Preconnect — font CDNs */}
+        <link rel="preconnect" href="https://fonts.cdnfonts.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* Humane display font — loaded here (not via @import) for faster render */}
+        <link rel="preload" href="https://fonts.cdnfonts.com/css/humane" as="style" />
+        <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/humane" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
         <meta name="theme-color" content="#7c6af7" />
         <meta name="apple-mobile-web-app-capable" content="yes" />

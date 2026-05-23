@@ -75,6 +75,25 @@ const nextConfig: NextConfig = {
   ],
   async headers() {
     return [
+      // ── Static asset caching ──────────────────────────────────
+      {
+        // Images, fonts, icons — content-hashed by Next.js, safe to cache forever
+        source: '/:path*\\.(webp|png|jpg|jpeg|svg|ico|woff2|woff|ttf|otf)',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
+      {
+        // 3D models — large, infrequently changed
+        source: '/models/:path*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
+      {
+        // Video backgrounds — may change; 1-week cache with revalidation
+        source: '/videos/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=604800, stale-while-revalidate=86400' },
+        ],
+      },
+      // ── Security headers (all routes) ────────────────────────
       {
         source: '/(.*)',
         headers: [
