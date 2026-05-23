@@ -121,32 +121,6 @@ function createWindow() {
   Menu.setApplicationMenu(null);
 }
 
-// Rewrite any www.getbased.dev URL to the apex domain.
-// Used by the will-redirect handler on each webContents.
-function stripWww(url) {
-  return url.replace(/^https:\/\/www\.getbased\.dev/, 'https://getbased.dev');
-}
-
-// Attach will-redirect + will-navigate listeners to a webContents so that any
-// redirect chain involving www.getbased.dev is cancelled and reloaded at the
-// apex domain. This is more reliable than webRequest.onBeforeRequest because
-// it fires for every redirect hop before Chromium follows it, preventing
-// ERR_TOO_MANY_REDIRECTS caused by Vercel's www ↔ apex redirect config.
-function fixWwwRedirects(webContents) {
-  webContents.on('will-redirect', (event, url) => {
-    if (url.startsWith('https://www.getbased.dev')) {
-      event.preventDefault();
-      webContents.loadURL(stripWww(url));
-    }
-  });
-  webContents.on('will-navigate', (event, url) => {
-    if (url.startsWith('https://www.getbased.dev')) {
-      event.preventDefault();
-      webContents.loadURL(stripWww(url));
-    }
-  });
-}
-
 app.whenReady().then(async () => {
   // Set a Chrome-like User-Agent on the persist:based session before any window
   // loads a URL. Electron's default UA contains "Electron/x.x.x" which Vercel's
@@ -154,15 +128,16 @@ app.whenReady().then(async () => {
   // that while keeping all session cookies and auth tokens intact.
   const CHROME_UA =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
-  session.fromPartition('persist:based').setUserAgent(CHROME_UA);
+  const basedSession = session.fromPartition('persist:based');
+  basedSession.setUserAgent(CHROME_UA);
+
+  // Clear cached 301/302 redirects once on startup so stale www. ↔ apex
+  // redirect chains never accumulate. Does not wipe cookies or auth tokens.
+  await basedSession.clearCache();
 
   createWindow();
   createOverlayWindow();
   createBubbleWindow();
-
-  // Attach www-redirect fix to all windows after creation.
-  if (win) fixWwwRedirects(win.webContents);
-  if (overlayWin) fixWwwRedirects(overlayWin.webContents);
 
   // Allow getDisplayMedia / screen capture in all sessions (default + named partition).
   // Registered AFTER windows are created so the 'persist:based' session object is fully
