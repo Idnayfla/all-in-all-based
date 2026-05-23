@@ -4,12 +4,6 @@ import { useRef, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { captureScreen, isScreenCaptureSupported } from '@/hooks/useScreenCapture';
 
-/** Races a promise against a timeout; rejects with Error('timeout') if ms elapses first. */
-const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> =>
-  Promise.race([
-    promise,
-    new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
-  ]);
 
 /**
  * Compresses a screenshot data URL to JPEG at reduced resolution so that
@@ -215,16 +209,11 @@ export default function CompanionOverlayPage() {
     const fetchTimeoutId = setTimeout(() => abortController.abort(), 30000);
 
     try {
-      // getSession() reads from localStorage — no network call needed.
-      // getUser() was previously called here to trigger a token refresh, but it
-      // makes a network round-trip to Supabase that can fail or timeout in
-      // Electron, causing spurious "Failed to connect." errors. Removed.
-      const {
-        data: { session: freshSession },
-      } = (await withTimeout(supabase.auth.getSession(), 5000)) as Awaited<
-        ReturnType<typeof supabase.auth.getSession>
-      >;
-      const token = freshSession?.access_token ?? authToken;
+      // Use the token fetched at mount (authToken state). Calling getSession()
+      // here again can trigger a network round-trip to Supabase to refresh an
+      // expired token, which times out in Electron. The server validates the
+      // token and returns 401 if expired, which we handle below.
+      const token = authToken;
 
       if (!token) {
         setMessages(prev => {
