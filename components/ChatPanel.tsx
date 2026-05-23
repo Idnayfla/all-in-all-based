@@ -199,6 +199,8 @@ export default function ChatPanel({
 }) {
   const [input, setInput] = useState(prefillMessage ?? '');
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
+  const [slowWarning, setSlowWarning] = useState(false);
+  const slowWarningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [generationMode, setGenerationMode] = useState<GenerationMode>('chat');
   const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
   const [generateAudio, setGenerateAudio] = useState(false);
@@ -589,6 +591,8 @@ export default function ChatPanel({
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setIsGenerating(true);
+    setSlowWarning(false);
+    slowWarningTimerRef.current = setTimeout(() => setSlowWarning(true), 15000);
 
     let doneHandled = false;
     let assistantMsg = '';
@@ -906,6 +910,11 @@ export default function ChatPanel({
         ]);
       }
     } finally {
+      if (slowWarningTimerRef.current) {
+        clearTimeout(slowWarningTimerRef.current);
+        slowWarningTimerRef.current = null;
+      }
+      setSlowWarning(false);
       if (!doneHandled) {
         setGenProgress(null);
         setMessages(prev => {
@@ -1172,12 +1181,19 @@ export default function ChatPanel({
                 <div className="message-role">{m.role === 'user' ? 'YOU' : 'BASED'}</div>
                 <div className="message-content">
                   {m.role === 'assistant' && isGenerating && i === messages.length - 1 ? (
-                    <ProgressBar
-                      progress={
-                        genProgress ?? { files: [], completed: 0, total: 0, file: '', chunks: 0 }
-                      }
-                      isFree={aiModel === 'free'}
-                    />
+                    <>
+                      <ProgressBar
+                        progress={
+                          genProgress ?? { files: [], completed: 0, total: 0, file: '', chunks: 0 }
+                        }
+                        isFree={aiModel === 'free'}
+                      />
+                      {slowWarning && (
+                        <div className="slow-warning">
+                          ◈ Taking longer than usual — still working...
+                        </div>
+                      )}
+                    </>
                   ) : (
                     renderContent(m.content, i)
                   )}
