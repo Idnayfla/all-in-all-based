@@ -82,6 +82,8 @@
   z-index: 0;
   mix-blend-mode: screen;
   filter: brightness(0.7) contrast(1.1);
+  grid-column: 1 / -1;
+  grid-row: 1;
 }
 
 .hero {
@@ -101,6 +103,8 @@
   position: relative;
   z-index: 2;
   padding: 0 6vw 0 10vw;
+  grid-column: 1;
+  grid-row: 1;
 }
 
 .orbWrap {
@@ -109,6 +113,8 @@
   height: 100vh;
   z-index: 1;
   pointer-events: none;
+  grid-column: 2;
+  grid-row: 1;
 }
 
 .lang {
