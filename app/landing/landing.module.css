@@ -336,6 +336,38 @@
   margin: 0;
 }
 
+.companionDownloadBtn {
+  display: inline-block;
+  margin-top: 2.4rem;
+  padding: 1em 2.4em;
+  background: #c9a87c;
+  color: #08070e;
+  font-family: var(--font-ui, system-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  text-decoration: none;
+  transition:
+    background 0.22s ease,
+    transform 0.22s ease;
+}
+
+.companionDownloadBtn:hover {
+  background: #f5f0e8;
+  transform: translateY(-2px);
+}
+
+.companionDownloadNote {
+  display: block;
+  margin-top: 0.8rem;
+  font-family: var(--font-ui, system-ui);
+  font-size: 10px;
+  font-weight: 300;
+  letter-spacing: 0.1em;
+  color: rgba(237, 232, 208, 0.42);
+}
+
 /* ── Sticky quote (pattern 4) ──────────────────────────────── */
 
 .stickyContainer {

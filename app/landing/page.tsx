@@ -183,6 +183,12 @@ export default function LandingPage() {
               anything — it sees your screen, knows your context, and picks up exactly where you
               left off. Not a tab. Not a shortcut. A presence.
             </p>
+            <a href="#download" className={styles.companionDownloadBtn}>
+              Download for Windows&nbsp;&#8594;
+            </a>
+            <span className={styles.companionDownloadNote}>
+              Free &middot; Windows 10/11 &middot; Sign in to Based first
+            </span>
           </ScrollReveal>
         </section>
 
