@@ -87,8 +87,7 @@
 .hero {
   min-height: 100vh;
   display: flex;
-  align-items: flex-start;
-  padding-top: 26vh;
+  align-items: center;
   padding-left: 10vw;
   position: relative;
   overflow: hidden;
@@ -100,7 +99,6 @@
   flex-direction: column;
   position: relative;
   z-index: 2;
-  max-width: 52vw;
 }
 
 .orbWrap {
@@ -115,13 +113,13 @@
 
 /* 3D orb — positioned right half, bleeds off edge for drama */
 .orbWrap {
-  right: -4vw;
-  top: 54%;
+  right: 2vw;
+  top: 50%;
   transform: translateY(-50%);
-  width: 52vw;
-  height: 52vw;
-  max-width: 780px;
-  max-height: 780px;
+  width: 44vw;
+  height: 44vw;
+  max-width: 600px;
+  max-height: 600px;
   pointer-events: none;
 }
 
