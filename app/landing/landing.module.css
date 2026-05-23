@@ -1,12 +1,3 @@
-/* ── Palette tokens ────────────────────────────────────────── */
-:local {
-  --l-black: #08070e;
-  --l-cream: #ede8d0;
-  --l-gold: #c9a87c;
-  --l-violet: #8b76ff;
-  --l-white: #f5f0e8;
-}
-
 .root {
   min-height: 100vh;
   background: #08070e;
