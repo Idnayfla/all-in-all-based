@@ -208,6 +208,13 @@ export default function LandingPage({ onSignIn }: Props) {
           <button className="landing-cta-secondary" onClick={() => onSignIn('signin')}>
             Sign In
           </button>
+          <a
+            href="https://github.com/Idnayfla/all-in-all-based/releases/download/v0.1.0/Based.Setup.0.1.0.exe"
+            className="landing-cta-download"
+            download
+          >
+            ↓ Windows App
+          </a>
         </motion.div>
         <motion.div
           className="landing-hint"
