@@ -108,6 +108,9 @@ export default function LandingPage() {
         </animated.div>
 
         <div className={styles.headlineBlock}>
+          {/* Editorial gold rule — fades in with deco spring */}
+          <animated.div className={styles.heroRule} style={decoSpring} />
+
           {/* Scroll reveal handled by react-spring entrance; hover is CSS */}
           {trail.map((style, i) => (
             <div key={i} className={styles.lineWrap}>
