@@ -104,13 +104,13 @@
 /* 3D orb — positioned right half, vertically centered */
 .orbWrap {
   position: absolute;
-  right: -4vw;
+  right: 4vw;
   top: 50%;
   transform: translateY(-50%);
-  width: 52vw;
-  height: 52vw;
-  max-width: 700px;
-  max-height: 700px;
+  width: 46vw;
+  height: 46vw;
+  max-width: 640px;
+  max-height: 640px;
   pointer-events: none;
 }
 
