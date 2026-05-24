@@ -49,7 +49,7 @@ export default function GlobalCompanionBubble() {
 
   return (
     <>
-      <motion.button
+      <button
         className={`companion-trigger${showCompanion ? ' companion-trigger--open' : ''}${isCompanionGenerating ? ' companion-trigger--responding' : ''}`}
         onClick={() => {
           if (!showCompanion && !isPro) {
@@ -59,12 +59,6 @@ export default function GlobalCompanionBubble() {
           setShowCompanion(s => !s);
         }}
         aria-label="Open AI Companion"
-        animate={{ scale: [1, 1.06, 1] }}
-        transition={{
-          duration: isCompanionGenerating ? 0.8 : 3,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
       >
         <img
           src="/brand-icon-loop.svg"
@@ -73,7 +67,7 @@ export default function GlobalCompanionBubble() {
           width={32}
           height={32}
         />
-      </motion.button>
+      </button>
 
       <AnimatePresence>
         {showCompanion && (

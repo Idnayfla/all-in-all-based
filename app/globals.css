@@ -7294,10 +7294,8 @@ html.has-wallpaper .editor-panel {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 20px rgba(201, 168, 124, 0.2);
   z-index: 200;
   transition:
-    box-shadow 0.25s,
     transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
     border-color 0.2s;
   animation: companion-fab-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
@@ -7305,7 +7303,6 @@ html.has-wallpaper .editor-panel {
 .companion-trigger:hover {
   transform: scale(1.1);
   border-color: rgba(201, 168, 124, 0.7);
-  box-shadow: 0 6px 28px rgba(201, 168, 124, 0.35);
 }
 .companion-trigger--open {
   transform: scale(0.9) rotate(45deg);
@@ -12350,7 +12347,7 @@ body:has(.beta-banner) .app-root {
   border-radius: var(--radius-sm);
   color: var(--text2);
   font-size: var(--fs-xs);
-  letter-spacing: 0.020em;
+  letter-spacing: 0.02em;
   line-height: 1.5;
 }
 
