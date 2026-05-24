@@ -28,20 +28,21 @@
         width: 52px;
         height: 52px;
         border-radius: 50%;
-        background: linear-gradient(135deg, #7c3aed, #4f46e5);
-        border: none;
+        background: #08070e;
+        border: 1.5px solid rgba(201, 168, 124, 0.35);
         cursor: grab;
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 4px 20px rgba(124, 58, 237, 0.5);
+        box-shadow: 0 4px 20px rgba(201, 168, 124, 0.2);
         position: relative;
         -webkit-app-region: no-drag;
         outline: none;
         animation: breathe 3s ease-in-out infinite;
         transition:
           background 0.3s,
-          box-shadow 0.3s;
+          box-shadow 0.3s,
+          border-color 0.3s;
         user-select: none;
       }
       .btn.dragging {
@@ -49,31 +50,26 @@
         animation: none;
       }
       .btn.open {
-        background: linear-gradient(135deg, #4f46e5, #7c3aed);
-        box-shadow: 0 4px 28px rgba(124, 58, 237, 0.9);
+        background: #08070e;
+        border-color: rgba(201, 168, 124, 0.7);
+        box-shadow: 0 4px 28px rgba(201, 168, 124, 0.45);
         animation: breathe-fast 1s ease-in-out infinite;
       }
       .btn.open.dragging {
         animation: none;
       }
-      .label {
-        font-size: 15px;
-        font-weight: 800;
-        color: #fff;
-        position: relative;
-        z-index: 1;
-        line-height: 1;
-        font-family: monospace;
+      .icon {
+        width: 34px;
+        height: 34px;
         pointer-events: none;
         user-select: none;
       }
       .ring {
         position: absolute;
         border-radius: 50%;
-        border: 1.5px solid rgba(124, 58, 237, 0.5);
+        border: 1.5px solid rgba(201, 168, 124, 0.3);
         pointer-events: none;
       }
-      /* Reduced inset so rings stay within the 88px window frame */
       .ring-1 {
         inset: -6px;
         animation: ring-pulse 3s ease-in-out infinite;
@@ -113,11 +109,11 @@
       @keyframes ring-pulse {
         0%,
         100% {
-          opacity: 0.4;
+          opacity: 0.3;
           transform: scale(1);
         }
         50% {
-          opacity: 0.7;
+          opacity: 0.6;
           transform: scale(1.05);
         }
       }
@@ -126,7 +122,38 @@
   <body>
     <div class="root">
       <button class="btn" id="btn">
-        <span class="label">B&gt;</span>
+        <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+          <defs>
+            <filter id="lglow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="3.5" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <polygon points="60,22 91,39.5 91,74.5 60,92 29,74.5 29,39.5"
+            fill="rgba(201,168,124,0.07)">
+            <animate attributeName="opacity" values="0.4;1;0.4" dur="3s" repeatCount="indefinite"
+              calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
+          </polygon>
+          <polygon points="60,14 97,35 97,79 60,100 23,79 23,35"
+            fill="none" stroke="#c9a87c" stroke-width="2.5" filter="url(#lglow)"
+            stroke-linejoin="round">
+            <animate attributeName="opacity" values="0.7;1;0.7" dur="3s" repeatCount="indefinite"
+              calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
+          </polygon>
+          <circle cx="97" cy="35" r="3" fill="#c9a87c" filter="url(#lglow)">
+            <animate attributeName="opacity" values="0.5;1;0.5" dur="3s" repeatCount="indefinite"
+              calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
+          </circle>
+          <text x="60" y="65" text-anchor="middle"
+            font-family="'Space Mono','Courier New',monospace" font-weight="700" font-size="20"
+            fill="#c9a87c" filter="url(#lglow)" letter-spacing="1">
+            B&gt;
+          </text>
+          <rect x="74" y="51" width="2" height="14" fill="#c9a87c">
+            <animate attributeName="opacity" values="1;1;0;0;1;1" dur="1.4s" repeatCount="indefinite"
+              keyTimes="0;0.4;0.5;0.9;1;1"/>
+          </rect>
+        </svg>
         <span class="ring ring-1"></span>
         <span class="ring ring-2"></span>
       </button>
