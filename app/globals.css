@@ -134,9 +134,7 @@ body {
   overflow: hidden;
 }
 body {
-  background:
-    radial-gradient(ellipse 110% 55% at 50% -5%, rgba(139, 118, 255, 0.1) 0%, transparent 60%),
-    var(--bg);
+  background: var(--bg);
 }
 
 ::-webkit-scrollbar {
