@@ -123,30 +123,24 @@
     <div class="root">
       <button class="btn" id="btn">
         <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
-          <defs>
-            <filter id="lglow" x="-30%" y="-30%" width="160%" height="160%">
-              <feGaussianBlur stdDeviation="3.5" result="blur"/>
-              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-            </filter>
-          </defs>
           <polygon points="60,22 91,39.5 91,74.5 60,92 29,74.5 29,39.5"
             fill="rgba(201,168,124,0.07)">
             <animate attributeName="opacity" values="0.4;1;0.4" dur="3s" repeatCount="indefinite"
               calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
           </polygon>
           <polygon points="60,14 97,35 97,79 60,100 23,79 23,35"
-            fill="none" stroke="#c9a87c" stroke-width="2.5" filter="url(#lglow)"
+            fill="none" stroke="#c9a87c" stroke-width="2.5"
             stroke-linejoin="round">
             <animate attributeName="opacity" values="0.7;1;0.7" dur="3s" repeatCount="indefinite"
               calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
           </polygon>
-          <circle cx="97" cy="35" r="3" fill="#c9a87c" filter="url(#lglow)">
+          <circle cx="97" cy="35" r="3" fill="#c9a87c">
             <animate attributeName="opacity" values="0.5;1;0.5" dur="3s" repeatCount="indefinite"
               calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
           </circle>
           <text x="60" y="65" text-anchor="middle"
             font-family="'Space Mono','Courier New',monospace" font-weight="700" font-size="20"
-            fill="#c9a87c" filter="url(#lglow)" letter-spacing="1">
+            fill="#c9a87c" letter-spacing="1">
             B&gt;
           </text>
           <rect x="74" y="51" width="2" height="14" fill="#c9a87c">
