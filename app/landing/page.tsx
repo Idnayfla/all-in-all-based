@@ -9,6 +9,7 @@ import Link from 'next/link';
 import Marquee from '@/components/landing/Marquee';
 import ScrollReveal from '@/components/landing/ScrollReveal';
 import styles from './landing.module.css';
+import { GetAppLanding } from '@/components/GetAppButton';
 
 const BasedOrb = dynamic(() => import('@/components/landing/BasedOrb'), { ssr: false });
 
@@ -183,16 +184,10 @@ export default function LandingPage() {
               anything — it sees your screen, knows your context, and picks up exactly where you
               left off. Not a tab. Not a shortcut. A presence.
             </p>
-            <a
-              href="https://github.com/Idnayfla/all-in-all-based/releases/download/v0.1.0/Based.Setup.0.1.0.exe"
-              className={styles.companionDownloadBtn}
-              download
-            >
-              Download for Windows&nbsp;&#8594;
-            </a>
-            <span className={styles.companionDownloadNote}>
-              Free &middot; Windows 10/11 &middot; Sign in to Based first
-            </span>
+            <GetAppLanding
+              btnClass={styles.companionDownloadBtn}
+              noteClass={styles.companionDownloadNote}
+            />
           </ScrollReveal>
         </section>
 
