@@ -71,6 +71,7 @@ function createBubbleWindow() {
     alwaysOnTop: true,
     frame: false,
     transparent: true,
+    hasShadow: false,
     skipTaskbar: true,
     resizable: false,
     show: false,
