@@ -34,14 +34,12 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        box-shadow: 0 4px 20px rgba(201, 168, 124, 0.2);
         position: relative;
         -webkit-app-region: no-drag;
         outline: none;
         animation: breathe 3s ease-in-out infinite;
         transition:
           background 0.3s,
-          box-shadow 0.3s,
           border-color 0.3s;
         user-select: none;
       }
@@ -52,7 +50,6 @@
       .btn.open {
         background: #08070e;
         border-color: rgba(201, 168, 124, 0.7);
-        box-shadow: 0 4px 28px rgba(201, 168, 124, 0.45);
         animation: breathe-fast 1s ease-in-out infinite;
       }
       .btn.open.dragging {
