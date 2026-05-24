@@ -4,6 +4,12 @@ import { withSentryConfig } from '@sentry/nextjs';
 
 const nextConfig: NextConfig = {
   devIndicators: false,
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: 'lh3.googleusercontent.com' },
+      { protocol: 'https', hostname: '*.googleusercontent.com' },
+    ],
+  },
   transpilePackages: [
     'react-markdown',
     '@ungap/structured-clone',
