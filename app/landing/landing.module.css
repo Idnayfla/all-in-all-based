@@ -137,7 +137,7 @@
 }
 
 .line {
-  font-family: 'Humane', var(--font-display, sans-serif);
+  font-family: var(--font-brand);
   font-size: clamp(44px, 5.2vw, 88px);
   font-weight: 900;
   line-height: 0.9;
@@ -308,7 +308,7 @@
 }
 
 .companionHeadline {
-  font-family: 'Humane', var(--font-display, sans-serif);
+  font-family: var(--font-brand);
   font-size: clamp(56px, 7vw, 112px);
   font-weight: 900;
   line-height: 0.9;

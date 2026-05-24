@@ -62,36 +62,45 @@ export default function PersonaSwitcher({ persona, onChange, disabled }: Persona
 
   const handleKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') setOpen(false);
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggle();
+    }
   };
 
-  const panel = open && rect && mounted ? createPortal(
-    <div
-      className="persona-switcher-panel"
-      role="listbox"
-      aria-label="Select persona"
-      style={{ position: 'fixed', top: rect.bottom + 8, left: rect.left, zIndex: 9999 }}
-    >
-      {PERSONAS.map(p => (
-        <button
-          key={p.key}
-          type="button"
-          role="option"
-          aria-selected={p.key === persona}
-          className={`persona-switcher-option${p.key === persona ? ' selected' : ''}`}
-          onClick={() => { onChange(p.key); setOpen(false); }}
-        >
-          <span className="persona-switcher-opt-symbol">{p.symbol}</span>
-          <span className="persona-switcher-opt-label">
-            <span className="persona-switcher-opt-name">{p.name}</span>
-            <span className="persona-switcher-opt-desc">{p.desc}</span>
-          </span>
-          {p.key === persona && <span className="persona-switcher-check">◈</span>}
-        </button>
-      ))}
-    </div>,
-    document.body
-  ) : null;
+  const panel =
+    open && rect && mounted
+      ? createPortal(
+          <div
+            className="persona-switcher-panel"
+            role="listbox"
+            aria-label="Select persona"
+            style={{ position: 'fixed', top: rect.bottom + 8, left: rect.left, zIndex: 9999 }}
+          >
+            {PERSONAS.map(p => (
+              <button
+                key={p.key}
+                type="button"
+                role="option"
+                aria-selected={p.key === persona}
+                className={`persona-switcher-option${p.key === persona ? ' selected' : ''}`}
+                onClick={() => {
+                  onChange(p.key);
+                  setOpen(false);
+                }}
+              >
+                <span className="persona-switcher-opt-symbol">{p.symbol}</span>
+                <span className="persona-switcher-opt-label">
+                  <span className="persona-switcher-opt-name">{p.name}</span>
+                  <span className="persona-switcher-opt-desc">{p.desc}</span>
+                </span>
+                {p.key === persona && <span className="persona-switcher-check">◈</span>}
+              </button>
+            ))}
+          </div>,
+          document.body
+        )
+      : null;
 
   return (
     <div className="persona-switcher" ref={rootRef}>

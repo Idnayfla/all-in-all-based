@@ -39,8 +39,15 @@ export default function LaunchSplash() {
         >
           <div className="launch-splash__pulse" />
           <div className="launch-splash__content">
-            <h1 className="launch-splash__title">Based</h1>
-            <p className="launch-splash__tagline">Your personal AI studio</p>
+            <img
+              src="/brand-icon-animated.svg"
+              className="launch-splash__icon"
+              alt="Based"
+              width={96}
+              height={96}
+            />
+            <h1 className="launch-splash__title">BASED</h1>
+            <p className="launch-splash__tagline">your personal assistant AI</p>
           </div>
           <motion.p
             className="launch-splash__hint"

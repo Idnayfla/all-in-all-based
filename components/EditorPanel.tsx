@@ -92,7 +92,7 @@ export default function EditorPanel({
           onChange={val => onFileUpdate({ ...activeFile, content: val ?? '' })}
           options={{
             fontSize: 13,
-            fontFamily: "'Space Mono', monospace",
+            fontFamily: 'var(--font-mono)',
             minimap: { enabled: false },
             scrollBeyondLastLine: false,
             padding: { top: 16, bottom: 16 },

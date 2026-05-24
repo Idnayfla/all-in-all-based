@@ -76,15 +76,19 @@ Free plan is 10 builds/month, no credit card. Would genuinely love feedback from
 ### X / Twitter (follow-up thread)
 
 **Tweet 1**
+
 > The Based companion floats above every window. Always on top. No switching apps, no alt-tabbing. It's just there — like it should be.
 
 **Tweet 2**
+
 > Drag the B> bubble to any corner of your screen. Position sticks between restarts. It learns where you want it and stays there.
 
 **Tweet 3**
+
 > Ask it "what's on my screen?" — it captures a screenshot and analyses it. Debug an error, read a PDF, explain a UI. Without copy-pasting anything.
 
 **Tweet 4**
+
 > The overattached feeling is intentional. Based isn't a tool you open. It's a presence you keep. Desktop companion is live — getbased.dev
 
 ---

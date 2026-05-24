@@ -68,7 +68,7 @@ interface DrawStroke {
 const FONTS = [
   { label: 'Sans-serif', value: 'Inter, sans-serif' },
   { label: 'Serif', value: 'Georgia, serif' },
-  { label: 'Mono', value: 'JetBrains Mono, monospace' },
+  { label: 'Mono', value: 'var(--font-mono)' },
   { label: 'Cursive', value: 'cursive' },
 ];
 const FONT_SIZES = [

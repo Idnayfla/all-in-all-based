@@ -1,16 +1,14 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 
 export interface AppTheme {
   mode: 'dark' | 'oled' | 'light';
   accent: string;
-  fontMono: string;
 }
 
 export const DEFAULT_THEME: AppTheme = {
   mode: 'dark',
   accent: '#7c6af7',
-  fontMono: "'Space Mono', monospace",
 };
 
 const ACCENT_SWATCHES = [
@@ -22,25 +20,10 @@ const ACCENT_SWATCHES = [
   { color: '#6af7a5', label: 'Green' },
 ];
 
-const FONTS = [
-  { value: "'Space Mono', monospace", label: 'Space Mono', hint: 'Geometric · default' },
-  { value: "'JetBrains Mono', monospace", label: 'JetBrains Mono', hint: 'Developer clean' },
-  { value: "'Fira Code', monospace", label: 'Fira Code', hint: 'Warm · ligatures' },
-  { value: "'IBM Plex Mono', monospace", label: 'IBM Plex Mono', hint: 'Corporate precise' },
-  { value: "'Source Code Pro', monospace", label: 'Source Code Pro', hint: 'Minimal · sharp' },
-  { value: "'Inconsolata', monospace", label: 'Inconsolata', hint: 'Slim · elegant' },
-  { value: "'Courier Prime', monospace", label: 'Courier Prime', hint: 'Typewriter classic' },
-  { value: "'Share Tech Mono', monospace", label: 'Share Tech Mono', hint: 'Retro terminal' },
-  { value: "'Oxanium', monospace", label: 'Oxanium', hint: 'Futuristic · sci-fi' },
-  { value: "'Syne Mono', monospace", label: 'Syne Mono', hint: 'Artistic · editorial' },
-];
-
 export function applyTheme(theme: AppTheme) {
   const root = document.documentElement;
   root.setAttribute('data-theme', theme.mode === 'dark' ? '' : theme.mode);
   root.style.setProperty('--accent', theme.accent);
-  root.style.setProperty('--font-mono', theme.fontMono);
-  document.body.style.fontFamily = theme.fontMono;
 }
 
 export function loadTheme(): AppTheme {
@@ -115,25 +98,6 @@ export default function ThemeCustomizer({ theme, onChange }: Props) {
               style={{ position: 'absolute', opacity: 0, width: 28, height: 28, cursor: 'pointer' }}
             />
           </div>
-        </div>
-      </div>
-
-      {/* Font */}
-      <div className="theme-row theme-row--font">
-        <span className="theme-row-label">Font</span>
-        <div className="theme-font-grid">
-          {FONTS.map(f => (
-            <button
-              key={f.value}
-              className={`theme-font-btn${theme.fontMono === f.value ? ' active' : ''}`}
-              style={{ fontFamily: f.value }}
-              onClick={() => update({ fontMono: f.value })}
-              title={f.hint}
-            >
-              <span className="theme-font-name">{f.label}</span>
-              <span className="theme-font-hint">{f.hint}</span>
-            </button>
-          ))}
         </div>
       </div>
     </div>

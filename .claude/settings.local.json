@@ -27,7 +27,22 @@
       "Bash(mkdir \"C:\\\\Users\\\\Hus Alfyandi\\\\.vscode\\\\all-in-all-based\\\\.github\\\\workflows\")",
       "Bash(cp middleware.ts proxy.ts)",
       "Bash(git add *)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(cp \"C:\\\\Users\\\\Hus Alfyandi\\\\.vscode\\\\all-in-all-based\\\\.claude\\\\worktrees\\\\agent-af5d70768307d79bf\\\\lib\\\\crowd.ts\" \"C:\\\\Users\\\\Hus Alfyandi\\\\.vscode\\\\all-in-all-based\\\\lib\\\\crowd.ts\")",
+      "Bash(cp \"C:\\\\Users\\\\Hus Alfyandi\\\\.vscode\\\\all-in-all-based\\\\.claude\\\\worktrees\\\\agent-af5d70768307d79bf\\\\app\\\\api\\\\generate\\\\route.ts\" \"C:\\\\Users\\\\Hus Alfyandi\\\\.vscode\\\\all-in-all-based\\\\app\\\\api\\\\generate\\\\route.ts\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Hus Alfyandi\\\\.vscode\\\\all-in-all-based\\\\app\\\\api\\\\higgsfield\\\\image\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Hus Alfyandi\\\\.vscode\\\\all-in-all-based\\\\app\\\\api\\\\higgsfield\\\\video\")",
+      "mcp__higgsfield__generate_image",
+      "mcp__higgsfield__list_workspaces",
+      "mcp__higgsfield__balance",
+      "mcp__exa__web_search_exa",
+      "mcp__exa__web_fetch_exa",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Hus Alfyandi\\\\.vscode\\\\all-in-all-based\\\\public\\\\models\")",
+      "Bash(cp \"C:\\\\Users\\\\Hus Alfyandi\\\\Downloads\\\\abstract_geometric_sphere.glb\" \"C:\\\\Users\\\\Hus Alfyandi\\\\.vscode\\\\all-in-all-based\\\\public\\\\models\\\\abstract_geometric_sphere.glb\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Hus Alfyandi\\\\.vscode\\\\all-in-all-based\\\\public\\\\videos\")",
+      "Bash(cp \"C:\\\\Users\\\\Hus Alfyandi\\\\Downloads\\\\kling_20260523_VIDEO_Slow_drift_2923_0.mp4\" \"C:\\\\Users\\\\Hus Alfyandi\\\\.vscode\\\\all-in-all-based\\\\public\\\\videos\\\\hero.mp4\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Hus Alfyandi\\\\.vscode\\\\all-in-all-based\\\\public\\\\fonts\")",
+      "Bash(mkdir -p \"C:\\\\Users\\\\Hus Alfyandi\\\\.vscode\\\\all-in-all-based\\\\scripts\")"
     ],
     "deny": [
       "Bash(git push --force*)",
@@ -42,5 +57,7 @@
       "Bash(gh issue create*)",
       "Bash(gh release create*)"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": ["higgsfield"]
 }
