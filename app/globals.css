@@ -12321,7 +12321,7 @@ body:has(.beta-banner) .app-root {
   flex-direction: column;
   background: var(--bg2);
   border-radius: var(--r-2xl);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(201, 168, 124, 0.12);
   overflow: hidden;
   z-index: 99999;
   transform-origin: bottom right;
