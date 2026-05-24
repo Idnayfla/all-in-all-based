@@ -6,6 +6,14 @@ import { supabase } from '@/lib/supabase';
 import CompanionDrawer, { CMsg } from './CompanionDrawer';
 import PricingModal from './PricingModal';
 
+// In the Electron main window the native bubble.html overlay handles the
+// companion trigger. Rendering this component there causes phantom concentric
+// rings visible through the transparent bubbleWin layer. Suppress it entirely
+// when the main-preload.js flag is present (set by electron/main-preload.js).
+const isElectronMainWindow =
+  typeof window !== 'undefined' &&
+  (window as unknown as Record<string, unknown>)['__BASED_ELECTRON__'] === true;
+
 export default function GlobalCompanionBubble() {
   const [showCompanion, setShowCompanion] = useState(false);
   const [isCompanionGenerating, setIsCompanionGenerating] = useState(false);
@@ -14,7 +22,10 @@ export default function GlobalCompanionBubble() {
   const [isPro, setIsPro] = useState(false);
   const [showPricing, setShowPricing] = useState(false);
 
+  // All hooks must be called unconditionally before any early return.
   useEffect(() => {
+    // Skip side-effects when running inside the Electron main window.
+    if (isElectronMainWindow) return;
     supabase.auth.getSession().then(({ data: { session } }) => {
       setAuthToken(session?.access_token ?? '');
     });
@@ -22,6 +33,9 @@ export default function GlobalCompanionBubble() {
       setIsPro(localStorage.getItem('based_sub_tier') === 'pro');
     } catch {}
   }, []);
+
+  // Suppress the web bubble entirely in Electron — bubble.html handles it.
+  if (isElectronMainWindow) return null;
 
   const getHeaders = async (): Promise<HeadersInit> => {
     const {

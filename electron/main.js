@@ -114,6 +114,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       partition: 'persist:based',
+      preload: path.join(__dirname, 'main-preload.js'),
     },
     show: false,
   });
