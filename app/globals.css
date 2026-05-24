@@ -1474,16 +1474,15 @@ body {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
-  background: #12121e;
+  background: #1a1820;
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 6px;
   min-width: 230px;
   box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.75),
+    0 12px 40px rgba(0, 0, 0, 0.9),
     0 0 0 1px rgba(201, 168, 124, 0.08);
-  z-index: 300;
-  backdrop-filter: blur(12px);
+  z-index: 1000;
 }
 
 .persona-switcher-option {
