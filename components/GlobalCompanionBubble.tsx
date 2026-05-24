@@ -52,7 +52,13 @@ export default function GlobalCompanionBubble() {
           ease: 'easeInOut',
         }}
       >
-        <span className="companion-trigger-label">B</span>
+        <img
+          src="/brand-icon-loop.svg"
+          className="companion-trigger-label"
+          alt="Based"
+          width={32}
+          height={32}
+        />
         <motion.span
           className="companion-trigger-ring companion-trigger-ring--1"
           animate={{ opacity: [0.4, 0.8, 0.4] }}
