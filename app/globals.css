@@ -7331,32 +7331,6 @@ html.has-wallpaper .editor-panel {
   z-index: 1;
   pointer-events: none;
 }
-.companion-trigger-ring {
-  position: absolute;
-  border-radius: 50%;
-  border: 1px solid rgba(201, 168, 124, 0.18);
-  pointer-events: none;
-}
-.companion-trigger-ring--1 {
-  inset: -8px;
-  animation: companion-breathe 3s ease-in-out infinite;
-}
-.companion-trigger-ring--2 {
-  inset: -16px;
-  animation: companion-breathe 3s ease-in-out infinite 0.5s;
-}
-.companion-trigger--open:not(.companion-trigger--responding) .companion-trigger-ring {
-  display: none;
-}
-.companion-trigger--responding .companion-trigger-ring--1 {
-  display: block;
-  animation: companion-pulse-ring 1s ease-in-out infinite;
-  border-color: rgba(201, 168, 124, 0.5);
-}
-.companion-trigger--responding .companion-trigger-ring--2 {
-  display: none;
-}
-
 @keyframes companion-breathe {
   0%,
   100% {
@@ -7372,15 +7346,6 @@ html.has-wallpaper .editor-panel {
     right: 16px;
     width: 42px;
     height: 42px;
-  }
-}
-@keyframes companion-pulse-ring {
-  0%,
-  100% {
-    opacity: 0.3;
-  }
-  50% {
-    opacity: 0.7;
   }
 }
 
@@ -7508,7 +7473,6 @@ html.has-wallpaper .editor-panel {
 }
 .companion-empty {
   font-size: 11px;
-  gap: 10px;
   color: #4a4a6a;
   text-align: center;
   padding: 24px 12px;
@@ -12386,7 +12350,7 @@ body:has(.beta-banner) .app-root {
   border-radius: var(--radius-sm);
   color: var(--text2);
   font-size: var(--fs-xs);
-  letter-spacing: 0.01em;
+  letter-spacing: 0.020em;
   line-height: 1.5;
 }
 

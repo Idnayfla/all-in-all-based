@@ -73,8 +73,6 @@ export default function GlobalCompanionBubble() {
           width={32}
           height={32}
         />
-        <span className="companion-trigger-ring companion-trigger-ring--1" />
-        <span className="companion-trigger-ring companion-trigger-ring--2" />
       </motion.button>
 
       <AnimatePresence>
