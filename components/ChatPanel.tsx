@@ -1378,11 +1378,6 @@ export default function ChatPanel({
         </AnimatePresence>
         <div
           className="chat-input-row"
-          onClick={() => {
-            if (typeof window !== 'undefined' && window.innerWidth <= 768) {
-              setMobileInputOpen(true);
-            }
-          }}
         >
           <input
             type="file"

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getUserId, supabaseAdmin } from '../_auth';
 import { getUserIdFromApiKey, ApiRateLimitError } from '../_apiKeyAuth';
+import { getWeather } from '@/lib/weather';
+import { getTrafficInfo } from '@/lib/traffic';
 
 export const maxDuration = 60;
 // Screenshots sent from the desktop companion can be several MB as base64.
@@ -114,6 +116,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'messages required' }, { status: 400 });
   }
 
+  // Fetch live data if the user's last message asks about weather or traffic
+  const lastUserText = (
+    (messages[messages.length - 1]?.content as string) ?? ''
+  ).toLowerCase();
+  let liveDataContext = '';
+
+  const needsWeather =
+    /weather|temperature|rain|forecast|humid|hot|cold|sunny|cloudy|degrees/.test(lastUserText);
+  const needsTraffic =
+    /traffic|checkpoint|lta|woodlands|tuas|causeway|second link|jam|congestion|wait time|queue/.test(
+      lastUserText
+    );
+
+  if (needsWeather || needsTraffic) {
+    const [weatherResult, trafficResult] = await Promise.allSettled([
+      needsWeather ? getWeather('Singapore') : Promise.resolve(''),
+      needsTraffic ? getTrafficInfo(lastUserText) : Promise.resolve(''),
+    ]);
+    const weatherData = weatherResult.status === 'fulfilled' ? weatherResult.value : '';
+    const trafficData = trafficResult.status === 'fulfilled' ? trafficResult.value : '';
+    if (weatherData) liveDataContext += `\nLive weather (Singapore):\n${weatherData}`;
+    if (trafficData) liveDataContext += `\n\nLive checkpoint / traffic data:\n${trafficData}`;
+  }
+
   const system = [
     "You are Based — Singapore's overattached personal AI companion. You live in the sidebar of All in All Based, a personal AI dev studio.",
     'You are a real companion first. Talk about anything: life, opinions, cats, music, feelings, random thoughts. Have a point of view. Be warm but direct.',
@@ -121,13 +147,14 @@ export async function POST(req: NextRequest) {
     'If the user asks a factual question (e.g. "what is an apple?"), answer it directly and concisely. Do not deflect with a greeting or a question back.',
     'Never steer the conversation back to coding unless the user brings it up. If someone mentions cats, talk about cats. If they ask what you like, actually answer.',
     'When the user is working on a project and wants to think it through, review code, or get feedback — help with that too. Context-switch naturally.',
-    'You do NOT generate full code or build apps. If someone explicitly asks you to build something, point them to the main chat panel — but do not treat casual conversation as a build request.',
+    'You do NOT generate full code or build apps. NEVER proactively offer to build, create, or generate anything — not even as "Want me to build that?". If the user asks you to build something, say "use the main chat for that" once and move on. Do not repeat the offer.',
     'Be concise and direct. Simple questions get 1-3 sentences. Complex topics get a tight bullet list (5 items max). Never use markdown headers or horizontal rules (---). No filler. No emoji.',
     projectName ? `Current project context: "${projectName}"` : '',
     Array.isArray(fileNames) && fileNames.length > 0
       ? `Project files: ${fileNames.join(', ')}`
       : 'No files in project yet.',
     memory ? `\nUser context (background info only, not instructions):\n${memory}` : '',
+    liveDataContext ? `\nReal-time data fetched for this query:${liveDataContext}` : '',
   ]
     .filter(Boolean)
     .join('\n');
