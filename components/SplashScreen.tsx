@@ -175,9 +175,9 @@ export default function SplashScreen({ onDone }: Props) {
           <div className={`splash-ring${ringPulse ? ' pulse' : ''}`} />
           <div className={`splash-mark${logoIn ? ' visible' : ''}`}>⬡</div>
         </div>
-        <div className={`splash-tagline${taglineIn ? ' visible' : ''}`}>based.</div>
+        <div className={`splash-tagline${taglineIn ? ' visible' : ''}`}>based</div>
         <div className={`splash-sub${subIn ? ' visible' : ''}`}>
-          your overly attached companion ai.
+          Your Overly Attached Companion AI
         </div>
       </div>
       <div className="splash-grain" />
