@@ -1,4 +1,25 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;700&family=Fira+Code:wght@400;700&family=IBM+Plex+Mono:wght@400;700&family=Courier+Prime:wght@400;700&family=Inconsolata:wght@400;700&family=Share+Tech+Mono&family=Source+Code+Pro:wght@400;700&family=Oxanium:wght@400;700&family=Syne+Mono&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+
+@font-face {
+  font-family: 'BasedBrand';
+  src: url('/fonts/based-brand.otf') format('opentype');
+  font-weight: 700;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'BasedPixel';
+  src: url('/fonts/based-pixel.otf') format('opentype');
+  font-weight: 400 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'BasedUI';
+  src: url('/fonts/BasedUI.otf') format('opentype');
+  font-weight: 400 900;
+  font-display: swap;
+}
 
 *,
 *::before,
@@ -91,7 +112,9 @@ body {
   --shadow-accent: 0 4px 20px var(--accent-glow);
   --shadow-accent3: 0 4px 16px var(--accent3-glow);
   /* ── Typography ── */
-  --font-display: 'Syne', sans-serif;
+  --font-brand: 'BasedPixel', 'Space Mono', monospace;
+  --font-pixel: 'BasedUI', 'Space Mono', monospace;
+  --font-display: var(--font-brand);
   --font-mono: 'Space Mono', monospace;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   /* ── Safe area insets (PWA / notch support) ── */
@@ -105,7 +128,9 @@ html,
 body {
   height: 100%;
   color: var(--text);
-  font-family: var(--font-mono);
+  font-family: var(--font-pixel);
+  letter-spacing: 0.07em;
+  line-height: 1.55;
   overflow: hidden;
 }
 body {
@@ -166,7 +191,7 @@ body {
   font-weight: 800;
   color: var(--accent);
   letter-spacing: 1.5px;
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-pixel);
   text-transform: uppercase;
   animation: chipGlow 3s ease-in-out infinite;
 }
@@ -236,7 +261,7 @@ body {
   background: transparent;
   border: none;
   color: var(--text2);
-  font-family: var(--font-mono);
+  font-family: var(--font-pixel);
   font-size: 11px;
   letter-spacing: 1px;
   cursor: pointer;
@@ -787,25 +812,13 @@ body {
   color: var(--text3);
 }
 .chat-empty-logo {
-  width: 56px;
-  height: 56px;
-  background: linear-gradient(135deg, var(--accent), var(--accent3));
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-family: var(--font-mono);
-  font-weight: 700;
-  font-size: 22px;
-  color: var(--bg);
-  animation:
-    float 3s ease-in-out infinite,
-    glowPulse 3s ease-in-out infinite;
+  width: 80px;
+  height: 80px;
   pointer-events: none;
   cursor: default;
 }
 .chat-empty-title {
-  font-family: var(--font-mono);
+  font-family: var(--font-pixel);
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 3px;
@@ -813,7 +826,7 @@ body {
 }
 .chat-empty-sub {
   font-size: 14px;
-  font-family: var(--font-sans);
+  font-family: var(--font-pixel);
   color: var(--text3);
   text-align: center;
   max-width: 280px;
@@ -831,7 +844,7 @@ body {
   background: var(--accent-subtle);
   border: 1px solid var(--border);
   color: var(--text2);
-  font-family: var(--font-sans);
+  font-family: var(--font-pixel);
   font-size: 12px;
   cursor: pointer;
   border-radius: var(--r-full);
@@ -861,11 +874,11 @@ body {
   border-color: rgba(94, 245, 192, 0.12);
 }
 .message-role {
-  font-size: 10px;
+  font-size: 17px;
   letter-spacing: 2px;
   text-transform: uppercase;
-  font-family: var(--font-mono);
-  margin-bottom: 4px;
+  font-family: var(--font-pixel);
+  margin-bottom: 6px;
 }
 .message.user .message-role {
   color: var(--accent);
@@ -874,9 +887,9 @@ body {
   color: var(--accent3);
 }
 .message-content {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.85;
-  font-family: var(--font-sans);
+  font-family: var(--font-pixel);
   color: var(--text);
   word-break: break-word;
 }
@@ -966,8 +979,8 @@ body {
   background: var(--bg);
   border: 1px solid var(--border);
   color: var(--text);
-  font-family: var(--font-sans);
-  font-size: 14px;
+  font-family: var(--font-pixel);
+  font-size: 13px;
   padding: 12px 14px;
   border-radius: var(--r-lg);
   resize: none;
@@ -992,7 +1005,7 @@ body {
   background: var(--accent);
   border: none;
   color: white;
-  font-family: var(--font-mono);
+  font-family: var(--font-pixel);
   font-size: 12px;
   letter-spacing: 1px;
   cursor: pointer;
@@ -1239,8 +1252,8 @@ body {
     border: none;
     border-bottom: 1px solid var(--border-subtle);
     color: var(--text);
-    font-size: 15px;
-    font-family: var(--font-sans);
+    font-size: 13px;
+    font-family: var(--font-pixel);
     padding: 16px;
     resize: none;
     outline: none;
@@ -2101,16 +2114,17 @@ body {
   animation: fadeSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .no-project-title {
-  font-family: var(--font-mono);
+  font-family: var(--font-brand);
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 3px;
+  padding-left: 5px;
   color: var(--text);
   animation: breathe 3s ease-in-out infinite;
 }
 .no-project-sub {
   font-size: 16px;
-  font-family: var(--font-sans);
+  font-family: var(--font-pixel);
   color: var(--text2);
   text-align: center;
   line-height: 1.6;
@@ -2136,7 +2150,7 @@ body {
 }
 .no-project-examples span {
   font-size: 12px;
-  font-family: var(--font-sans);
+  font-family: var(--font-pixel);
   color: var(--text2);
   background: var(--surface2);
   border: 1px solid var(--border);
@@ -2167,7 +2181,7 @@ body {
 }
 .no-project-hint {
   font-size: 11px;
-  font-family: var(--font-sans);
+  font-family: var(--font-pixel);
   color: var(--text3);
   text-align: center;
   margin-top: 4px;
@@ -3245,7 +3259,7 @@ body {
   font-weight: 800;
   color: #0d0c1a;
   letter-spacing: 1.5px;
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-pixel);
   animation: chipGlow 2s ease-in-out infinite;
 }
 .pro-gate-blurred {
@@ -3268,7 +3282,7 @@ body {
   font-weight: 700;
   color: var(--accent);
   letter-spacing: 1px;
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-pixel);
   border: 1px solid rgba(139, 118, 255, 0.3);
   border-radius: 4px;
   padding: 1px 5px;
@@ -3448,10 +3462,30 @@ body {
 }
 
 .animated-logo-text {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 18px;
-  letter-spacing: 3px;
+  font-family: var(--font-brand);
+  font-weight: 900;
+  font-size: 20px;
+  letter-spacing: 4px;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.brand-logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.brand-logo-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  flex-shrink: 0;
+}
+.brand-logo-text {
+  font-family: var(--font-brand);
+  font-weight: 900;
+  font-size: 20px;
+  letter-spacing: 4px;
   color: var(--text);
   white-space: nowrap;
 }
@@ -4069,7 +4103,7 @@ body {
   transition:
     background 0.15s,
     box-shadow 0.15s;
-  font-family: var(--font-sans);
+  font-family: var(--font-pixel);
 }
 .auth-google-btn:hover {
   background: #f8f9fa;
@@ -4297,12 +4331,8 @@ body {
 }
 
 .splash-mark {
-  font-family: var(--font-display);
-  font-size: 72px;
-  font-weight: 800;
-  color: #c9a87c;
-  letter-spacing: -2px;
-  text-shadow: 0 0 40px rgba(201, 168, 124, 0.35);
+  width: 96px;
+  height: 96px;
   opacity: 0;
   transform: scale(0.85);
   transition:
@@ -4340,13 +4370,14 @@ body {
 }
 
 .splash-tagline {
-  font-family: var(--font-mono);
-  font-size: 22px;
-  letter-spacing: 0.18em;
+  font-family: var(--font-brand);
+  font-size: 37px;
+  font-weight: 900;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: rgba(201, 168, 124, 0.7);
-  margin-top: 16px;
-  margin-left: 3px;
+  margin-top: -5px;
+  margin-left: 16px;
   opacity: 0;
   transform: translateY(8px);
   transition:
@@ -4359,8 +4390,8 @@ body {
 }
 
 .splash-sub {
-  font-family: var(--font-sans, sans-serif);
-  font-size: 13px;
+  font-family: var(--font-pixel);
+  font-size: 16px;
   letter-spacing: 0.06em;
   color: rgba(237, 232, 208, 0.55);
   margin-top: 10px;
@@ -4368,6 +4399,7 @@ body {
   max-width: 280px;
   line-height: 1.5;
   opacity: 0;
+  text-align: center;
   transform: translateY(6px);
   transition:
     opacity 0.7s ease,
@@ -4376,6 +4408,20 @@ body {
 .splash-sub.visible {
   opacity: 0.8;
   transform: translateY(0);
+}
+
+.splash-tap-hint {
+  position: absolute;
+  bottom: calc(var(--safe-bottom) + 32px);
+  font-family: var(--font-pixel);
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  color: rgba(237, 232, 208, 0.3);
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+.splash-tap-hint.visible {
+  opacity: 1;
 }
 
 .splash-grain {
@@ -5011,11 +5057,13 @@ body {
 }
 .landing-headline {
   font-family: var(--font-display);
-  font-size: clamp(52px, 10vw, 96px);
+  font-size: clamp(36px, 10vw, 96px);
   font-weight: 800;
   line-height: 1.03;
   letter-spacing: -0.03em;
   margin-bottom: 28px;
+  padding-left: 10px;
+  text-align: center;
   background: linear-gradient(140deg, #ede8d0 20%, #c9a87c 60%, #e8d5b0 90%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -5032,9 +5080,11 @@ body {
 }
 .landing-ctas {
   display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
   gap: 12px;
   flex-wrap: wrap;
-  justify-content: center;
   margin-bottom: 22px;
   position: relative;
 }
@@ -5085,11 +5135,14 @@ body {
   color: rgba(201, 168, 124, 0.75);
   text-decoration: none;
   border-bottom: 1px solid rgba(201, 168, 124, 0.3);
-  padding-bottom: 1px;
+  padding-bottom: 15px;
+  margin-top: 4px;
   transition:
     color 0.2s,
     border-color 0.2s;
   white-space: nowrap;
+  width: 100%;
+  justify-content: center;
 }
 .landing-cta-download:hover {
   color: #c9a87c;
@@ -6072,7 +6125,7 @@ body {
   background: rgba(0, 0, 0, 0.4);
   border: 1px dashed var(--accent);
   outline: none;
-  font-family: Inter, sans-serif;
+  font-family: var(--font-pixel);
   font-weight: 700;
   min-width: 80px;
   padding: 2px 4px;
@@ -6659,7 +6712,7 @@ body {
 }
 .clarify-question {
   font-size: 14px;
-  font-family: var(--font-sans);
+  font-family: var(--font-pixel);
   color: var(--text);
   line-height: 1.6;
   font-weight: 500;
@@ -6674,7 +6727,7 @@ body {
   background: var(--accent-subtle);
   border: 1px solid var(--border);
   color: var(--text2);
-  font-family: var(--font-sans);
+  font-family: var(--font-pixel);
   font-size: 13px;
   cursor: pointer;
   border-radius: var(--r-full);
@@ -7148,31 +7201,46 @@ html.has-wallpaper .editor-panel {
 .launch-splash__content {
   position: relative;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.launch-splash__icon {
+  width: 96px;
+  height: 96px;
+  margin-bottom: 4px;
 }
 
 .launch-splash__title {
-  font-size: var(--fs-hero);
-  color: var(--accent);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-family: var(--font-brand);
+  font-size: 37px;
+  color: rgba(201, 168, 124, 0.7);
+  font-weight: 900;
+  letter-spacing: 0.22em;
   line-height: 1;
-  margin: 0 0 var(--sp-2);
+  margin: 0;
+  padding-left: 0.22em;
 }
 
 .launch-splash__tagline {
+  font-family: var(--font-pixel);
   font-size: var(--fs-sm);
   color: var(--text2);
+  font-size: 17px;
   margin: 0;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.08em;
 }
 
 .launch-splash__hint {
   position: absolute;
   bottom: calc(var(--safe-bottom) + var(--sp-6));
-  font-size: var(--fs-xs);
-  color: var(--text2);
+  font-family: var(--font-pixel);
+  font-size: 17px;
+  color: var(--text3);
   margin: 0;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
 }
 .theme-font-select:focus {
   outline: none;
@@ -7262,7 +7330,7 @@ html.has-wallpaper .editor-panel {
   position: relative;
   z-index: 1;
   line-height: 1;
-  font-family: 'Syne', sans-serif;
+  font-family: var(--font-brand);
 }
 .companion-trigger-ring {
   position: absolute;
@@ -7386,22 +7454,22 @@ html.has-wallpaper .editor-panel {
   flex-shrink: 0;
 }
 .companion-logo {
-  color: #7c3aed;
-  font-size: 16px;
-  line-height: 1;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
 }
 .companion-title {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.12em;
   color: #e8e8f0;
-  font-family: 'Syne', sans-serif;
+  font-family: var(--font-brand);
 }
 .companion-session {
   font-size: 10px;
   color: rgba(124, 58, 237, 0.6);
   margin-left: 2px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
 }
 .companion-clear {
   margin-left: auto;
@@ -7678,7 +7746,7 @@ html.has-wallpaper .editor-panel {
     border-color 0.15s,
     color 0.15s,
     background 0.15s;
-  font-family: var(--font-sans);
+  font-family: var(--font-pixel);
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -8622,7 +8690,7 @@ body:has(.beta-banner) .app-root {
   gap: 8px;
 }
 .apikey-code {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-primary);
   word-break: break-all;
@@ -8734,7 +8802,7 @@ body:has(.beta-banner) .app-root {
   margin: 0;
 }
 .apikey-hint-text code {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   background: rgba(255, 255, 255, 0.07);
   padding: 1px 4px;
   border-radius: 3px;
@@ -8777,7 +8845,7 @@ body:has(.beta-banner) .app-root {
   text-decoration-color: var(--accent);
 }
 .pantheon-onboarding-code {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   background: rgba(255, 255, 255, 0.07);
   padding: 1px 4px;
   border-radius: 3px;
@@ -11739,7 +11807,7 @@ body:has(.beta-banner) .app-root {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 12px 16px;
-  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   overflow-x: auto;
   margin: 0.6em 0;
@@ -11751,7 +11819,7 @@ body:has(.beta-banner) .app-root {
   background: var(--bg3);
   border-radius: 3px;
   padding: 1px 5px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 0.88em;
   color: #7dd3fc;
 }
@@ -12366,7 +12434,7 @@ body:has(.beta-banner) .app-root {
   position: relative;
   z-index: 1;
   line-height: 1;
-  font-family: 'Syne', sans-serif;
+  font-family: var(--font-brand);
   pointer-events: none;
 }
 

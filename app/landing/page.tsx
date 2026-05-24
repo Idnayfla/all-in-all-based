@@ -18,7 +18,7 @@ const nunito = Nunito({
   variable: '--font-ui',
 });
 
-const LINES = ['I AM YOUR', 'OVER — ATTACHED', 'COMPANION'];
+const LINES = ['I AM YOUR', 'PERSONAL', 'ASSISTANT AI'];
 
 const CARDS = [
   {

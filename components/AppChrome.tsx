@@ -5,7 +5,6 @@ import { Analytics } from '@vercel/analytics/react';
 import Script from 'next/script';
 import ErrorBoundary from './ErrorBoundary';
 import BetaBanner from './BetaBanner';
-import LaunchSplash from './LaunchSplash';
 import InstallPrompt from './InstallPrompt';
 import ServiceWorkerInit from './ServiceWorkerInit';
 import PostHogProvider from './PostHogProvider';
@@ -21,7 +20,6 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
   return (
     <>
       <BetaBanner />
-      <LaunchSplash />
       <InstallPrompt />
       <ServiceWorkerInit />
       <PostHogProvider>

@@ -8,7 +8,6 @@ import EditorPanel from '@/components/EditorPanel';
 import PreviewPanel from '@/components/PreviewPanel';
 import SidebarTrigger from '@/components/SidebarTrigger';
 import DebugPanel from '@/components/DebugPanel';
-import LogoDisplay from '@/components/LogoDisplay';
 import ProjectNameModal from '@/components/ProjectNameModal';
 import AuthModal from '@/components/AuthModal';
 import SplashScreen from '@/components/SplashScreen';
@@ -24,7 +23,6 @@ import ThemeCustomizer, {
 } from '@/components/ThemeCustomizer';
 import { supabase } from '@/lib/supabase';
 import type { User } from '@supabase/supabase-js';
-import { LOGO_DEFAULTS } from '@/hooks/useLogoConfig';
 import { useSwipePanels } from '@/hooks/useSwipePanels';
 import PricingModal from '@/components/PricingModal';
 import LandingPage from '@/components/LandingPage';
@@ -1028,7 +1026,16 @@ export default function Home() {
           onClick={() => currentProject && setCurrentProject(null)}
           title={currentProject ? 'Back to home' : undefined}
         >
-          <LogoDisplay config={LOGO_DEFAULTS} />
+          <span className="brand-logo-wrap">
+            <img
+              src="/brand-icon-loop.svg"
+              className="brand-logo-icon"
+              alt="Based"
+              width={36}
+              height={36}
+            />
+            <span className="brand-logo-text">BASED</span>
+          </span>
           {currentProject && <span className="project-name-display">{currentProject.name}</span>}
           {subscription.tier === 'pro' && <span className="pro-chip">PRO ⬡</span>}
         </div>
@@ -1911,9 +1918,13 @@ export default function Home() {
               </div>
             ) : !currentProject ? (
               <div className="no-project">
-                <div className="chat-empty-logo" aria-hidden="true">
-                  B&gt;
-                </div>
+                <img
+                  src="/brand-icon-loop.svg"
+                  className="chat-empty-logo"
+                  alt="Based"
+                  width={80}
+                  height={80}
+                />
                 <div className="no-project-title">BASED</div>
                 <div className="no-project-sub">You describe it. Based builds it.</div>
                 <div className="no-project-features">

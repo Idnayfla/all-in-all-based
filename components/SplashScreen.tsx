@@ -24,23 +24,21 @@ interface Props {
 export default function SplashScreen({ onDone }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const masterGainRef = useRef<GainNode | null>(null);
   const exitedRef = useRef(false);
   const [logoIn, setLogoIn] = useState(false);
   const [taglineIn, setTaglineIn] = useState(false);
   const [subIn, setSubIn] = useState(false);
+  const [tapHintIn, setTapHintIn] = useState(false);
   const [ringPulse, setRingPulse] = useState(false);
   const [exiting, setExiting] = useState(false);
-  const [showMute, setShowMute] = useState(false);
 
   const exit = useCallback(() => {
     if (exitedRef.current) return;
     exitedRef.current = true;
-    const ctx = audioCtxRef.current;
-    const gain = masterGainRef.current;
-    if (ctx && gain) {
-      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.3);
-    }
+    // Start audio on tap — guaranteed user interaction unlocks AudioContext
+    const audioCtx = new AudioContext();
+    audioCtxRef.current = audioCtx;
+    audioCtx.resume().then(() => startAudio(audioCtx));
     setExiting(true);
     setTimeout(onDone, 500);
   }, [onDone]);
@@ -91,7 +89,7 @@ export default function SplashScreen({ onDone }: Props) {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  /* ── Reveal timers ── */
+  /* ── Reveal timers — no auto-exit, wait for tap ── */
   useEffect(() => {
     const t1 = setTimeout(() => {
       setLogoIn(true);
@@ -99,73 +97,14 @@ export default function SplashScreen({ onDone }: Props) {
     }, 1200);
     const t2 = setTimeout(() => setTaglineIn(true), 1800);
     const t3 = setTimeout(() => setSubIn(true), 2200);
-    const t4 = setTimeout(exit, 3800);
+    const t4 = setTimeout(() => setTapHintIn(true), 2800);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
       clearTimeout(t4);
     };
-  }, [exit]);
-
-  /* ── Audio ── */
-  useEffect(() => {
-    const audioCtx = new AudioContext();
-    audioCtxRef.current = audioCtx;
-
-    let started = false;
-
-    const tryStart = () => {
-      if (started) return;
-      audioCtx
-        .resume()
-        .then(() => {
-          if (audioCtx.state === 'running' && !started) {
-            started = true;
-            masterGainRef.current = startAudio(audioCtx);
-            setShowMute(false);
-          }
-        })
-        .catch(() => {
-          // autoplay blocked — show fallback button
-          queueMicrotask(() => setShowMute(true));
-        });
-    };
-
-    // Attempt autoplay immediately
-    if (audioCtx.state === 'running') {
-      started = true;
-      masterGainRef.current = startAudio(audioCtx);
-    } else {
-      // Show button as fallback immediately, then try to autoplay
-      queueMicrotask(() => setShowMute(true));
-      tryStart();
-    }
-
-    // Any user interaction anywhere on the document unlocks audio
-    const handleInteraction = () => {
-      if (!started) tryStart();
-    };
-    document.addEventListener('click', handleInteraction, { capture: true });
-    document.addEventListener('keydown', handleInteraction, { capture: true });
-    document.addEventListener('touchstart', handleInteraction, { capture: true });
-
-    return () => {
-      document.removeEventListener('click', handleInteraction, { capture: true });
-      document.removeEventListener('keydown', handleInteraction, { capture: true });
-      document.removeEventListener('touchstart', handleInteraction, { capture: true });
-      audioCtxRef.current?.close();
-    };
   }, []);
-
-  const unmute = () => {
-    audioCtxRef.current?.resume().then(() => {
-      if (audioCtxRef.current) {
-        masterGainRef.current = startAudio(audioCtxRef.current);
-      }
-      setShowMute(false);
-    });
-  };
 
   return (
     <div className={`splash-root${exiting ? ' exiting' : ''}`} onClick={exit}>
@@ -173,26 +112,19 @@ export default function SplashScreen({ onDone }: Props) {
       <div className="splash-center">
         <div className="splash-ring-wrap" style={{ position: 'relative' }}>
           <div className={`splash-ring${ringPulse ? ' pulse' : ''}`} />
-          <div className={`splash-mark${logoIn ? ' visible' : ''}`}>⬡</div>
+          <img
+            src="/brand-icon-animated.svg"
+            className={`splash-mark${logoIn ? ' visible' : ''}`}
+            alt="Based"
+            width={96}
+            height={96}
+          />
         </div>
         <div className={`splash-tagline${taglineIn ? ' visible' : ''}`}>based</div>
-        <div className={`splash-sub${subIn ? ' visible' : ''}`}>
-          Your Overly Attached Companion AI
-        </div>
+        <div className={`splash-sub${subIn ? ' visible' : ''}`}>Your Personal Assistant AI</div>
       </div>
       <div className="splash-grain" />
-      {showMute && (
-        <button
-          className="splash-mute"
-          onClick={e => {
-            e.stopPropagation();
-            unmute();
-          }}
-          title="Unmute"
-        >
-          &#9658;
-        </button>
-      )}
+      <div className={`splash-tap-hint${tapHintIn ? ' visible' : ''}`}>tap anywhere to enter</div>
     </div>
   );
 }
@@ -203,7 +135,7 @@ function startAudio(ctx: AudioContext): GainNode {
   master.gain.setValueAtTime(1, now);
   master.connect(ctx.destination);
 
-  /* sub-bass drone: 40 Hz, fades in then out before impact */
+  /* sub-bass drone */
   const bass = ctx.createOscillator();
   const bassGain = ctx.createGain();
   bass.frequency.setValueAtTime(40, now);
@@ -216,7 +148,7 @@ function startAudio(ctx: AudioContext): GainNode {
   bass.start(now);
   bass.stop(now + 1.5);
 
-  /* rising frequency sweep: 80→200 Hz at t=0.8s */
+  /* rising frequency sweep */
   const sweep = ctx.createOscillator();
   const sweepGain = ctx.createGain();
   sweep.frequency.setValueAtTime(80, now + 0.8);
@@ -228,7 +160,7 @@ function startAudio(ctx: AudioContext): GainNode {
   sweep.start(now + 0.8);
   sweep.stop(now + 1.3);
 
-  /* impact thud at t=1.2s: two detuned sines */
+  /* impact thud */
   for (const freq of [80, 84]) {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -241,7 +173,7 @@ function startAudio(ctx: AudioContext): GainNode {
     osc.stop(now + 1.6);
   }
 
-  /* crystalline chord at t=1.2s: Bb4=466 Hz, D5=587 Hz, F#5=740 Hz */
+  /* crystalline chord */
   for (const freq of [466, 587, 740]) {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -255,7 +187,7 @@ function startAudio(ctx: AudioContext): GainNode {
     osc.stop(now + 2.2);
   }
 
-  /* white-noise shimmer at t=1.4s */
+  /* white-noise shimmer */
   const bufLen = Math.ceil(ctx.sampleRate * 0.06);
   const buffer = ctx.createBuffer(1, bufLen, ctx.sampleRate);
   const data = buffer.getChannelData(0);

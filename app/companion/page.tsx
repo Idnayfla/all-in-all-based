@@ -4,7 +4,6 @@ import { useRef, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { captureScreen, isScreenCaptureSupported } from '@/hooks/useScreenCapture';
 
-
 /**
  * Compresses a screenshot data URL to JPEG at reduced resolution so that
  * the base64 payload stays well under the 20 MB server body limit.
@@ -357,7 +356,13 @@ export default function CompanionOverlayPage() {
   return (
     <div className={`companion-overlay-root${isClosing ? ' companion-overlay--closing' : ''}`}>
       <div className="companion-overlay-header">
-        <span className="companion-logo">⬡</span>
+        <img
+          src="/brand-icon-loop.svg"
+          className="companion-logo"
+          alt="Based"
+          width={24}
+          height={24}
+        />
         <span className="companion-title">BASED</span>
         <span className="companion-session">#{sessionId.current}</span>
         <button

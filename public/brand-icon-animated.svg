@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="bound"><rect width="120" height="120"/></clipPath>
+  </defs>
+
+  <!-- Outer ring pulse -->
+  <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(201,168,124,0.06)" stroke-width="1">
+    <animate attributeName="r" values="54;56;54" dur="2.8s" repeatCount="indefinite"
+      calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
+    <animate attributeName="opacity"
+      values="0;0;0.4;0.8;0.8;0.4;0" dur="2.8s" repeatCount="indefinite"
+      keyTimes="0;0.05;0.25;0.4;0.75;0.9;1"/>
+  </circle>
+
+  <!-- Hex fill bloom -->
+  <polygon points="60,22 91,39.5 91,74.5 60,92 29,74.5 29,39.5"
+    fill="rgba(201,168,124,0.07)" opacity="0">
+    <animate attributeName="opacity"
+      values="0;0;0;0.6;1;1;0.6;0" dur="2.8s" repeatCount="indefinite"
+      keyTimes="0;0.1;0.35;0.45;0.5;0.78;0.9;1"/>
+  </polygon>
+
+  <!-- Hex outline — draws itself, full perimeter = 260 -->
+  <polygon points="60,14 97,35 97,79 60,100 23,79 23,35"
+    fill="none" stroke="#c9a87c" stroke-width="2.5" filter="url(#glow)"
+    stroke-dasharray="260" stroke-dashoffset="260" stroke-linejoin="round">
+    <animate attributeName="stroke-dashoffset"
+      values="260;0;0;260"
+      dur="2.8s" repeatCount="indefinite"
+      keyTimes="0;0.38;0.85;1"
+      calcMode="spline"
+      keySplines="0.25 0.46 0.45 0.94;0 0 1 1;0.55 0 1 0.45"/>
+    <animate attributeName="opacity"
+      values="0;0.4;1;1;1;0" dur="2.8s" repeatCount="indefinite"
+      keyTimes="0;0.05;0.25;0.38;0.85;1"/>
+  </polygon>
+
+  <!-- Scan line sweeps through the hex -->
+  <line x1="20" y1="14" x2="100" y2="14"
+    stroke="rgba(201,168,124,0.22)" stroke-width="1" opacity="0"
+    clip-path="url(#bound)">
+    <animate attributeName="y1" values="14;100" dur="2.8s" repeatCount="indefinite"/>
+    <animate attributeName="y2" values="14;100" dur="2.8s" repeatCount="indefinite"/>
+    <animate attributeName="opacity"
+      values="0;0;0.4;0.3;0;0" dur="2.8s" repeatCount="indefinite"
+      keyTimes="0;0.3;0.4;0.6;0.7;1"/>
+  </line>
+
+  <!-- Corner dot blinks on as outline completes -->
+  <circle cx="97" cy="35" r="3" fill="#c9a87c" filter="url(#glow)" opacity="0">
+    <animate attributeName="opacity"
+      values="0;0;0;1;0.6;1;0.6;0" dur="2.8s" repeatCount="indefinite"
+      keyTimes="0;0.3;0.36;0.4;0.5;0.6;0.85;1"/>
+  </circle>
+
+  <!-- B> centered in hex (center=60,57 → baseline at y=65) -->
+  <text x="60" y="65" text-anchor="middle"
+    font-family="'Space Mono','Courier New',monospace" font-weight="700" font-size="20"
+    fill="#c9a87c" filter="url(#glow)" opacity="0" letter-spacing="1">
+    B&gt;
+    <animate attributeName="opacity"
+      values="0;0;0;0;1;0.6;1;0.8;1;0" dur="2.8s" repeatCount="indefinite"
+      keyTimes="0;0.3;0.38;0.42;0.46;0.5;0.54;0.58;0.85;1"/>
+  </text>
+
+  <!-- Cursor blink -->
+  <rect x="74" y="51" width="2" height="14"
+    fill="#c9a87c" opacity="0">
+    <animate attributeName="opacity"
+      values="0;0;0;0;1;0;1;0;1;0;1;0" dur="2.8s" repeatCount="indefinite"
+      keyTimes="0;0.42;0.46;0.5;0.55;0.6;0.65;0.7;0.75;0.8;0.85;1"/>
+  </rect>
+</svg>

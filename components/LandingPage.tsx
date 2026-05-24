@@ -174,7 +174,7 @@ export default function LandingPage({ onSignIn }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
         >
-          ◈ Overly Attached Companion AI
+          ◈ Personal Assistant AI
         </motion.div>
         <motion.h1
           className="landing-headline"
@@ -182,7 +182,7 @@ export default function LandingPage({ onSignIn }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.18, type: 'spring', stiffness: 180, damping: 24 }}
         >
-          Never leaves
+          <span style={{ whiteSpace: 'nowrap' }}>Never leaves</span>
           <br />
           your side.
         </motion.h1>
@@ -192,9 +192,9 @@ export default function LandingPage({ onSignIn }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.28 }}
         >
-          Not a tool. Not just a chatbot. Based is your overly attached companion AI — it builds
-          your apps, edits your video, composes your music, answers anything, and remembers
-          everything about you.
+          Not a tool. Not just a chatbot. Based is your personal assistant AI — it builds your apps,
+          edits your video, composes your music, answers anything, and remembers everything about
+          you.
         </motion.p>
         <motion.div
           className="landing-ctas"
@@ -222,7 +222,7 @@ export default function LandingPage({ onSignIn }: Props) {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.55 }}
         >
-          Free plan · 10 generations/month · No credit card required
+          Free to start · 10 generations/month · No credit card needed
         </motion.div>
       </section>
 
@@ -464,7 +464,7 @@ export default function LandingPage({ onSignIn }: Props) {
           <div className="landing-closer-badge">B&gt;</div>
           <h2 className="landing-closer-headline">Your companion is waiting.</h2>
           <p className="landing-closer-sub">
-            Free plan, no credit card. Based is ready when you are.
+            Free to start · 10 generations/month · No credit card needed.
           </p>
           <button className="landing-cta-primary" onClick={() => onSignIn('signup')}>
             Start free →
