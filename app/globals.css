@@ -7334,7 +7334,7 @@ html.has-wallpaper .editor-panel {
 .companion-trigger-ring {
   position: absolute;
   border-radius: 50%;
-  border: 1.5px solid rgba(201, 168, 124, 0.3);
+  border: 1px solid rgba(201, 168, 124, 0.18);
   pointer-events: none;
 }
 .companion-trigger-ring--1 {
@@ -7351,7 +7351,7 @@ html.has-wallpaper .editor-panel {
 .companion-trigger--responding .companion-trigger-ring--1 {
   display: block;
   animation: companion-pulse-ring 1s ease-in-out infinite;
-  border-color: rgba(201, 168, 124, 0.9);
+  border-color: rgba(201, 168, 124, 0.5);
 }
 .companion-trigger--responding .companion-trigger-ring--2 {
   display: none;
@@ -7360,12 +7360,10 @@ html.has-wallpaper .editor-panel {
 @keyframes companion-breathe {
   0%,
   100% {
-    transform: scale(1);
-    opacity: 0.5;
+    opacity: 0.25;
   }
   50% {
-    transform: scale(1.1);
-    opacity: 0.85;
+    opacity: 0.55;
   }
 }
 @media (max-width: 600px) {
@@ -7379,12 +7377,10 @@ html.has-wallpaper .editor-panel {
 @keyframes companion-pulse-ring {
   0%,
   100% {
-    transform: scale(1);
-    opacity: 0.4;
+    opacity: 0.3;
   }
   50% {
-    transform: scale(1.18);
-    opacity: 1;
+    opacity: 0.7;
   }
 }
 
@@ -7512,6 +7508,7 @@ html.has-wallpaper .editor-panel {
 }
 .companion-empty {
   font-size: 11px;
+  gap: 10px;
   color: #4a4a6a;
   text-align: center;
   padding: 24px 12px;

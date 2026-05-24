@@ -73,26 +73,8 @@ export default function GlobalCompanionBubble() {
           width={32}
           height={32}
         />
-        <motion.span
-          className="companion-trigger-ring companion-trigger-ring--1"
-          animate={{ opacity: [0.4, 0.8, 0.4] }}
-          transition={{
-            duration: isCompanionGenerating ? 0.8 : 3,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: 0,
-          }}
-        />
-        <motion.span
-          className="companion-trigger-ring companion-trigger-ring--2"
-          animate={{ opacity: [0.4, 0.8, 0.4] }}
-          transition={{
-            duration: isCompanionGenerating ? 0.8 : 3,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: 0.4,
-          }}
-        />
+        <span className="companion-trigger-ring companion-trigger-ring--1" />
+        <span className="companion-trigger-ring companion-trigger-ring--2" />
       </motion.button>
 
       <AnimatePresence>
