@@ -12316,13 +12316,13 @@ body:has(.beta-banner) .app-root {
 /* â”€â”€ Companion Overlay (Electron floating window) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .companion-overlay-root {
   position: fixed;
-  inset: 0;
+  inset: 10px;
   display: flex;
   flex-direction: column;
   background: var(--bg2);
   border-radius: var(--r-2xl);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow-lg), var(--shadow-accent);
+  filter: drop-shadow(0 8px 32px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 12px rgba(201, 168, 124, 0.06));
   overflow: hidden;
   z-index: 99999;
   transform-origin: bottom right;
