@@ -136,7 +136,6 @@ body {
 body {
   background:
     radial-gradient(ellipse 110% 55% at 50% -5%, rgba(139, 118, 255, 0.1) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 90% 100%, rgba(94, 245, 192, 0.05) 0%, transparent 55%),
     var(--bg);
 }
 
@@ -7288,6 +7287,7 @@ html.has-wallpaper .editor-panel {
   width: 52px;
   height: 52px;
   border-radius: 50%;
+  overflow: hidden;
   background: #08070e;
   border: 1.5px solid rgba(201, 168, 124, 0.35);
   cursor: pointer;
