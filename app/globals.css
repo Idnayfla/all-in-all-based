@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
 
 @font-face {
   font-family: 'BasedBrand';
@@ -33,7 +33,7 @@ a {
   touch-action: manipulation;
 }
 
-/* ── Global disabled state — applies to every button unless overridden by a more specific rule ── */
+/* â”€â”€ Global disabled state â€” applies to every button unless overridden by a more specific rule â”€â”€ */
 button:disabled {
   opacity: var(--disabled-opacity);
   cursor: not-allowed;
@@ -50,7 +50,7 @@ body {
 }
 
 :root {
-  /* ── Color primitives ── */
+  /* â”€â”€ Color primitives â”€â”€ */
   --bg: #08070e;
   --bg2: #0f0e1a;
   --bg3: #16141f;
@@ -64,22 +64,22 @@ body {
   --text2: rgba(237, 232, 208, 0.6);
   --text3: rgba(237, 232, 208, 0.32);
   --text-chat: #e4dfc8;
-  /* ── Semantic aliases (previously undefined — bug fix) ── */
+  /* â”€â”€ Semantic aliases (previously undefined â€” bug fix) â”€â”€ */
   --surface: var(--bg2);
   --muted: var(--text3);
-  /* ── Interaction tokens ── */
+  /* â”€â”€ Interaction tokens â”€â”€ */
   --accent-hover: #dfc090;
   --disabled-opacity: 0.4;
-  /* ── Accent opacity tokens ── */
+  /* â”€â”€ Accent opacity tokens â”€â”€ */
   --accent-muted: rgba(201, 168, 124, 0.12);
   --accent-subtle: rgba(201, 168, 124, 0.06);
   --accent-glow: rgba(201, 168, 124, 0.3);
   --accent3-muted: rgba(106, 247, 200, 0.12);
   --accent3-subtle: rgba(106, 247, 200, 0.06);
   --accent3-glow: rgba(106, 247, 200, 0.28);
-  /* ── Surface layers ── */
+  /* â”€â”€ Surface layers â”€â”€ */
   --surface2: rgba(255, 255, 255, 0.05);
-  /* ── Typography scale ── */
+  /* â”€â”€ Typography scale â”€â”€ */
   --fs-2xs: 9px;
   --fs-xs: 10px;
   --fs-sm: 11px;
@@ -90,7 +90,7 @@ body {
   --fs-2xl: 18px;
   --fs-3xl: 22px;
   --fs-hero: 72px;
-  /* ── Spacing scale ── */
+  /* â”€â”€ Spacing scale â”€â”€ */
   --sp-1: 4px;
   --sp-2: 8px;
   --sp-3: 12px;
@@ -98,26 +98,26 @@ body {
   --sp-5: 20px;
   --sp-6: 24px;
   --sp-8: 32px;
-  /* ── Border radius scale ── */
+  /* â”€â”€ Border radius scale â”€â”€ */
   --r-sm: 5px;
   --r-md: 8px;
   --r-lg: 12px;
   --r-xl: 16px;
   --r-2xl: 22px;
   --r-full: 9999px;
-  /* ── Shadow scale ── */
+  /* â”€â”€ Shadow scale â”€â”€ */
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 12px 40px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.6);
   --shadow-accent: 0 4px 20px var(--accent-glow);
   --shadow-accent3: 0 4px 16px var(--accent3-glow);
-  /* ── Typography ── */
+  /* â”€â”€ Typography â”€â”€ */
   --font-brand: 'BasedPixel', 'Space Mono', monospace;
   --font-pixel: 'BasedUI', 'Space Mono', monospace;
   --font-display: var(--font-brand);
   --font-mono: 'Space Mono', monospace;
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  /* ── Safe area insets (PWA / notch support) ── */
+  /* â”€â”€ Safe area insets (PWA / notch support) â”€â”€ */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
@@ -158,7 +158,7 @@ body {
   height: 100vh;
 }
 
-/* ── Pro indicators ── */
+/* â”€â”€ Pro indicators â”€â”€ */
 .pro-crown-strip {
   position: fixed;
   top: 0;
@@ -297,7 +297,7 @@ body {
   color: var(--accent3);
 }
 
-/* ── Debug Panel ── */
+/* â”€â”€ Debug Panel â”€â”€ */
 .debug-panel {
   height: 100%;
   display: flex;
@@ -1080,7 +1080,7 @@ body {
   cursor: not-allowed;
 }
 
-/* ── Audio Toggle ── */
+/* â”€â”€ Audio Toggle â”€â”€ */
 .audio-toggle-btn {
   flex-shrink: 0;
   height: 44px;
@@ -1109,7 +1109,7 @@ body {
   cursor: not-allowed;
 }
 
-/* ── Voice Activation Button ── */
+/* â”€â”€ Voice Activation Button â”€â”€ */
 .voice-btn {
   flex-shrink: 0;
   width: 44px;
@@ -1168,7 +1168,7 @@ body {
   animation: voice-pulse 2s ease-in-out infinite;
 }
 
-/* Mobile floating prompt overlay — only active on narrow viewports */
+/* Mobile floating prompt overlay â€” only active on narrow viewports */
 .mobile-input-overlay {
   display: none;
 }
@@ -1202,7 +1202,7 @@ body {
       0 0 40px var(--accent-glow);
   }
 
-  /* Header row — Based mark + label + close */
+  /* Header row â€” Based mark + label + close */
   .mobile-input-header {
     display: flex;
     align-items: center;
@@ -1330,7 +1330,7 @@ body {
   }
 }
 
-/* ── Mode Dropdown ── */
+/* â”€â”€ Mode Dropdown â”€â”€ */
 .mode-dropdown {
   position: relative;
   flex-shrink: 0;
@@ -1426,7 +1426,7 @@ body {
   font-size: 16px;
 }
 
-/* ── Persona Switcher ── */
+/* â”€â”€ Persona Switcher â”€â”€ */
 .persona-switcher {
   position: relative;
   flex-shrink: 0;
@@ -1600,7 +1600,7 @@ body {
   background: rgba(201, 168, 124, 0.15);
 }
 
-/* ── Generated Video Card ── */
+/* â”€â”€ Generated Video Card â”€â”€ */
 .generated-video-wrap {
   display: flex;
   flex-direction: column;
@@ -2486,7 +2486,7 @@ body {
   }
 }
 
-/* ── Two-row header on phones ──────────────────────────────── */
+/* â”€â”€ Two-row header on phones â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @media (max-width: 600px) {
   .app-header {
     flex-wrap: wrap;
@@ -2514,7 +2514,7 @@ body {
     gap: 4px;
   }
 
-  /* Row 2: tab switcher — only primary + More */
+  /* Row 2: tab switcher â€” only primary + More */
   .tab-switcher {
     order: 3;
     width: 100%;
@@ -2534,11 +2534,11 @@ body {
     letter-spacing: 0.4px;
     min-width: 0;
   }
-  /* Secondary & debug hidden on mobile — shown in More drawer */
+  /* Secondary & debug hidden on mobile â€” shown in More drawer */
   .tab-btn-secondary {
     display: none;
   }
-  /* More toggle — visible on mobile, same flex weight as primaries */
+  /* More toggle â€” visible on mobile, same flex weight as primaries */
   .tab-btn-more {
     display: flex;
     align-items: center;
@@ -2566,7 +2566,7 @@ body {
   }
 }
 
-/* ── More-tabs drawer (mobile only) ─────────────────────────── */
+/* â”€â”€ More-tabs drawer (mobile only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .more-tabs-backdrop {
   position: fixed;
   inset: 0;
@@ -2698,7 +2698,7 @@ body {
   margin-left: 1px;
 }
 
-/* ── Tips Guide ──────────────────────────────────────────────── */
+/* â”€â”€ Tips Guide â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .tips-guide {
   position: fixed;
   bottom: 80px;
@@ -2930,7 +2930,7 @@ body {
   transform: scale(0.97);
 }
 
-/* Sidebar item hover — consolidated into canonical blocks above */
+/* Sidebar item hover â€” consolidated into canonical blocks above */
 
 /* Panel fade transition */
 .panel {
@@ -3016,7 +3016,7 @@ body {
   padding-top: 8px;
 }
 
-/* Sidebar new btn — canonical definition in PROJECT MANAGEMENT block above */
+/* Sidebar new btn â€” canonical definition in PROJECT MANAGEMENT block above */
 
 /* Mobile overlay fade */
 [style*='rgba(0,0,0,0.5)'] {
@@ -3033,7 +3033,7 @@ body {
 
 /* ===== UI POLISH ===== */
 
-/* Sidebar spacing — canonical values live in PROJECT MANAGEMENT + sidebar blocks above */
+/* Sidebar spacing â€” canonical values live in PROJECT MANAGEMENT + sidebar blocks above */
 /* No overrides needed here */
 
 /* .project-item consolidated into canonical block in PROJECT MANAGEMENT section */
@@ -3234,7 +3234,7 @@ body {
   color: var(--text);
 }
 
-/* ── Pro gate ── */
+/* â”€â”€ Pro gate â”€â”€ */
 .pro-gate-overlay {
   position: absolute;
   inset: 0;
@@ -3517,7 +3517,7 @@ body {
   }
 }
 
-/* ── Animated Sidebar ── */
+/* â”€â”€ Animated Sidebar â”€â”€ */
 .sidebar-backdrop {
   position: fixed;
   inset: 0;
@@ -3606,7 +3606,7 @@ body {
   background: transparent;
 }
 
-/* ── Image Editor Modal ──────────────────────────── */
+/* â”€â”€ Image Editor Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .image-editor-overlay {
   position: fixed;
   inset: 0;
@@ -3898,7 +3898,7 @@ body {
   color: var(--accent);
 }
 
-/* ── Generating Card ── */
+/* â”€â”€ Generating Card â”€â”€ */
 .generating-card {
   position: relative;
   overflow: hidden;
@@ -3965,7 +3965,7 @@ body {
   margin-left: 1px;
 }
 
-/* ── Project Name Modal ── */
+/* â”€â”€ Project Name Modal â”€â”€ */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -4045,7 +4045,7 @@ body {
   background: var(--accent-hover);
 }
 
-/* ── Auth Modal ── */
+/* â”€â”€ Auth Modal â”€â”€ */
 .auth-overlay {
   position: fixed;
   inset: 0;
@@ -4085,7 +4085,7 @@ body {
   flex-direction: column;
   gap: 8px;
 }
-/* Google — prominent white button */
+/* Google â€” prominent white button */
 .auth-google-btn {
   display: flex;
   align-items: center;
@@ -4118,7 +4118,7 @@ body {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
-/* GitHub — secondary small button */
+/* GitHub â€” secondary small button */
 .auth-oauth-btn {
   display: flex;
   align-items: center;
@@ -4250,7 +4250,7 @@ body {
   color: var(--accent);
 }
 
-/* ── User Avatar ── */
+/* â”€â”€ User Avatar â”€â”€ */
 .user-avatar-btn {
   width: 32px;
   height: 32px;
@@ -4292,7 +4292,7 @@ body {
   background: rgba(255, 107, 107, 0.15);
 }
 
-/* ─── Splash Screen ──────────────────────────────────────────── */
+/* â”€â”€â”€ Splash Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .splash-root {
   position: fixed;
   inset: 0;
@@ -4463,7 +4463,7 @@ body {
   }
 }
 
-/* ─── Personality Panel ──────────────────────────────────────── */
+/* â”€â”€â”€ Personality Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .personality-locked {
   background: var(--accent-subtle);
   border: 1px solid rgba(201, 168, 124, 0.2);
@@ -4526,7 +4526,7 @@ body {
   cursor: grabbing;
 }
 
-/* ── Memory Manager ── */
+/* â”€â”€ Memory Manager â”€â”€ */
 .memory-manager {
   display: flex;
   flex-direction: column;
@@ -4711,7 +4711,7 @@ body {
   cursor: not-allowed;
 }
 
-/* ── Memory Window (centered floating) ── */
+/* â”€â”€ Memory Window (centered floating) â”€â”€ */
 .memwin-backdrop {
   position: fixed;
   inset: 0;
@@ -4846,7 +4846,7 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
-/* ── Install Prompt ── */
+/* â”€â”€ Install Prompt â”€â”€ */
 .install-prompt {
   position: fixed;
   bottom: calc(var(--safe-bottom) + 64px);
@@ -4967,7 +4967,7 @@ body {
   }
 }
 
-/* ── Landing Page ─────────────────────────────────────────────────────────── */
+/* â”€â”€ Landing Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .landing-root {
   min-height: 100vh;
   height: 100vh;
@@ -5015,7 +5015,7 @@ body {
   color: var(--accent);
 }
 
-/* ── Hero ── */
+/* â”€â”€ Hero â”€â”€ */
 .landing-hero {
   display: flex;
   flex-direction: column;
@@ -5154,7 +5154,7 @@ body {
   position: relative;
 }
 
-/* ── Capability marquee ── */
+/* â”€â”€ Capability marquee â”€â”€ */
 .landing-marquee {
   overflow: hidden;
   border-top: 1px solid var(--border-subtle);
@@ -5193,7 +5193,7 @@ body {
   }
 }
 
-/* ── Bento companion story ── */
+/* â”€â”€ Bento companion story â”€â”€ */
 .landing-bento-section {
   max-width: 1000px;
   margin: 0 auto 72px;
@@ -5624,7 +5624,7 @@ body {
   position: relative;
 }
 .landing-tier-features li::before {
-  content: '✓';
+  content: 'âœ“';
   position: absolute;
   left: 0;
   color: var(--accent3);
@@ -5654,7 +5654,7 @@ body {
   border-color: var(--accent-hover);
 }
 
-/* ── Closing CTA ── */
+/* â”€â”€ Closing CTA â”€â”€ */
 .landing-closer {
   padding: 96px 24px;
   text-align: center;
@@ -5772,7 +5772,7 @@ body {
   }
 }
 
-/* ── Landing page entrance animations ── */
+/* â”€â”€ Landing page entrance animations â”€â”€ */
 /* Hero entrance handled by framer-motion; only scroll-triggered cards use CSS animations */
 .landing-cta-primary {
   animation: glowPulse 3s 1.2s ease-in-out infinite;
@@ -5860,7 +5860,7 @@ body {
   transform: translateY(-1px);
 }
 
-/* ── Proactive check-in card ── */
+/* â”€â”€ Proactive check-in card â”€â”€ */
 .checkin-card {
   width: 100%;
   max-width: 400px;
@@ -5964,7 +5964,7 @@ body {
   }
 }
 
-/* ── Image Studio ── */
+/* â”€â”€ Image Studio â”€â”€ */
 .image-studio {
   display: flex;
   flex-direction: column;
@@ -6409,7 +6409,7 @@ body {
   padding: 6px 8px;
 }
 
-/* ── Suggestion chips ── */
+/* â”€â”€ Suggestion chips â”€â”€ */
 .suggestion-btn {
   animation: staggerFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -6435,7 +6435,7 @@ body {
   transform: scale(0.96);
 }
 
-/* ── Sidebar list item hover lift ── */
+/* â”€â”€ Sidebar list item hover lift â”€â”€ */
 .project-item {
   transition:
     background 0.18s ease,
@@ -6462,7 +6462,7 @@ body {
   transform: translateX(2px);
 }
 
-/* ── Preview empty state ── */
+/* â”€â”€ Preview empty state â”€â”€ */
 .preview-empty-icon {
   animation: float 4s ease-in-out infinite;
 }
@@ -6470,7 +6470,7 @@ body {
   animation: fadeSlideUp 0.5s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* ── Settings panel sections ── */
+/* â”€â”€ Settings panel sections â”€â”€ */
 .settings-section {
   animation: fadeSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -6500,7 +6500,7 @@ body {
   transform: scaleY(1.005);
 }
 
-/* ── Upload / audio / mode buttons ── */
+/* â”€â”€ Upload / audio / mode buttons â”€â”€ */
 .upload-btn {
   transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -6528,7 +6528,7 @@ body {
   transform: translateY(-1px);
 }
 
-/* ── Chat empty title ── */
+/* â”€â”€ Chat empty title â”€â”€ */
 .chat-empty-title {
   animation: fadeSlideUp 0.5s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -6536,7 +6536,7 @@ body {
   animation: fadeSlideUp 0.5s 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* ── Response flag ── */
+/* â”€â”€ Response flag â”€â”€ */
 .msg-flag-area {
   margin-top: 6px;
 }
@@ -6643,7 +6643,7 @@ body {
   cursor: default;
 }
 
-/* ── Error block ── */
+/* â”€â”€ Error block â”€â”€ */
 .chat-error-block {
   display: flex;
   align-items: flex-start;
@@ -6703,7 +6703,7 @@ body {
   filter: none;
 }
 
-/* ── Clarification card (Akinator-style intent chips) ── */
+/* â”€â”€ Clarification card (Akinator-style intent chips) â”€â”€ */
 .clarify-card {
   display: flex;
   flex-direction: column;
@@ -6744,7 +6744,7 @@ body {
   transform: scale(0.96);
 }
 
-/* ── Wallpaper mode — semi-transparent panels so the photo shows through ── */
+/* â”€â”€ Wallpaper mode â€” semi-transparent panels so the photo shows through â”€â”€ */
 .wallpaper-bg-layer {
   position: fixed;
   inset: -60px;
@@ -6778,7 +6778,7 @@ html.has-wallpaper .editor-panel {
   -webkit-backdrop-filter: blur(18px) saturate(1.2);
 }
 
-/* ── Wallpaper settings UI ── */
+/* â”€â”€ Wallpaper settings UI â”€â”€ */
 .wallpaper-section {
   display: flex;
   flex-direction: column;
@@ -6881,7 +6881,7 @@ html.has-wallpaper .editor-panel {
   color: var(--danger);
 }
 
-/* ── Wallpaper Cropper modal ── */
+/* â”€â”€ Wallpaper Cropper modal â”€â”€ */
 .cropper-overlay {
   position: fixed;
   inset: 0;
@@ -6985,7 +6985,7 @@ html.has-wallpaper .editor-panel {
   text-align: center;
 }
 
-/* ── Light mode ── */
+/* â”€â”€ Light mode â”€â”€ */
 [data-theme='light'] {
   --bg: #f0f0f5;
   --bg2: #ffffff;
@@ -7000,7 +7000,7 @@ html.has-wallpaper .editor-panel {
   --muted: #9090b0;
 }
 
-/* ── OLED mode ── */
+/* â”€â”€ OLED mode â”€â”€ */
 [data-theme='oled'] {
   --bg: #000000;
   --bg2: #080808;
@@ -7015,7 +7015,7 @@ html.has-wallpaper .editor-panel {
   --muted: #4a4a6a;
 }
 
-/* ── Theme Customizer ── */
+/* â”€â”€ Theme Customizer â”€â”€ */
 .theme-customizer {
   display: flex;
   flex-direction: column;
@@ -7163,7 +7163,7 @@ html.has-wallpaper .editor-panel {
   line-height: 1.2;
 }
 
-/* ── Launch Splash ── */
+/* â”€â”€ Launch Splash â”€â”€ */
 .launch-splash {
   position: fixed;
   inset: 0;
@@ -7247,7 +7247,7 @@ html.has-wallpaper .editor-panel {
   border-color: var(--accent);
 }
 
-/* ── SW Update Toast ── */
+/* â”€â”€ SW Update Toast â”€â”€ */
 .sw-update-toast {
   position: fixed;
   bottom: calc(var(--safe-bottom) + var(--sp-4));
@@ -7280,7 +7280,7 @@ html.has-wallpaper .editor-panel {
   background: var(--accent-hover);
 }
 
-/* ── Companion Trigger ───────────────────────────────────────────── */
+/* â”€â”€ Companion Trigger â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .companion-trigger {
   position: fixed;
   bottom: 24px;
@@ -7388,7 +7388,7 @@ html.has-wallpaper .editor-panel {
   }
 }
 
-/* ── Companion Drawer ────────────────────────────────────────────── */
+/* â”€â”€ Companion Drawer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .companion-drawer {
   position: fixed;
   top: 0;
@@ -7526,8 +7526,8 @@ html.has-wallpaper .editor-panel {
   word-break: break-word;
 }
 .companion-bubble--user {
-  background: rgba(124, 58, 237, 0.18);
-  color: #c8c8e0;
+  background: rgba(201, 168, 124, 0.15);
+  color: #ede8d0;
   align-self: flex-end;
   border-bottom-right-radius: 3px;
 }
@@ -7726,7 +7726,7 @@ html.has-wallpaper .editor-panel {
   cursor: default;
 }
 
-/* ── Suggestion chips ─────────────────────────────────────────────── */
+/* â”€â”€ Suggestion chips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .suggestion-chips {
   display: flex;
   flex-wrap: wrap;
@@ -7757,7 +7757,7 @@ html.has-wallpaper .editor-panel {
   background: rgba(201, 168, 124, 0.08);
 }
 
-/* ── Pricing Modal ───────────────────────────────────────────────── */
+/* â”€â”€ Pricing Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .pricing-overlay {
   position: fixed;
   inset: 0;
@@ -7979,7 +7979,7 @@ html.has-wallpaper .editor-panel {
   margin: var(--sp-2) 0 0;
 }
 
-/* ── Plan section in settings ────────────────────────────────────── */
+/* â”€â”€ Plan section in settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .plan-badge-row {
   display: flex;
   align-items: center;
@@ -8047,7 +8047,7 @@ html.has-wallpaper .editor-panel {
   touch-action: manipulation;
 }
 
-/* ── Beta banner ───────────────────────────────────────────────────────────── */
+/* â”€â”€ Beta banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .beta-banner {
   position: fixed;
   top: 0;
@@ -8074,7 +8074,7 @@ body:has(.beta-banner) .app-root {
   text-decoration: underline;
 }
 
-/* ── Feedback ──────────────────────────────────────────────────────────────── */
+/* â”€â”€ Feedback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .feedback-header-btn {
   background: transparent;
   border: 1px solid var(--border);
@@ -8309,7 +8309,7 @@ body:has(.beta-banner) .app-root {
   font-family: var(--font-mono);
 }
 
-/* ── Roadmap page ────────────────────────────────────────────────────────── */
+/* â”€â”€ Roadmap page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .rm-root {
   height: 100vh;
@@ -8653,7 +8653,7 @@ body:has(.beta-banner) .app-root {
   color: var(--text2);
 }
 
-/* ── Referral panel ──────────────────────────────────────────────────────── */
+/* â”€â”€ Referral panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .referral-loading {
   font-size: var(--fs-xs);
@@ -8661,7 +8661,7 @@ body:has(.beta-banner) .app-root {
   font-family: var(--font-mono);
 }
 
-/* ── API Keys ─────────────────────────────────────────── */
+/* â”€â”€ API Keys â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .apikey-section {
   display: flex;
   flex-direction: column;
@@ -9440,7 +9440,7 @@ body:has(.beta-banner) .app-root {
   color: var(--text1);
 }
 
-/* __ Gallery page — bigger cards ____________________________________________ */
+/* __ Gallery page â€” bigger cards ____________________________________________ */
 
 .gal-grid {
   grid-template-columns: repeat(auto-fill, minmax(480px, 1fr)) !important;
@@ -9469,7 +9469,7 @@ body:has(.beta-banner) .app-root {
   font-size: 13px !important;
 }
 
-/* __ Landing page — header nav ______________________________________________ */
+/* __ Landing page â€” header nav ______________________________________________ */
 
 .landing-header-nav {
   display: flex;
@@ -9488,7 +9488,7 @@ body:has(.beta-banner) .app-root {
   color: var(--text1);
 }
 
-/* __ Landing page — gallery section _________________________________________ */
+/* __ Landing page â€” gallery section _________________________________________ */
 
 .landing-gallery {
   max-width: 1200px;
@@ -9652,7 +9652,7 @@ body:has(.beta-banner) .app-root {
   opacity: 0.75;
 }
 
-/* ── Crop Modal ── */
+/* â”€â”€ Crop Modal â”€â”€ */
 .crop-overlay {
   position: fixed;
   inset: 0;
@@ -9920,7 +9920,7 @@ body:has(.beta-banner) .app-root {
   }
 }
 
-/* ── Video Editor Panel ─────────────────────────────────────────────────── */
+/* â”€â”€ Video Editor Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .ve-panel {
   display: flex;
   flex-direction: column;
@@ -10490,7 +10490,7 @@ body:has(.beta-banner) .app-root {
   border-radius: 50%;
 }
 
-/* Trim bracket — top + bottom border highlighting the active trim region */
+/* Trim bracket â€” top + bottom border highlighting the active trim region */
 .ve-trim-bracket {
   position: absolute;
   top: 0;
@@ -10590,7 +10590,7 @@ body:has(.beta-banner) .app-root {
   }
 }
 
-/* ── Music Studio Panel ─────────────────────────────────────────────────── */
+/* â”€â”€ Music Studio Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .studio-panel {
   display: flex;
   flex-direction: column;
@@ -11121,7 +11121,7 @@ body:has(.beta-banner) .app-root {
   background: color-mix(in srgb, var(--accent) 60%, #f0ece0);
 }
 
-/* Black key absolute positioning — one per possible sharp, offset based on white key index */
+/* Black key absolute positioning â€” one per possible sharp, offset based on white key index */
 .piano-black {
   position: absolute;
   top: 0;
@@ -11390,7 +11390,7 @@ body:has(.beta-banner) .app-root {
   }
 }
 
-/* ── Notes Panel ─────────────────────────────────────────────────────────── */
+/* â”€â”€ Notes Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .notes-root {
   display: flex;
   height: 100%;
@@ -11938,7 +11938,7 @@ body:has(.beta-banner) .app-root {
   }
 }
 
-/* ── Phase 15: 3D / Blueprint Studio ──────────────────────────────────────── */
+/* â”€â”€ Phase 15: 3D / Blueprint Studio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .threed-studio {
   display: flex;
   flex-direction: column;
@@ -12094,7 +12094,7 @@ body:has(.beta-banner) .app-root {
   letter-spacing: 0.05em;
 }
 
-/* ── Changelog page ───────────────────────────────────────────────────────── */
+/* â”€â”€ Changelog page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .cl-root {
   min-height: 100vh;
@@ -12313,7 +12313,7 @@ body:has(.beta-banner) .app-root {
   color: var(--border);
 }
 
-/* ── Companion Overlay (Electron floating window) ────────────────── */
+/* â”€â”€ Companion Overlay (Electron floating window) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .companion-overlay-root {
   position: fixed;
   inset: 0;
@@ -12394,7 +12394,7 @@ body:has(.beta-banner) .app-root {
   line-height: 1.5;
 }
 
-/* ── Desktop companion bubble (Electron always-visible window) ── */
+/* â”€â”€ Desktop companion bubble (Electron always-visible window) â”€â”€ */
 .desktop-bubble-root {
   width: 100vw;
   height: 100vh;
@@ -12408,13 +12408,13 @@ body:has(.beta-banner) .app-root {
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  background: linear-gradient(135deg, #c9a87c, #c9a87c);
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.5);
+  box-shadow: 0 4px 20px rgba(201, 168, 124, 0.45);
   position: relative;
   flex-shrink: 0;
   -webkit-app-region: no-drag;
@@ -12422,8 +12422,8 @@ body:has(.beta-banner) .app-root {
 }
 
 .desktop-bubble-btn--open {
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
-  box-shadow: 0 4px 24px rgba(124, 58, 237, 0.8);
+  background: linear-gradient(135deg, #c9a87c, #c9a87c);
+  box-shadow: 0 4px 24px rgba(201, 168, 124, 0.75);
 }
 
 .desktop-bubble-label {
@@ -12440,7 +12440,7 @@ body:has(.beta-banner) .app-root {
 .desktop-bubble-ring {
   position: absolute;
   border-radius: 50%;
-  border: 1.5px solid rgba(124, 58, 237, 0.5);
+  border: 1.5px solid rgba(201, 168, 124, 0.45);
   pointer-events: none;
 }
 
@@ -12452,9 +12452,9 @@ body:has(.beta-banner) .app-root {
   inset: -16px;
 }
 
-/* ═══════════════════════════════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    SPEC PANEL
-   ═══════════════════════════════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .spec-root {
   display: flex;
@@ -12465,7 +12465,7 @@ body:has(.beta-banner) .app-root {
   font-family: var(--font-mono);
 }
 
-/* ── Input column ── */
+/* â”€â”€ Input column â”€â”€ */
 .spec-input-col {
   width: 38%;
   flex-shrink: 0;
@@ -12666,7 +12666,7 @@ body:has(.beta-banner) .app-root {
   color: var(--text);
 }
 
-/* ── Output column ── */
+/* â”€â”€ Output column â”€â”€ */
 .spec-output-col {
   flex: 1;
   overflow-y: auto;
@@ -12849,7 +12849,7 @@ body:has(.beta-banner) .app-root {
   display: none;
 }
 
-/* ── Mobile layout ── */
+/* â”€â”€ Mobile layout â”€â”€ */
 @media (max-width: 767px) {
   .spec-root {
     flex-direction: column;
@@ -12891,7 +12891,7 @@ body:has(.beta-banner) .app-root {
   }
 }
 
-/* ── Legal pages ──────────────────────────────────────────── */
+/* â”€â”€ Legal pages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .legal-page {
   max-width: 680px;
   margin: 0 auto;
