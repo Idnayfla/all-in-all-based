@@ -1178,6 +1178,10 @@ body {
   animation: voice-pulse 2s ease-in-out infinite;
 }
 
+.voice-hint--error {
+  color: #f87171;
+}
+
 /* Mobile floating prompt overlay â€” only active on narrow viewports */
 .mobile-input-overlay {
   display: none;
@@ -13103,7 +13107,9 @@ body:has(.beta-banner) .app-root {
   text-align: left;
   cursor: pointer;
   font-family: var(--font-mono);
-  transition: border-color 0.15s, color 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
 }
 .fs-suggestion:hover {
   border-color: var(--accent);
@@ -13216,7 +13222,9 @@ body:has(.beta-banner) .app-root {
   border-radius: var(--r-sm);
   padding: 4px 10px;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 .fs-tab:hover,
 .fs-tab--active {

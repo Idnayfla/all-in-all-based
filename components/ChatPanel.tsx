@@ -232,6 +232,7 @@ export default function ChatPanel({
   const [reportedErrors, setReportedErrors] = useState<Set<string>>(new Set());
   const reportingInFlight = useRef<Set<string>>(new Set());
   const [micState, setMicState] = useState<'idle' | 'recording' | 'transcribing'>('idle');
+  const [micError, setMicError] = useState('');
   const [mobileInputOpen, setMobileInputOpen] = useState(false);
   const mobileTextareaRef = useRef<HTMLTextAreaElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -305,7 +306,11 @@ export default function ChatPanel({
         setMicState('transcribing');
         try {
           const actualType = recorder.mimeType || mimeType || 'audio/webm';
-          const ext = actualType.includes('mp4') ? 'm4a' : actualType.includes('ogg') ? 'ogg' : 'webm';
+          const ext = actualType.includes('mp4')
+            ? 'm4a'
+            : actualType.includes('ogg')
+              ? 'ogg'
+              : 'webm';
           const blob = new Blob(audioChunksRef.current, { type: actualType });
           const form = new FormData();
           form.append('audio', blob, `recording.${ext}`);
@@ -336,8 +341,24 @@ export default function ChatPanel({
       recorder.start();
       mediaRecorderRef.current = recorder;
       setMicState('recording');
-    } catch {
-      // mic not available or denied — silently ignore
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      const isDenied =
+        msg.toLowerCase().includes('denied') ||
+        msg.toLowerCase().includes('permission') ||
+        msg.toLowerCase().includes('not allowed');
+      const isNotSupported =
+        msg.toLowerCase().includes('not supported') || msg.toLowerCase().includes('not found');
+      // Show a 2-second error hint in the voice hint area
+      setMicState('idle');
+      if (isDenied) {
+        setMicError('Mic access denied — check browser permissions');
+      } else if (isNotSupported) {
+        setMicError('Mic not supported in this browser');
+      } else {
+        setMicError('Could not access mic — try again');
+      }
+      setTimeout(() => setMicError(''), 3000);
     }
   };
 
@@ -1180,7 +1201,9 @@ export default function ChatPanel({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 35 }}
               >
-                <div className="message-role">{m.role === 'user' ? t('chat.role.you') : t('chat.role.based')}</div>
+                <div className="message-role">
+                  {m.role === 'user' ? t('chat.role.you') : t('chat.role.based')}
+                </div>
                 <div className="message-content">
                   {m.role === 'assistant' && isGenerating && i === messages.length - 1 ? (
                     <>
@@ -1190,9 +1213,7 @@ export default function ChatPanel({
                         }
                         isFree={aiModel === 'free'}
                       />
-                      {slowWarning && (
-                        <div className="slow-warning">{t('chat.loading.slow')}</div>
-                      )}
+                      {slowWarning && <div className="slow-warning">{t('chat.loading.slow')}</div>}
                     </>
                   ) : (
                     renderContent(m.content, i)
@@ -1211,7 +1232,12 @@ export default function ChatPanel({
                         <div className="msg-flag-form">
                           <div className="msg-flag-question">{t('chat.flag.expecting')}</div>
                           <div className="msg-flag-chips">
-                            {[t('chat.flag.reason1'), t('chat.flag.reason2'), t('chat.flag.reason3'), t('chat.flag.reason4')].map(r => (
+                            {[
+                              t('chat.flag.reason1'),
+                              t('chat.flag.reason2'),
+                              t('chat.flag.reason3'),
+                              t('chat.flag.reason4'),
+                            ].map(r => (
                               <button
                                 key={r}
                                 className={`msg-flag-chip${flagReason === r ? ' active' : ''}`}
@@ -1317,9 +1343,7 @@ export default function ChatPanel({
             >
               <div className="support-nudge-text">
                 <span className="support-nudge-icon">◈</span>
-                <span>
-                  {t('chat.support.text')}
-                </span>
+                <span>{t('chat.support.text')}</span>
               </div>
               <div className="support-nudge-actions">
                 <a
@@ -1375,9 +1399,7 @@ export default function ChatPanel({
             </motion.div>
           )}
         </AnimatePresence>
-        <div
-          className="chat-input-row"
-        >
+        <div className="chat-input-row">
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"
@@ -1499,6 +1521,7 @@ export default function ChatPanel({
           <div className="voice-hint">Recording — press mic again to stop and send</div>
         )}
         {micState === 'transcribing' && <div className="voice-hint">Transcribing your voice…</div>}
+        {micError && <div className="voice-hint voice-hint--error">{micError}</div>}
       </div>
 
       {/* Mobile floating prompt overlay */}
