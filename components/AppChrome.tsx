@@ -8,17 +8,22 @@ import BetaBanner from './BetaBanner';
 import InstallPrompt from './InstallPrompt';
 import ServiceWorkerInit from './ServiceWorkerInit';
 import PostHogProvider from './PostHogProvider';
+import { LanguageProvider } from '@/lib/i18n';
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isCompanion =
     pathname === '/companion' || pathname === '/companion-bubble' || pathname === '/landing';
 
   if (isCompanion) {
-    return <ErrorBoundary>{children}</ErrorBoundary>;
+    return (
+      <LanguageProvider>
+        <ErrorBoundary>{children}</ErrorBoundary>
+      </LanguageProvider>
+    );
   }
 
   return (
-    <>
+    <LanguageProvider>
       <BetaBanner />
       <InstallPrompt />
       <ServiceWorkerInit />
@@ -54,6 +59,6 @@ export default function AppChrome({ children }: { children: React.ReactNode }) {
           alt=""
         />
       </noscript>
-    </>
+    </LanguageProvider>
   );
 }

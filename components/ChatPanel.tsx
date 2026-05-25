@@ -12,6 +12,7 @@ import GeneratedVideoCard from './GeneratedVideoCard';
 import GeneratedMusicCard from './GeneratedMusicCard';
 import GeneratingCard from './GeneratingCard';
 import { track } from '@/lib/posthog';
+import { useTranslation } from '@/lib/i18n';
 
 const SUGGESTION_POOL = [
   'Build a todo app with drag & drop',
@@ -235,13 +236,7 @@ export default function ChatPanel({
   const mobileTextareaRef = useRef<HTMLTextAreaElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-
-  const FLAG_REASONS = [
-    'Wrong type of response',
-    'Misunderstood my request',
-    'Too much / too little',
-    'Broke existing code',
-  ];
+  const { t } = useTranslation();
 
   const submitFlag = async (msgIdx: number, _msgContent: string, _userPrompt: string) => {
     if (flagSending) return;
@@ -284,6 +279,13 @@ export default function ChatPanel({
     }
   };
 
+  const getSupportedMimeType = () => {
+    for (const type of ['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav']) {
+      if (MediaRecorder.isTypeSupported(type)) return type;
+    }
+    return '';
+  };
+
   const toggleMic = async () => {
     if (micState === 'recording') {
       mediaRecorderRef.current?.stop();
@@ -293,19 +295,20 @@ export default function ChatPanel({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioChunksRef.current = [];
-      const recorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg',
-      });
+      const mimeType = getSupportedMimeType();
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
       recorder.ondataavailable = e => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
       recorder.onstop = async () => {
-        stream.getTracks().forEach(t => t.stop());
+        stream.getTracks().forEach(track => track.stop());
         setMicState('transcribing');
         try {
-          const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          const actualType = recorder.mimeType || mimeType || 'audio/webm';
+          const ext = actualType.includes('mp4') ? 'm4a' : actualType.includes('ogg') ? 'ogg' : 'webm';
+          const blob = new Blob(audioChunksRef.current, { type: actualType });
           const form = new FormData();
-          form.append('audio', blob, 'recording.webm');
+          form.append('audio', blob, `recording.${ext}`);
           const res = await fetch('/api/transcribe', { method: 'POST', body: form });
           const { text } = await res.json();
           if (text?.trim()) {
@@ -1110,7 +1113,7 @@ export default function ChatPanel({
                       });
                     }}
                   >
-                    {alreadyReported ? '◉ Reported' : '⬡ Report'}
+                    {alreadyReported ? t('chat.reported') : t('chat.report')}
                   </button>
                 </div>
               </div>
@@ -1145,12 +1148,11 @@ export default function ChatPanel({
         {messages.length === 0 ? (
           <div className="chat-empty">
             <div className="chat-empty-logo" aria-hidden="true">
-              B&gt;
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand-icon-loop.svg" alt="" width={64} height={64} />
             </div>
             <div className="chat-empty-title">BASED</div>
-            <div className="chat-empty-sub">
-              Describe what you want to build — Based brings it to life.
-            </div>
+            <div className="chat-empty-sub">{t('chat.empty.subtitle')}</div>
             <div className="chat-suggestions">
               {suggestions.map((s, index) => (
                 <motion.button
@@ -1178,7 +1180,7 @@ export default function ChatPanel({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 35 }}
               >
-                <div className="message-role">{m.role === 'user' ? 'YOU' : 'BASED'}</div>
+                <div className="message-role">{m.role === 'user' ? t('chat.role.you') : t('chat.role.based')}</div>
                 <div className="message-content">
                   {m.role === 'assistant' && isGenerating && i === messages.length - 1 ? (
                     <>
@@ -1189,9 +1191,7 @@ export default function ChatPanel({
                         isFree={aiModel === 'free'}
                       />
                       {slowWarning && (
-                        <div className="slow-warning">
-                          ◈ Taking longer than usual — still working...
-                        </div>
+                        <div className="slow-warning">{t('chat.loading.slow')}</div>
                       )}
                     </>
                   ) : (
@@ -1206,12 +1206,12 @@ export default function ChatPanel({
                   ) && (
                     <div className="msg-flag-area">
                       {flaggedSet.has(i) ? (
-                        <span className="msg-flag-noted">◈ Noted — thanks</span>
+                        <span className="msg-flag-noted">{t('chat.flag.noted')}</span>
                       ) : flaggingIdx === i ? (
                         <div className="msg-flag-form">
-                          <div className="msg-flag-question">What were you expecting?</div>
+                          <div className="msg-flag-question">{t('chat.flag.expecting')}</div>
                           <div className="msg-flag-chips">
-                            {FLAG_REASONS.map(r => (
+                            {[t('chat.flag.reason1'), t('chat.flag.reason2'), t('chat.flag.reason3'), t('chat.flag.reason4')].map(r => (
                               <button
                                 key={r}
                                 className={`msg-flag-chip${flagReason === r ? ' active' : ''}`}
@@ -1223,7 +1223,7 @@ export default function ChatPanel({
                           </div>
                           <input
                             className="msg-flag-input"
-                            placeholder="Anything else? (optional)"
+                            placeholder={t('chat.flag.optional')}
                             value={flagText}
                             onChange={e => setFlagText(e.target.value)}
                           />
@@ -1236,7 +1236,7 @@ export default function ChatPanel({
                                 setFlagText('');
                               }}
                             >
-                              Cancel
+                              {t('chat.flag.cancel')}
                             </button>
                             <button
                               className="msg-flag-send"
@@ -1268,7 +1268,7 @@ export default function ChatPanel({
                                 submitFlag(i, txt, userTxt);
                               }}
                             >
-                              {flagSending ? '◈ Sending…' : '→ Send'}
+                              {flagSending ? t('chat.flag.sending') : t('chat.flag.send')}
                             </button>
                           </div>
                         </div>
@@ -1278,7 +1278,7 @@ export default function ChatPanel({
                           onClick={() => setFlaggingIdx(i)}
                           title="Not what you expected?"
                         >
-                          ⊙ Not what I expected
+                          {t('chat.flag.title')}
                         </button>
                       )}
                     </div>
@@ -1318,8 +1318,7 @@ export default function ChatPanel({
               <div className="support-nudge-text">
                 <span className="support-nudge-icon">◈</span>
                 <span>
-                  Based runs on community support — API costs add up fast. If it&apos;s been useful,
-                  consider backing it.
+                  {t('chat.support.text')}
                 </span>
               </div>
               <div className="support-nudge-actions">
@@ -1330,7 +1329,7 @@ export default function ChatPanel({
                   className="support-nudge-btn"
                   onClick={() => setShowSupportNudge(false)}
                 >
-                  ◈ Support on Ko-fi
+                  {t('chat.support.kofi')}
                 </a>
                 <button
                   className="support-nudge-dismiss"
@@ -1339,7 +1338,7 @@ export default function ChatPanel({
                     localStorage.setItem('based_nudge_dismissed', '1');
                   }}
                 >
-                  Not now
+                  {t('chat.support.notNow')}
                 </button>
               </div>
             </motion.div>
@@ -1355,7 +1354,7 @@ export default function ChatPanel({
               exit={{ opacity: 0, y: 6 }}
               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             >
-              ✕ Discard
+              {t('chat.discard')}
             </motion.button>
           )}
         </AnimatePresence>
@@ -1448,24 +1447,30 @@ export default function ChatPanel({
               autoResize();
             }}
             onKeyDown={handleKey}
-            onFocus={() => {
+            onTouchStart={e => {
               if (window.innerWidth <= 768) {
+                e.preventDefault();
                 setMobileInputOpen(true);
                 setTimeout(() => mobileTextareaRef.current?.focus(), 50);
               }
             }}
+            onFocus={e => {
+              if (window.innerWidth <= 768) {
+                e.currentTarget.blur();
+              }
+            }}
             placeholder={
               micState === 'recording'
-                ? 'Recording — press mic again to send…'
+                ? t('chat.placeholder.recording')
                 : micState === 'transcribing'
-                  ? 'Transcribing…'
+                  ? t('chat.placeholder.transcribing')
                   : generationMode === 'seedance'
-                    ? 'Describe a video to generate...'
+                    ? t('chat.placeholder.video')
                     : generationMode === 'music'
-                      ? 'Describe the music to generate...'
+                      ? t('chat.placeholder.music')
                       : generationMode !== 'chat'
-                        ? 'Describe an image to generate...'
-                        : 'Ask Based anything...'
+                        ? t('chat.placeholder.image')
+                        : t('chat.placeholder.default')
             }
             rows={1}
             disabled={isGenerating || isGeneratingMedia}
@@ -1484,9 +1489,9 @@ export default function ChatPanel({
             {isGeneratingMedia ? (
               <span className="spinner" />
             ) : generationMode !== 'chat' ? (
-              'Generate'
+              t('chat.generate')
             ) : (
-              'Send'
+              t('chat.send')
             )}
           </motion.button>
         </div>
@@ -1517,7 +1522,7 @@ export default function ChatPanel({
             >
               <div className="mobile-input-header">
                 <span className="mobile-input-mark">B&gt;</span>
-                <span className="mobile-input-label">Ask Based anything</span>
+                <span className="mobile-input-label">{t('chat.mobile.header')}</span>
                 <button
                   className="mobile-input-close"
                   onClick={() => setMobileInputOpen(false)}
@@ -1543,12 +1548,12 @@ export default function ChatPanel({
                 }}
                 placeholder={
                   generationMode === 'seedance'
-                    ? 'Describe a video to generate...'
+                    ? t('chat.placeholder.video')
                     : generationMode === 'music'
-                      ? 'Describe the music to generate...'
+                      ? t('chat.placeholder.music')
                       : generationMode !== 'chat'
-                        ? 'Describe an image to generate...'
-                        : 'Ask Based anything...'
+                        ? t('chat.placeholder.image')
+                        : t('chat.placeholder.default')
                 }
                 rows={5}
                 autoFocus

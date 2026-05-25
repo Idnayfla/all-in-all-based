@@ -10,11 +10,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const formData = await req.formData();
-    const audio = formData.get('audio') as Blob | null;
+    const audio = formData.get('audio') as File | Blob | null;
     if (!audio) return NextResponse.json({ error: 'No audio' }, { status: 400 });
+    const filename = (audio as File).name ?? 'recording.webm';
 
     const groqForm = new FormData();
-    groqForm.append('file', audio, 'recording.webm');
+    groqForm.append('file', audio, filename);
     groqForm.append('model', 'whisper-large-v3-turbo');
     groqForm.append('response_format', 'json');
 

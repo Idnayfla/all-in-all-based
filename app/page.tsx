@@ -39,6 +39,17 @@ import TipsGuide from '@/components/TipsGuide';
 import SpecPanel from '@/components/SpecPanel';
 import { track, identifyUser } from '@/lib/posthog';
 import { GetAppButton } from '@/components/GetAppButton';
+import { useTranslation, SUPPORTED_LANGUAGES } from '@/lib/i18n';
+
+function uuid(): string {
+  if (typeof crypto?.randomUUID === 'function') return uuid();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  return [...b]
+    .map((x, i) => ([4, 6, 8, 10].includes(i) ? '-' : '') + x.toString(16).padStart(2, '0'))
+    .join('');
+}
 
 export interface FileNode {
   name: string;
@@ -85,6 +96,7 @@ const DEFAULT_PERSONALITY =
   'You are Based, the AI inside All in All Based — a sharp, witty, and direct coding assistant. You are confident, occasionally funny, and always helpful. You treat the user like a smart friend, not a customer. You get straight to the point, never over-explain, and celebrate when things work.';
 
 export default function Home() {
+  const { t, locale, setLocale } = useTranslation();
   const [messages, setMessages] = useState<Message[]>([]);
   const [files, setFiles] = useState<FileNode[]>([]);
   const [activeFile, setActiveFile] = useState<FileNode | null>(null);
@@ -327,7 +339,7 @@ export default function Home() {
       const res = await fetch(`/api/gallery/remix/${remixShareId}`, { headers });
       if (!res.ok) return;
       const { projectName, files: remixFiles } = await res.json();
-      const id = crypto.randomUUID();
+      const id = uuid();
       const project: Project = {
         id,
         name: `${projectName} (remix)`,
@@ -825,7 +837,7 @@ export default function Home() {
     setProjectModal(false);
 
     // Generate ID on client so local and cloud share the same ID from the start
-    const id = crypto.randomUUID();
+    const id = uuid();
     const newProject: Project = {
       id,
       name: name.trim(),
@@ -1688,6 +1700,21 @@ export default function Home() {
                     <ReferralPanel getHeaders={getHeaders} />
                   </div>
                 )}
+
+                <div className="settings-section">
+                  <label className="settings-label">{t('settings.language')}</label>
+                  <div className="lang-switcher">
+                    {SUPPORTED_LANGUAGES.map(lang => (
+                      <button
+                        key={lang.code}
+                        className={`lang-btn${locale === lang.code ? ' active' : ''}`}
+                        onClick={() => setLocale(lang.code)}
+                      >
+                        {lang.nativeLabel}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
                 {user && subscription.tier === 'pro' && (
                   <div className="settings-section" style={{ position: 'relative' }}>

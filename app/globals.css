@@ -813,6 +813,14 @@ body {
   height: 80px;
   pointer-events: none;
   cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.chat-empty-logo img {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
 }
 .chat-empty-title {
   font-family: var(--font-pixel);
@@ -1147,6 +1155,11 @@ body {
 .voice-btn--unsupported {
   opacity: 0.3;
   cursor: not-allowed;
+}
+@media (max-width: 768px) {
+  .voice-btn {
+    display: none;
+  }
 }
 .voice-btn:disabled {
   opacity: 0.4;
@@ -2407,6 +2420,31 @@ body {
   font-size: 11px;
   color: var(--text3);
   line-height: 1.6;
+}
+.lang-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.lang-btn {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text2);
+  font-size: 12px;
+  font-family: var(--font-pixel);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.lang-btn:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+.lang-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
 }
 
 .publish-link {
