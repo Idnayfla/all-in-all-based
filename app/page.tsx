@@ -1339,9 +1339,7 @@ export default function Home() {
                 <div className="settings-header">⬡ Settings</div>
                 {user && (
                   <div className="settings-section settings-account-row">
-                    <span className="settings-hint" style={{ margin: 0 }}>
-                      {user.email}
-                    </span>
+                    <span className="settings-hint settings-hint--flush">{user.email}</span>
                     <button className="auth-signout-btn" onClick={signOut}>
                       Sign Out
                     </button>
@@ -1418,7 +1416,7 @@ export default function Home() {
                     onChange={handleWallpaperUpload}
                   />
                 </div>
-                <div className="settings-section" style={{ position: 'relative' }}>
+                <div className="settings-section settings-section--relative">
                   <label className="settings-label">Appearance</label>
                   {subscription.tier === 'free' && (
                     <div
@@ -1473,7 +1471,7 @@ export default function Home() {
                 </div>
                 <div className="settings-section">
                   <label className="settings-label">Persona</label>
-                  <div className="settings-hint" style={{ marginBottom: 8 }}>
+                  <div className="settings-hint settings-hint--spaced">
                     {(() => {
                       const current = PERSONAS.find(pItem => pItem.key === persona);
                       return current ? `${current.symbol} ${current.name} — ${current.desc}` : '';
@@ -1481,7 +1479,7 @@ export default function Home() {
                   </div>
                   <PersonaSwitcher persona={persona} onChange={setPersona} />
                 </div>
-                <div className="settings-section" style={{ position: 'relative' }}>
+                <div className="settings-section settings-section--relative">
                   <label className="settings-label">AI Personality</label>
                   {subscription.tier === 'free' && (
                     <div
@@ -1510,7 +1508,7 @@ export default function Home() {
                     />
                   </div>
                 </div>
-                <div className="settings-section" style={{ position: 'relative' }}>
+                <div className="settings-section settings-section--relative">
                   <label className="settings-label">Global Memory</label>
                   {subscription.tier === 'free' && (
                     <div
@@ -1525,7 +1523,7 @@ export default function Home() {
                     </div>
                   )}
                   <div className={subscription.tier === 'free' ? 'pro-gate-blurred' : ''}>
-                    <div className="settings-hint" style={{ marginBottom: 8 }}>
+                    <div className="settings-hint settings-hint--spaced">
                       Auto-updated after each conversation. Based remembers this across all
                       projects.
                     </div>
@@ -1725,7 +1723,7 @@ export default function Home() {
                 </div>
 
                 {user && subscription.tier === 'pro' && (
-                  <div className="settings-section" style={{ position: 'relative' }}>
+                  <div className="settings-section settings-section--relative">
                     <label className="settings-label">API Keys</label>
                     <div className="pantheon-onboarding-card">
                       <span className="pantheon-onboarding-title">Pantheon VSCode Extension</span>
