@@ -8003,6 +8003,22 @@ html.has-wallpaper .editor-panel {
   color: var(--text3);
   margin: var(--sp-2) 0 0;
 }
+.pricing-payment-methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+.pricing-payment-badge {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xs);
+  padding: 2px 7px;
+  letter-spacing: 0.5px;
+}
 
 /* â”€â”€ Plan section in settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .plan-badge-row {
@@ -13029,10 +13045,10 @@ body:has(.beta-banner) .app-root {
 
 /* pricing-legal consent line */
 .pricing-legal {
-  font-size: 11px;
-  color: var(--text3);
+  font-size: var(--fs-sm);
+  color: var(--text2);
   text-align: center;
-  margin: 4px 0 0;
+  margin: 0 0 12px;
   line-height: 1.5;
 }
 .pricing-legal-link {

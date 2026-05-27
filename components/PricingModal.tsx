@@ -139,21 +139,29 @@ export default function PricingModal({
 
         {error && <div className="pricing-error">{error}</div>}
 
-        <button className="pricing-upgrade-btn" onClick={upgrade} disabled={loading}>
-          {loading ? 'Redirecting to Stripe...' : 'Upgrade to Pro — $12/month  ·  was $20'}
-        </button>
-        {onSwitchToFreeAI && (
-          <button className="pricing-free-ai-btn" onClick={onSwitchToFreeAI}>
-            Or use Free AI — Llama 3.3 70B, unlimited, unrestricted →
-          </button>
-        )}
-        <p className="pricing-note">Cancel anytime. Powered by Stripe.</p>
+        <div className="pricing-payment-methods">
+          <span className="pricing-payment-badge">Apple Pay</span>
+          <span className="pricing-payment-badge">Google Pay</span>
+          <span className="pricing-payment-badge">Visa</span>
+          <span className="pricing-payment-badge">Mastercard</span>
+          <span className="pricing-payment-badge">+ more</span>
+        </div>
+
         <p className="pricing-legal">
           By upgrading you agree to our{' '}
           <a href="/terms" target="_blank" rel="noopener noreferrer" className="pricing-legal-link">
-            Terms
-          </a>{' '}
-          and{' '}
+            Terms of Service
+          </a>
+          {', '}
+          <a
+            href="/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="pricing-legal-link"
+          >
+            Privacy Policy
+          </a>
+          {' and '}
           <a
             href="/refund"
             target="_blank"
@@ -164,6 +172,16 @@ export default function PricingModal({
           </a>
           .
         </p>
+
+        <button className="pricing-upgrade-btn" onClick={upgrade} disabled={loading}>
+          {loading ? 'Redirecting to Stripe...' : 'Upgrade to Pro — $12/month  ·  was $20'}
+        </button>
+        {onSwitchToFreeAI && (
+          <button className="pricing-free-ai-btn" onClick={onSwitchToFreeAI}>
+            Or use Free AI — Llama 3.3 70B, unlimited, unrestricted →
+          </button>
+        )}
+        <p className="pricing-note">Cancel anytime. Powered by Stripe.</p>
       </motion.div>
     </motion.div>
   );
