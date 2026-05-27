@@ -13,7 +13,7 @@ import AuthModal from '@/components/AuthModal';
 import SplashScreen from '@/components/SplashScreen';
 import PersonalityPanel from '@/components/PersonalityPanel';
 import PersonaSwitcher, { PERSONAS } from '@/components/PersonaSwitcher';
-import MemoryManager, { parseMemories } from '@/components/MemoryManager';
+import MemoryManager, { parseMemories, parseMemoryItems } from '@/components/MemoryManager';
 import ThemeCustomizer, {
   AppTheme,
   DEFAULT_THEME,
@@ -1051,6 +1051,7 @@ export default function Home() {
           </span>
           {currentProject && <span className="project-name-display">{currentProject.name}</span>}
           {subscription.tier === 'pro' && <span className="pro-chip">PRO ⬡</span>}
+          <span className="early-access-chip">◈ Early Access</span>
         </div>
         <nav className="header-nav">
           <div className="tab-switcher">
@@ -1529,10 +1530,13 @@ export default function Home() {
                       projects.
                     </div>
                     <div className="memory-compiled-preview">
-                      {parseMemories(globalMemory).length > 0 ? (
-                        parseMemories(globalMemory).map((line, i) => (
+                      {parseMemoryItems(globalMemory).length > 0 ? (
+                        parseMemoryItems(globalMemory).map((item, i) => (
                           <div key={i} className="memory-compiled-line">
-                            {i + 1}) {line}
+                            {i + 1}) {item.text}
+                            {item.source && (
+                              <span className="memory-source-tag">· {item.source}</span>
+                            )}
                           </div>
                         ))
                       ) : (
@@ -1691,6 +1695,10 @@ export default function Home() {
                             ? 'Failed — try again'
                             : '↻ Re-sync subscription'}
                     </button>
+                    <div className="settings-hint early-access-note">
+                      ◈ Based is in Early Access — rough edges are expected. Your feedback shapes
+                      what ships next.
+                    </div>
                   </div>
                 )}
 

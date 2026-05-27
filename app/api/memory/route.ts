@@ -38,9 +38,20 @@ export async function POST(req: NextRequest) {
     const userId = await getUserId(req);
     const { messages } = await req.json();
 
-    const conversation = (messages as { role: string; content: unknown }[])
+    const msgList = messages as { role: string; content: unknown }[];
+    const conversation = msgList
       .map(m => `${String(m.role).toUpperCase()}: ${contentToText(m.content)}`)
       .join('\n');
+
+    // Short label of the trigger prompt for source attribution
+    const firstUser = msgList.find(m => m.role === 'user');
+    const sourceHint = firstUser
+      ? contentToText(firstUser.content)
+          .trim()
+          .replace(/[\[\]]/g, '')
+          .replace(/\s+/g, ' ')
+          .slice(0, 45)
+      : '';
 
     const { data: settingsData } = await supabaseAdmin
       .from('user_settings')
@@ -51,7 +62,7 @@ export async function POST(req: NextRequest) {
 
     const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5',
-      max_tokens: 500,
+      max_tokens: 600,
       messages: [
         {
           role: 'user',
@@ -64,15 +75,17 @@ NEW CONVERSATION:
 ${conversation}
 
 Return ONLY a plain numbered list. Max 20 items. Format exactly like:
-1) Prefers dark mode interfaces
+1) Prefers dark mode interfaces [from: build dark mode UI]
 2) Works primarily in TypeScript
-3) Building a SaaS product
+3) Building a SaaS product [from: ${sourceHint || 'conversation'}]
 
 STRICT RULES:
 - Never start a fact with "User" — write the fact directly as a statement or preference
 - No headers, no bold text, no asterisks, no markdown whatsoever
 - No categories or labels
 - Just plain sentences in first-person-implied style
+- For each NEW fact you add (not already in EXISTING MEMORY), append [from: ${sourceHint || 'conversation'}] at the end
+- Never modify or remove [from: ...] annotations that already exist in EXISTING MEMORY
 - If nothing new to add, return existing memory unchanged.`,
         },
       ],

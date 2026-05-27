@@ -192,6 +192,25 @@ body {
   text-transform: uppercase;
   animation: chipGlow 3s ease-in-out infinite;
 }
+.early-access-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 9px;
+  color: var(--text3);
+  letter-spacing: 0.8px;
+  font-family: var(--font-mono);
+}
+.early-access-note {
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1px dashed var(--border);
+  border-radius: var(--r-sm);
+  line-height: 1.5;
+}
 @keyframes chipGlow {
   0%,
   100% {
@@ -4944,6 +4963,19 @@ body {
   color: var(--text2);
   font-family: var(--font-mono);
   line-height: 1.5;
+}
+.memory-source-tag {
+  font-size: 10px;
+  color: var(--text3);
+  margin-left: 6px;
+  opacity: 0.7;
+}
+.memory-chip-source {
+  display: block;
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 2px;
+  opacity: 0.7;
 }
 
 .memory-manage-btn {

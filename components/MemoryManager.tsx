@@ -3,15 +3,35 @@ import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
-function parseMemories(raw: string): string[] {
-  return raw
-    .split('\n')
-    .map(line => line.replace(/^\d+[\)\.]\s*/, '').trim())
-    .filter(Boolean);
+interface MemoryItem {
+  text: string;
+  source?: string;
 }
 
-function stringifyMemories(items: string[]): string {
-  return items.map((item, i) => `${i + 1}) ${item}`).join('\n');
+function parseMemoryItems(raw: string): MemoryItem[] {
+  return raw
+    .split('\n')
+    .map(line => {
+      const clean = line.replace(/^\d+[\)\.]\s*/, '').trim();
+      if (!clean) return null;
+      const match = clean.match(/^(.*?)\s*\[from:\s*(.+?)\]\s*$/);
+      if (match) return { text: match[1].trim(), source: match[2].trim() };
+      return { text: clean };
+    })
+    .filter((item): item is MemoryItem => item !== null && item.text.length > 0);
+}
+
+function parseMemories(raw: string): string[] {
+  return parseMemoryItems(raw).map(item => item.text);
+}
+
+function stringifyMemories(items: MemoryItem[]): string {
+  return items
+    .map((item, i) => {
+      const src = item.source ? ` [from: ${item.source}]` : '';
+      return `${i + 1}) ${item.text}${src}`;
+    })
+    .join('\n');
 }
 
 interface Props {
@@ -21,7 +41,7 @@ interface Props {
 }
 
 export default function MemoryManager({ memory, onSave, onClose }: Props) {
-  const items = parseMemories(memory);
+  const items = parseMemoryItems(memory);
   const [editIndex, setEditIndex] = useState<number | null>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [draft, setDraft] = useState('');
@@ -32,7 +52,7 @@ export default function MemoryManager({ memory, onSave, onClose }: Props) {
     setEditOpen(true);
   };
   const openEdit = (i: number) => {
-    setDraft(items[i]);
+    setDraft(items[i].text);
     setEditIndex(i);
     setEditOpen(true);
   };
@@ -44,10 +64,10 @@ export default function MemoryManager({ memory, onSave, onClose }: Props) {
   const handleSave = () => {
     const text = draft.trim();
     if (!text) return;
-    const next =
+    const next: MemoryItem[] =
       editIndex === null
-        ? [...items, text]
-        : items.map((item, i) => (i === editIndex ? text : item));
+        ? [...items, { text }]
+        : items.map((item, i) => (i === editIndex ? { text } : item));
     onSave(stringifyMemories(next));
     closeEdit();
   };
@@ -100,7 +120,12 @@ export default function MemoryManager({ memory, onSave, onClose }: Props) {
                   layout
                 >
                   <span className="memory-chip-num">{i + 1}</span>
-                  <span className="memory-chip-text">{item}</span>
+                  <span className="memory-chip-text">
+                    {item.text}
+                    {item.source && (
+                      <span className="memory-chip-source">· {item.source}</span>
+                    )}
+                  </span>
                   <div className="memory-chip-actions">
                     <button className="memory-chip-btn" onClick={() => openEdit(i)} title="Edit">
                       ✎
@@ -180,4 +205,5 @@ export default function MemoryManager({ memory, onSave, onClose }: Props) {
   );
 }
 
-export { parseMemories };
+export { parseMemories, parseMemoryItems };
+export type { MemoryItem };
