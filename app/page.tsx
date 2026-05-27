@@ -13,7 +13,7 @@ import AuthModal from '@/components/AuthModal';
 import SplashScreen from '@/components/SplashScreen';
 import PersonalityPanel from '@/components/PersonalityPanel';
 import PersonaSwitcher, { PERSONAS } from '@/components/PersonaSwitcher';
-import MemoryManager, { parseMemories, parseMemoryItems } from '@/components/MemoryManager';
+import MemoryManager, { parseMemoryItems } from '@/components/MemoryManager';
 import ThemeCustomizer, {
   AppTheme,
   DEFAULT_THEME,
@@ -42,7 +42,7 @@ import { GetAppButton } from '@/components/GetAppButton';
 import { useTranslation, SUPPORTED_LANGUAGES } from '@/lib/i18n';
 
 function uuid(): string {
-  if (typeof crypto?.randomUUID === 'function') return uuid();
+  if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
   const b = crypto.getRandomValues(new Uint8Array(16));
   b[6] = (b[6] & 0x0f) | 0x40;
   b[8] = (b[8] & 0x3f) | 0x80;
