@@ -3,6 +3,13 @@ import { stripe } from '@/lib/stripe';
 import { getUserId, supabaseAdmin } from '../../_auth';
 
 export async function POST(req: NextRequest) {
+  if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_PRO_PRICE_ID) {
+    return NextResponse.json(
+      { error: 'Payment not configured — contact support.' },
+      { status: 503 }
+    );
+  }
+
   try {
     const userId = await getUserId(req);
 
