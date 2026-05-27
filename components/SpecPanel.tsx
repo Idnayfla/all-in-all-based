@@ -286,9 +286,12 @@ export default function SpecPanel({
               setStreamText(accumulated);
             } else if (payload.done && payload.srs) {
               const parsed = parseSections(payload.srs);
-              setSections(parsed);
-              setOpenSections(new Set([0]));
-              setStreamText('');
+              if (parsed.length > 0) {
+                setSections(parsed);
+                setOpenSections(new Set([0]));
+                setStreamText('');
+              }
+              // if parsing yields nothing (truncated/malformed), keep accumulated text visible
             } else if (payload.error) {
               setGenError(payload.error);
             }

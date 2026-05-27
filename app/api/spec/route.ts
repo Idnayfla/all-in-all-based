@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getUserId, supabaseAdmin } from '../_auth';
 
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || process.env.APP_ANTHROPIC_API_KEY,
@@ -206,7 +206,7 @@ export async function POST(req: NextRequest) {
       try {
         const stream = await client.messages.stream({
           model: 'claude-sonnet-4-6',
-          max_tokens: 6000,
+          max_tokens: 8192,
           system: [
             {
               type: 'text',
