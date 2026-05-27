@@ -43,16 +43,6 @@ export async function POST(req: NextRequest) {
       .map(m => `${String(m.role).toUpperCase()}: ${contentToText(m.content)}`)
       .join('\n');
 
-    // Short label of the trigger prompt for source attribution
-    const firstUser = msgList.find(m => m.role === 'user');
-    const sourceHint = firstUser
-      ? contentToText(firstUser.content)
-          .trim()
-          .replace(/[\[\]]/g, '')
-          .replace(/\s+/g, ' ')
-          .slice(0, 45)
-      : '';
-
     const { data: settingsData } = await supabaseAdmin
       .from('user_settings')
       .select('global_memory')
@@ -75,16 +65,16 @@ NEW CONVERSATION:
 ${conversation}
 
 Return ONLY a plain numbered list. Max 20 items. Format exactly like:
-1) Prefers dark mode interfaces [from: build dark mode UI]
+1) Prefers dark mode interfaces [from: dark mode UI project]
 2) Works primarily in TypeScript
-3) Building a SaaS product [from: ${sourceHint || 'conversation'}]
+3) Building a SaaS product [from: SaaS pricing discussion]
 
 STRICT RULES:
 - Never start a fact with "User" — write the fact directly as a statement or preference
 - No headers, no bold text, no asterisks, no markdown whatsoever
 - No categories or labels
 - Just plain sentences in first-person-implied style
-- For each NEW fact you add (not already in EXISTING MEMORY), append [from: ${sourceHint || 'conversation'}] at the end
+- For each NEW fact you add (not already in EXISTING MEMORY), append [from: TOPIC] where TOPIC is a concise 2-5 word description of what the conversation was about (e.g. "building portfolio site", "dark mode preferences", "React debugging help") — NOT the user's literal words
 - Never modify or remove [from: ...] annotations that already exist in EXISTING MEMORY
 - If nothing new to add, return existing memory unchanged.`,
         },

@@ -352,7 +352,7 @@ export default function ChatPanel({
       // Show a 2-second error hint in the voice hint area
       setMicState('idle');
       if (isDenied) {
-        setMicError('Mic access denied — check browser permissions');
+        setMicError('Mic blocked — click the lock icon in your address bar and allow microphone');
       } else if (isNotSupported) {
         setMicError('Mic not supported in this browser');
       } else {

@@ -57,8 +57,13 @@ export default function PricingModal({
     try {
       const headers = await getHeaders();
       const res = await fetch('/api/stripe/checkout', { method: 'POST', headers });
+      const contentType = res.headers.get('content-type') ?? '';
+      if (!contentType.includes('application/json')) {
+        throw new Error('Payment service unavailable — please try again or contact support.');
+      }
       const { url, error: err } = await res.json();
       if (err) throw new Error(err);
+      if (!url) throw new Error('No checkout URL returned — please try again.');
       window.location.href = url;
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
