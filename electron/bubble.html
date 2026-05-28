@@ -11,13 +11,13 @@
       html,
       body {
         width: 260px;
-        height: 340px;
+        height: 260px;
         background: transparent;
         overflow: hidden;
       }
       .root {
         width: 260px;
-        height: 340px;
+        height: 260px;
         display: flex;
         align-items: center;
         justify-content: flex-end;
@@ -121,9 +121,8 @@
         left: 50%;
         transform: translateX(-50%);
         width: 220px;
-        max-height: 240px;
-        overflow-y: auto;
-        scrollbar-width: none;
+        height: 80px;
+        overflow: hidden;
         background: #0e0c17;
         border: 1px solid rgba(201, 168, 124, 0.35);
         border-radius: 10px;
@@ -138,9 +137,6 @@
         opacity: 0;
         transition: opacity 0.25s ease;
         z-index: 20;
-      }
-      .speech-bubble::-webkit-scrollbar {
-        display: none;
       }
       .speech-bubble.visible {
         opacity: 1;
@@ -271,6 +267,8 @@
         btn.classList.remove('dragging');
       });
 
+      const MAX_WORDS = 12; // show at most 12 words at a time
+
       const speakingDot = document.getElementById('speaking-dot');
       const speechBubble = document.getElementById('speech-bubble');
       let companionOpen = false;
@@ -284,6 +282,7 @@
       let hideTimer = null;
 
       function showBubble(text) {
+        if (!text) return;
         if (hideTimer !== null) {
           clearTimeout(hideTimer);
           hideTimer = null;
@@ -295,10 +294,12 @@
           speechBubble.classList.add('visible');
           bubbleShownAt = Date.now();
         }
-        // text is already the correct progressive slice — set it directly
-        speechBubble.textContent = text;
-        // Auto-scroll to bottom so no text is clipped
-        speechBubble.scrollTop = speechBubble.scrollHeight;
+        // Sliding window: show only the last MAX_WORDS words
+        const allWords = text.trim().split(/\s+/);
+        const visibleWords = allWords.slice(-MAX_WORDS);
+        const displayText = visibleWords.join(' ');
+        speechBubble.textContent = displayText;
+        // No scrollTop needed — fixed height, always showing latest words
       }
 
       function hideBubble() {
