@@ -60,14 +60,15 @@ function createOverlayWindow() {
 
 function createBubbleWindow() {
   const { workAreaSize } = screen.getPrimaryDisplay();
-  // Window is 260×260 (transparent). The 52px button sits at the bottom-centre.
+  // Window is 260×340 (transparent). The 52px button sits at the bottom-centre.
   // Default position keeps the button at the bottom-right corner of the work area.
+  // Height increased from 260→340 to give the speech bubble room to grow upward.
   const defaultX = workAreaSize.width - 210;
-  const defaultY = workAreaSize.height - 276;
+  const defaultY = workAreaSize.height - 356;
   const pos = loadBubblePosition(defaultX, defaultY);
   bubbleWin = new BrowserWindow({
     width: 260,
-    height: 260,
+    height: 340,
     x: pos.x,
     y: pos.y,
     alwaysOnTop: true,
@@ -233,7 +234,7 @@ app.whenReady().then(async () => {
     const [x, y] = bubbleWin.getPosition();
     const { workAreaSize } = screen.getPrimaryDisplay();
     const newX = Math.max(0, Math.min(x + dx, workAreaSize.width - 260));
-    const newY = Math.max(0, Math.min(y + dy, workAreaSize.height - 260));
+    const newY = Math.max(0, Math.min(y + dy, workAreaSize.height - 340));
     bubbleWin.setPosition(newX, newY);
     if (savePosTimer) clearTimeout(savePosTimer);
     savePosTimer = setTimeout(saveBubblePosition, 500);
