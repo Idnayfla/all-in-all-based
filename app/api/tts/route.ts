@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   const { text } = (await req.json()) as { text?: string };
   if (!text?.trim()) return NextResponse.json({ error: 'No text' }, { status: 400 });
 
-  const voiceId = process.env.ELEVENLABS_VOICE_ID ?? '21m00Tcm4TlvDq8ikWAM';
+  const voiceId = process.env.ELEVENLABS_VOICE_ID ?? 'EXAVITQu4vr4xnSDxMaL';
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) return NextResponse.json({ error: 'TTS not configured' }, { status: 503 });
 
@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       text: text.slice(0, 500),
-      model_id: 'eleven_turbo_v2_5',
+      model_id: 'eleven_flash_v2_5',
       voice_settings: {
         stability: 0.5,
         similarity_boost: 0.75,
