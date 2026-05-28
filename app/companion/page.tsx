@@ -46,8 +46,9 @@ declare global {
       showAfterCapture: () => void;
       /** Captures the screen in the main process; returns a data-URL or null. */
       captureScreenMain: () => Promise<string | null>;
-      /** Notify the bubble window that Based started or stopped speaking. */
-      setSpeaking: (speaking: boolean) => void;
+      /** Notify the bubble window that Based started or stopped speaking.
+       *  Pass the spoken text when starting so the bubble can display it. */
+      setSpeaking: (speaking: boolean, text?: string) => void;
     };
   }
 }
@@ -117,14 +118,11 @@ export default function CompanionOverlayPage() {
       currentAudioRef.current = null;
     }
     setIsSpeaking(true);
-    window.electronAPI?.setSpeaking(true);
+    window.electronAPI?.setSpeaking(true, text);
     try {
       const res = await fetch('/api/tts', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       });
       if (!res.ok) throw new Error('tts failed');
@@ -134,13 +132,13 @@ export default function CompanionOverlayPage() {
       currentAudioRef.current = audio;
       audio.onended = () => {
         setIsSpeaking(false);
-        window.electronAPI?.setSpeaking(false);
+        window.electronAPI?.setSpeaking(false, '');
         URL.revokeObjectURL(url);
         currentAudioRef.current = null;
       };
       audio.onerror = () => {
         setIsSpeaking(false);
-        window.electronAPI?.setSpeaking(false);
+        window.electronAPI?.setSpeaking(false, '');
         URL.revokeObjectURL(url);
         currentAudioRef.current = null;
       };
@@ -155,11 +153,11 @@ export default function CompanionOverlayPage() {
       utterance.volume = 1.0;
       utterance.onend = () => {
         setIsSpeaking(false);
-        window.electronAPI?.setSpeaking(false);
+        window.electronAPI?.setSpeaking(false, '');
       };
       utterance.onerror = () => {
         setIsSpeaking(false);
-        window.electronAPI?.setSpeaking(false);
+        window.electronAPI?.setSpeaking(false, '');
       };
       window.speechSynthesis?.speak(utterance);
     }

@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserId } from '../_auth';
 
 export const maxDuration = 30;
 
 export async function POST(req: NextRequest) {
-  try {
-    await getUserId(req);
-  } catch {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { text } = (await req.json().catch(() => ({}))) as { text?: string };
+  if (!text?.trim() || text.length > 1000) {
+    return NextResponse.json({ error: 'Invalid text' }, { status: 400 });
   }
-
-  const { text } = (await req.json()) as { text?: string };
-  if (!text?.trim()) return NextResponse.json({ error: 'No text' }, { status: 400 });
 
   const voiceId = process.env.ELEVENLABS_VOICE_ID ?? 'EXAVITQu4vr4xnSDxMaL';
   const apiKey = process.env.ELEVENLABS_API_KEY;
@@ -23,12 +18,7 @@ export async function POST(req: NextRequest) {
     body: JSON.stringify({
       text: text.slice(0, 500),
       model_id: 'eleven_flash_v2_5',
-      voice_settings: {
-        stability: 0.5,
-        similarity_boost: 0.75,
-        style: 0.3,
-        use_speaker_boost: true,
-      },
+      voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.3, use_speaker_boost: true },
     }),
   });
 
