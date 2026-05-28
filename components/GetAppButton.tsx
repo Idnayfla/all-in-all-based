@@ -38,13 +38,7 @@ export function GetAppButton({ className }: { className?: string }) {
 }
 
 /** Landing page variant — renders the download button + sub-note */
-export function GetAppLanding({
-  btnClass,
-  noteClass,
-}: {
-  btnClass: string;
-  noteClass: string;
-}) {
+export function GetAppLanding({ btnClass, noteClass }: { btnClass: string; noteClass: string }) {
   const [platform, setPlatform] = useState<AppPlatform>('unknown');
 
   useEffect(() => {

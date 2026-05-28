@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="lglow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="arcfade" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#c9a87c" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#c9a87c" stop-opacity="1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="120" height="120" fill="#08070e" rx="24"/>
+
+  <!-- Dim hex track -->
+  <polygon points="60,14 97,35 97,79 60,100 23,79 23,35"
+    fill="none" stroke="rgba(201,168,124,0.12)" stroke-width="2" stroke-linejoin="round"/>
+
+  <!-- Rotating arc: animates stroke-dashoffset from 0 → -260 (one full loop) -->
+  <polygon points="60,14 97,35 97,79 60,100 23,79 23,35"
+    fill="none" stroke="#c9a87c" stroke-width="3"
+    stroke-dasharray="73 187"
+    stroke-dashoffset="0"
+    stroke-linejoin="round"
+    filter="url(#lglow)">
+    <animate attributeName="stroke-dashoffset"
+      from="0" to="-260"
+      dur="1.6s" repeatCount="indefinite"
+      calcMode="linear"/>
+  </polygon>
+
+  <!-- Trailing fade: slightly larger dash that's dimmer, offset back by ~20 units -->
+  <polygon points="60,14 97,35 97,79 60,100 23,79 23,35"
+    fill="none" stroke="#c9a87c" stroke-width="5"
+    stroke-dasharray="44 216"
+    stroke-dashoffset="29"
+    stroke-linejoin="round"
+    opacity="0.25">
+    <animate attributeName="stroke-dashoffset"
+      from="29" to="-231"
+      dur="1.6s" repeatCount="indefinite"
+      calcMode="linear"/>
+  </polygon>
+
+  <!-- Pulsing center dot -->
+  <circle cx="60" cy="57" r="3" fill="#c9a87c" filter="url(#lglow)">
+    <animate attributeName="r" values="2;4;2" dur="1.6s" repeatCount="indefinite"
+      calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
+    <animate attributeName="opacity" values="0.5;1;0.5" dur="1.6s" repeatCount="indefinite"
+      calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
+  </circle>
+</svg>

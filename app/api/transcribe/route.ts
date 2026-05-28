@@ -14,10 +14,23 @@ export async function POST(req: NextRequest) {
     if (!audio) return NextResponse.json({ error: 'No audio' }, { status: 400 });
     const filename = (audio as File).name ?? 'recording.webm';
 
+    const locale = (formData.get('locale') as string | null) ?? 'en';
+    // Map app locale codes to Whisper ISO 639-1 codes
+    const LOCALE_TO_WHISPER: Record<string, string> = {
+      en: 'en',
+      ms: 'ms',
+      'zh-Hans': 'zh',
+      ta: 'ta',
+      ja: 'ja',
+      'pt-BR': 'pt',
+    };
+    const language = LOCALE_TO_WHISPER[locale] ?? 'en';
+
     const groqForm = new FormData();
     groqForm.append('file', audio, filename);
     groqForm.append('model', 'whisper-large-v3-turbo');
     groqForm.append('response_format', 'json');
+    groqForm.append('language', language);
 
     const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
@@ -32,7 +45,21 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await res.json();
-    return NextResponse.json({ text: data.text ?? '' });
+    const raw: string = data.text ?? '';
+    const normalized = raw
+      .trim()
+      .toLowerCase()
+      .replace(/[.,!?\s]+$/, '');
+    const HALLUCINATIONS = [
+      'thank you',
+      'thanks for watching',
+      'thank you for watching',
+      'thanks for listening',
+      'bye',
+      'you',
+    ];
+    const clean = HALLUCINATIONS.includes(normalized) ? '' : raw;
+    return NextResponse.json({ text: clean });
   } catch (err: unknown) {
     console.error('[transcribe]', err);
     return NextResponse.json(

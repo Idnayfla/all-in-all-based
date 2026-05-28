@@ -76,8 +76,7 @@ function FontRender({ font, text, size }: { font: FontDef; text: string; size: n
       }}
     >
       {text.split('').map((char, i) => {
-        if (char === '\n')
-          return <div key={i} style={{ width: '100%', height: size * 0.2 }} />;
+        if (char === '\n') return <div key={i} style={{ width: '100%', height: size * 0.2 }} />;
         if (char === ' ') {
           const spGlyph = font.glyphs[' '];
           const spW = spGlyph ? (spGlyph.width / 100) * size : size * 0.35;

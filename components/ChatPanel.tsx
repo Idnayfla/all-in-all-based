@@ -156,6 +156,7 @@ function ProgressBar({ progress, isFree }: { progress: GenerationProgress; isFre
   );
 }
 
+
 export default function ChatPanel({
   messages,
   setMessages,
@@ -231,13 +232,20 @@ export default function ChatPanel({
   const [flagSending, setFlagSending] = useState(false);
   const [reportedErrors, setReportedErrors] = useState<Set<string>>(new Set());
   const reportingInFlight = useRef<Set<string>>(new Set());
-  const [micState, setMicState] = useState<'idle' | 'recording' | 'transcribing'>('idle');
+  const [micState, setMicState] = useState<'idle' | 'warming' | 'recording' | 'transcribing'>(
+    'idle'
+  );
   const [micError, setMicError] = useState('');
+  const [micDeviceId, setMicDeviceId] = useState<string>(() =>
+    typeof window !== 'undefined' ? (localStorage.getItem('mic-device-id') ?? 'default') : 'default'
+  );
+  const [micDevices, setMicDevices] = useState<MediaDeviceInfo[]>([]);
+  const [showMicPicker, setShowMicPicker] = useState(false);
   const [mobileInputOpen, setMobileInputOpen] = useState(false);
   const mobileTextareaRef = useRef<HTMLTextAreaElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const { t } = useTranslation();
+  const recordingStartRef = useRef<number>(0);
+  const stopRecordingRef = useRef<boolean>(false);
+  const { t, locale } = useTranslation();
 
   const submitFlag = async (msgIdx: number, _msgContent: string, _userPrompt: string) => {
     if (flagSending) return;
@@ -280,85 +288,131 @@ export default function ChatPanel({
     }
   };
 
-  const getSupportedMimeType = () => {
-    for (const type of ['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav']) {
-      if (MediaRecorder.isTypeSupported(type)) return type;
-    }
-    return '';
+  const openMicPicker = async () => {
+    const all = await navigator.mediaDevices.enumerateDevices();
+    setMicDevices(all.filter(d => d.kind === 'audioinput'));
+    setShowMicPicker(true);
   };
 
   const toggleMic = async () => {
     if (micState === 'recording') {
-      mediaRecorderRef.current?.stop();
+      // signal stop — handled via ref flag
+      stopRecordingRef.current = true;
       return;
     }
     if (micState !== 'idle') return;
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicError('Mic not supported — use HTTPS or a modern browser');
+      setTimeout(() => setMicError(''), 4000);
+      return;
+    }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioChunksRef.current = [];
-      const mimeType = getSupportedMimeType();
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
-      recorder.ondataavailable = e => {
-        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      const baseConstraints: MediaTrackConstraints = {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
       };
-      recorder.onstop = async () => {
-        stream.getTracks().forEach(track => track.stop());
-        setMicState('transcribing');
+      let stream: MediaStream;
+      if (micDeviceId && micDeviceId !== 'default') {
         try {
-          const actualType = recorder.mimeType || mimeType || 'audio/webm';
-          const ext = actualType.includes('mp4')
-            ? 'm4a'
-            : actualType.includes('ogg')
-              ? 'ogg'
-              : 'webm';
-          const blob = new Blob(audioChunksRef.current, { type: actualType });
-          const form = new FormData();
-          form.append('audio', blob, `recording.${ext}`);
-          const res = await fetch('/api/transcribe', { method: 'POST', body: form });
-          const { text } = await res.json();
-          if (text?.trim()) {
-            // Insert at cursor (Wispr Flow behaviour) — user reviews before sending
-            const ta = textareaRef.current;
-            if (ta) {
-              const start = ta.selectionStart ?? ta.value.length;
-              const end = ta.selectionEnd ?? ta.value.length;
-              const next = ta.value.slice(0, start) + text.trim() + ta.value.slice(end);
-              setInput(next);
-              setTimeout(() => {
-                ta.setSelectionRange(start + text.trim().length, start + text.trim().length);
-                ta.focus();
-              }, 0);
-            } else {
-              setInput(prev => (prev ? prev + ' ' + text.trim() : text.trim()));
-            }
-          }
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: { ...baseConstraints, deviceId: { exact: micDeviceId } },
+          });
         } catch {
-          // silently fail — user can type manually
-        } finally {
-          setMicState('idle');
+          // device no longer available — fall back to system default
+          stream = await navigator.mediaDevices.getUserMedia({ audio: baseConstraints });
         }
+      } else {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: baseConstraints });
+      }
+
+
+      setMicState('warming');
+      await new Promise(r => setTimeout(r, 1500)); // AMD/Bluetooth device re-init time
+
+      const mimeType =
+        ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'].find(t =>
+          MediaRecorder.isTypeSupported(t)
+        ) ?? '';
+      const mr = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+      const chunks: BlobPart[] = [];
+      mr.ondataavailable = e => {
+        if (e.data.size > 0) chunks.push(e.data);
       };
-      recorder.start();
-      mediaRecorderRef.current = recorder;
+
+      stopRecordingRef.current = false;
+      recordingStartRef.current = Date.now();
       setMicState('recording');
+
+      await new Promise<void>(resolve => {
+        mr.onstop = () => resolve();
+        mr.start(250);
+        const check = setInterval(() => {
+          if (stopRecordingRef.current) {
+            clearInterval(check);
+            mr.stop();
+          }
+        }, 50);
+      });
+
+      stream.getTracks().forEach(t => t.stop());
+
+      const duration = Date.now() - recordingStartRef.current;
+      if (duration < 800 || chunks.length === 0) {
+        setMicState('idle');
+        return;
+      }
+
+      setMicState('transcribing');
+      try {
+        const finalMime = mr.mimeType || mimeType || 'audio/webm';
+        const ext = finalMime.includes('ogg') ? 'ogg' : finalMime.includes('mp4') ? 'mp4' : 'webm';
+        const blob = new Blob(chunks, { type: finalMime });
+        const form = new FormData();
+        form.append('audio', blob, `recording.${ext}`);
+        form.append('locale', locale);
+        const res = await fetch('/api/transcribe', {
+          method: 'POST',
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+          body: form,
+        });
+        const json = (await res.json().catch(() => ({}))) as { text?: string; error?: string };
+        if (!res.ok || json.error) {
+          const msg = json.error ?? `Transcription failed (${res.status})`;
+          setMicError(msg);
+          setTimeout(() => setMicError(''), 6000);
+        } else if (json.text?.trim()) {
+          const trimmed = json.text.trim();
+          setInput(prev => (prev ? prev + ' ' + trimmed : trimmed));
+          setTimeout(() => {
+            const ta = mobileTextareaRef.current ?? textareaRef.current;
+            ta?.focus();
+          }, 0);
+        } else {
+          setMicError('No speech detected — try speaking closer to the mic');
+          setTimeout(() => setMicError(''), 4000);
+        }
+      } catch {
+        setMicError('Could not reach transcription service — check your connection');
+        setTimeout(() => setMicError(''), 6000);
+      } finally {
+        setMicState('idle');
+      }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '';
-      const isDenied =
-        msg.toLowerCase().includes('denied') ||
-        msg.toLowerCase().includes('permission') ||
-        msg.toLowerCase().includes('not allowed');
-      const isNotSupported =
-        msg.toLowerCase().includes('not supported') || msg.toLowerCase().includes('not found');
-      // Show a 2-second error hint in the voice hint area
+      const name = err instanceof DOMException ? err.name : '';
       setMicState('idle');
-      if (isDenied) {
-        setMicError('Mic blocked — click the lock icon in your address bar and allow microphone');
-      } else if (isNotSupported) {
-        setMicError('Mic not supported in this browser');
+      if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+        setMicError(
+          'Mic blocked — open site settings (lock icon) and set Microphone to Allow, then refresh'
+        );
+      } else if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+        setMicError('No microphone found — check it is plugged in or enabled');
+      } else if (name === 'NotReadableError' || name === 'TrackStartError') {
+        setMicError('Mic in use by another app — close it and try again');
       } else {
         setMicError('Could not access mic — try again');
       }
-      setTimeout(() => setMicError(''), 3000);
+      setTimeout(() => setMicError(''), 5000);
     }
   };
 
@@ -1423,21 +1477,59 @@ export default function ChatPanel({
             disabled={isGenerating || isGeneratingMedia}
             onPanelSwitch={onPanelSwitch}
           />
-          <button
-            type="button"
-            className={`voice-btn voice-btn--${micState === 'recording' ? 'listening' : micState === 'transcribing' ? 'activated' : 'idle'}`}
-            onClick={toggleMic}
-            title={
-              micState === 'idle'
-                ? 'Press to record — speak, then press again to send'
-                : micState === 'recording'
-                  ? 'Recording… press to stop and send'
-                  : 'Transcribing…'
-            }
-            disabled={isGenerating || isGeneratingMedia || micState === 'transcribing'}
-          >
-            {micState === 'transcribing' ? '◉' : '⬡'}
-          </button>
+          <div className="voice-btn-wrap">
+            <button
+              type="button"
+              className={`voice-btn voice-btn--${micState === 'recording' ? 'listening' : micState === 'transcribing' || micState === 'warming' ? 'activated' : 'idle'}`}
+              onClick={toggleMic}
+              title={
+                micState === 'idle'
+                  ? 'Press to record — speak, then press again to send'
+                  : micState === 'warming'
+                    ? 'Warming up mic…'
+                    : micState === 'recording'
+                      ? 'Recording… press to stop and send'
+                      : 'Transcribing…'
+              }
+              disabled={
+                isGenerating ||
+                isGeneratingMedia ||
+                micState === 'transcribing' ||
+                micState === 'warming'
+              }
+            >
+              {micState === 'transcribing' || micState === 'warming' ? '◉' : '⬡'}
+            </button>
+            <button
+              className="mic-picker-btn"
+              onClick={openMicPicker}
+              title="Select microphone"
+              aria-label="Select microphone"
+            >
+              ·
+            </button>
+            {showMicPicker && (
+              <div className="mic-picker-dropdown">
+                <div className="mic-picker-header">Select microphone</div>
+                {micDevices.map(d => (
+                  <button
+                    key={d.deviceId}
+                    className={`mic-picker-option${micDeviceId === d.deviceId ? ' mic-picker-option--active' : ''}`}
+                    onClick={() => {
+                      setMicDeviceId(d.deviceId);
+                      localStorage.setItem('mic-device-id', d.deviceId);
+                      setShowMicPicker(false);
+                    }}
+                  >
+                    {d.label || `Microphone ${d.deviceId.slice(0, 6)}`}
+                  </button>
+                ))}
+                <button className="mic-picker-close" onClick={() => setShowMicPicker(false)}>
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
           <AnimatePresence>
             {generationMode === 'seedance' && (
               <motion.button
@@ -1482,17 +1574,19 @@ export default function ChatPanel({
               }
             }}
             placeholder={
-              micState === 'recording'
-                ? t('chat.placeholder.recording')
-                : micState === 'transcribing'
-                  ? t('chat.placeholder.transcribing')
-                  : generationMode === 'seedance'
-                    ? t('chat.placeholder.video')
-                    : generationMode === 'music'
-                      ? t('chat.placeholder.music')
-                      : generationMode !== 'chat'
-                        ? t('chat.placeholder.image')
-                        : t('chat.placeholder.default')
+              micState === 'warming'
+                ? 'Warming up mic…'
+                : micState === 'recording'
+                  ? t('chat.placeholder.recording')
+                  : micState === 'transcribing'
+                    ? t('chat.placeholder.transcribing')
+                    : generationMode === 'seedance'
+                      ? t('chat.placeholder.video')
+                      : generationMode === 'music'
+                        ? t('chat.placeholder.music')
+                        : generationMode !== 'chat'
+                          ? t('chat.placeholder.image')
+                          : t('chat.placeholder.default')
             }
             rows={1}
             disabled={isGenerating || isGeneratingMedia}
@@ -1517,6 +1611,9 @@ export default function ChatPanel({
             )}
           </motion.button>
         </div>
+        {micState === 'warming' && (
+          <div className="voice-hint">Warming up mic — ready in a moment…</div>
+        )}
         {micState === 'recording' && (
           <div className="voice-hint">Recording — press mic again to stop and send</div>
         )}

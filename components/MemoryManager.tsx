@@ -122,9 +122,7 @@ export default function MemoryManager({ memory, onSave, onClose }: Props) {
                   <span className="memory-chip-num">{i + 1}</span>
                   <span className="memory-chip-text">
                     {item.text}
-                    {item.source && (
-                      <span className="memory-chip-source">· {item.source}</span>
-                    )}
+                    {item.source && <span className="memory-chip-source">· {item.source}</span>}
                   </span>
                   <div className="memory-chip-actions">
                     <button className="memory-chip-btn" onClick={() => openEdit(i)} title="Edit">
