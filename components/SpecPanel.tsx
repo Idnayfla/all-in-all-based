@@ -319,9 +319,25 @@ export default function SpecPanel({
   const copyMarkdown = async () => {
     const markdown = sections.length > 0 ? reconstructMarkdown() : streamText;
     if (!markdown) return;
-    await navigator.clipboard.writeText(markdown);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(markdown);
+      } else {
+        // Fallback for non-HTTPS contexts (local IP, file://)
+        const ta = document.createElement('textarea');
+        ta.value = markdown;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // silent — user can copy manually
+    }
   };
 
   const saveToNotes = async () => {
