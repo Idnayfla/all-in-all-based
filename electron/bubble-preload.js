@@ -7,6 +7,6 @@ contextBridge.exposeInMainWorld('bubbleAPI', {
     ipcRenderer.on('companion-bubble:state', (_event, state) => cb(state));
   },
   onSpeaking: cb => {
-    ipcRenderer.on('companion-bubble:speaking', (_event, speaking, text) => cb(speaking, text ?? ''));
+    ipcRenderer.on('companion-bubble:speaking', (_event, speaking, text, msPerWord) => cb(speaking, text ?? '', msPerWord ?? 0));
   },
 });
