@@ -1,7 +1,7 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import Anthropic from '@anthropic-ai/sdk';
-import { supabaseAdmin } from '../_auth';
+import { getUserId, supabaseAdmin } from '../_auth';
 import { searchWeb, exaSearch } from '@/lib/tavily';
 import { getWeather } from '@/lib/weather';
 import { getCrowdInfo } from '@/lib/crowd';
@@ -1311,6 +1311,34 @@ async function streamText(
 }
 
 export async function POST(req: NextRequest) {
+  // ── Auth guard ───────────────────────────────────────────────────────────
+  let userId: string;
+  try {
+    userId = await getUserId(req);
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // ── Rate limiting: 10 requests per minute per user ──────────────────────
+  if (process.env.REDIS_URL) {
+    try {
+      const { createClient } = await import('redis');
+      const redis = createClient({ url: process.env.REDIS_URL });
+      await redis.connect();
+      const key = `rl:generate:${userId}`;
+      const count = await redis.incr(key);
+      if (count === 1) {
+        await redis.expire(key, 60);
+      }
+      await redis.disconnect();
+      if (count > 10) {
+        return NextResponse.json({ error: 'rate_limit' }, { status: 429 });
+      }
+    } catch {
+      /* fail open — never block users due to Redis issues */
+    }
+  }
+
   try {
     const {
       messages,
@@ -1339,52 +1367,46 @@ export async function POST(req: NextRequest) {
     // ALWAYS_PRO=true bypasses all tier checks (set on beta deployment)
     // Free AI model bypasses limits entirely (uses Groq, not our Anthropic credits)
     const alwaysPro = process.env.ALWAYS_PRO === 'true';
-    const authToken = req.headers.get('Authorization')?.replace('Bearer ', '');
-    let supabaseUserId: string | undefined;
-    if (!alwaysPro && !usingFreeModel && authToken) {
+    // userId is already verified by the auth guard above
+    const supabaseUserId: string = userId;
+    if (!alwaysPro && !usingFreeModel) {
       try {
-        const {
-          data: { user },
-        } = await supabaseAdmin.auth.getUser(authToken);
-        if (user) {
-          supabaseUserId = user.id;
-          const { data: s } = await supabaseAdmin
-            .from('user_settings')
-            .select(
-              'subscription_tier, generations_used, generations_reset_at, pro_bonus_expires_at'
-            )
-            .eq('user_id', user.id)
-            .single();
+        const { data: s } = await supabaseAdmin
+          .from('user_settings')
+          .select(
+            'subscription_tier, generations_used, generations_reset_at, pro_bonus_expires_at'
+          )
+          .eq('user_id', userId)
+          .single();
 
-          const hasBonusPro =
-            !!s?.pro_bonus_expires_at && new Date(s.pro_bonus_expires_at) > new Date();
-          const effectiveTier = s?.subscription_tier === 'pro' || hasBonusPro ? 'pro' : 'free';
+        const hasBonusPro =
+          !!s?.pro_bonus_expires_at && new Date(s.pro_bonus_expires_at) > new Date();
+        const effectiveTier = s?.subscription_tier === 'pro' || hasBonusPro ? 'pro' : 'free';
 
-          if (effectiveTier === 'free') {
-            const now = new Date();
-            const needsReset =
-              !s?.generations_reset_at ||
-              new Date(s.generations_reset_at).getMonth() !== now.getMonth() ||
-              new Date(s.generations_reset_at).getFullYear() !== now.getFullYear();
-            const used = needsReset ? 0 : (s?.generations_used ?? 0);
+        if (effectiveTier === 'free') {
+          const now = new Date();
+          const needsReset =
+            !s?.generations_reset_at ||
+            new Date(s.generations_reset_at).getMonth() !== now.getMonth() ||
+            new Date(s.generations_reset_at).getFullYear() !== now.getFullYear();
+          const used = needsReset ? 0 : (s?.generations_used ?? 0);
 
-            if (used >= 10) {
-              return NextResponse.json({ error: 'generation_limit_reached' }, { status: 402 });
-            }
-
-            void (async () => {
-              try {
-                await supabaseAdmin.from('user_settings').upsert(
-                  {
-                    user_id: user.id,
-                    generations_used: used + 1,
-                    generations_reset_at: needsReset ? now.toISOString() : s.generations_reset_at,
-                  },
-                  { onConflict: 'user_id' }
-                );
-              } catch {}
-            })();
+          if (used >= 10) {
+            return NextResponse.json({ error: 'generation_limit_reached' }, { status: 402 });
           }
+
+          void (async () => {
+            try {
+              await supabaseAdmin.from('user_settings').upsert(
+                {
+                  user_id: userId,
+                  generations_used: used + 1,
+                  generations_reset_at: needsReset ? now.toISOString() : s.generations_reset_at,
+                },
+                { onConflict: 'user_id' }
+              );
+            } catch {}
+          })();
         }
       } catch {
         /* fail open */
