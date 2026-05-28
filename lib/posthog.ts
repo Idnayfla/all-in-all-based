@@ -1,20 +1,20 @@
 import posthog from 'posthog-js';
 
-let initialized = false;
-
-export function initPostHog() {
-  if (initialized || typeof window === 'undefined') return;
+if (typeof window !== 'undefined') {
   const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
-  if (!key) return;
-  posthog.init(key, {
-    api_host: 'https://us.i.posthog.com',
-    capture_pageview: true,
-    capture_pageleave: true,
-    autocapture: false,
-    persistence: 'localStorage+cookie',
-  });
-  initialized = true;
+  if (key) {
+    posthog.init(key, {
+      api_host: 'https://us.i.posthog.com',
+      capture_pageview: true,
+      capture_pageleave: true,
+      autocapture: false,
+      persistence: 'localStorage+cookie',
+    });
+  }
 }
+
+// kept for backward compatibility — PostHogProvider still calls this
+export function initPostHog() {}
 
 export function identifyUser(userId: string, props?: Record<string, unknown>) {
   if (typeof window === 'undefined') return;
