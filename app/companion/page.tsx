@@ -139,8 +139,23 @@ export default function CompanionOverlayPage() {
         window.electronAPI?.setSpeaking(true, text);
       };
 
+      // Web Audio API for silence detection so word reveal pauses during
+      // natural speech gaps rather than jumping ahead on silence.
+      const audioCtx = new AudioContext();
+      const source = audioCtx.createMediaElementSource(audio);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyser.connect(audioCtx.destination);
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
       audio.ontimeupdate = () => {
         if (!audio.duration || audio.duration === Infinity) return;
+        // Check if audio is currently producing sound — skip reveal during silence
+        analyser.getByteFrequencyData(dataArray);
+        const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+        const isSilent = avg < 5;
+        if (isSilent) return;
         // Reveal words proportional to playback position for true audio-sync
         const progress = audio.currentTime / audio.duration;
         const wordsToShow = Math.ceil(progress * words.length);
@@ -150,12 +165,14 @@ export default function CompanionOverlayPage() {
       audio.onended = () => {
         setIsSpeaking(false);
         window.electronAPI?.setSpeaking(false, '');
+        audioCtx.close().catch(() => {});
         URL.revokeObjectURL(url);
         currentAudioRef.current = null;
       };
       audio.onerror = () => {
         setIsSpeaking(false);
         window.electronAPI?.setSpeaking(false, '');
+        audioCtx.close().catch(() => {});
         URL.revokeObjectURL(url);
         currentAudioRef.current = null;
       };
