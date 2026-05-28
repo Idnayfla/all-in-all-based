@@ -135,9 +135,9 @@ export default function CompanionOverlayPage() {
       });
       if (!res.ok) throw new Error('tts failed');
 
-      const { audioBase64, words: wordTimestamps } = (await res.json()) as {
+      const { audioBase64 } = (await res.json()) as {
         audioBase64: string;
-        words: { word: string; startTime: number }[];
+        words?: { word: string; startTime: number }[];
       };
 
       const audioBlob = base64ToBlob(audioBase64, 'audio/mpeg');
@@ -145,39 +145,19 @@ export default function CompanionOverlayPage() {
       const audio = new Audio(url);
       currentAudioRef.current = audio;
 
-      // Track scheduled timers so we can cancel them if audio is interrupted
-      const wordTimers: ReturnType<typeof setTimeout>[] = [];
-
       audio.onplay = () => {
-        // Fire speaking state only once audio has actually started playing
+        // Show the full response text immediately when audio starts playing
         setIsSpeaking(true);
-        window.electronAPI?.setSpeaking(true, wordTimestamps[0]?.word ?? '');
-
-        // Schedule each word reveal based on its actual ElevenLabs timestamp
-        const MAX_WORDS = 12;
-        wordTimestamps.forEach((w, i) => {
-          const timer = setTimeout(() => {
-            if (!audio.paused && !audio.ended) {
-              const slice = wordTimestamps
-                .slice(Math.max(0, i - MAX_WORDS + 1), i + 1)
-                .map(x => x.word)
-                .join(' ');
-              window.electronAPI?.setSpeaking(true, slice);
-            }
-          }, w.startTime * 1000);
-          wordTimers.push(timer);
-        });
+        window.electronAPI?.setSpeaking(true, text);
       };
 
       audio.onended = () => {
-        wordTimers.forEach(clearTimeout);
         setIsSpeaking(false);
         window.electronAPI?.setSpeaking(false, '');
         URL.revokeObjectURL(url);
         currentAudioRef.current = null;
       };
       audio.onerror = () => {
-        wordTimers.forEach(clearTimeout);
         setIsSpeaking(false);
         window.electronAPI?.setSpeaking(false, '');
         URL.revokeObjectURL(url);
@@ -195,13 +175,6 @@ export default function CompanionOverlayPage() {
       utterance.rate = 0.95;
       utterance.pitch = 1.0;
       utterance.volume = 1.0;
-      utterance.onboundary = (event: SpeechSynthesisEvent) => {
-        // Send the progressively revealed text slice so the bubble shows live captions
-        if (event.name === 'word') {
-          const partial = text.slice(0, event.charIndex + event.charLength);
-          window.electronAPI?.setSpeaking(true, partial);
-        }
-      };
       utterance.onend = () => {
         setIsSpeaking(false);
         window.electronAPI?.setSpeaking(false, '');
