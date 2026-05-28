@@ -10,14 +10,14 @@
       }
       html,
       body {
-        width: 290px;
-        height: 480px;
+        width: 320px;
+        height: 700px;
         background: transparent;
         overflow: hidden;
       }
       .root {
-        width: 290px;
-        height: 480px;
+        width: 320px;
+        height: 700px;
         display: flex;
         align-items: center;
         justify-content: flex-end;
@@ -120,16 +120,16 @@
         bottom: 90px;
         left: 50%;
         transform: translateX(-50%);
-        width: 240px;
-        max-height: 260px;
+        width: 290px;
+        max-height: 500px;
         overflow: hidden;
         background: #0e0c17;
         border: 1px solid rgba(201, 168, 124, 0.35);
         border-radius: 10px;
-        padding: 11px 14px;
+        padding: 8px 10px;
         color: #c9a87c;
         font-family: 'Space Mono', 'Courier New', monospace;
-        font-size: 14px;
+        font-size: 11px;
         line-height: 1.5;
         letter-spacing: 0.01em;
         word-break: break-word;
@@ -267,7 +267,7 @@
         btn.classList.remove('dragging');
       });
 
-      const MAX_WORDS = 18; // show at most 12 words at a time
+      const MAX_WORDS = 40; // show at most 12 words at a time
 
       const speakingDot = document.getElementById('speaking-dot');
       const speechBubble = document.getElementById('speech-bubble');
