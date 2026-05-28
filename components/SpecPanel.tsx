@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Project } from '@/app/page';
+import { track } from '@/lib/posthog';
 
 interface SpecSection {
   heading: string;
@@ -127,6 +128,12 @@ export default function SpecPanel({
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevProjectId = useRef<string | null>(null);
 
+  // Fire once on mount — intentionally no deps, we only want this on first render
+  useEffect(() => {
+    track('spec_panel_opened', { subscription_tier: subscriptionTier });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Load spec when project changes
   useEffect(() => {
     if (!currentProject?.id || !authToken) {
@@ -213,6 +220,11 @@ export default function SpecPanel({
 
   const generate = async () => {
     if (!description.trim() || isGenerating) return;
+    track('spec_generation_started', {
+      platform,
+      has_timeline: !!timeline.trim(),
+      subscription_tier: subscriptionTier,
+    });
     setIsGenerating(true);
     setStreamText('');
     setSections([]);
@@ -240,6 +252,7 @@ export default function SpecPanel({
           limit?: number;
         };
         if (data.error === 'free_limit_reached') {
+          track('spec_limit_hit', { limit: data.limit });
           setGenError(
             `You've used your ${data.limit ?? FREE_MONTHLY_LIMIT} free spec generations this month. Upgrade to Pro for unlimited.`
           );
@@ -280,11 +293,16 @@ export default function SpecPanel({
               done?: boolean;
               srs?: string;
               error?: string;
+              wordCount?: number;
             };
             if (payload.chunk) {
               accumulated += payload.chunk;
               setStreamText(accumulated);
             } else if (payload.done && payload.srs) {
+              track('spec_generation_complete', {
+                word_count: payload.wordCount,
+                subscription_tier: subscriptionTier,
+              });
               const parsed = parseSections(payload.srs);
               if (parsed.length > 0) {
                 setSections(parsed);
@@ -364,6 +382,10 @@ export default function SpecPanel({
 
   const buildFromSpec = () => {
     if (sections.length === 0) return;
+    track('spec_build_clicked', {
+      section_count: sections.length,
+      subscription_tier: subscriptionTier,
+    });
     const prompt = condenseSRS(sections, description);
     onBuildFromSpec(prompt);
   };
