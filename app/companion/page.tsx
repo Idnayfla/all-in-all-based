@@ -63,6 +63,13 @@ interface Msg {
 const SCREEN_INTENT =
   /\b(screen|what'?s (on|here)|solve this|answer this|what do you see|help me with this|what is this)\b/i;
 
+function base64ToBlob(b64: string, mime: string): Blob {
+  const bytes = atob(b64);
+  const arr = new Uint8Array(bytes.length);
+  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
 /**
  * Pick the best available English voice in priority order:
  *   Google UK English Female → Google US English → Microsoft Zira →
@@ -127,52 +134,52 @@ export default function CompanionOverlayPage() {
         body: JSON.stringify({ text }),
       });
       if (!res.ok) throw new Error('tts failed');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
+
+      const { audioBase64, words: wordTimestamps } = (await res.json()) as {
+        audioBase64: string;
+        words: { word: string; startTime: number }[];
+      };
+
+      const audioBlob = base64ToBlob(audioBase64, 'audio/mpeg');
+      const url = URL.createObjectURL(audioBlob);
       const audio = new Audio(url);
       currentAudioRef.current = audio;
-      const words = text.trim().split(/\s+/);
+
+      // Track scheduled timers so we can cancel them if audio is interrupted
+      const wordTimers: ReturnType<typeof setTimeout>[] = [];
 
       audio.onplay = () => {
         // Fire speaking state only once audio has actually started playing
         setIsSpeaking(true);
-        window.electronAPI?.setSpeaking(true, text);
+        window.electronAPI?.setSpeaking(true, wordTimestamps[0]?.word ?? '');
+
+        // Schedule each word reveal based on its actual ElevenLabs timestamp
+        const MAX_WORDS = 12;
+        wordTimestamps.forEach((w, i) => {
+          const timer = setTimeout(() => {
+            if (!audio.paused && !audio.ended) {
+              const slice = wordTimestamps
+                .slice(Math.max(0, i - MAX_WORDS + 1), i + 1)
+                .map(x => x.word)
+                .join(' ');
+              window.electronAPI?.setSpeaking(true, slice);
+            }
+          }, w.startTime * 1000);
+          wordTimers.push(timer);
+        });
       };
 
-      // Web Audio API for silence detection so word reveal pauses during
-      // natural speech gaps rather than jumping ahead on silence.
-      const audioCtx = new AudioContext();
-      const source = audioCtx.createMediaElementSource(audio);
-      const analyser = audioCtx.createAnalyser();
-      analyser.fftSize = 256;
-      source.connect(analyser);
-      analyser.connect(audioCtx.destination);
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
-      audio.ontimeupdate = () => {
-        if (!audio.duration || audio.duration === Infinity) return;
-        // Check if audio is currently producing sound — skip reveal during silence
-        analyser.getByteFrequencyData(dataArray);
-        const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-        const isSilent = avg < 5;
-        if (isSilent) return;
-        // Reveal words proportional to playback position for true audio-sync
-        const progress = audio.currentTime / audio.duration;
-        const wordsToShow = Math.ceil(progress * words.length);
-        const partial = words.slice(0, wordsToShow).join(' ');
-        window.electronAPI?.setSpeaking(true, partial);
-      };
       audio.onended = () => {
+        wordTimers.forEach(clearTimeout);
         setIsSpeaking(false);
         window.electronAPI?.setSpeaking(false, '');
-        audioCtx.close().catch(() => {});
         URL.revokeObjectURL(url);
         currentAudioRef.current = null;
       };
       audio.onerror = () => {
+        wordTimers.forEach(clearTimeout);
         setIsSpeaking(false);
         window.electronAPI?.setSpeaking(false, '');
-        audioCtx.close().catch(() => {});
         URL.revokeObjectURL(url);
         currentAudioRef.current = null;
       };
