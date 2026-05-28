@@ -156,7 +156,6 @@ function ProgressBar({ progress, isFree }: { progress: GenerationProgress; isFre
   );
 }
 
-
 export default function ChatPanel({
   messages,
   setMessages,
@@ -325,7 +324,6 @@ export default function ChatPanel({
       } else {
         stream = await navigator.mediaDevices.getUserMedia({ audio: baseConstraints });
       }
-
 
       setMicState('warming');
       await new Promise(r => setTimeout(r, 1500)); // AMD/Bluetooth device re-init time
