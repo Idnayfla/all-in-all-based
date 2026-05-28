@@ -1133,6 +1133,15 @@ export default function Home() {
               3D
             </button>
             <button
+              className={`tab-btn tab-btn-secondary ${activePanel === 'spec' ? 'active' : ''}`}
+              onClick={() => {
+                setActivePanel('spec');
+                setShowSettings(false);
+              }}
+            >
+              Spec
+            </button>
+            <button
               className={`tab-btn tab-btn-debug tab-btn-secondary ${activePanel === 'debug' ? 'active' : ''}`}
               onClick={() => {
                 setActivePanel('debug');
