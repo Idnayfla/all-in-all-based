@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid text' }, { status: 400 });
   }
 
-  const voiceId = process.env.ELEVENLABS_VOICE_ID ?? 'EXAVITQu4vr4xnSDxMaL';
+  const voiceId = 'EXAVITQu4vr4xnSDxMaL'; // Sarah — verified working on free tier
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) return NextResponse.json({ error: 'TTS not configured' }, { status: 503 });
 

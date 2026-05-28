@@ -159,6 +159,13 @@ export default function CompanionOverlayPage() {
       utterance.rate = 0.95;
       utterance.pitch = 1.0;
       utterance.volume = 1.0;
+      utterance.onboundary = (event: SpeechSynthesisEvent) => {
+        // Send the progressively revealed text slice so the bubble shows live captions
+        if (event.name === 'word') {
+          const partial = text.slice(0, event.charIndex + event.charLength);
+          window.electronAPI?.setSpeaking(true, partial);
+        }
+      };
       utterance.onend = () => {
         setIsSpeaking(false);
         window.electronAPI?.setSpeaking(false, '');
