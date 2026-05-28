@@ -117,8 +117,8 @@ export default function CompanionOverlayPage() {
       currentAudioRef.current.pause();
       currentAudioRef.current = null;
     }
-    setIsSpeaking(true);
-    window.electronAPI?.setSpeaking(true, text);
+    // Do NOT call setSpeaking(true) yet — wait until we have audio actually playing
+    // so the bubble never shows and immediately clears on a fast ElevenLabs failure.
     try {
       const res = await fetch('/api/tts', {
         method: 'POST',
@@ -130,6 +130,11 @@ export default function CompanionOverlayPage() {
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       currentAudioRef.current = audio;
+      audio.onplay = () => {
+        // Fire speaking state only once audio has actually started playing
+        setIsSpeaking(true);
+        window.electronAPI?.setSpeaking(true, text);
+      };
       audio.onended = () => {
         setIsSpeaking(false);
         window.electronAPI?.setSpeaking(false, '');
@@ -145,7 +150,9 @@ export default function CompanionOverlayPage() {
       await audio.play();
     } catch (err) {
       console.error('[tts error]', err);
-      // Fallback to SpeechSynthesis
+      // Fallback to SpeechSynthesis — set speaking state here so bubble shows during system TTS
+      setIsSpeaking(true);
+      window.electronAPI?.setSpeaking(true, text);
       const utterance = new SpeechSynthesisUtterance(text.slice(0, 500));
       const voice = pickBestVoice();
       if (voice) utterance.voice = voice;

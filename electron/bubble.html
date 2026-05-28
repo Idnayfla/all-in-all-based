@@ -270,21 +270,60 @@
       let companionOpen = false;
       let isSpeaking = false;
       let speakingText = '';
+      // Minimum time (ms) the bubble stays visible once shown
+      const BUBBLE_MIN_MS = 1500;
+      // Delay (ms) before hiding the bubble after speaking stops
+      const BUBBLE_HIDE_DELAY_MS = 300;
+      let bubbleShownAt = 0;
+      let hideTimer = null;
 
       function truncate(text, max) {
         if (!text) return '';
         return text.length > max ? text.slice(0, max).trimEnd() + '...' : text;
       }
 
+      function showBubble() {
+        if (hideTimer !== null) {
+          clearTimeout(hideTimer);
+          hideTimer = null;
+        }
+        speakingDot.classList.add('visible');
+        speechBubble.textContent = truncate(speakingText, 120);
+        speechBubble.classList.add('visible');
+        bubbleShownAt = Date.now();
+      }
+
+      function hideBubble() {
+        speakingDot.classList.remove('visible');
+        speechBubble.classList.remove('visible');
+        hideTimer = null;
+      }
+
+      function scheduleHide() {
+        if (hideTimer !== null) clearTimeout(hideTimer);
+        const elapsed = Date.now() - bubbleShownAt;
+        // Honour both the minimum display time and the hide delay
+        const delay = Math.max(BUBBLE_HIDE_DELAY_MS, BUBBLE_MIN_MS - elapsed);
+        hideTimer = setTimeout(() => {
+          // Only hide if speaking is still false when the timer fires
+          if (!isSpeaking) hideBubble();
+        }, delay);
+      }
+
       function updateSpeakingUI() {
         const showIndicators = isSpeaking && !companionOpen;
         if (showIndicators) {
-          speakingDot.classList.add('visible');
-          speechBubble.textContent = truncate(speakingText, 120);
-          speechBubble.classList.add('visible');
+          showBubble();
+        } else if (!isSpeaking) {
+          // If the bubble was never shown (bubbleShownAt === 0), hide immediately
+          if (bubbleShownAt === 0) {
+            hideBubble();
+          } else {
+            scheduleHide();
+          }
         } else {
-          speakingDot.classList.remove('visible');
-          speechBubble.classList.remove('visible');
+          // isSpeaking but companionOpen — hide immediately
+          hideBubble();
         }
       }
 
@@ -298,6 +337,7 @@
       window.bubbleAPI?.onSpeaking((speaking, text) => {
         isSpeaking = speaking;
         speakingText = text || '';
+        if (!speaking) bubbleShownAt = bubbleShownAt || 0; // keep existing value
         updateSpeakingUI();
       });
     </script>
