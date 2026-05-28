@@ -60,14 +60,14 @@ function createOverlayWindow() {
 
 function createBubbleWindow() {
   const { workAreaSize } = screen.getPrimaryDisplay();
-  // Window is 290×480 (transparent). The 52px button sits at the bottom-centre.
+  // Window is 320×700 (transparent). The 52px button sits at the bottom-centre.
   // Default position keeps the button at the bottom-right corner of the work area.
-  const defaultX = workAreaSize.width - 230;
-  const defaultY = workAreaSize.height - 496;
+  const defaultX = workAreaSize.width - 250;
+  const defaultY = workAreaSize.height - 716;
   const pos = loadBubblePosition(defaultX, defaultY);
   bubbleWin = new BrowserWindow({
-    width: 290,
-    height: 480,
+    width: 320,
+    height: 700,
     x: pos.x,
     y: pos.y,
     alwaysOnTop: true,
@@ -232,8 +232,8 @@ app.whenReady().then(async () => {
     if (!bubbleWin) return;
     const [x, y] = bubbleWin.getPosition();
     const { workAreaSize } = screen.getPrimaryDisplay();
-    const newX = Math.max(0, Math.min(x + dx, workAreaSize.width - 290));
-    const newY = Math.max(0, Math.min(y + dy, workAreaSize.height - 480));
+    const newX = Math.max(0, Math.min(x + dx, workAreaSize.width - 320));
+    const newY = Math.max(0, Math.min(y + dy, workAreaSize.height - 700));
     bubbleWin.setPosition(newX, newY);
     if (savePosTimer) clearTimeout(savePosTimer);
     savePosTimer = setTimeout(saveBubblePosition, 500);
