@@ -106,29 +106,63 @@ export default function CompanionOverlayPage() {
   const sessionId = useRef(String(Date.now()).slice(-4));
   const screenSupported = isScreenCaptureSupported();
 
-  const speak = (text: string) => {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    // Prefer a natural-sounding voice; fall back gracefully if none found
-    const voice = pickBestVoice();
-    if (voice) utterance.voice = voice;
-    utterance.rate = 0.95;
-    utterance.pitch = 1.0;
-    utterance.volume = 1.0;
-    utterance.onstart = () => {
-      setIsSpeaking(true);
-      window.electronAPI?.setSpeaking(true);
-    };
-    utterance.onend = () => {
-      setIsSpeaking(false);
-      window.electronAPI?.setSpeaking(false);
-    };
-    utterance.onerror = () => {
-      setIsSpeaking(false);
-      window.electronAPI?.setSpeaking(false);
-    };
-    window.speechSynthesis.speak(utterance);
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  const speak = async (text: string) => {
+    if (!voiceEnabled) return;
+    // Cancel any in-progress speech
+    window.speechSynthesis?.cancel();
+    if (currentAudioRef.current) {
+      currentAudioRef.current.pause();
+      currentAudioRef.current = null;
+    }
+    setIsSpeaking(true);
+    window.electronAPI?.setSpeaking(true);
+    try {
+      const res = await fetch('/api/tts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error('tts failed');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      currentAudioRef.current = audio;
+      audio.onended = () => {
+        setIsSpeaking(false);
+        window.electronAPI?.setSpeaking(false);
+        URL.revokeObjectURL(url);
+        currentAudioRef.current = null;
+      };
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        window.electronAPI?.setSpeaking(false);
+        URL.revokeObjectURL(url);
+        currentAudioRef.current = null;
+      };
+      await audio.play();
+    } catch {
+      // Fallback to SpeechSynthesis
+      const utterance = new SpeechSynthesisUtterance(text.slice(0, 500));
+      const voice = pickBestVoice();
+      if (voice) utterance.voice = voice;
+      utterance.rate = 0.95;
+      utterance.pitch = 1.0;
+      utterance.volume = 1.0;
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        window.electronAPI?.setSpeaking(false);
+      };
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        window.electronAPI?.setSpeaking(false);
+      };
+      window.speechSynthesis?.speak(utterance);
+    }
   };
 
   useEffect(() => {
@@ -518,6 +552,10 @@ export default function CompanionOverlayPage() {
               localStorage.setItem('based_companion_voice', String(next));
               if (!next) {
                 window.speechSynthesis?.cancel();
+                if (currentAudioRef.current) {
+                  currentAudioRef.current.pause();
+                  currentAudioRef.current = null;
+                }
                 setIsSpeaking(false);
                 window.electronAPI?.setSpeaking(false);
               }
