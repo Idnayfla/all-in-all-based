@@ -220,6 +220,11 @@ app.whenReady().then(async () => {
   });
   ipcMain.on('companion-bubble:click', () => toggleOverlay());
 
+  // Forward speaking state from overlay to bubble window
+  ipcMain.on('companion:speaking', (_, speaking) => {
+    bubbleWin?.webContents.send('companion-bubble:speaking', speaking);
+  });
+
   let savePosTimer = null;
   ipcMain.on('companion-bubble:move-delta', (_, dx, dy) => {
     if (!bubbleWin) return;

@@ -46,6 +46,8 @@ declare global {
       showAfterCapture: () => void;
       /** Captures the screen in the main process; returns a data-URL or null. */
       captureScreenMain: () => Promise<string | null>;
+      /** Notify the bubble window that Based started or stopped speaking. */
+      setSpeaking: (speaking: boolean) => void;
     };
   }
 }
@@ -59,14 +61,28 @@ interface Msg {
 const SCREEN_INTENT =
   /\b(screen|what'?s (on|here)|solve this|answer this|what do you see|help me with this|what is this)\b/i;
 
-function speak(text: string) {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = 1.0;
-  utterance.pitch = 1.0;
-  utterance.volume = 1.0;
-  window.speechSynthesis.speak(utterance);
+/**
+ * Pick the best available English voice in priority order:
+ *   Google UK English Female → Google US English → Microsoft Zira →
+ *   Samantha (macOS) → any en- voice → system default
+ */
+function pickBestVoice(): SpeechSynthesisVoice | null {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  const PRIORITY = [
+    'Google UK English Female',
+    'Google US English',
+    'Microsoft Zira Desktop - English (United States)',
+    'Microsoft Zira',
+    'Samantha',
+  ];
+  for (const name of PRIORITY) {
+    const match = voices.find(v => v.name === name);
+    if (match) return match;
+  }
+  // Fall back to any English voice
+  return voices.find(v => v.lang.startsWith('en')) ?? null;
 }
 
 export default function CompanionOverlayPage() {
@@ -82,12 +98,38 @@ export default function CompanionOverlayPage() {
   const [isClosing, setIsClosing] = useState(false);
   const [slowWarning, setSlowWarning] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const slowWarningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hardResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sessionId = useRef(String(Date.now()).slice(-4));
   const screenSupported = isScreenCaptureSupported();
+
+  const speak = (text: string) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    // Prefer a natural-sounding voice; fall back gracefully if none found
+    const voice = pickBestVoice();
+    if (voice) utterance.voice = voice;
+    utterance.rate = 0.95;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+      window.electronAPI?.setSpeaking(true);
+    };
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      window.electronAPI?.setSpeaking(false);
+    };
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      window.electronAPI?.setSpeaking(false);
+    };
+    window.speechSynthesis.speak(utterance);
+  };
 
   useEffect(() => {
     const stored = localStorage.getItem('based_companion_voice');
@@ -392,6 +434,9 @@ export default function CompanionOverlayPage() {
         />
         <span className="companion-title">BASED</span>
         <span className="companion-session">#{sessionId.current}</span>
+        {isSpeaking && (
+          <span className="companion-speaking-indicator" title="Based is speaking">◉</span>
+        )}
         <button
           className="companion-clear"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
@@ -471,7 +516,11 @@ export default function CompanionOverlayPage() {
               const next = !voiceEnabled;
               setVoiceEnabled(next);
               localStorage.setItem('based_companion_voice', String(next));
-              if (!next) window.speechSynthesis?.cancel();
+              if (!next) {
+                window.speechSynthesis?.cancel();
+                setIsSpeaking(false);
+                window.electronAPI?.setSpeaking(false);
+              }
             }}
             title={voiceEnabled ? 'Voice on — click to mute' : 'Voice off — click to enable'}
           >

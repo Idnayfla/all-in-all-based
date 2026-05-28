@@ -6,4 +6,7 @@ contextBridge.exposeInMainWorld('bubbleAPI', {
   onStateChange: cb => {
     ipcRenderer.on('companion-bubble:state', (_event, state) => cb(state));
   },
+  onSpeaking: cb => {
+    ipcRenderer.on('companion-bubble:speaking', (_event, speaking) => cb(speaking));
+  },
 });
