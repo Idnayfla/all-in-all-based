@@ -49,7 +49,7 @@ declare global {
       /** Notify the bubble window that Based started or stopped speaking.
        *  Pass the spoken text when starting so the bubble can display it.
        *  Pass msPerWord (ms per word) so the bubble syncs reveal speed to audio. */
-      setSpeaking: (speaking: boolean, text?: string, msPerWord?: number) => void;
+      setSpeaking: (speaking: boolean, text?: string) => void;
     };
   }
 }
@@ -131,27 +131,21 @@ export default function CompanionOverlayPage() {
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       currentAudioRef.current = audio;
-      const wordCount = text.trim().split(/\s+/).length;
-
-      const sendSpeakingWithTiming = () => {
-        const dur = audio.duration;
-        const msPerWord =
-          dur && isFinite(dur) && dur > 0
-            ? Math.round((dur * 1000) / wordCount)
-            : 0;
-        window.electronAPI?.setSpeaking(true, text, msPerWord || undefined);
-      };
+      const words = text.trim().split(/\s+/);
 
       audio.onplay = () => {
         // Fire speaking state only once audio has actually started playing
         setIsSpeaking(true);
-        sendSpeakingWithTiming();
+        window.electronAPI?.setSpeaking(true, text);
       };
-      audio.onloadedmetadata = () => {
-        // If duration wasn't available at onplay time, send a corrected timing update
-        if (isSpeaking) {
-          sendSpeakingWithTiming();
-        }
+
+      audio.ontimeupdate = () => {
+        if (!audio.duration || audio.duration === Infinity) return;
+        // Reveal words proportional to playback position for true audio-sync
+        const progress = audio.currentTime / audio.duration;
+        const wordsToShow = Math.ceil(progress * words.length);
+        const partial = words.slice(0, wordsToShow).join(' ');
+        window.electronAPI?.setSpeaking(true, partial);
       };
       audio.onended = () => {
         setIsSpeaking(false);
