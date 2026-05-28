@@ -60,12 +60,15 @@ function createOverlayWindow() {
 
 function createBubbleWindow() {
   const { workAreaSize } = screen.getPrimaryDisplay();
-  const defaultX = workAreaSize.width - 104;
-  const defaultY = workAreaSize.height - 104;
+  // Window is 220×220 (transparent). The 52px button sits at the bottom-centre.
+  // These defaults keep the button visually at the same bottom-right corner as
+  // the old 88×88 window: button centre at (width-60, height-60).
+  const defaultX = workAreaSize.width - 170;
+  const defaultY = workAreaSize.height - 236;
   const pos = loadBubblePosition(defaultX, defaultY);
   bubbleWin = new BrowserWindow({
-    width: 88,
-    height: 88,
+    width: 220,
+    height: 220,
     x: pos.x,
     y: pos.y,
     alwaysOnTop: true,
@@ -220,9 +223,9 @@ app.whenReady().then(async () => {
   });
   ipcMain.on('companion-bubble:click', () => toggleOverlay());
 
-  // Forward speaking state from overlay to bubble window
-  ipcMain.on('companion:speaking', (_, speaking) => {
-    bubbleWin?.webContents.send('companion-bubble:speaking', speaking);
+  // Forward speaking state (and optional text) from overlay to bubble window
+  ipcMain.on('companion:speaking', (_, speaking, text) => {
+    bubbleWin?.webContents.send('companion-bubble:speaking', speaking, text ?? '');
   });
 
   let savePosTimer = null;
@@ -230,8 +233,8 @@ app.whenReady().then(async () => {
     if (!bubbleWin) return;
     const [x, y] = bubbleWin.getPosition();
     const { workAreaSize } = screen.getPrimaryDisplay();
-    const newX = Math.max(0, Math.min(x + dx, workAreaSize.width - 88));
-    const newY = Math.max(0, Math.min(y + dy, workAreaSize.height - 88));
+    const newX = Math.max(0, Math.min(x + dx, workAreaSize.width - 220));
+    const newY = Math.max(0, Math.min(y + dy, workAreaSize.height - 220));
     bubbleWin.setPosition(newX, newY);
     if (savePosTimer) clearTimeout(savePosTimer);
     savePosTimer = setTimeout(saveBubblePosition, 500);

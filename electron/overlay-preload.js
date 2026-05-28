@@ -8,5 +8,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Returns a data:image/jpeg;base64,... string or null on failure.
   captureScreenMain: () => ipcRenderer.invoke('companion:capture-screen'),
   // Notify the bubble window that Based started or stopped speaking.
-  setSpeaking: (speaking) => ipcRenderer.send('companion:speaking', speaking),
+  // Pass the spoken text when starting so the bubble can display it.
+  setSpeaking: (speaking, text) => ipcRenderer.send('companion:speaking', speaking, text ?? ''),
 });
