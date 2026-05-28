@@ -121,7 +121,10 @@
         left: 50%;
         transform: translateX(-50%);
         width: 290px;
-        max-height: 500px;
+        height: 300px;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
         overflow: hidden;
         background: #0e0c17;
         border: 1px solid rgba(201, 168, 124, 0.35);
@@ -267,7 +270,7 @@
         btn.classList.remove('dragging');
       });
 
-      const MAX_WORDS = 80; // show at most 12 words at a time
+      const MAX_WORDS = 120; // ~120 words fits 300px fixed height at 11px font
 
       const speakingDot = document.getElementById('speaking-dot');
       const speechBubble = document.getElementById('speech-bubble');
