@@ -129,7 +129,7 @@
         padding: 8px 10px;
         color: #c9a87c;
         font-family: 'Space Mono', 'Courier New', monospace;
-        font-size: 11px;
+        font-size: 13px;
         line-height: 1.5;
         letter-spacing: 0.01em;
         word-break: break-word;
@@ -267,8 +267,6 @@
         btn.classList.remove('dragging');
       });
 
-      const MAX_WORDS = 120; // ~120 words; bubble grows up to max-height: 400px
-
       const speakingDot = document.getElementById('speaking-dot');
       const speechBubble = document.getElementById('speech-bubble');
       let companionOpen = false;
@@ -294,11 +292,7 @@
           speechBubble.classList.add('visible');
           bubbleShownAt = Date.now();
         }
-        // Sliding window: show only the last MAX_WORDS words
-        const allWords = text.trim().split(/\s+/);
-        const visibleWords = allWords.slice(-MAX_WORDS);
-        const displayText = visibleWords.join(' ');
-        speechBubble.textContent = displayText;
+        speechBubble.textContent = text;
       }
 
       function hideBubble() {
