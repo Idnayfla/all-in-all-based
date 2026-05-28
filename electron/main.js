@@ -15,7 +15,13 @@ const BUBBLE_POS_FILE = () => path.join(app.getPath('userData'), 'bubble-positio
 function loadBubblePosition(defaultX, defaultY) {
   try {
     const data = JSON.parse(fs.readFileSync(BUBBLE_POS_FILE(), 'utf8'));
-    if (typeof data.x === 'number' && typeof data.y === 'number') return { x: data.x, y: data.y };
+    if (typeof data.x === 'number' && typeof data.y === 'number') {
+      const { workAreaSize } = screen.getPrimaryDisplay();
+      // Validate saved position fits the current window size — reset if off-screen
+      const fitsX = data.x >= 0 && data.x + 320 <= workAreaSize.width;
+      const fitsY = data.y >= 0 && data.y + 700 <= workAreaSize.height;
+      if (fitsX && fitsY) return { x: data.x, y: data.y };
+    }
   } catch {}
   return { x: defaultX, y: defaultY };
 }
