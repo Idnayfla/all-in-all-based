@@ -59,6 +59,16 @@ interface Msg {
 const SCREEN_INTENT =
   /\b(screen|what'?s (on|here)|solve this|answer this|what do you see|help me with this|what is this)\b/i;
 
+function speak(text: string) {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate = 1.0;
+  utterance.pitch = 1.0;
+  utterance.volume = 1.0;
+  window.speechSynthesis.speak(utterance);
+}
+
 export default function CompanionOverlayPage() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
@@ -71,12 +81,18 @@ export default function CompanionOverlayPage() {
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
   const [slowWarning, setSlowWarning] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const slowWarningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hardResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sessionId = useRef(String(Date.now()).slice(-4));
   const screenSupported = isScreenCaptureSupported();
+
+  useEffect(() => {
+    const stored = localStorage.getItem('based_companion_voice');
+    if (stored === 'true') setVoiceEnabled(true);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -307,6 +323,17 @@ export default function CompanionOverlayPage() {
           }
         }
       }
+      // Speak the completed assistant response when voice is enabled and no error occurred.
+      if (voiceEnabled && !streamError) {
+        setMessages(prev => {
+          const last = prev[prev.length - 1];
+          if (last?.role === 'assistant' && last.content?.trim()) {
+            speak(last.content);
+          }
+          return prev;
+        });
+      }
+
       // Only show an error message if the server explicitly sent an error event.
       // Show the actual error text when it's short and meaningful so failures
       // are debuggable; fall back to a generic message for long/technical strings.
@@ -437,6 +464,19 @@ export default function CompanionOverlayPage() {
               ◉ Screen
             </button>
           )}
+          <button
+            className={`companion-capture-btn companion-voice-btn${voiceEnabled ? ' active' : ''}`}
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            onClick={() => {
+              const next = !voiceEnabled;
+              setVoiceEnabled(next);
+              localStorage.setItem('based_companion_voice', String(next));
+              if (!next) window.speechSynthesis?.cancel();
+            }}
+            title={voiceEnabled ? 'Voice on — click to mute' : 'Voice off — click to enable'}
+          >
+            {voiceEnabled ? '◉ Voice' : '⊙ Voice'}
+          </button>
           {captureError && <span className="companion-capture-error">{captureError}</span>}
         </div>
 
