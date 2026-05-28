@@ -274,26 +274,79 @@
       const BUBBLE_MIN_MS = 1500;
       // Delay (ms) before hiding the bubble after speaking stops
       const BUBBLE_HIDE_DELAY_MS = 300;
+      // Interval between word reveals for ElevenLabs (ms per word)
+      const WORD_REVEAL_MS = 120;
       let bubbleShownAt = 0;
       let hideTimer = null;
+      // Word-by-word reveal state for ElevenLabs
+      let revealInterval = null;
+      let revealWords = [];
+      let revealIndex = 0;
 
       function truncate(text, max) {
         if (!text) return '';
-        return text.length > max ? text.slice(0, max).trimEnd() + '...' : text;
+        return text.length > max ? '...' + text.slice(text.length - max) : text;
       }
 
-      function showBubble() {
+      function stopReveal() {
+        if (revealInterval !== null) {
+          clearInterval(revealInterval);
+          revealInterval = null;
+        }
+        revealWords = [];
+        revealIndex = 0;
+      }
+
+      function startWordReveal(fullText) {
+        stopReveal();
+        revealWords = fullText.trim().split(/\s+/);
+        revealIndex = 0;
+        function tick() {
+          revealIndex++;
+          const visible = revealWords.slice(0, revealIndex).join(' ');
+          speechBubble.textContent = truncate(visible, 200);
+          if (revealIndex >= revealWords.length) {
+            stopReveal();
+          }
+        }
+        tick(); // show first word immediately
+        revealInterval = setInterval(tick, WORD_REVEAL_MS);
+      }
+
+      function showBubble(fullText) {
         if (hideTimer !== null) {
           clearTimeout(hideTimer);
           hideTimer = null;
         }
         speakingDot.classList.add('visible');
-        speechBubble.textContent = truncate(speakingText, 120);
-        speechBubble.classList.add('visible');
-        bubbleShownAt = Date.now();
+        // Only trigger the CSS show animation on hidden→visible transition
+        const wasVisible = speechBubble.classList.contains('visible');
+        if (!wasVisible) {
+          speechBubble.classList.add('visible');
+          bubbleShownAt = Date.now();
+        }
+        // If this is a system-TTS progressive update (partial text already set externally),
+        // just update textContent directly. Otherwise start word-by-word reveal.
+        if (revealInterval === null && !wasVisible) {
+          // Fresh ElevenLabs audio — start word-by-word reveal
+          startWordReveal(fullText);
+        } else if (revealInterval === null) {
+          // Repeated setSpeaking(true, partial) calls from onboundary — update directly
+          speechBubble.textContent = truncate(fullText, 200);
+        }
+        // If revealInterval is running, let it continue — don't reset mid-reveal
+      }
+
+      function updateBubbleText(fullText) {
+        // Called on repeated setSpeaking(true, ...) when the bubble is already visible.
+        // For system TTS (onboundary), fullText grows progressively — update directly.
+        // If word reveal is running (ElevenLabs), don't interrupt it.
+        if (revealInterval !== null) return;
+        speechBubble.textContent = truncate(fullText, 200);
       }
 
       function hideBubble() {
+        stopReveal();
         speakingDot.classList.remove('visible');
         speechBubble.classList.remove('visible');
         hideTimer = null;
@@ -310,10 +363,17 @@
         }, delay);
       }
 
-      function updateSpeakingUI() {
+      function updateSpeakingUI(text) {
         const showIndicators = isSpeaking && !companionOpen;
         if (showIndicators) {
-          showBubble();
+          const isAlreadyVisible = speechBubble.classList.contains('visible');
+          if (!isAlreadyVisible) {
+            showBubble(text);
+          } else {
+            updateBubbleText(text);
+          }
+          // Ensure dot is always visible while speaking
+          speakingDot.classList.add('visible');
         } else if (!isSpeaking) {
           // If the bubble was never shown (bubbleShownAt === 0), hide immediately
           if (bubbleShownAt === 0) {
@@ -331,14 +391,22 @@
         const isOpen = state === 'open';
         btn.classList.toggle('open', isOpen);
         companionOpen = isOpen;
-        updateSpeakingUI();
+        updateSpeakingUI(speakingText);
       });
 
       window.bubbleAPI?.onSpeaking((speaking, text) => {
+        const wasAlreadySpeaking = isSpeaking;
         isSpeaking = speaking;
         speakingText = text || '';
-        if (!speaking) bubbleShownAt = bubbleShownAt || 0; // keep existing value
-        updateSpeakingUI();
+        if (!speaking) {
+          bubbleShownAt = bubbleShownAt || 0; // keep existing value
+        }
+        if (speaking && wasAlreadySpeaking) {
+          // Repeated true call — update text only (no animation reset)
+          updateSpeakingUI(speakingText);
+        } else {
+          updateSpeakingUI(speakingText);
+        }
       });
     </script>
   </body>
