@@ -143,7 +143,8 @@ export default function CompanionOverlayPage() {
         currentAudioRef.current = null;
       };
       await audio.play();
-    } catch {
+    } catch (err) {
+      console.error('[tts error]', err);
       // Fallback to SpeechSynthesis
       const utterance = new SpeechSynthesisUtterance(text.slice(0, 500));
       const voice = pickBestVoice();
