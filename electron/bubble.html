@@ -11,13 +11,13 @@
       html,
       body {
         width: 320px;
-        height: 700px;
+        height: 420px;
         background: transparent;
         overflow: hidden;
       }
       .root {
         width: 320px;
-        height: 700px;
+        height: 420px;
         display: flex;
         align-items: center;
         justify-content: flex-end;
@@ -121,10 +121,7 @@
         left: 50%;
         transform: translateX(-50%);
         width: 290px;
-        height: 300px;
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-end;
+        max-height: 400px;
         overflow: hidden;
         background: #0e0c17;
         border: 1px solid rgba(201, 168, 124, 0.35);
@@ -270,7 +267,7 @@
         btn.classList.remove('dragging');
       });
 
-      const MAX_WORDS = 120; // ~120 words fits 300px fixed height at 11px font
+      const MAX_WORDS = 120; // ~120 words; bubble grows up to max-height: 400px
 
       const speakingDot = document.getElementById('speaking-dot');
       const speechBubble = document.getElementById('speech-bubble');
@@ -302,7 +299,6 @@
         const visibleWords = allWords.slice(-MAX_WORDS);
         const displayText = visibleWords.join(' ');
         speechBubble.textContent = displayText;
-        // No scrollTop needed — fixed height, always showing latest words
       }
 
       function hideBubble() {
