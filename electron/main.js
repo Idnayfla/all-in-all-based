@@ -223,9 +223,9 @@ app.whenReady().then(async () => {
   });
   ipcMain.on('companion-bubble:click', () => toggleOverlay());
 
-  // Forward speaking state (and optional text) from overlay to bubble window
-  ipcMain.on('companion:speaking', (_, speaking, text) => {
-    bubbleWin?.webContents.send('companion-bubble:speaking', speaking, text ?? '');
+  // Forward speaking state (and optional text + timing) from overlay to bubble window
+  ipcMain.on('companion:speaking', (_, speaking, text, msPerWord) => {
+    bubbleWin?.webContents.send('companion-bubble:speaking', speaking, text ?? '', msPerWord ?? 0);
   });
 
   let savePosTimer = null;

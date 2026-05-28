@@ -274,8 +274,11 @@
       const BUBBLE_MIN_MS = 1500;
       // Delay (ms) before hiding the bubble after speaking stops
       const BUBBLE_HIDE_DELAY_MS = 300;
-      // Interval between word reveals for ElevenLabs (ms per word)
-      const WORD_REVEAL_MS = 120;
+      // Word reveal timing bounds (ms per word)
+      const WORD_REVEAL_MIN_MS = 80;
+      const WORD_REVEAL_MAX_MS = 600;
+      const WORD_REVEAL_DEFAULT_MS = 300;
+      let currentMsPerWord = WORD_REVEAL_DEFAULT_MS;
       let bubbleShownAt = 0;
       let hideTimer = null;
       // Word-by-word reveal state for ElevenLabs
@@ -297,8 +300,13 @@
         revealIndex = 0;
       }
 
-      function startWordReveal(fullText) {
+      function startWordReveal(fullText, msPerWord) {
         stopReveal();
+        // Clamp to valid range; fall back to default if missing or zero
+        const interval = msPerWord && msPerWord > 0
+          ? Math.min(WORD_REVEAL_MAX_MS, Math.max(WORD_REVEAL_MIN_MS, msPerWord))
+          : WORD_REVEAL_DEFAULT_MS;
+        currentMsPerWord = interval;
         revealWords = fullText.trim().split(/\s+/);
         revealIndex = 0;
         function tick() {
@@ -310,10 +318,10 @@
           }
         }
         tick(); // show first word immediately
-        revealInterval = setInterval(tick, WORD_REVEAL_MS);
+        revealInterval = setInterval(tick, currentMsPerWord);
       }
 
-      function showBubble(fullText) {
+      function showBubble(fullText, msPerWord) {
         if (hideTimer !== null) {
           clearTimeout(hideTimer);
           hideTimer = null;
@@ -328,13 +336,33 @@
         // If this is a system-TTS progressive update (partial text already set externally),
         // just update textContent directly. Otherwise start word-by-word reveal.
         if (revealInterval === null && !wasVisible) {
-          // Fresh ElevenLabs audio — start word-by-word reveal
-          startWordReveal(fullText);
+          // Fresh ElevenLabs audio — start word-by-word reveal with synced timing
+          startWordReveal(fullText, msPerWord);
         } else if (revealInterval === null) {
           // Repeated setSpeaking(true, partial) calls from onboundary — update directly
           speechBubble.textContent = truncate(fullText, 200);
+        } else if (msPerWord && msPerWord > 0) {
+          // Timing correction arrived after reveal started (onloadedmetadata fallback):
+          // restart the reveal with the corrected interval from the current word position.
+          const clamped = Math.min(WORD_REVEAL_MAX_MS, Math.max(WORD_REVEAL_MIN_MS, msPerWord));
+          if (Math.abs(clamped - currentMsPerWord) > 20) {
+            // Meaningful difference — restart from current position with new interval
+            clearInterval(revealInterval);
+            revealInterval = null;
+            currentMsPerWord = clamped;
+            function tickCorrected() {
+              revealIndex++;
+              const visible = revealWords.slice(0, revealIndex).join(' ');
+              speechBubble.textContent = truncate(visible, 200);
+              if (revealIndex >= revealWords.length) {
+                clearInterval(revealInterval);
+                revealInterval = null;
+              }
+            }
+            revealInterval = setInterval(tickCorrected, currentMsPerWord);
+          }
         }
-        // If revealInterval is running, let it continue — don't reset mid-reveal
+        // If revealInterval is running and no timing correction, let it continue
       }
 
       function updateBubbleText(fullText) {
@@ -363,14 +391,15 @@
         }, delay);
       }
 
-      function updateSpeakingUI(text) {
+      function updateSpeakingUI(text, msPerWord) {
         const showIndicators = isSpeaking && !companionOpen;
         if (showIndicators) {
           const isAlreadyVisible = speechBubble.classList.contains('visible');
           if (!isAlreadyVisible) {
-            showBubble(text);
+            showBubble(text, msPerWord);
           } else {
-            updateBubbleText(text);
+            // Pass msPerWord in case this is a timing-correction call (onloadedmetadata)
+            showBubble(text, msPerWord);
           }
           // Ensure dot is always visible while speaking
           speakingDot.classList.add('visible');
@@ -391,22 +420,17 @@
         const isOpen = state === 'open';
         btn.classList.toggle('open', isOpen);
         companionOpen = isOpen;
-        updateSpeakingUI(speakingText);
+        updateSpeakingUI(speakingText, currentMsPerWord);
       });
 
-      window.bubbleAPI?.onSpeaking((speaking, text) => {
+      window.bubbleAPI?.onSpeaking((speaking, text, msPerWord) => {
         const wasAlreadySpeaking = isSpeaking;
         isSpeaking = speaking;
         speakingText = text || '';
         if (!speaking) {
           bubbleShownAt = bubbleShownAt || 0; // keep existing value
         }
-        if (speaking && wasAlreadySpeaking) {
-          // Repeated true call — update text only (no animation reset)
-          updateSpeakingUI(speakingText);
-        } else {
-          updateSpeakingUI(speakingText);
-        }
+        updateSpeakingUI(speakingText, msPerWord || 0);
       });
     </script>
   </body>
