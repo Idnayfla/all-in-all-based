@@ -12516,6 +12516,21 @@ body:has(.beta-banner) .app-root {
   line-height: 1.5;
 }
 
+.companion-speaking-indicator {
+  margin-left: auto;
+  font-size: 11px;
+  color: #c9a87c;
+  opacity: 1;
+  animation: companion-speaking-pulse 1s ease-in-out infinite;
+  pointer-events: none;
+  line-height: 1;
+}
+
+@keyframes companion-speaking-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.85); }
+}
+
 /* â”€â”€ Desktop companion bubble (Electron always-visible window) â”€â”€ */
 .desktop-bubble-root {
   width: 100vw;

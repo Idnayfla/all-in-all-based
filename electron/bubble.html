@@ -85,6 +85,33 @@
       .btn.dragging .ring-2 {
         opacity: 0;
       }
+      .speaking-dot {
+        position: absolute;
+        top: -2px;
+        right: -2px;
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: #c9a87c;
+        border: 2px solid #08070e;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        font-size: 7px;
+        color: #08070e;
+        font-weight: 900;
+        line-height: 1;
+        pointer-events: none;
+        z-index: 10;
+        animation: speaking-pulse 1s ease-in-out infinite;
+      }
+      .speaking-dot.visible {
+        display: flex;
+      }
+      @keyframes speaking-pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.25); opacity: 0.7; }
+      }
       @keyframes breathe {
         0%,
         100% {
@@ -147,6 +174,7 @@
         </svg>
         <span class="ring ring-1"></span>
         <span class="ring ring-2"></span>
+        <span class="speaking-dot" id="speaking-dot">&#9689;</span>
       </button>
     </div>
     <script>
@@ -184,9 +212,28 @@
         btn.classList.remove('dragging');
       });
 
+      const speakingDot = document.getElementById('speaking-dot');
+      let companionOpen = false;
+      let isSpeaking = false;
+
+      function updateSpeakingDot() {
+        if (isSpeaking && !companionOpen) {
+          speakingDot.classList.add('visible');
+        } else {
+          speakingDot.classList.remove('visible');
+        }
+      }
+
       window.bubbleAPI?.onStateChange(state => {
         const isOpen = state === 'open';
         btn.classList.toggle('open', isOpen);
+        companionOpen = isOpen;
+        updateSpeakingDot();
+      });
+
+      window.bubbleAPI?.onSpeaking(speaking => {
+        isSpeaking = speaking;
+        updateSpeakingDot();
       });
     </script>
   </body>
