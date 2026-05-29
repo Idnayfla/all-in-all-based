@@ -7,17 +7,25 @@ interface WordTimestamp {
   startTime: number;
 }
 
+const VOICES: Record<string, string> = {
+  male: 'witRXbSJAs6nWlhTTzNe', // Based-D — warm, composed male (ElevenLabs Voice Design, late-20s neutral American male)
+  female: 'HuUeqrT8e2PWVP3RIv1T', // Based-D-Female-2 — warm, grounded female (ElevenLabs Voice Design, mid-20s neutral American female)
+};
+
 export async function POST(req: NextRequest) {
-  const { text } = (await req.json().catch(() => ({}))) as { text?: string };
+  const { text, gender = 'male' } = (await req.json().catch(() => ({}))) as {
+    text?: string;
+    gender?: 'male' | 'female';
+  };
   if (!text?.trim() || text.length > 1000) {
     return NextResponse.json({ error: 'Invalid text' }, { status: 400 });
   }
 
-  const voiceId = 'EXAVITQu4vr4xnSDxMaL'; // Sarah — verified working on free tier
+  const voiceId = VOICES[gender] ?? VOICES.male;
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) return NextResponse.json({ error: 'TTS not configured' }, { status: 503 });
 
-  const trimmedText = text.slice(0, 500);
+  const trimmedText = text.trim();
 
   const res = await fetch(
     `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps`,
@@ -28,9 +36,9 @@ export async function POST(req: NextRequest) {
         text: trimmedText,
         model_id: 'eleven_flash_v2_5',
         voice_settings: {
-          stability: 0.5,
-          similarity_boost: 0.75,
-          style: 0.3,
+          stability: 0.55,
+          similarity_boost: 0.8,
+          style: 0.35,
           use_speaker_boost: true,
         },
       }),
@@ -70,8 +78,5 @@ export async function POST(req: NextRequest) {
     charIdx += word.length + 1; // +1 for the space after the word
   }
 
-  return NextResponse.json(
-    { audioBase64, words },
-    { headers: { 'Cache-Control': 'no-store' } }
-  );
+  return NextResponse.json({ audioBase64, words }, { headers: { 'Cache-Control': 'no-store' } });
 }
