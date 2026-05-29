@@ -8,7 +8,7 @@ interface WordTimestamp {
 }
 
 const VOICES: Record<string, string> = {
-  male: 'witRXbSJAs6nWlhTTzNe', // Based-D — warm, composed male (ElevenLabs Voice Design, late-20s neutral American male)
+  male: '2gpuOKD5shp7mKh4qkta', // Based — warm, unhurried, intimately direct (saved permanent voice 2026-05-30)
   female: 'HuUeqrT8e2PWVP3RIv1T', // Based-D-Female-2 — warm, grounded female (ElevenLabs Voice Design, mid-20s neutral American female)
 };
 
