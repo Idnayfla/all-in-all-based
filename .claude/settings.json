@@ -1,4 +1,26 @@
 {
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\Hus Alfyandi\\.vscode\\all-in-all-based\\.claude\\hooks\\save-session.js\""
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\Hus Alfyandi\\.vscode\\all-in-all-based\\.claude\\hooks\\save-session.js\""
+          }
+        ]
+      }
+    ]
+  },
   "permissions": {
     "allow": [
       "Bash(*)",

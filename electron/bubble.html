@@ -11,13 +11,13 @@
       html,
       body {
         width: 320px;
-        height: 420px;
+        height: 600px;
         background: transparent;
         overflow: hidden;
       }
       .root {
         width: 320px;
-        height: 420px;
+        height: 600px;
         display: flex;
         align-items: center;
         justify-content: flex-end;
@@ -121,7 +121,7 @@
         left: 50%;
         transform: translateX(-50%);
         width: 290px;
-        max-height: 400px;
+        max-height: 500px;
         overflow: hidden;
         background: #0e0c17;
         border: 1px solid rgba(201, 168, 124, 0.35);
@@ -237,14 +237,26 @@
       let dragStart = null;
       let isDragging = false;
 
+      function updatePassthrough(clientX, clientY) {
+        var el = document.elementFromPoint(clientX, clientY);
+        var isOverBtn = el === btn || btn.contains(el);
+        window.bubbleAPI?.setIgnoreMouseEvents(!isOverBtn);
+      }
+
       btn.addEventListener('mousedown', e => {
         dragStart = { x: e.screenX, y: e.screenY };
         isDragging = false;
+        // Ensure the window is interactive while button is held
+        window.bubbleAPI?.setIgnoreMouseEvents(false);
         e.preventDefault();
       });
 
       window.addEventListener('mousemove', e => {
-        if (!dragStart) return;
+        if (!dragStart) {
+          // Not dragging: make transparent areas pass clicks through to the OS
+          updatePassthrough(e.clientX, e.clientY);
+          return;
+        }
         const dx = e.screenX - dragStart.x;
         const dy = e.screenY - dragStart.y;
         if (!isDragging && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
@@ -258,13 +270,20 @@
         }
       });
 
-      window.addEventListener('mouseup', () => {
+      window.addEventListener('mouseup', e => {
         if (dragStart && !isDragging) {
           window.bubbleAPI?.toggle();
         }
         dragStart = null;
         isDragging = false;
         btn.classList.remove('dragging');
+        // Re-evaluate passthrough after drag ends
+        updatePassthrough(e.clientX, e.clientY);
+      });
+
+      // Mouse left the window entirely — restore passthrough
+      window.addEventListener('mouseleave', () => {
+        if (!dragStart) window.bubbleAPI?.setIgnoreMouseEvents(true);
       });
 
       const speakingDot = document.getElementById('speaking-dot');
@@ -272,74 +291,164 @@
       let companionOpen = false;
       let isSpeaking = false;
       let speakingText = '';
-      // Minimum time (ms) the bubble stays visible once shown
-      const BUBBLE_MIN_MS = 1500;
-      // Delay (ms) before hiding the bubble after speaking stops
-      const BUBBLE_HIDE_DELAY_MS = 300;
-      let bubbleShownAt = 0;
+      let lastSpeakingText = '';
+      let speakingStartedAt = 0;
       let hideTimer = null;
+      let chunkTimers = [];
 
-      function showBubble(text) {
-        if (!text) return;
-        if (hideTimer !== null) {
-          clearTimeout(hideTimer);
-          hideTimer = null;
+      var WPM = 160;
+
+      function splitChunks(text) {
+        var maxWords = 12;
+        var sentences = text.match(/[^.!?]+[.!?]*/g) || [text];
+        var chunks = [];
+        for (var i = 0; i < sentences.length; i++) {
+          var s = sentences[i].trim();
+          if (!s) continue;
+          var words = s.split(/\s+/).filter(function(w) { return w.length > 0; });
+          if (words.length <= maxWords) {
+            chunks.push(s);
+          } else {
+            for (var j = 0; j < words.length; j += maxWords) {
+              var chunk = words.slice(j, j + maxWords).join(' ');
+              if (chunk) chunks.push(chunk);
+            }
+          }
         }
-        speakingDot.classList.add('visible');
-        // Only trigger the CSS opacity animation on hidden→visible transition
-        const wasVisible = speechBubble.classList.contains('visible');
-        if (!wasVisible) {
+        return chunks.filter(function(c) { return c.length > 0; });
+      }
+
+      function estimatedDelay(chunk) {
+        var words = chunk.trim().split(/\s+/).filter(function(w) { return w.length > 0; }).length;
+        var speakMs = (words / WPM) * 60 * 1000;
+        // Add pause if chunk ends a sentence
+        var pause = /[.!?]\s*$/.test(chunk) ? 500 : 0;
+        return Math.max(1000, speakMs + pause);
+      }
+
+      function clearChunkTimers() {
+        for (var i = 0; i < chunkTimers.length; i++) clearTimeout(chunkTimers[i]);
+        chunkTimers = [];
+      }
+
+      function setChunk(text) {
+        if (speechBubble.classList.contains('visible')) {
+          speechBubble.classList.remove('visible');
+          var t = setTimeout(function() {
+            speechBubble.textContent = text;
+            speechBubble.classList.add('visible');
+          }, 150);
+          chunkTimers.push(t);
+        } else {
+          speechBubble.textContent = text;
           speechBubble.classList.add('visible');
-          bubbleShownAt = Date.now();
         }
-        speechBubble.textContent = text;
+      }
+
+      function showBubble(rawText) {
+        if (!rawText) return;
+        if (hideTimer !== null) { clearTimeout(hideTimer); hideTimer = null; }
+        clearChunkTimers();
+        speakingDot.classList.add('visible');
+
+        // How far into the current audio are we?
+        var elapsed = speakingStartedAt > 0 ? Math.max(0, Date.now() - speakingStartedAt) : 0;
+
+        // Real ElevenLabs word-timed path: seek to the chunk that matches elapsed time
+        if (rawText.indexOf('__timed:') === 0) {
+          try {
+            var timed = JSON.parse(rawText.slice(8));
+            if (timed && timed.length > 0) {
+              // Find the last chunk whose scheduled delay has already passed
+              var currentIdx = 0;
+              for (var i = 0; i < timed.length; i++) {
+                if (timed[i].d <= elapsed) { currentIdx = i; } else { break; }
+              }
+              setChunk(timed[currentIdx].t);
+              for (var i = currentIdx + 1; i < timed.length; i++) {
+                (function(entry) {
+                  var t = setTimeout(function() { setChunk(entry.t); }, Math.max(0, entry.d - elapsed));
+                  chunkTimers.push(t);
+                })(timed[i]);
+              }
+              return;
+            }
+          } catch(e) {}
+        }
+
+        // Estimation fallback (prod companion sends plain text): seek to the right chunk
+        var chunks = splitChunks(rawText);
+        if (chunks.length === 0) return;
+        var cumElapsed = 0;
+        var startIdx = 0;
+        var chunkStart = 0;
+        for (var i = 0; i < chunks.length; i++) {
+          var dur = estimatedDelay(chunks[i]);
+          if (cumElapsed + dur > elapsed || i === chunks.length - 1) {
+            startIdx = i;
+            chunkStart = cumElapsed;
+            break;
+          }
+          cumElapsed += dur;
+        }
+        setChunk(chunks[startIdx]);
+        var timeInChunk = elapsed - chunkStart;
+        var nextDelay = Math.max(100, estimatedDelay(chunks[startIdx]) - timeInChunk);
+        for (var i = startIdx + 1; i < chunks.length; i++) {
+          (function(chunk, delay) {
+            var t = setTimeout(function() { setChunk(chunk); }, delay);
+            chunkTimers.push(t);
+          })(chunks[i], nextDelay);
+          nextDelay += estimatedDelay(chunks[i]);
+        }
       }
 
       function hideBubble() {
+        clearChunkTimers();
         speakingDot.classList.remove('visible');
         speechBubble.classList.remove('visible');
+        speechBubble.textContent = '';
         hideTimer = null;
-      }
-
-      function scheduleHide() {
-        if (hideTimer !== null) clearTimeout(hideTimer);
-        const elapsed = Date.now() - bubbleShownAt;
-        // Honour both the minimum display time and the hide delay
-        const delay = Math.max(BUBBLE_HIDE_DELAY_MS, BUBBLE_MIN_MS - elapsed);
-        hideTimer = setTimeout(() => {
-          // Only hide if speaking is still false when the timer fires
-          if (!isSpeaking) hideBubble();
-        }, delay);
-      }
-
-      function updateSpeakingUI(text) {
-        const showIndicators = isSpeaking && !companionOpen;
-        if (showIndicators) {
-          showBubble(text);
-          speakingDot.classList.add('visible');
-        } else if (!isSpeaking) {
-          if (bubbleShownAt === 0) {
-            hideBubble();
-          } else {
-            scheduleHide();
-          }
-        } else {
-          // isSpeaking but companionOpen — hide immediately
-          hideBubble();
-        }
+        lastSpeakingText = '';
       }
 
       window.bubbleAPI?.onStateChange(state => {
         const isOpen = state === 'open';
         btn.classList.toggle('open', isOpen);
         companionOpen = isOpen;
-        updateSpeakingUI(speakingText);
+        if (isOpen) {
+          // Companion opened — hide any bubble text so it doesn't overlap
+          hideBubble();
+        } else {
+          // Companion closed/minimized — show bubble if there is any speaking text.
+          // Use lastSpeakingText as fallback so a race between audio.onended and
+          // the hide event (where isSpeaking flips to false a frame too early)
+          // doesn't silently drop the bubble.
+          var textToShow = speakingText || lastSpeakingText;
+          if (textToShow) showBubble(textToShow);
+        }
       });
 
       window.bubbleAPI?.onSpeaking((speaking, text) => {
         isSpeaking = speaking;
         speakingText = text || '';
-        updateSpeakingUI(speakingText);
+        if (speaking) {
+          if (speakingText) lastSpeakingText = speakingText;
+          speakingStartedAt = Date.now();
+          if (hideTimer !== null) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+          }
+          if (!companionOpen) {
+            showBubble(speakingText);
+          }
+        } else {
+          // speaking=false: wait 1000ms before hiding to prevent end-of-speech flicker
+          if (hideTimer !== null) clearTimeout(hideTimer);
+          hideTimer = setTimeout(() => {
+            if (!isSpeaking) hideBubble();
+          }, 1000);
+        }
       });
     </script>
   </body>

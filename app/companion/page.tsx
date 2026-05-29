@@ -75,6 +75,21 @@ function base64ToBlob(b64: string, mime: string): Blob {
  *   Google UK English Female → Google US English → Microsoft Zira →
  *   Samantha (macOS) → any en- voice → system default
  */
+function buildSpeechChunks(text: string, maxWords = 12): string[] {
+  const sentences = text.match(/[^.!?]+[.!?]*/g) ?? [text];
+  const out: string[] = [];
+  for (const s of sentences) {
+    const ws = s.trim().split(/\s+/).filter(Boolean);
+    if (!ws.length) continue;
+    if (ws.length <= maxWords) {
+      out.push(s.trim());
+      continue;
+    }
+    for (let i = 0; i < ws.length; i += maxWords) out.push(ws.slice(i, i + maxWords).join(' '));
+  }
+  return out.filter(Boolean);
+}
+
 function pickBestVoice(): SpeechSynthesisVoice | null {
   if (typeof window === 'undefined' || !window.speechSynthesis) return null;
   const voices = window.speechSynthesis.getVoices();
@@ -107,6 +122,7 @@ export default function CompanionOverlayPage() {
   const [isClosing, setIsClosing] = useState(false);
   const [slowWarning, setSlowWarning] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('male');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const slowWarningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hardResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -116,9 +132,12 @@ export default function CompanionOverlayPage() {
   const screenSupported = isScreenCaptureSupported();
 
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const lastSpokenRef = useRef('');
 
   const speak = async (text: string) => {
     if (!voiceEnabled) return;
+    if (text === lastSpokenRef.current) return;
+    lastSpokenRef.current = text;
     // Cancel any in-progress speech
     window.speechSynthesis?.cancel();
     if (currentAudioRef.current) {
@@ -131,11 +150,11 @@ export default function CompanionOverlayPage() {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, gender: voiceGender }),
       });
       if (!res.ok) throw new Error('tts failed');
 
-      const { audioBase64 } = (await res.json()) as {
+      const { audioBase64, words = [] } = (await res.json()) as {
         audioBase64: string;
         words?: { word: string; startTime: number }[];
       };
@@ -146,18 +165,31 @@ export default function CompanionOverlayPage() {
       currentAudioRef.current = audio;
 
       audio.onplay = () => {
-        // Show the full response text immediately when audio starts playing
         setIsSpeaking(true);
-        window.electronAPI?.setSpeaking(true, text);
+        if (words.length > 0) {
+          // Build sentence chunks, anchor each to its first word's ElevenLabs timestamp
+          const chunks = buildSpeechChunks(text);
+          let wordCursor = 0;
+          const timed = chunks.map(chunk => {
+            const anchor = words[Math.min(wordCursor, words.length - 1)];
+            const delay = Math.round(anchor.startTime * 1000);
+            wordCursor += chunk.split(/\s+/).filter(Boolean).length;
+            return { t: chunk, d: delay };
+          });
+          window.electronAPI?.setSpeaking(true, '__timed:' + JSON.stringify(timed));
+        } else {
+          window.electronAPI?.setSpeaking(true, text);
+        }
       };
-
       audio.onended = () => {
+        lastSpokenRef.current = '';
         setIsSpeaking(false);
         window.electronAPI?.setSpeaking(false, '');
         URL.revokeObjectURL(url);
         currentAudioRef.current = null;
       };
       audio.onerror = () => {
+        lastSpokenRef.current = '';
         setIsSpeaking(false);
         window.electronAPI?.setSpeaking(false, '');
         URL.revokeObjectURL(url);
@@ -169,17 +201,19 @@ export default function CompanionOverlayPage() {
       // Fallback to SpeechSynthesis — set speaking state here so bubble shows during system TTS
       setIsSpeaking(true);
       window.electronAPI?.setSpeaking(true, text);
-      const utterance = new SpeechSynthesisUtterance(text.slice(0, 500));
+      const utterance = new SpeechSynthesisUtterance(text);
       const voice = pickBestVoice();
       if (voice) utterance.voice = voice;
       utterance.rate = 0.95;
       utterance.pitch = 1.0;
       utterance.volume = 1.0;
       utterance.onend = () => {
+        lastSpokenRef.current = '';
         setIsSpeaking(false);
         window.electronAPI?.setSpeaking(false, '');
       };
       utterance.onerror = () => {
+        lastSpokenRef.current = '';
         setIsSpeaking(false);
         window.electronAPI?.setSpeaking(false, '');
       };
@@ -190,6 +224,8 @@ export default function CompanionOverlayPage() {
   useEffect(() => {
     const stored = localStorage.getItem('based_companion_voice');
     if (stored === 'true') setVoiceEnabled(true);
+    const storedGender = localStorage.getItem('based_companion_voice_gender');
+    if (storedGender === 'female') setVoiceGender('female');
   }, []);
 
   useEffect(() => {
@@ -491,7 +527,9 @@ export default function CompanionOverlayPage() {
         <span className="companion-title">BASED</span>
         <span className="companion-session">#{sessionId.current}</span>
         {isSpeaking && (
-          <span className="companion-speaking-indicator" title="Based is speaking">◉</span>
+          <span className="companion-speaking-indicator" title="Based is speaking">
+            ◉
+          </span>
         )}
         <button
           className="companion-clear"
@@ -586,6 +624,20 @@ export default function CompanionOverlayPage() {
           >
             {voiceEnabled ? '◉ Voice' : '⊙ Voice'}
           </button>
+          {voiceEnabled && (
+            <button
+              className="companion-capture-btn"
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              onClick={() => {
+                const next: 'male' | 'female' = voiceGender === 'male' ? 'female' : 'male';
+                setVoiceGender(next);
+                localStorage.setItem('based_companion_voice_gender', next);
+              }}
+              title={`Voice: ${voiceGender} — click to switch`}
+            >
+              {voiceGender === 'male' ? '⬡ Male' : '⬡ Female'}
+            </button>
+          )}
           {captureError && <span className="companion-capture-error">{captureError}</span>}
         </div>
 
