@@ -13,11 +13,15 @@ let isQuitting = false;
 
 const BUBBLE_POS_FILE = () => path.join(app.getPath('userData'), 'bubble-position.json');
 
-// The button sits 530px below the window top (600 window - 52 btn - 18 margin-bottom).
-// To let the button reach the top of the work area the window Y must go negative.
+// Button is 52px wide/tall, centered in 320px window, 18px margin-bottom, 530px from top.
+// Allow window X/Y to go negative so the button can reach all screen edges.
+const BUBBLE_WIN_W = 320;
 const BUBBLE_WIN_H = 600;
-const BUBBLE_BTN_OFFSET = BUBBLE_WIN_H - 52 - 18; // 530 — px from window top to button top
-const BUBBLE_MIN_Y = -BUBBLE_BTN_OFFSET;           // window Y when button is at work-area top
+const BUBBLE_BTN_LEFT = (BUBBLE_WIN_W - 52) / 2;          // 134 — px from window left to button left
+const BUBBLE_BTN_OFFSET = BUBBLE_WIN_H - 52 - 18;         // 530 — px from window top to button top
+const BUBBLE_MIN_X = -BUBBLE_BTN_LEFT;                    // window X when button is at screen left
+const BUBBLE_MAX_X_OFFSET = BUBBLE_WIN_W - BUBBLE_BTN_LEFT; // 186 — px from window left to button right
+const BUBBLE_MIN_Y = -BUBBLE_BTN_OFFSET;                  // window Y when button is at screen top
 
 function loadBubblePosition(defaultX, defaultY) {
   try {
@@ -25,7 +29,7 @@ function loadBubblePosition(defaultX, defaultY) {
     if (typeof data.x === 'number' && typeof data.y === 'number') {
       const { workAreaSize } = screen.getPrimaryDisplay();
       // Validate saved position fits the current window size — reset if off-screen
-      const fitsX = data.x >= 0 && data.x + 320 <= workAreaSize.width;
+      const fitsX = data.x >= BUBBLE_MIN_X && data.x + BUBBLE_MAX_X_OFFSET <= workAreaSize.width;
       const fitsY = data.y >= BUBBLE_MIN_Y && data.y + BUBBLE_WIN_H <= workAreaSize.height;
       if (fitsX && fitsY) return { x: data.x, y: data.y };
     }
@@ -257,7 +261,7 @@ app.whenReady().then(async () => {
     if (!bubbleWin) return;
     const [x, y] = bubbleWin.getPosition();
     const { workAreaSize } = screen.getPrimaryDisplay();
-    const newX = Math.max(0, Math.min(x + dx, workAreaSize.width - 320));
+    const newX = Math.max(BUBBLE_MIN_X, Math.min(x + dx, workAreaSize.width - BUBBLE_MAX_X_OFFSET));
     const newY = Math.max(BUBBLE_MIN_Y, Math.min(y + dy, workAreaSize.height - BUBBLE_WIN_H));
     bubbleWin.setPosition(newX, newY);
     if (savePosTimer) clearTimeout(savePosTimer);

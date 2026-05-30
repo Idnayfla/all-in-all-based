@@ -296,6 +296,35 @@
       let hideTimer = null;
       let chunkTimers = [];
 
+      // Idle companion voice — plays a random line after N minutes of silence
+      var IDLE_DELAY_MS = 3 * 60 * 1000; // 3 minutes
+      var idleLines = [
+        './audio/idle/still-here.mp3',
+        './audio/idle/you-good.mp3',
+        './audio/idle/whenever-ready.mp3',
+        './audio/idle/not-going-anywhere.mp3',
+        './audio/idle/still-with-you.mp3',
+        './audio/idle/take-your-time.mp3',
+      ];
+      var idleTimer = null;
+      var idleAudio = null;
+
+      function resetIdleTimer() {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(playIdleLine, IDLE_DELAY_MS);
+      }
+
+      function playIdleLine() {
+        if (companionOpen || isSpeaking) { resetIdleTimer(); return; }
+        var src = idleLines[Math.floor(Math.random() * idleLines.length)];
+        idleAudio = new Audio(src);
+        idleAudio.volume = 0.85;
+        idleAudio.play().catch(function() {});
+        idleAudio.onended = function() { idleAudio = null; resetIdleTimer(); };
+      }
+
+      resetIdleTimer();
+
       var WPM = 160;
 
       function splitChunks(text) {
@@ -419,7 +448,9 @@
         if (isOpen) {
           // Companion opened — hide any bubble text so it doesn't overlap
           hideBubble();
+          if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
         } else {
+          resetIdleTimer();
           // Companion closed/minimized — show bubble if there is any speaking text.
           // Use lastSpeakingText as fallback so a race between audio.onended and
           // the hide event (where isSpeaking flips to false a frame too early)
@@ -448,6 +479,8 @@
           hideTimer = setTimeout(() => {
             if (!isSpeaking) hideBubble();
           }, 1000);
+          // Reset idle timer — user just had an interaction
+          resetIdleTimer();
         }
       });
     </script>
