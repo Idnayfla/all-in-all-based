@@ -244,6 +244,33 @@
             <animate attributeName="opacity" values="0.5;1;0.5" dur="3s" repeatCount="indefinite"
               calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
           </circle>
+
+          <!-- Eye blink animations — both eyes blink in sync via shared SMIL begin chains -->
+          <!-- Sequence: blink1 at 4s → blink2 at 8.5s after blink1 ends → double-blink3a at 5s after blink2 → double-blink3b 0.35s after 3a -->
+          <!-- Left eye -->
+          <ellipse id="eye-l" cx="42" cy="44" rx="3.5" ry="3.5" fill="#c9a87c">
+            <!-- blink 1 -->
+            <animate id="lb1" attributeName="ry" values="3.5;0;3.5" dur="0.12s" begin="4s" fill="freeze"/>
+            <!-- blink 2 (8.5s after blink1 ends) -->
+            <animate id="lb2" attributeName="ry" values="3.5;0;3.5" dur="0.12s" begin="lb1.end+8.5s" fill="freeze"/>
+            <!-- double-blink 3a (5s after blink2 ends) -->
+            <animate id="lb3a" attributeName="ry" values="3.5;0;3.5" dur="0.1s" begin="lb2.end+5s" fill="freeze"/>
+            <!-- double-blink 3b (0.35s after 3a ends) -->
+            <animate id="lb3b" attributeName="ry" values="3.5;0;3.5" dur="0.1s" begin="lb3a.end+0.35s" fill="freeze"/>
+            <!-- restart cycle: blink 4 loops back (9s after double-blink ends) -->
+            <animate id="lb4" attributeName="ry" values="3.5;0;3.5" dur="0.12s" begin="lb3b.end+9s" fill="freeze"/>
+            <animate attributeName="ry" values="3.5;0;3.5" dur="0.12s" begin="lb4.end+6s;lb4.end+6s" fill="freeze" repeatCount="indefinite"/>
+          </ellipse>
+          <!-- Right eye (identical timing, references same lb* ids so they're perfectly synced) -->
+          <ellipse id="eye-r" cx="78" cy="44" rx="3.5" ry="3.5" fill="#c9a87c">
+            <animate attributeName="ry" values="3.5;0;3.5" dur="0.12s" begin="lb1.begin" fill="freeze"/>
+            <animate attributeName="ry" values="3.5;0;3.5" dur="0.12s" begin="lb2.begin" fill="freeze"/>
+            <animate attributeName="ry" values="3.5;0;3.5" dur="0.1s"  begin="lb3a.begin" fill="freeze"/>
+            <animate attributeName="ry" values="3.5;0;3.5" dur="0.1s"  begin="lb3b.begin" fill="freeze"/>
+            <animate attributeName="ry" values="3.5;0;3.5" dur="0.12s" begin="lb4.begin" fill="freeze"/>
+            <animate attributeName="ry" values="3.5;0;3.5" dur="0.12s" begin="lb4.end+6s" fill="freeze" repeatCount="indefinite"/>
+          </ellipse>
+
           <text x="60" y="65" text-anchor="middle"
             font-family="'Space Mono','Courier New',monospace" font-weight="700" font-size="20"
             fill="#c9a87c" letter-spacing="1">
