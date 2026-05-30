@@ -4,6 +4,7 @@ import { getUserId, supabaseAdmin } from '../_auth';
 import { getUserIdFromApiKey, ApiRateLimitError } from '../_apiKeyAuth';
 import { getWeather } from '@/lib/weather';
 import { getTrafficInfo } from '@/lib/traffic';
+import { MODEL_SONNET } from '@/lib/models';
 
 export const maxDuration = 60;
 // Screenshots sent from the desktop companion can be several MB as base64.
@@ -198,7 +199,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       try {
         const stream = await client.messages.stream({
-          model: 'claude-sonnet-4-6',
+          model: MODEL_SONNET,
           max_tokens: 1024,
           system,
           messages: apiMessages as Parameters<typeof client.messages.stream>[0]['messages'],

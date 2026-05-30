@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getUserId } from '../_auth';
+import { MODEL_HAIKU } from '@/lib/models';
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
   try {
     const { command, duration } = await req.json();
     const msg = await client.messages.create({
-      model: 'claude-haiku-4-5',
+      model: MODEL_HAIKU,
       max_tokens: 512,
       system: SYSTEM,
       messages: [{ role: 'user', content: `Video duration: ${duration}s\nCommand: ${command}` }],

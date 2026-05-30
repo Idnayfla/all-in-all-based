@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getUserId } from '../_auth';
+import { MODEL_SONNET } from '@/lib/models';
 
 export const maxDuration = 60;
 
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: MODEL_SONNET,
       max_tokens: 2048,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: prompt }],
