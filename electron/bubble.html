@@ -55,8 +55,8 @@
         animation: none;
       }
       .icon {
-        width: 34px;
-        height: 34px;
+        width: 60px;
+        height: 60px;
         pointer-events: none;
         user-select: none;
       }
@@ -243,41 +243,22 @@
               calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
           </circle>
 
-          <!-- Eye blink animations — both eyes blink in sync via shared SMIL begin chains -->
-          <!-- Sequence: blink1 at 4s → blink2 at 8.5s after blink1 ends → double-blink3a at 5s after blink2 → double-blink3b 0.35s after 3a -->
-          <!-- Left eye -->
-          <ellipse id="eye-l" cx="33" cy="57" rx="3" ry="3" fill="#c9a87c">
-            <!-- blink 1 -->
-            <animate id="lb1" attributeName="ry" values="3;0;3" dur="0.25s" begin="4s" fill="freeze"/>
-            <!-- blink 2 (8.5s after blink1 ends) -->
-            <animate id="lb2" attributeName="ry" values="3;0;3" dur="0.25s" begin="lb1.end+8.5s" fill="freeze"/>
-            <!-- double-blink 3a (5s after blink2 ends) -->
-            <animate id="lb3a" attributeName="ry" values="3;0;3" dur="0.2s" begin="lb2.end+5s" fill="freeze"/>
-            <!-- double-blink 3b (0.35s after 3a ends) -->
-            <animate id="lb3b" attributeName="ry" values="3;0;3" dur="0.2s" begin="lb3a.end+0.35s" fill="freeze"/>
-            <!-- restart cycle: blink 4 loops back (9s after double-blink ends) -->
-            <animate id="lb4" attributeName="ry" values="3;0;3" dur="0.25s" begin="lb3b.end+9s" fill="freeze"/>
-            <animate attributeName="ry" values="3;0;3" dur="0.25s" begin="lb4.end+6s;lb4.end+6s" fill="freeze" repeatCount="indefinite"/>
+          <!-- Single hooded cyclops eye -->
+          <!-- Sclera — animates ry to blink (top is hooded, so eye closes upward from bottom) -->
+          <ellipse id="eye-sclera" cx="60" cy="57" rx="14" ry="9" fill="#c9a87c">
+            <animate id="blink1" attributeName="ry" values="9;0.5;9" dur="0.18s" begin="5s" fill="freeze"/>
+            <animate id="blink2" attributeName="ry" values="9;0.5;9" dur="0.18s" begin="blink1.end+7s" fill="freeze"/>
+            <animate id="blink3a" attributeName="ry" values="9;0.5;9" dur="0.15s" begin="blink2.end+4s" fill="freeze"/>
+            <animate id="blink3b" attributeName="ry" values="9;0.5;9" dur="0.15s" begin="blink3a.end+0.4s" fill="freeze"/>
+            <animate id="blink4" attributeName="ry" values="9;0.5;9" dur="0.18s" begin="blink3b.end+9s" fill="freeze"/>
+            <animate attributeName="ry" values="9;0.5;9" dur="0.18s" begin="blink4.end+6s" fill="freeze" repeatCount="indefinite"/>
           </ellipse>
-          <!-- Right eye (identical timing, references same lb* ids so they're perfectly synced) -->
-          <ellipse id="eye-r" cx="87" cy="57" rx="3" ry="3" fill="#c9a87c">
-            <animate attributeName="ry" values="3;0;3" dur="0.25s" begin="lb1.begin" fill="freeze"/>
-            <animate attributeName="ry" values="3;0;3" dur="0.25s" begin="lb2.begin" fill="freeze"/>
-            <animate attributeName="ry" values="3;0;3" dur="0.2s"  begin="lb3a.begin" fill="freeze"/>
-            <animate attributeName="ry" values="3;0;3" dur="0.2s"  begin="lb3b.begin" fill="freeze"/>
-            <animate attributeName="ry" values="3;0;3" dur="0.25s" begin="lb4.begin" fill="freeze"/>
-            <animate attributeName="ry" values="3;0;3" dur="0.25s" begin="lb4.end+6s" fill="freeze" repeatCount="indefinite"/>
-          </ellipse>
-
-          <text x="60" y="65" text-anchor="middle"
-            font-family="'Space Mono','Courier New',monospace" font-weight="700" font-size="20"
-            fill="#c9a87c" letter-spacing="1">
-            B&gt;
-          </text>
-          <rect x="74" y="51" width="2" height="14" fill="#c9a87c">
-            <animate attributeName="opacity" values="1;1;0;0;1;1" dur="1.4s" repeatCount="indefinite"
-              keyTimes="0;0.4;0.5;0.9;1;1"/>
-          </rect>
+          <!-- Pupil (offset 1px right — gaze toward viewer) -->
+          <circle id="eye-pupil" cx="62" cy="57" r="5" fill="#0d0c15"/>
+          <!-- Catchlight -->
+          <circle cx="65" cy="54" r="2.4" fill="white" opacity="0.55"/>
+          <!-- Upper lid hood — cuts top ~38% of sclera, creates hooded/watching look -->
+          <rect id="eye-hood" x="46" y="48" width="28" height="10" fill="#0d0c15"/>
         </svg>
         <span class="ring ring-1"></span>
         <span class="ring ring-2"></span>
