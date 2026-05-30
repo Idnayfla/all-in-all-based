@@ -13,6 +13,8 @@ User-facing record of what shipped on beta.getbased.dev.
 - **Bubble text sync** — while Based speaks, the floating bubble displays the text in real time, paced to the audio
 - **Idle voice** — Based greets you when you open the companion, without needing a prompt
 - **Full-edge bubble drag** — the B> bubble can now be dragged from any edge of the screen, not just the bottom corner
+- **Lip-sync pulse** — the B> bubble button pulses with a fast irregular animation while Based is speaking, so you always know when it's talking
+- **Voice cache** — repeated responses are served instantly from cache, no re-generation needed
 
 ### Fixed
 
