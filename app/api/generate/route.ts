@@ -1373,9 +1373,7 @@ export async function POST(req: NextRequest) {
       try {
         const { data: s } = await supabaseAdmin
           .from('user_settings')
-          .select(
-            'subscription_tier, generations_used, generations_reset_at, pro_bonus_expires_at'
-          )
+          .select('subscription_tier, generations_used, generations_reset_at, pro_bonus_expires_at')
           .eq('user_id', userId)
           .single();
 

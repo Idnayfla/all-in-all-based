@@ -26,6 +26,87 @@ type ChangeEntry = {
 
 const ENTRIES: ChangeEntry[] = [
   {
+    date: '2026-05-30',
+    label: 'v0.1.2',
+    title: 'Based Voice',
+    sections: [
+      {
+        kind: 'added',
+        items: [
+          {
+            bold: 'Based speaks',
+            text: "The companion now reads its responses aloud in Based's own voice. Enable with the ◉ Voice button. Switch between male and female voice.",
+          },
+          {
+            bold: 'Self-hosted voice',
+            text: "Based's voice runs on its own infrastructure — no third-party API, no credits, no rate limits.",
+          },
+          {
+            bold: 'Lip-sync pulse',
+            text: "The B> bubble button pulses with a fast irregular animation while Based is speaking, so you always know when it's talking.",
+          },
+          {
+            bold: 'Bubble text sync',
+            text: 'While Based speaks, the floating bubble displays the text in real time, paced to the audio.',
+          },
+          {
+            bold: 'Idle voice',
+            text: "Based checks in after a few minutes of silence — a reminder it's still there.",
+          },
+          {
+            bold: 'Voice cache',
+            text: 'Repeated responses are served instantly from cache, no re-generation needed.',
+          },
+          {
+            bold: 'Full-edge bubble drag',
+            text: 'The B> bubble can now be dragged to any edge of the screen, not just the bottom corner.',
+          },
+        ],
+      },
+      {
+        kind: 'fixed',
+        items: [
+          {
+            bold: 'Bubble text timing',
+            text: 'Text no longer flashes before audio starts playing.',
+          },
+          {
+            bold: 'Click-through',
+            text: 'Clicks now pass through the bubble window to the app behind it when the button is not active.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    date: '2026-05-23',
+    label: 'Beta',
+    title: 'Windows Floating Companion',
+    sections: [
+      {
+        kind: 'added',
+        items: [
+          {
+            bold: 'Desktop companion overlay',
+            text: 'Based runs as a floating Electron overlay on Windows, sitting above every app — always visible, always ready. No more switching windows.',
+          },
+          {
+            bold: 'Draggable B> bubble',
+            text: "The companion's entry point is a pulsing B> bubble you can drag anywhere on screen. Position is saved between sessions.",
+          },
+          {
+            bold: 'Screen capture on demand',
+            text: 'Ask "what\'s on my screen?" and Based takes a screenshot and analyses it — useful for debugging errors, reading docs, or understanding any UI.',
+          },
+          {
+            bold: 'Persistent session',
+            text: 'The companion authenticates via your Based account automatically. Memory and context carry over from the web app.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     date: '2026-05-21',
     label: 'Beta',
     title: 'API Keys, Persona Settings & Stability',
