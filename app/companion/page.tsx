@@ -90,25 +90,6 @@ function buildSpeechChunks(text: string, maxWords = 12): string[] {
   return out.filter(Boolean);
 }
 
-function pickBestVoice(): SpeechSynthesisVoice | null {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return null;
-  const voices = window.speechSynthesis.getVoices();
-  if (!voices.length) return null;
-  const PRIORITY = [
-    'Google UK English Female',
-    'Google US English',
-    'Microsoft Zira Desktop - English (United States)',
-    'Microsoft Zira',
-    'Samantha',
-  ];
-  for (const name of PRIORITY) {
-    const match = voices.find(v => v.name === name);
-    if (match) return match;
-  }
-  // Fall back to any English voice
-  return voices.find(v => v.lang.startsWith('en')) ?? null;
-}
-
 export default function CompanionOverlayPage() {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
@@ -154,12 +135,17 @@ export default function CompanionOverlayPage() {
       });
       if (!res.ok) throw new Error('tts failed');
 
-      const { audioBase64, words = [] } = (await res.json()) as {
+      const {
+        audioBase64,
+        words = [],
+        mime = 'audio/mpeg',
+      } = (await res.json()) as {
         audioBase64: string;
         words?: { word: string; startTime: number }[];
+        mime?: string;
       };
 
-      const audioBlob = base64ToBlob(audioBase64, 'audio/mpeg');
+      const audioBlob = base64ToBlob(audioBase64, mime);
       const url = URL.createObjectURL(audioBlob);
       const audio = new Audio(url);
       currentAudioRef.current = audio;
@@ -198,26 +184,8 @@ export default function CompanionOverlayPage() {
       await audio.play();
     } catch (err) {
       console.error('[tts error]', err);
-      // Fallback to SpeechSynthesis — set speaking state here so bubble shows during system TTS
-      setIsSpeaking(true);
-      window.electronAPI?.setSpeaking(true, text);
-      const utterance = new SpeechSynthesisUtterance(text);
-      const voice = pickBestVoice();
-      if (voice) utterance.voice = voice;
-      utterance.rate = 0.95;
-      utterance.pitch = 1.0;
-      utterance.volume = 1.0;
-      utterance.onend = () => {
-        lastSpokenRef.current = '';
-        setIsSpeaking(false);
-        window.electronAPI?.setSpeaking(false, '');
-      };
-      utterance.onerror = () => {
-        lastSpokenRef.current = '';
-        setIsSpeaking(false);
-        window.electronAPI?.setSpeaking(false, '');
-      };
-      window.speechSynthesis?.speak(utterance);
+      // Silent fail — no robotic fallback voice
+      lastSpokenRef.current = '';
     }
   };
 
@@ -226,6 +194,14 @@ export default function CompanionOverlayPage() {
     if (stored === 'true') setVoiceEnabled(true);
     const storedGender = localStorage.getItem('based_companion_voice_gender');
     if (storedGender === 'female') setVoiceGender('female');
+    // Pre-warm Modal TTS container so the first voice message has no cold start,
+    // then ping every 4 min to prevent scaledown while companion is open.
+    if (stored === 'true') {
+      const ping = () => void fetch('/api/tts/warmup', { method: 'POST' }).catch(() => {});
+      ping();
+      const keepalive = setInterval(ping, 4 * 60 * 1000);
+      return () => clearInterval(keepalive);
+    }
   }, []);
 
   useEffect(() => {

@@ -1,0 +1,9 @@
+dist-electron/
+voice-samples/
+voice-test/
+test-results/
+council-report*.html
+council-transcript*.md
+modal_tts/
+electron/
+.claude/
