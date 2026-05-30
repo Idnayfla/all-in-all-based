@@ -55,8 +55,8 @@
         animation: none;
       }
       .icon {
-        width: 60px;
-        height: 60px;
+        width: 80px;
+        height: 80px;
         pointer-events: none;
         user-select: none;
       }
@@ -67,11 +67,11 @@
         pointer-events: none;
       }
       .ring-1 {
-        inset: -6px;
+        inset: -3px;
         animation: ring-pulse 3s ease-in-out infinite;
       }
       .ring-2 {
-        inset: -12px;
+        inset: -8px;
         animation: ring-pulse 3s ease-in-out infinite 0.4s;
       }
       .btn.open .ring-1 {
@@ -244,17 +244,10 @@
           </circle>
 
           <!-- Single hooded cyclops eye -->
-          <!-- Sclera — animates ry to blink (top is hooded, so eye closes upward from bottom) -->
-          <ellipse id="eye-sclera" cx="60" cy="57" rx="14" ry="9" fill="#c9a87c">
-            <animate id="blink1" attributeName="ry" values="9;0.5;9" dur="0.18s" begin="5s" fill="freeze"/>
-            <animate id="blink2" attributeName="ry" values="9;0.5;9" dur="0.18s" begin="blink1.end+7s" fill="freeze"/>
-            <animate id="blink3a" attributeName="ry" values="9;0.5;9" dur="0.15s" begin="blink2.end+4s" fill="freeze"/>
-            <animate id="blink3b" attributeName="ry" values="9;0.5;9" dur="0.15s" begin="blink3a.end+0.4s" fill="freeze"/>
-            <animate id="blink4" attributeName="ry" values="9;0.5;9" dur="0.18s" begin="blink3b.end+9s" fill="freeze"/>
-            <animate attributeName="ry" values="9;0.5;9" dur="0.18s" begin="blink4.end+6s" fill="freeze" repeatCount="indefinite"/>
-          </ellipse>
-          <!-- Pupil (offset 1px right — gaze toward viewer) -->
-          <circle id="eye-pupil" cx="62" cy="57" r="5" fill="#0d0c15"/>
+          <!-- Sclera — ry controlled by JS blink engine -->
+          <ellipse id="eye-sclera" cx="60" cy="57" rx="14" ry="9" fill="#c9a87c"/>
+          <!-- Pupil (centered) -->
+          <circle id="eye-pupil" cx="60" cy="57" r="5" fill="#0d0c15"/>
           <!-- Catchlight -->
           <circle cx="65" cy="54" r="2.4" fill="white" opacity="0.55"/>
           <!-- Upper lid hood — cuts top ~38% of sclera, creates hooded/watching look -->
@@ -491,6 +484,96 @@
           var textToShow = speakingText || lastSpeakingText;
           if (textToShow) showBubble(textToShow);
         }
+      });
+
+      // --- Eye blink (human-paced, randomised) ---
+      const sclera = document.getElementById('eye-sclera');
+      const RY_OPEN = 9;   // matches current ry="9"
+      const RY_SHUT = 0.5;
+
+      function animateRy(from, to, durationMs, onDone) {
+        const start = performance.now();
+        function step(now) {
+          const t = Math.min((now - start) / durationMs, 1);
+          const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t; // ease-in-out
+          sclera.setAttribute('ry', from + (to - from) * ease);
+          if (t < 1) requestAnimationFrame(step);
+          else if (onDone) onDone();
+        }
+        requestAnimationFrame(step);
+      }
+
+      function doBlink(onDone) {
+        // Close: 120ms, open: 100ms — feels natural
+        animateRy(RY_OPEN, RY_SHUT, 120, () => {
+          animateRy(RY_SHUT, RY_OPEN, 100, onDone);
+        });
+      }
+
+      function scheduleNextBlink() {
+        // Random interval: 3–8 seconds. Occasionally do a double blink.
+        const delay = 3000 + Math.random() * 5000;
+        setTimeout(() => {
+          const isDouble = Math.random() < 0.25; // 25% chance of double blink
+          doBlink(() => {
+            if (isDouble) {
+              setTimeout(() => doBlink(scheduleNextBlink), 180 + Math.random() * 120);
+            } else {
+              scheduleNextBlink();
+            }
+          });
+        }, delay);
+      }
+
+      scheduleNextBlink();
+
+      // --- Pupil cursor tracking ---
+      const pupil = document.getElementById('eye-pupil');
+      const EYE_SVG_CX = 60; // matches actual cx="60" (centered)
+      const EYE_SVG_CY = 57;
+      const MAX_OFFSET = 3; // max px offset in SVG units
+
+      // The SVG is inside .btn which is 60px, viewBox 120 — scale factor: 120/60 = 2
+      const SVG_SCALE = 2;
+
+      // The .btn is positioned at bottom-center of the 320x600 window
+      // We'll track mousemove on the whole window
+      let currentX = EYE_SVG_CX;
+      let currentY = EYE_SVG_CY;
+      let targetX = EYE_SVG_CX;
+      let targetY = EYE_SVG_CY;
+
+      window.addEventListener('mousemove', (e) => {
+        // Use the SVG element's rect for accurate eye center calculation
+        const svgEl = btn.querySelector('svg');
+        const svgRect = svgEl.getBoundingClientRect();
+        const eyeScreenCX = svgRect.left + svgRect.width * (EYE_SVG_CX / 120);
+        const eyeScreenCY = svgRect.top  + svgRect.height * (EYE_SVG_CY / 120);
+
+        const dx = e.clientX - eyeScreenCX;
+        const dy = e.clientY - eyeScreenCY;
+        const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+
+        // Clamp offset to MAX_OFFSET SVG units
+        const scale = Math.min(dist / 80, 1); // 80px screen distance = full offset
+        targetX = EYE_SVG_CX + (dx / dist) * MAX_OFFSET * scale;
+        targetY = EYE_SVG_CY + (dy / dist) * MAX_OFFSET * scale;
+      });
+
+      // Smooth lerp loop
+      function trackingLoop() {
+        currentX += (targetX - currentX) * 0.08;
+        currentY += (targetY - currentY) * 0.08;
+        pupil.setAttribute('cx', currentX.toFixed(2));
+        pupil.setAttribute('cy', currentY.toFixed(2));
+        requestAnimationFrame(trackingLoop);
+      }
+      trackingLoop();
+
+      // When mouse leaves the window, return to center
+      window.addEventListener('mouseleave', () => {
+        targetX = EYE_SVG_CX;
+        targetY = EYE_SVG_CY;
       });
 
       window.bubbleAPI?.onSpeaking((speaking, text) => {
