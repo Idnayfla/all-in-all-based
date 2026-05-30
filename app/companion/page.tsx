@@ -194,12 +194,14 @@ export default function CompanionOverlayPage() {
     if (stored === 'true') setVoiceEnabled(true);
     const storedGender = localStorage.getItem('based_companion_voice_gender');
     if (storedGender === 'female') setVoiceGender('female');
-    // Pre-warm Modal TTS container so the first voice message has no cold start,
-    // then ping every 4 min to prevent scaledown while companion is open.
+    // On open: real generation warmup loads the F5-TTS model onto GPU (fires once).
+    // Every 4 min: lightweight health ping keeps the container alive without burning GPU credits.
     if (stored === 'true') {
-      const ping = () => void fetch('/api/tts/warmup', { method: 'POST' }).catch(() => {});
-      ping();
-      const keepalive = setInterval(ping, 4 * 60 * 1000);
+      void fetch('/api/tts/warmup', { method: 'POST' }).catch(() => {});
+      const keepalive = setInterval(
+        () => void fetch('/api/tts/keepalive', { method: 'POST' }).catch(() => {}),
+        4 * 60 * 1000
+      );
       return () => clearInterval(keepalive);
     }
   }, []);
