@@ -1,6 +1,7 @@
 {
   "name": "based",
-  "version": "0.1.2",
+  "version": "0.1.3",
+  "description": "Based — your AI companion. Always on top, always ready.",
   "private": true,
   "engines": {
     "node": ">=20.9.0"

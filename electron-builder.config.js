@@ -1,7 +1,6 @@
 module.exports = {
   appId: 'dev.getbased.app',
   productName: 'Based',
-  description: 'Based — your AI companion. Always on top, always ready.',
   directories: {
     output: 'dist-electron',
   },
