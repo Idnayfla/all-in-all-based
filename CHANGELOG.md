@@ -4,6 +4,23 @@ User-facing record of what shipped on beta.getbased.dev.
 
 ---
 
+## v0.1.2 — 2026-05-30 — Based Voice
+
+### Added
+
+- **Based speaks** — the companion now reads its responses aloud in Based's own voice. Enable voice with the ◉ Voice button in the companion. Switch between male and female voice
+- **Self-hosted voice** — Based's voice runs on its own infrastructure, not a third-party API. No credits, no rate limits, no outages from external providers
+- **Bubble text sync** — while Based speaks, the floating bubble displays the text in real time, paced to the audio
+- **Idle voice** — Based greets you when you open the companion, without needing a prompt
+- **Full-edge bubble drag** — the B> bubble can now be dragged from any edge of the screen, not just the bottom corner
+
+### Fixed
+
+- Bubble text showing too early before audio started playing
+- Click-through on the bubble window — clicks now pass through to the app behind it when the bubble is not active
+
+---
+
 ## [Beta] 2026-05-23 — Windows Floating Companion
 
 ### Added
