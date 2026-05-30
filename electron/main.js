@@ -124,6 +124,7 @@ function createBubbleWindow() {
   });
   bubbleWin.loadFile(path.join(__dirname, 'bubble.html'));
   bubbleWin.once('ready-to-show', () => {
+    bubbleWin.setAlwaysOnTop(true, 'screen-saver');
     bubbleWin.show();
     // Transparent pixels should not eat OS mouse events — only the button area
     // needs to be interactive. The renderer will toggle this on hover.
@@ -146,7 +147,9 @@ function toggleOverlay() {
     overlayWin.hide();
     bubbleWin?.webContents.send('companion-bubble:state', 'closed');
   } else {
+    overlayWin.setAlwaysOnTop(true, 'screen-saver');
     overlayWin.show();
+    overlayWin.moveTop();
     overlayWin.focus();
     bubbleWin?.webContents.send('companion-bubble:state', 'open');
   }
