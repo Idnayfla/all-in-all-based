@@ -10,4 +10,7 @@ contextBridge.exposeInMainWorld('bubbleAPI', {
   onSpeaking: cb => {
     ipcRenderer.on('companion-bubble:speaking', (_event, speaking, text) => cb(speaking, text ?? ''));
   },
+  onCursorPos: cb => {
+    ipcRenderer.on('cursor-pos', (_event, pos) => cb(pos));
+  },
 });

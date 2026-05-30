@@ -238,10 +238,6 @@
             <animate attributeName="opacity" values="0.7;1;0.7" dur="3s" repeatCount="indefinite"
               calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
           </polygon>
-          <circle cx="97" cy="35" r="3" fill="#c9a87c">
-            <animate attributeName="opacity" values="0.5;1;0.5" dur="3s" repeatCount="indefinite"
-              calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
-          </circle>
 
           <!-- Single hooded cyclops eye -->
           <!-- Sclera — ry controlled by JS blink engine -->
@@ -527,38 +523,44 @@
 
       scheduleNextBlink();
 
-      // --- Pupil cursor tracking ---
+      // --- Pupil cursor tracking (screen-wide via IPC) ---
       const pupil = document.getElementById('eye-pupil');
       const EYE_SVG_CX = 60; // matches actual cx="60" (centered)
       const EYE_SVG_CY = 57;
       const MAX_OFFSET = 3; // max px offset in SVG units
 
-      // The SVG is inside .btn which is 60px, viewBox 120 — scale factor: 120/60 = 2
-      const SVG_SCALE = 2;
-
-      // The .btn is positioned at bottom-center of the 320x600 window
-      // We'll track mousemove on the whole window
       let currentX = EYE_SVG_CX;
       let currentY = EYE_SVG_CY;
       let targetX = EYE_SVG_CX;
       let targetY = EYE_SVG_CY;
 
-      window.addEventListener('mousemove', (e) => {
-        // Use the SVG element's rect for accurate eye center calculation
+      function updateTarget(screenX, screenY) {
         const svgEl = btn.querySelector('svg');
         const svgRect = svgEl.getBoundingClientRect();
-        const eyeScreenCX = svgRect.left + svgRect.width * (EYE_SVG_CX / 120);
-        const eyeScreenCY = svgRect.top  + svgRect.height * (EYE_SVG_CY / 120);
-
-        const dx = e.clientX - eyeScreenCX;
-        const dy = e.clientY - eyeScreenCY;
-        const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-
-        // Clamp offset to MAX_OFFSET SVG units
-        const scale = Math.min(dist / 80, 1); // 80px screen distance = full offset
+        // Convert SVG eye center to absolute screen coordinates using the window's
+        // screen origin (window.screenX/Y is the bubble BrowserWindow's top-left corner).
+        const eyeScreenCX = window.screenX + svgRect.left + svgRect.width  * (EYE_SVG_CX / 120);
+        const eyeScreenCY = window.screenY + svgRect.top  + svgRect.height * (EYE_SVG_CY / 120);
+        const dx = screenX - eyeScreenCX;
+        const dy = screenY - eyeScreenCY;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        // 300px screen distance = full MAX_OFFSET deflection
+        const scale = Math.min(dist / 300, 1);
         targetX = EYE_SVG_CX + (dx / dist) * MAX_OFFSET * scale;
         targetY = EYE_SVG_CY + (dy / dist) * MAX_OFFSET * scale;
-      });
+      }
+
+      // Primary path: IPC from main process (screen.getCursorScreenPoint() at ~30fps)
+      if (window.bubbleAPI?.onCursorPos) {
+        window.bubbleAPI.onCursorPos(({ x, y }) => updateTarget(x, y));
+      } else {
+        // Browser fallback — used when bubble.html is opened directly in a browser for testing
+        window.addEventListener('mousemove', (e) => updateTarget(e.screenX, e.screenY));
+        window.addEventListener('mouseleave', () => {
+          targetX = EYE_SVG_CX;
+          targetY = EYE_SVG_CY;
+        });
+      }
 
       // Smooth lerp loop
       function trackingLoop() {
@@ -569,12 +571,6 @@
         requestAnimationFrame(trackingLoop);
       }
       trackingLoop();
-
-      // When mouse leaves the window, return to center
-      window.addEventListener('mouseleave', () => {
-        targetX = EYE_SVG_CX;
-        targetY = EYE_SVG_CY;
-      });
 
       window.bubbleAPI?.onSpeaking((speaking, text) => {
         isSpeaking = speaking;
