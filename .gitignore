@@ -39,6 +39,15 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# electron build output
+dist-electron/
+
+# local voice test artifacts
+voice-test/
+test-results/
+council-report*.html
+council-transcript*.md
 .gstack/
 .superpowers/
 .aider*
