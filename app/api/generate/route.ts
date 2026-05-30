@@ -7,6 +7,7 @@ import { getWeather } from '@/lib/weather';
 import { getCrowdInfo } from '@/lib/crowd';
 import { getTrafficInfo } from '@/lib/traffic';
 import { createLangfuseClient } from '@/lib/langfuse';
+import { MODEL_OPUS, MODEL_SONNET, MODEL_HAIKU, MODEL_GROQ, MODEL_CEREBRAS } from '@/lib/models';
 
 export const maxDuration = 300;
 
@@ -17,9 +18,9 @@ const client = new Anthropic({
 const PANTHEON_KEY = process.env.PANTHEON_API_KEY ?? process.env.PANTHEON_OWNER_KEY ?? '';
 const PANTHEON_URL = process.env.PANTHEON_API_URL ?? 'https://pantheon-api.vercel.app';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_MODEL = MODEL_GROQ;
 const CEREBRAS_URL = 'https://api.cerebras.ai/v1/chat/completions';
-const CEREBRAS_MODEL = 'gpt-oss-120b';
+const CEREBRAS_MODEL = MODEL_CEREBRAS;
 
 function friendlyError(e: unknown): string {
   const raw: string = (e instanceof Error ? e.message : null) ?? String(e);
@@ -1220,9 +1221,7 @@ async function callModel(
     if (hasOwnKey) {
       try {
         const directModel =
-          modelType === 'planner' || modelType === 'summary'
-            ? 'claude-haiku-4-5'
-            : 'claude-sonnet-4-6';
+          modelType === 'planner' || modelType === 'summary' ? MODEL_HAIKU : MODEL_SONNET;
         const res = await client.messages.create({
           model: directModel,
           max_tokens: maxTokens,
@@ -1251,7 +1250,7 @@ async function callModel(
 
   // Image-containing calls stay on Anthropic (vision required)
   const response = await client.messages.create({
-    model: modelType === 'generator' ? 'claude-opus-4-7' : 'claude-haiku-4-5',
+    model: modelType === 'generator' ? MODEL_OPUS : MODEL_HAIKU,
     max_tokens: modelType === 'generator' ? 16000 : 8000,
     system: systemPrompt,
     messages: [{ role: 'user', content: prompt }],
@@ -1277,7 +1276,7 @@ async function streamText(
       const conversationMessages = messages.filter(m => m.role !== 'system');
       let accumulated = '';
       const stream = client.messages.stream({
-        model: 'claude-opus-4-7',
+        model: MODEL_OPUS,
         max_tokens: maxTokens,
         system: systemMsg?.content ?? '',
         messages: conversationMessages.map(m => ({
@@ -1656,6 +1655,9 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                 ]
               : lastUserMessage + existingFilesContext;
 
+          // Signal client that planning is starting so it can show "Planning..." immediately
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ planning: true })}\n\n`));
+
           // Planner chain: Groq (primary, fastest) → Cerebras (second, if Groq fails) → Haiku (final).
           // Images skip fast planners — Anthropic vision is required for multimodal input.
           const useGroqPlanner = !!process.env.GROQ_API_KEY && imageBlocks.length === 0;
@@ -1664,7 +1666,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             ? GROQ_MODEL
             : useCerebrasPlanner
               ? CEREBRAS_MODEL
-              : 'claude-haiku-4-5';
+              : MODEL_HAIKU;
           const planGeneration = trace?.generation({
             name: 'planner',
             model: plannerModel,
@@ -1739,6 +1741,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
               output: Math.ceil(planText.length / 4),
             },
           });
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ planning: false })}\n\n`));
 
           let filePlan: { name: string; language: string; description: string }[] = [];
           let routeToChat = false;
@@ -1766,7 +1769,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
               let fullText = '';
               if (imageBlocks.length > 0) {
                 const stream = await client.messages.stream({
-                  model: 'claude-opus-4-7',
+                  model: MODEL_OPUS,
                   max_tokens: 16000,
                   system: [
                     {
@@ -1824,7 +1827,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             let fullText = '';
             if (imageBlocks.length > 0) {
               const stream = await client.messages.stream({
-                model: 'claude-sonnet-4-6',
+                model: MODEL_SONNET,
                 max_tokens: 4096,
                 system: systemBlocks,
                 messages: anthropicMessages,
@@ -1929,7 +1932,7 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
             );
             const fileGeneration = trace?.generation({
               name: `generate-file:${fileSpec.name}`,
-              model: 'claude-opus-4-7',
+              model: MODEL_OPUS,
               input: filePrompt,
             });
 
@@ -1942,7 +1945,7 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
             if (imageBlocks.length > 0) {
               // Image-containing files must use Anthropic (vision required)
               const fileStream = client.messages.stream({
-                model: 'claude-opus-4-7',
+                model: MODEL_OPUS,
                 max_tokens: 16000,
                 system: FILE_GENERATOR_SYSTEM_BLOCKS,
                 messages: [{ role: 'user', content: filePromptContent }],
@@ -1958,7 +1961,7 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
               const fileResult = await fileStream.finalMessage();
               if (fileResult.stop_reason === 'max_tokens' && !fileText.includes('</forge_file>')) {
                 const contStream = client.messages.stream({
-                  model: 'claude-opus-4-7',
+                  model: MODEL_OPUS,
                   max_tokens: 16000,
                   system: FILE_GENERATOR_SYSTEM_BLOCKS,
                   messages: [
@@ -2073,7 +2076,7 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
             try {
               await supabaseAdmin.from('inference_logs').insert({
                 user_id: supabaseUserId ?? null,
-                model: usingFreeModel ? GROQ_MODEL : 'claude-opus-4-7',
+                model: usingFreeModel ? GROQ_MODEL : MODEL_OPUS,
                 project_type: projectType,
                 prompt: lastUserMessage.slice(0, 2000),
                 response: reply.slice(0, 1000),

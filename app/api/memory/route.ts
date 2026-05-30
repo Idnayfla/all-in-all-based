@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getUserId, supabaseAdmin } from '../_auth';
+import { MODEL_HAIKU } from '@/lib/models';
 
 function contentToText(content: unknown): string {
   if (typeof content === 'string') return content;
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
     const existing = settingsData?.global_memory ?? '';
 
     const response = await anthropic.messages.create({
-      model: 'claude-haiku-4-5',
+      model: MODEL_HAIKU,
       max_tokens: 600,
       messages: [
         {

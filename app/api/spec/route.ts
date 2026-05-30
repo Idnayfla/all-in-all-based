@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getUserId, supabaseAdmin } from '../_auth';
+import { MODEL_SONNET } from '@/lib/models';
 
 export const maxDuration = 120;
 
@@ -205,7 +206,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       try {
         const stream = await client.messages.stream({
-          model: 'claude-sonnet-4-6',
+          model: MODEL_SONNET,
           max_tokens: 8192,
           system: [
             {

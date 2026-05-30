@@ -744,6 +744,25 @@ export default function ChatPanel({
             try {
               const data = JSON.parse(line.slice(6));
 
+              if (data.planning === true) {
+                setMessages(prev => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = { role: 'assistant', content: '◈ Planning...' };
+                  return updated;
+                });
+              }
+
+              if (data.planning === false) {
+                setMessages(prev => {
+                  const updated = [...prev];
+                  const last = updated[updated.length - 1];
+                  if (last?.content === '◈ Planning...') {
+                    updated[updated.length - 1] = { role: 'assistant', content: '◈ Working...' };
+                  }
+                  return updated;
+                });
+              }
+
               if (data.searching === 'web') {
                 setMessages(prev => {
                   const updated = [...prev];
