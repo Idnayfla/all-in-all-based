@@ -75,6 +75,28 @@ function createOverlayWindow() {
   });
 }
 
+// --- Screen-wide cursor polling for bubble pupil tracking ---
+let cursorPollInterval = null;
+
+function startCursorPoll() {
+  if (cursorPollInterval) return;
+  cursorPollInterval = setInterval(() => {
+    if (!bubbleWin || bubbleWin.isDestroyed()) {
+      stopCursorPoll();
+      return;
+    }
+    const pos = screen.getCursorScreenPoint();
+    bubbleWin.webContents.send('cursor-pos', pos);
+  }, 33); // ~30fps
+}
+
+function stopCursorPoll() {
+  if (cursorPollInterval) {
+    clearInterval(cursorPollInterval);
+    cursorPollInterval = null;
+  }
+}
+
 function createBubbleWindow() {
   const { workAreaSize } = screen.getPrimaryDisplay();
   // Window is 320×600 (transparent). The 52px button sits at the bottom-centre.
@@ -106,10 +128,15 @@ function createBubbleWindow() {
     // Transparent pixels should not eat OS mouse events — only the button area
     // needs to be interactive. The renderer will toggle this on hover.
     bubbleWin.setIgnoreMouseEvents(true, { forward: true });
+    // Begin polling the OS cursor position and forwarding to the renderer
+    startCursorPoll();
   });
   bubbleWin.on('moved', saveBubblePosition);
   bubbleWin.on('close', e => {
     if (!isQuitting) e.preventDefault();
+  });
+  bubbleWin.on('closed', () => {
+    stopCursorPoll();
   });
 }
 

@@ -30,8 +30,8 @@
         width: 52px;
         height: 52px;
         border-radius: 50%;
-        background: #08070e;
-        border: 1.5px solid rgba(201, 168, 124, 0.35);
+        background: transparent;
+        border: none;
         cursor: grab;
         display: flex;
         align-items: center;
@@ -40,9 +40,7 @@
         -webkit-app-region: no-drag;
         outline: none;
         animation: breathe 3s ease-in-out infinite;
-        transition:
-          background 0.3s,
-          border-color 0.3s;
+        transition: opacity 0.3s;
         user-select: none;
         margin-bottom: 18px;
       }
@@ -51,16 +49,14 @@
         animation: none;
       }
       .btn.open {
-        background: #08070e;
-        border-color: rgba(201, 168, 124, 0.7);
         animation: breathe-fast 1s ease-in-out infinite;
       }
       .btn.open.dragging {
         animation: none;
       }
       .icon {
-        width: 34px;
-        height: 34px;
+        width: 80px;
+        height: 80px;
         pointer-events: none;
         user-select: none;
       }
@@ -71,11 +67,11 @@
         pointer-events: none;
       }
       .ring-1 {
-        inset: -6px;
+        inset: -3px;
         animation: ring-pulse 3s ease-in-out infinite;
       }
       .ring-2 {
-        inset: -12px;
+        inset: -8px;
         animation: ring-pulse 3s ease-in-out infinite 0.4s;
       }
       .btn.open .ring-1 {
@@ -229,6 +225,8 @@
       <div class="speech-bubble" id="speech-bubble"></div>
       <button class="btn" id="btn">
         <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+          <!-- Dark background fill so hexagon is opaque against any desktop -->
+          <polygon points="60,14 97,35 97,79 60,100 23,79 23,35" fill="#08070e"/>
           <polygon points="60,22 91,39.5 91,74.5 60,92 29,74.5 29,39.5"
             fill="rgba(201,168,124,0.07)">
             <animate attributeName="opacity" values="0.4;1;0.4" dur="3s" repeatCount="indefinite"
@@ -240,19 +238,16 @@
             <animate attributeName="opacity" values="0.7;1;0.7" dur="3s" repeatCount="indefinite"
               calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
           </polygon>
-          <circle cx="97" cy="35" r="3" fill="#c9a87c">
-            <animate attributeName="opacity" values="0.5;1;0.5" dur="3s" repeatCount="indefinite"
-              calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
-          </circle>
-          <text x="60" y="65" text-anchor="middle"
-            font-family="'Space Mono','Courier New',monospace" font-weight="700" font-size="20"
-            fill="#c9a87c" letter-spacing="1">
-            B&gt;
-          </text>
-          <rect x="74" y="51" width="2" height="14" fill="#c9a87c">
-            <animate attributeName="opacity" values="1;1;0;0;1;1" dur="1.4s" repeatCount="indefinite"
-              keyTimes="0;0.4;0.5;0.9;1;1"/>
-          </rect>
+
+          <!-- Single hooded cyclops eye -->
+          <!-- Sclera — ry controlled by JS blink engine -->
+          <ellipse id="eye-sclera" cx="60" cy="57" rx="14" ry="9" fill="#c9a87c"/>
+          <!-- Pupil (centered) -->
+          <circle id="eye-pupil" cx="60" cy="57" r="5" fill="#0d0c15"/>
+          <!-- Catchlight -->
+          <circle cx="65" cy="54" r="2.4" fill="white" opacity="0.55"/>
+          <!-- Upper lid hood — cuts top ~38% of sclera, creates hooded/watching look -->
+          <rect id="eye-hood" x="46" y="48" width="28" height="10" fill="#0d0c15"/>
         </svg>
         <span class="ring ring-1"></span>
         <span class="ring ring-2"></span>
@@ -486,6 +481,96 @@
           if (textToShow) showBubble(textToShow);
         }
       });
+
+      // --- Eye blink (human-paced, randomised) ---
+      const sclera = document.getElementById('eye-sclera');
+      const RY_OPEN = 9;   // matches current ry="9"
+      const RY_SHUT = 0.5;
+
+      function animateRy(from, to, durationMs, onDone) {
+        const start = performance.now();
+        function step(now) {
+          const t = Math.min((now - start) / durationMs, 1);
+          const ease = t < 0.5 ? 2*t*t : -1+(4-2*t)*t; // ease-in-out
+          sclera.setAttribute('ry', from + (to - from) * ease);
+          if (t < 1) requestAnimationFrame(step);
+          else if (onDone) onDone();
+        }
+        requestAnimationFrame(step);
+      }
+
+      function doBlink(onDone) {
+        // Close: 120ms, open: 100ms — feels natural
+        animateRy(RY_OPEN, RY_SHUT, 120, () => {
+          animateRy(RY_SHUT, RY_OPEN, 100, onDone);
+        });
+      }
+
+      function scheduleNextBlink() {
+        // Random interval: 3–8 seconds. Occasionally do a double blink.
+        const delay = 3000 + Math.random() * 5000;
+        setTimeout(() => {
+          const isDouble = Math.random() < 0.25; // 25% chance of double blink
+          doBlink(() => {
+            if (isDouble) {
+              setTimeout(() => doBlink(scheduleNextBlink), 180 + Math.random() * 120);
+            } else {
+              scheduleNextBlink();
+            }
+          });
+        }, delay);
+      }
+
+      scheduleNextBlink();
+
+      // --- Pupil cursor tracking (screen-wide via IPC) ---
+      const pupil = document.getElementById('eye-pupil');
+      const EYE_SVG_CX = 60; // matches actual cx="60" (centered)
+      const EYE_SVG_CY = 57;
+      const MAX_OFFSET = 3; // max px offset in SVG units
+
+      let currentX = EYE_SVG_CX;
+      let currentY = EYE_SVG_CY;
+      let targetX = EYE_SVG_CX;
+      let targetY = EYE_SVG_CY;
+
+      function updateTarget(screenX, screenY) {
+        const svgEl = btn.querySelector('svg');
+        const svgRect = svgEl.getBoundingClientRect();
+        // Convert SVG eye center to absolute screen coordinates using the window's
+        // screen origin (window.screenX/Y is the bubble BrowserWindow's top-left corner).
+        const eyeScreenCX = window.screenX + svgRect.left + svgRect.width  * (EYE_SVG_CX / 120);
+        const eyeScreenCY = window.screenY + svgRect.top  + svgRect.height * (EYE_SVG_CY / 120);
+        const dx = screenX - eyeScreenCX;
+        const dy = screenY - eyeScreenCY;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        // 300px screen distance = full MAX_OFFSET deflection
+        const scale = Math.min(dist / 300, 1);
+        targetX = EYE_SVG_CX + (dx / dist) * MAX_OFFSET * scale;
+        targetY = EYE_SVG_CY + (dy / dist) * MAX_OFFSET * scale;
+      }
+
+      // Primary path: IPC from main process (screen.getCursorScreenPoint() at ~30fps)
+      if (window.bubbleAPI?.onCursorPos) {
+        window.bubbleAPI.onCursorPos(({ x, y }) => updateTarget(x, y));
+      } else {
+        // Browser fallback — used when bubble.html is opened directly in a browser for testing
+        window.addEventListener('mousemove', (e) => updateTarget(e.screenX, e.screenY));
+        window.addEventListener('mouseleave', () => {
+          targetX = EYE_SVG_CX;
+          targetY = EYE_SVG_CY;
+        });
+      }
+
+      // Smooth lerp loop
+      function trackingLoop() {
+        currentX += (targetX - currentX) * 0.08;
+        currentY += (targetY - currentY) * 0.08;
+        pupil.setAttribute('cx', currentX.toFixed(2));
+        pupil.setAttribute('cy', currentY.toFixed(2));
+        requestAnimationFrame(trackingLoop);
+      }
+      trackingLoop();
 
       window.bubbleAPI?.onSpeaking((speaking, text) => {
         isSpeaking = speaking;
