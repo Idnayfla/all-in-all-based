@@ -207,7 +207,37 @@ export default function CompanionOverlayPage() {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Race getSession() against a 3 s timeout. In Android WebView (and Electron)
+    // the Supabase network round-trip to validate a stored token can hang
+    // indefinitely. If it does, fall back to reading the access_token directly
+    // from the Supabase localStorage entry so the UI never stays stuck on
+    // "Connecting...".
+    const SESSION_TIMEOUT_MS = 3000;
+    const timeoutRace = new Promise<{ data: { session: { access_token: string } | null } }>(
+      resolve => {
+        setTimeout(() => {
+          try {
+            // Supabase stores its session as JSON in localStorage under the
+            // key matching the pattern sb-<project-ref>-auth-token.
+            const entry = Object.keys(localStorage).find(k => k.endsWith('-auth-token'));
+            if (entry) {
+              const parsed = JSON.parse(localStorage.getItem(entry) ?? '{}') as {
+                access_token?: string;
+              };
+              if (parsed.access_token) {
+                resolve({ data: { session: { access_token: parsed.access_token } } });
+                return;
+              }
+            }
+          } catch {
+            // ignore parse errors
+          }
+          resolve({ data: { session: null } });
+        }, SESSION_TIMEOUT_MS);
+      }
+    );
+
+    Promise.race([supabase.auth.getSession(), timeoutRace]).then(({ data: { session } }) => {
       setAuthToken(session?.access_token ?? '');
       setAuthReady(true);
     });
