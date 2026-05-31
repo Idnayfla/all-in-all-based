@@ -44,13 +44,17 @@ declare global {
       hideCompanion: () => void;
       hideForCapture: () => void;
       showAfterCapture: () => void;
-      /** Captures the screen in the main process; returns a data-URL or null. */
       captureScreenMain: () => Promise<string | null>;
-      /** Notify the bubble window that Based started or stopped speaking.
-       *  Pass the spoken text when starting so the bubble can display it.
-       *  Pass msPerWord (ms per word) so the bubble syncs reveal speed to audio. */
       setSpeaking: (speaking: boolean, text?: string) => void;
     };
+    AndroidBridge?: {
+      close: () => void;
+      startScreenCapture: () => void;
+      stopScreenCapture: () => void;
+    };
+    onScreenFrame?: (base64Jpeg: string) => void;
+    onScreenCaptureDenied?: () => void;
+    onScreenCaptureStopped?: () => void;
   }
 }
 
@@ -102,6 +106,8 @@ export default function CompanionOverlayPage() {
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
   const [slowWarning, setSlowWarning] = useState(false);
+  const [isAndroidBridge, setIsAndroidBridge] = useState(false);
+  const [androidCapturing, setAndroidCapturing] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('male');
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -256,6 +262,32 @@ export default function CompanionOverlayPage() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Android bridge detection + frame/event handlers
+  useEffect(() => {
+    setIsAndroidBridge(!!window.AndroidBridge);
+
+    window.onScreenFrame = (base64Jpeg: string) => {
+      const dataUrl = `data:image/jpeg;base64,${base64Jpeg}`;
+      setPendingCapture({ source: dataUrl, thumb: dataUrl });
+    };
+
+    window.onScreenCaptureDenied = () => {
+      setAndroidCapturing(false);
+      flashError('Screen permission denied');
+    };
+
+    window.onScreenCaptureStopped = () => {
+      setAndroidCapturing(false);
+      setPendingCapture(null);
+    };
+
+    return () => {
+      delete window.onScreenFrame;
+      delete window.onScreenCaptureDenied;
+      delete window.onScreenCaptureStopped;
+    };
+  }, []);
+
   // Clear any pending timers when the overlay unmounts
   useEffect(() => {
     return () => {
@@ -286,6 +318,17 @@ export default function CompanionOverlayPage() {
   };
 
   const handleScreen = async () => {
+    if (window.AndroidBridge) {
+      if (androidCapturing) {
+        window.AndroidBridge.stopScreenCapture();
+        setAndroidCapturing(false);
+        setPendingCapture(null);
+      } else {
+        setAndroidCapturing(true);
+        window.AndroidBridge.startScreenCapture();
+      }
+      return;
+    }
     window.electronAPI?.hideForCapture();
     // 300 ms lets the Windows DWM compositor repaint before desktopCapturer
     // grabs a fresh snapshot in the main process.  The old getDisplayMedia path
@@ -313,8 +356,9 @@ export default function CompanionOverlayPage() {
 
     let cap = pendingCapture;
 
-    // Auto-capture screen when message implies screen intent and no capture is already attached
-    if (!cap && SCREEN_INTENT.test(text)) {
+    // Auto-capture screen when message implies screen intent and no capture is already attached.
+    // Skip on Android — MediaProjection requires an explicit user gesture, not a silent trigger.
+    if (!cap && SCREEN_INTENT.test(text) && !window.AndroidBridge) {
       try {
         window.electronAPI?.hideForCapture();
         // 300 ms settle — same reasoning as handleScreen above
@@ -601,14 +645,14 @@ export default function CompanionOverlayPage() {
 
       <div className="companion-input-area">
         <div className="companion-capture-row">
-          {screenSupported && (
+          {(screenSupported || isAndroidBridge) && (
             <button
-              className={`companion-capture-btn${pendingCapture ? ' active' : ''}`}
+              className={`companion-capture-btn${pendingCapture || androidCapturing ? ' active' : ''}`}
               onClick={handleScreen}
               disabled={isGenerating}
-              title="Share your screen with Based"
+              title={androidCapturing ? 'Stop screen sharing' : 'Share your screen with Based'}
             >
-              ◉ Screen
+              {androidCapturing ? '◉ Watching' : '◉ Screen'}
             </button>
           )}
           <button
