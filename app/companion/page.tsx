@@ -264,7 +264,15 @@ export default function CompanionOverlayPage() {
 
   // Android bridge detection + frame/event handlers
   useEffect(() => {
-    setIsAndroidBridge(!!window.AndroidBridge);
+    // Primary detection: bridge is injected before page load via addJavascriptInterface.
+    // Fallback: onPageFinished in CompanionActivity dispatches 'androidBridgeReady' and
+    // sets window.__androidBridge so we catch it even if the useEffect ran before the
+    // bridge was fully available (e.g. after a redirect through /beta-gate).
+    if (window.AndroidBridge ?? (window as unknown as Record<string, unknown>).__androidBridge) {
+      setIsAndroidBridge(true);
+    }
+    const onBridgeReady = () => setIsAndroidBridge(true);
+    document.addEventListener('androidBridgeReady', onBridgeReady);
 
     window.onScreenFrame = (base64Jpeg: string) => {
       const dataUrl = `data:image/jpeg;base64,${base64Jpeg}`;
@@ -282,6 +290,7 @@ export default function CompanionOverlayPage() {
     };
 
     return () => {
+      document.removeEventListener('androidBridgeReady', onBridgeReady);
       delete window.onScreenFrame;
       delete window.onScreenCaptureDenied;
       delete window.onScreenCaptureStopped;

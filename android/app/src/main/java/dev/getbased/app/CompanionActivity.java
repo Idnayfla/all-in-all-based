@@ -33,7 +33,7 @@ public class CompanionActivity extends AppCompatActivity {
     static final String ACTION_COMPANION_CLOSED = "dev.getbased.app.COMPANION_CLOSED";
     static final String ACTION_CLOSE_REQUEST    = "dev.getbased.app.COMPANION_CLOSE_REQUEST";
 
-    private static final String COMPANION_URL          = "https://www.getbased.dev/companion";
+    private static final String COMPANION_URL          = "https://beta.getbased.dev/companion";
     private static final int    REQUEST_MEDIA_PROJECTION = 1002;
 
     private WebView webView;
@@ -116,6 +116,16 @@ public class CompanionActivity extends AppCompatActivity {
                             "window.close = function() {" +
                             "  if (window.AndroidBridge) { window.AndroidBridge.close(); }" +
                             "};",
+                            null);
+                    // Bug 2 fix: window.AndroidBridge is injected before page load but React's
+                    // useEffect may read it before the bridge is fully ready, or a redirect
+                    // (e.g. beta-gate) may cause a second onPageFinished. Dispatch a custom event
+                    // so the companion page can detect the bridge even after mount.
+                    view.evaluateJavascript(
+                            "(function() {" +
+                            "  window.__androidBridge = true;" +
+                            "  document.dispatchEvent(new CustomEvent('androidBridgeReady'));" +
+                            "})()",
                             null);
                 }
             }

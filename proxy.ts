@@ -16,7 +16,13 @@ export function proxy(req: NextRequest) {
     pathname.startsWith('/api/beta-gate') ||
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/_next') ||
-    pathname.startsWith('/favicon')
+    pathname.startsWith('/favicon') ||
+    // Allow the companion and its API routes through without a beta cookie.
+    // The Android WebView loads /companion directly and never has the beta
+    // access cookie set; blocking it redirects to /beta-gate and shows
+    // "Sign in to use" even for authenticated users.
+    pathname.startsWith('/companion') ||
+    pathname.startsWith('/api/companion')
   ) {
     return NextResponse.next();
   }
