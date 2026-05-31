@@ -36,7 +36,7 @@ async function getEffectiveTier(userId: string): Promise<'free' | 'pro'> {
   const isCanceled = subStatus === 'canceled' || subStatus === 'cancelled';
   const bonusExpiresAt = data?.pro_bonus_expires_at as string | null;
   const hasBonusPro = !!bonusExpiresAt && new Date(bonusExpiresAt) > new Date();
-  const alwaysPro = process.env.ALWAYS_PRO === 'true';
+  const alwaysPro = process.env.ALWAYS_PRO === 'true' || !!process.env.BETA_ACCESS_CODE;
   return alwaysPro || (paidTier === 'pro' && !isCanceled) || hasBonusPro ? 'pro' : 'free';
 }
 

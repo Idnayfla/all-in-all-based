@@ -6,10 +6,15 @@ export function proxy(req: NextRequest) {
 
   const { pathname } = req.nextUrl;
 
-  // Always allow the gate page and its API through
+  // Always allow the gate page and its API through.
+  // Also allow /auth/* so that OAuth callbacks (Google, GitHub) land correctly — the
+  // user hasn't set the beta cookie yet at that point but needs the callback to complete
+  // before being gated. The auth/callback page exchanges the code and then redirects to /,
+  // which will properly trigger the gate with the now-established Supabase session.
   if (
     pathname.startsWith('/beta-gate') ||
     pathname.startsWith('/api/beta-gate') ||
+    pathname.startsWith('/auth/') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/favicon')
   ) {

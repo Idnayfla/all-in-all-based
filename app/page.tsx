@@ -825,7 +825,15 @@ export default function Home() {
 
   // ── Project CRUD ─────────────────────────────────────────────────────────
   const newProject = () => {
-    if (subscription.tier === 'free' && projects.length >= 3) {
+    // Beta deployments are always treated as Pro — ALWAYS_PRO=true (or BETA_ACCESS_CODE set)
+    // on the server mirrors this on every gated API, so the client-side 3-project limit must
+    // also be lifted for beta users to avoid a mismatched gate.
+    // Use NEXT_PUBLIC_BUILD_ENV when set; fall back to hostname detection so the gate
+    // is skipped even if the env var is missing from the Vercel beta project settings.
+    const isBetaEnv =
+      process.env.NEXT_PUBLIC_BUILD_ENV === 'beta' ||
+      (typeof window !== 'undefined' && window.location.hostname === 'beta.getbased.dev');
+    if (!isBetaEnv && subscription.tier === 'free' && projects.length >= 3) {
       setPricingReason('projects');
       setShowPricing(true);
       return;
