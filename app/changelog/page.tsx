@@ -39,7 +39,7 @@ const ENTRIES: ChangeEntry[] = [
           },
           {
             bold: 'Based has opinions',
-            text: "Based pushes back, names patterns it notices, and matches your energy. It is not a yes-machine — it will tell you when something is a bad idea.",
+            text: 'Based pushes back, names patterns it notices, and matches your energy. It is not a yes-machine — it will tell you when something is a bad idea.',
           },
           {
             bold: 'Pattern timeline',
@@ -518,6 +518,10 @@ export default function ChangelogPage() {
         >
           ◈ Ko-fi
         </a>
+        <span className="cl-footer-sep">·</span>
+        <Link href="/vote" className="cl-footer-link">
+          Vote
+        </Link>
         <span className="cl-footer-sep">·</span>
         <Link href="/terms" className="cl-footer-link">
           Terms
