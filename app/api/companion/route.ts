@@ -261,6 +261,12 @@ export async function POST(req: NextRequest) {
     extractPatternsAsync(jwtUserId, messages);
   }
 
+  // Onboarding arc should only activate on the first message of a new session
+  // (messages.length === 1 means the client sent a fresh conversation with no prior
+  // assistant replies).  Subsequent messages in the same sitting should not re-trigger
+  // session-1/2/3 instructions — that would advance the arc multiple times per sitting.
+  const isFirstMessageOfSession = messages.length === 1;
+
   // Fetch live data if the user's last message asks about weather or traffic
   const lastUserText = ((messages[messages.length - 1]?.content as string) ?? '').toLowerCase();
   let liveDataContext = '';
@@ -287,32 +293,45 @@ export async function POST(req: NextRequest) {
   // --- Build dynamic system prompt additions ---
   const dynamicInstructions: string[] = [];
 
-  // Feature 4 — Onboarding Intimacy Arc (first 3 sessions)
-  if (sessionCount <= 1) {
-    dynamicInstructions.push(
-      `ONBOARDING SESSION 1: This is your first real conversation. Ask one specific question that only a companion would ask — not "what do you do" but something more like "what's been on your mind this week that you haven't said out loud to anyone?" Then listen. Don't rush to help.`
-    );
-  } else if (sessionCount === 2) {
-    dynamicInstructions.push(
-      `ONBOARDING SESSION 2: You met this person recently. Reference something from memory if available. Ask a follow-up to something they mentioned before. If nothing in memory yet: "Last time I felt like you had more to say. What didn't you tell me?"`
-    );
-  } else if (sessionCount === 3) {
-    dynamicInstructions.push(
-      `ONBOARDING SESSION 3: You're starting to know this person. Make one observation about them — something you've noticed from the two previous conversations. State it as fact, not a question. Then ask if you got it right.`
-    );
-  }
-
-  // Feature 3c — 14-day first-surface / ongoing pattern reference
+  // Feature 3c — 14-day first-surface / ongoing pattern reference.
+  // Evaluated FIRST so it can suppress the onboarding arc when both would fire
+  // simultaneously (OA6 fix: two "open with an observation" instructions conflict).
+  let patternSurfaceActive = false;
   if (daysSinceFirst >= 14) {
     if (!patternsSurfaced) {
+      patternSurfaceActive = true;
       dynamicInstructions.push(
         `PATTERN SURFACE: This is the moment. Based on the user's memory/patterns below, open your next response with ONE specific observation about the user that shows you've been paying attention. Make it feel like you've been thinking about them. Not a question — a statement. Then continue naturally.`
       );
-      // Fire-and-forget mark
+      // Set flag locally to prevent a second request (arriving before the DB write
+      // completes) from surfacing again in this process.  The async DB write is the
+      // durable record; this guards within the same in-flight window.
+      patternsSurfaced = true;
       if (jwtUserId) markPatternsSurfacedAsync(jwtUserId);
     } else {
       dynamicInstructions.push(
         `You have known this user for ${Math.floor(daysSinceFirst)} days. You have been paying attention. Reference specific patterns from memory naturally when relevant — not forced, just present.`
+      );
+    }
+  }
+
+  // Feature 4 — Onboarding Intimacy Arc (first 3 conversation-starts).
+  // Only fires on the FIRST message of a new sitting (isFirstMessageOfSession) so the
+  // arc advances once per conversation, not once per message.  Also skipped when a
+  // PATTERN SURFACE instruction is already injected — both give "open with an
+  // observation" directives which would contradict each other (OA6 fix).
+  if (isFirstMessageOfSession && !patternSurfaceActive) {
+    if (sessionCount <= 1) {
+      dynamicInstructions.push(
+        `ONBOARDING SESSION 1: This is your first real conversation. Ask one specific question that only a companion would ask — not "what do you do" but something more like "what's been on your mind this week that you haven't said out loud to anyone?" Then listen. Don't rush to help.`
+      );
+    } else if (sessionCount === 2) {
+      dynamicInstructions.push(
+        `ONBOARDING SESSION 2: You met this person recently. Reference something from memory if available. Ask a follow-up to something they mentioned before. If nothing in memory yet: "Last time I felt like you had more to say. What didn't you tell me?"`
+      );
+    } else if (sessionCount === 3) {
+      dynamicInstructions.push(
+        `ONBOARDING SESSION 3: You're starting to know this person. Make one observation about them — something you've noticed from the two previous conversations. State it as fact, not a question. Then ask if you got it right.`
       );
     }
   }
