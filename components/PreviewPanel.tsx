@@ -105,13 +105,19 @@ export default function PreviewPanel({
     });
   };
 
+  const [exportError, setExportError] = useState<string | null>(null);
+
   const exportPNG = async () => {
     setIsExporting(true);
     setShowExportMenu(false);
+    setExportError(null);
     try {
       const canvas = await captureCanvas();
       if (!canvas) return;
       setCropData({ url: canvas.toDataURL('image/png'), format: 'png' });
+    } catch (err: unknown) {
+      setExportError('Export failed — try opening in a new tab first.');
+      console.error('[export PNG]', err);
     } finally {
       setIsExporting(false);
     }
@@ -120,10 +126,14 @@ export default function PreviewPanel({
   const exportJPG = async () => {
     setIsExporting(true);
     setShowExportMenu(false);
+    setExportError(null);
     try {
       const canvas = await captureCanvas();
       if (!canvas) return;
       setCropData({ url: canvas.toDataURL('image/jpeg', 0.92), format: 'jpg' });
+    } catch (err: unknown) {
+      setExportError('Export failed — try opening in a new tab first.');
+      console.error('[export JPG]', err);
     } finally {
       setIsExporting(false);
     }
@@ -132,6 +142,7 @@ export default function PreviewPanel({
   const exportGIF = async () => {
     setIsExporting(true);
     setShowExportMenu(false);
+    setExportError(null);
     try {
       const iframe = iframeRef.current;
       if (!iframe?.contentDocument?.body) return;
@@ -182,6 +193,9 @@ export default function PreviewPanel({
         gif.on('error', reject);
         gif.render();
       });
+    } catch (err: unknown) {
+      setExportError('GIF export failed — try a simpler animation.');
+      console.error('[export GIF]', err);
     } finally {
       setIsExporting(false);
     }
@@ -190,6 +204,7 @@ export default function PreviewPanel({
   const exportPDF = async () => {
     setIsExporting(true);
     setShowExportMenu(false);
+    setExportError(null);
     try {
       const canvas = await captureCanvas(2);
       if (!canvas) return;
@@ -206,6 +221,9 @@ export default function PreviewPanel({
       a.href = URL.createObjectURL(blob);
       a.download = 'based-export.pdf';
       a.click();
+    } catch (err: unknown) {
+      setExportError('PDF export failed — try opening in a new tab first.');
+      console.error('[export PDF]', err);
     } finally {
       setIsExporting(false);
     }
@@ -214,6 +232,7 @@ export default function PreviewPanel({
   const exportDOCX = async () => {
     setIsExporting(true);
     setShowExportMenu(false);
+    setExportError(null);
     try {
       const iframe = iframeRef.current;
       if (!iframe?.contentDocument?.body) return;
@@ -253,6 +272,9 @@ export default function PreviewPanel({
       a.download = 'based-export.docx';
       a.click();
       URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      setExportError('Word export failed — please try again.');
+      console.error('[export DOCX]', err);
     } finally {
       setIsExporting(false);
     }
@@ -261,6 +283,7 @@ export default function PreviewPanel({
   const exportPPTX = async () => {
     setIsExporting(true);
     setShowExportMenu(false);
+    setExportError(null);
     try {
       const canvas = await captureCanvas(2);
       if (!canvas) return;
@@ -272,6 +295,9 @@ export default function PreviewPanel({
       const slide = pptx.addSlide();
       slide.addImage({ data: imgData, x: 0, y: 0, w: '100%', h: '100%' });
       await pptx.writeFile({ fileName: 'based-export.pptx' });
+    } catch (err: unknown) {
+      setExportError('PowerPoint export failed — please try again.');
+      console.error('[export PPTX]', err);
     } finally {
       setIsExporting(false);
     }
@@ -280,6 +306,7 @@ export default function PreviewPanel({
   const exportXLSX = async () => {
     setIsExporting(true);
     setShowExportMenu(false);
+    setExportError(null);
     try {
       const iframe = iframeRef.current;
       if (!iframe?.contentDocument) return;
@@ -307,6 +334,9 @@ export default function PreviewPanel({
         XLSX.utils.book_append_sheet(wb, ws, `Sheet${i + 1}`);
       });
       XLSX.writeFile(wb, 'based-export.xlsx');
+    } catch (err: unknown) {
+      setExportError('Excel export failed — please try again.');
+      console.error('[export XLSX]', err);
     } finally {
       setIsExporting(false);
     }
@@ -455,6 +485,11 @@ export default function PreviewPanel({
           format={cropData.format}
           onClose={() => setCropData(null)}
         />
+      )}
+      {exportError && (
+        <div className="export-error-toast" onClick={() => setExportError(null)}>
+          {exportError}
+        </div>
       )}
     </div>
   );

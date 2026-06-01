@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useRef, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
@@ -44,13 +44,18 @@ declare global {
       hideCompanion: () => void;
       hideForCapture: () => void;
       showAfterCapture: () => void;
-      /** Captures the screen in the main process; returns a data-URL or null. */
       captureScreenMain: () => Promise<string | null>;
-      /** Notify the bubble window that Based started or stopped speaking.
-       *  Pass the spoken text when starting so the bubble can display it.
-       *  Pass msPerWord (ms per word) so the bubble syncs reveal speed to audio. */
       setSpeaking: (speaking: boolean, text?: string) => void;
     };
+    AndroidBridge?: {
+      close: () => void;
+      startScreenCapture: () => void;
+      stopScreenCapture: () => void;
+      shareText: (text: string) => void;
+    };
+    onScreenFrame?: (base64Jpeg: string) => void;
+    onScreenCaptureDenied?: () => void;
+    onScreenCaptureStopped?: () => void;
   }
 }
 
@@ -58,6 +63,7 @@ interface Msg {
   role: 'user' | 'assistant';
   content: string;
   captureThumb?: string;
+  shareable?: boolean;
 }
 
 const SCREEN_INTENT =
@@ -72,8 +78,8 @@ function base64ToBlob(b64: string, mime: string): Blob {
 
 /**
  * Pick the best available English voice in priority order:
- *   Google UK English Female → Google US English → Microsoft Zira →
- *   Samantha (macOS) → any en- voice → system default
+ *   Google UK English Female â†’ Google US English â†’ Microsoft Zira â†’
+ *   Samantha (macOS) â†’ any en- voice â†’ system default
  */
 function buildSpeechChunks(text: string, maxWords = 12): string[] {
   const sentences = text.match(/[^.!?]+[.!?]*/g) ?? [text];
@@ -96,12 +102,16 @@ export default function CompanionOverlayPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [authToken, setAuthToken] = useState('');
   const [authReady, setAuthReady] = useState(false);
+  // Session-cached memory â€” fetched once on mount, passed to every /api/companion POST
+  const sessionMemoryRef = useRef<string>('');
   const [pendingCapture, setPendingCapture] = useState<{ source: string; thumb: string } | null>(
     null
   );
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
   const [slowWarning, setSlowWarning] = useState(false);
+  const [isAndroidBridge, setIsAndroidBridge] = useState(false);
+  const [androidCapturing, setAndroidCapturing] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('male');
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -112,6 +122,9 @@ export default function CompanionOverlayPage() {
   const sessionId = useRef(String(Date.now()).slice(-4));
   const screenSupported = isScreenCaptureSupported();
 
+  const nextResponseIsShareableRef = useRef<boolean>(false);
+  const daysSinceFirstRef = useRef<number>(0);
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const lastSpokenRef = useRef('');
 
@@ -125,7 +138,7 @@ export default function CompanionOverlayPage() {
       currentAudioRef.current.pause();
       currentAudioRef.current = null;
     }
-    // Do NOT call setSpeaking(true) yet — wait until we have audio actually playing
+    // Do NOT call setSpeaking(true) yet â€” wait until we have audio actually playing
     // so the bubble never shows and immediately clears on a fast ElevenLabs failure.
     try {
       const res = await fetch('/api/tts', {
@@ -184,7 +197,7 @@ export default function CompanionOverlayPage() {
       await audio.play();
     } catch (err) {
       console.error('[tts error]', err);
-      // Silent fail — no robotic fallback voice
+      // Silent fail â€” no robotic fallback voice
       lastSpokenRef.current = '';
     }
   };
@@ -238,8 +251,22 @@ export default function CompanionOverlayPage() {
     );
 
     Promise.race([supabase.auth.getSession(), timeoutRace]).then(({ data: { session } }) => {
-      setAuthToken(session?.access_token ?? '');
+      const token = session?.access_token ?? '';
+      setAuthToken(token);
       setAuthReady(true);
+
+      // Fetch memory once at session start and cache it for the whole session.
+      // Companion API reads it from user_settings â€” skip if not signed in.
+      if (token) {
+        void fetch('/api/memory', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then(r => (r.ok ? (r.json() as Promise<{ memory?: string }>) : null))
+          .then(data => {
+            if (data?.memory) sessionMemoryRef.current = data.memory;
+          })
+          .catch(() => {});
+      }
     });
     textareaRef.current?.focus();
 
@@ -256,6 +283,41 @@ export default function CompanionOverlayPage() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Android bridge detection + frame/event handlers
+  useEffect(() => {
+    // Primary detection: bridge is injected before page load via addJavascriptInterface.
+    // Fallback: onPageFinished in CompanionActivity dispatches 'androidBridgeReady' and
+    // sets window.__androidBridge so we catch it even if the useEffect ran before the
+    // bridge was fully available (e.g. after a redirect through /beta-gate).
+    if (window.AndroidBridge ?? (window as unknown as Record<string, unknown>).__androidBridge) {
+      setIsAndroidBridge(true);
+    }
+    const onBridgeReady = () => setIsAndroidBridge(true);
+    document.addEventListener('androidBridgeReady', onBridgeReady);
+
+    window.onScreenFrame = (base64Jpeg: string) => {
+      const dataUrl = `data:image/jpeg;base64,${base64Jpeg}`;
+      setPendingCapture({ source: dataUrl, thumb: dataUrl });
+    };
+
+    window.onScreenCaptureDenied = () => {
+      setAndroidCapturing(false);
+      flashError('Screen permission denied');
+    };
+
+    window.onScreenCaptureStopped = () => {
+      setAndroidCapturing(false);
+      setPendingCapture(null);
+    };
+
+    return () => {
+      document.removeEventListener('androidBridgeReady', onBridgeReady);
+      delete window.onScreenFrame;
+      delete window.onScreenCaptureDenied;
+      delete window.onScreenCaptureStopped;
+    };
+  }, []);
+
   // Clear any pending timers when the overlay unmounts
   useEffect(() => {
     return () => {
@@ -263,6 +325,36 @@ export default function CompanionOverlayPage() {
       if (hardResetTimerRef.current) clearTimeout(hardResetTimerRef.current);
     };
   }, []);
+
+  // Restore messages from localStorage on mount (survives WebView recreation)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('based_companion_messages');
+      if (stored) {
+        const parsed = JSON.parse(stored) as Msg[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      }
+    } catch {
+      // ignore parse errors â€” start fresh
+    }
+  }, []);
+
+  // Persist messages to localStorage on every change
+  useEffect(() => {
+    try {
+      if (messages.length === 0) {
+        localStorage.removeItem('based_companion_messages');
+      } else {
+        // Only persist completed messages (skip the live-streaming empty assistant bubble)
+        const toSave = messages.filter(m => m.content?.trim());
+        localStorage.setItem('based_companion_messages', JSON.stringify(toSave));
+      }
+    } catch {
+      // ignore storage errors (e.g. quota exceeded)
+    }
+  }, [messages]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -286,6 +378,17 @@ export default function CompanionOverlayPage() {
   };
 
   const handleScreen = async () => {
+    if (window.AndroidBridge) {
+      if (androidCapturing) {
+        window.AndroidBridge.stopScreenCapture();
+        setAndroidCapturing(false);
+        setPendingCapture(null);
+      } else {
+        setAndroidCapturing(true);
+        window.AndroidBridge.startScreenCapture();
+      }
+      return;
+    }
     window.electronAPI?.hideForCapture();
     // 300 ms lets the Windows DWM compositor repaint before desktopCapturer
     // grabs a fresh snapshot in the main process.  The old getDisplayMedia path
@@ -313,11 +416,12 @@ export default function CompanionOverlayPage() {
 
     let cap = pendingCapture;
 
-    // Auto-capture screen when message implies screen intent and no capture is already attached
-    if (!cap && SCREEN_INTENT.test(text)) {
+    // Auto-capture screen when message implies screen intent and no capture is already attached.
+    // Skip on Android â€” MediaProjection requires an explicit user gesture, not a silent trigger.
+    if (!cap && SCREEN_INTENT.test(text) && !window.AndroidBridge) {
       try {
         window.electronAPI?.hideForCapture();
-        // 300 ms settle — same reasoning as handleScreen above
+        // 300 ms settle â€” same reasoning as handleScreen above
         await new Promise<void>(resolve => setTimeout(resolve, 300));
         // Fix B: 5s timeout so a stalled IPC call doesn't block send() forever
         const dataUrl = window.electronAPI?.captureScreenMain
@@ -329,7 +433,7 @@ export default function CompanionOverlayPage() {
         window.electronAPI?.showAfterCapture();
         if (dataUrl) cap = { source: dataUrl, thumb: dataUrl };
       } catch {
-        // Capture failure is non-fatal — proceed without screenshot
+        // Capture failure is non-fatal â€” proceed without screenshot
         window.electronAPI?.showAfterCapture();
       }
     }
@@ -348,7 +452,7 @@ export default function CompanionOverlayPage() {
     // Fix F: slow warning visible after 15 s
     slowWarningTimerRef.current = setTimeout(() => setSlowWarning(true), 15000);
 
-    // Fix E: hard-reset safety net — if isGenerating is still true after 45 s,
+    // Fix E: hard-reset safety net â€” if isGenerating is still true after 45 s,
     // force it false so the UI never stays permanently locked.
     hardResetTimerRef.current = setTimeout(() => {
       setIsGenerating(false);
@@ -357,7 +461,7 @@ export default function CompanionOverlayPage() {
         const next = [...prev];
         const last = next[next.length - 1];
         if (last?.role === 'assistant' && !last.content?.trim()) {
-          next[next.length - 1] = { ...last, content: '✕ Request timed out. Please try again.' };
+          next[next.length - 1] = { ...last, content: 'âœ• Request timed out. Please try again.' };
         }
         return next;
       });
@@ -379,7 +483,7 @@ export default function CompanionOverlayPage() {
           const next = [...prev];
           next[next.length - 1] = {
             ...next[next.length - 1],
-            content: '✕ Not signed in. Please open Based and sign in first.',
+            content: 'âœ• Not signed in. Please open Based and sign in first.',
           };
           return next;
         });
@@ -401,16 +505,19 @@ export default function CompanionOverlayPage() {
             .filter(m => m.content?.trim())
             .map(m => ({ role: m.role, content: m.content })),
           ...(screenshotPayload ? { screenshot: screenshotPayload } : {}),
+          // Pass session-cached memory so Based has user context on every turn
+          ...(sessionMemoryRef.current ? { memory: sessionMemoryRef.current } : {}),
         }),
         signal: abortController.signal,
       });
 
       if (res.status === 429) {
-        let limitMsg = '⬡ Daily limit reached. Upgrade to Pro for unlimited access → getbased.dev';
+        let limitMsg =
+          'â¬¡ Daily limit reached. Upgrade to Pro for unlimited access â†’ getbased.dev';
         try {
           const data = (await res.json()) as { error?: string; limit?: number };
           if (data.error === 'free_limit_reached') {
-            limitMsg = `⬡ You've used your ${data.limit ?? 5} free companion messages today. Upgrade to Pro for unlimited access → getbased.dev`;
+            limitMsg = `â¬¡ You've used your ${data.limit ?? 5} free companion messages today. Upgrade to Pro for unlimited access â†’ getbased.dev`;
           }
         } catch {}
         setMessages(prev => {
@@ -425,6 +532,11 @@ export default function CompanionOverlayPage() {
         if (res.status === 401) throw new Error('session-expired');
         throw new Error('failed');
       }
+
+      // Read shareable/days headers before the stream body is consumed
+      nextResponseIsShareableRef.current = res.headers.get('X-Based-Shareable') === '1';
+      const daysHeader = res.headers.get('X-Based-Days');
+      if (daysHeader !== null) daysSinceFirstRef.current = parseInt(daysHeader, 10) || 0;
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -448,7 +560,7 @@ export default function CompanionOverlayPage() {
           try {
             const parsed = JSON.parse(raw) as { text?: string; error?: string };
             if (parsed.error) {
-              // Server signalled a stream failure — record it and let [DONE] close the loop
+              // Server signalled a stream failure â€” record it and let [DONE] close the loop
               streamError = parsed.error;
             } else if (parsed.text) {
               setMessages(prev => {
@@ -461,10 +573,23 @@ export default function CompanionOverlayPage() {
               });
             }
           } catch {
-            // malformed SSE chunk — skip
+            // malformed SSE chunk â€” skip
           }
         }
       }
+      // Mark the completed message as shareable if the server flagged it
+      if (nextResponseIsShareableRef.current && !streamError) {
+        nextResponseIsShareableRef.current = false;
+        setMessages(prev => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last?.role === 'assistant' && last.content?.trim()) {
+            next[next.length - 1] = { ...last, shareable: true };
+          }
+          return next;
+        });
+      }
+
       // Speak the completed assistant response when voice is enabled and no error occurred.
       if (voiceEnabled && !streamError) {
         setMessages(prev => {
@@ -481,10 +606,10 @@ export default function CompanionOverlayPage() {
       // are debuggable; fall back to a generic message for long/technical strings.
       if (streamError) {
         const errorDisplay = streamError.toLowerCase().includes('unauthorized')
-          ? '✕ Session expired — sign in again in Based.'
+          ? 'âœ• Session expired â€” sign in again in Based.'
           : streamError.length <= 80
-            ? `✕ ${streamError}`
-            : '✕ Failed to connect.';
+            ? `âœ• ${streamError}`
+            : 'âœ• Failed to connect.';
         setMessages(prev => {
           const next = [...prev];
           next[next.length - 1] = { ...next[next.length - 1], content: errorDisplay };
@@ -500,10 +625,10 @@ export default function CompanionOverlayPage() {
         next[next.length - 1] = {
           ...next[next.length - 1],
           content: isExpired
-            ? '✕ Session expired. Please sign in again in Based.'
+            ? 'âœ• Session expired. Please sign in again in Based.'
             : isAborted || isTimeout
-              ? '✕ Connection timed out. Check your internet.'
-              : '✕ Failed to connect.',
+              ? 'âœ• Connection timed out. Check your internet.'
+              : 'âœ• Failed to connect.',
         };
         return next;
       });
@@ -522,6 +647,29 @@ export default function CompanionOverlayPage() {
     }
   };
 
+  const handleShare = (content: string, msgIdx: number) => {
+    const sentences = content.split(/(?<=[.!?])\s+/);
+    const excerpt = sentences.slice(0, 2).join(' ');
+    const days = daysSinceFirstRef.current;
+    const shareText = `Based's read on me:\n\n"${excerpt}"\n\n— Based has known me for ${days} day${days === 1 ? '' : 's'}\ngetbased.dev`;
+
+    // Android: use bridge
+    if (window.AndroidBridge?.shareText) {
+      window.AndroidBridge.shareText(shareText);
+      return;
+    }
+    // Web fallback: Web Share API
+    if (navigator.share) {
+      navigator.share({ text: shareText }).catch(() => {});
+      return;
+    }
+    // Final fallback: clipboard
+    void navigator.clipboard?.writeText(shareText).then(() => {
+      setCopiedIdx(msgIdx);
+      setTimeout(() => setCopiedIdx(prev => (prev === msgIdx ? null : prev)), 2000);
+    });
+  };
+
   return (
     <div className={`companion-overlay-root${isClosing ? ' companion-overlay--closing' : ''}`}>
       <div className="companion-overlay-header">
@@ -536,7 +684,7 @@ export default function CompanionOverlayPage() {
         <span className="companion-session">#{sessionId.current}</span>
         {isSpeaking && (
           <span className="companion-speaking-indicator" title="Based is speaking">
-            ◉
+            â—‰
           </span>
         )}
         <button
@@ -546,7 +694,7 @@ export default function CompanionOverlayPage() {
           disabled={isGenerating}
           title="Clear history"
         >
-          ↺
+          â†º
         </button>
         <button
           className="companion-close"
@@ -554,20 +702,20 @@ export default function CompanionOverlayPage() {
           onClick={close}
           title="Close"
         >
-          ✕
+          âœ•
         </button>
       </div>
 
       <div className="companion-messages">
-        {!authReady && <div className="companion-auth-notice">◈ Connecting…</div>}
+        {!authReady && <div className="companion-auth-notice">â—ˆ Connectingâ€¦</div>}
         {authReady && !authToken && (
           <div className="companion-auth-notice">
-            ◈ Sign in to Based first, then open the companion.
+            â—ˆ Sign in to Based first, then open the companion.
           </div>
         )}
         {messages.length === 0 && (
           <div className="companion-overlay-empty">
-            <span style={{ fontSize: '2rem' }}>⬡</span>
+            <span style={{ fontSize: '2rem' }}>â¬¡</span>
             <p>i&apos;m here.</p>
             <p>tell me what you&apos;re building.</p>
           </div>
@@ -576,7 +724,7 @@ export default function CompanionOverlayPage() {
           <div key={i}>
             {msg.captureThumb && (
               <div className="companion-capture-card">
-                <div className="companion-capture-label">◉ Screen captured</div>
+                <div className="companion-capture-label">â—‰ Screen captured</div>
                 <img className="companion-capture-thumb" src={msg.captureThumb} alt="capture" />
                 <div className="companion-scan-line" />
               </div>
@@ -587,12 +735,25 @@ export default function CompanionOverlayPage() {
                 <span className="companion-cursor" />
               )}
             </div>
+            {/* Share chip -- shown for shareable reads once streaming is complete */}
+            {msg.role === 'assistant' &&
+              msg.shareable &&
+              !(isGenerating && i === messages.length - 1) && (
+                <button
+                  className="companion-share-chip"
+                  onClick={() => handleShare(msg.content, i)}
+                >
+                  {copiedIdx === i ? '◈ Copied!' : '◈ Share this read'}
+                </button>
+              )}
             {/* Fix F: slow warning shown after 15 s */}
             {msg.role === 'assistant' &&
               isGenerating &&
               i === messages.length - 1 &&
               slowWarning && (
-                <div className="slow-warning">◈ Taking longer than usual — still working...</div>
+                <div className="slow-warning">
+                  â—ˆ Taking longer than usual â€” still working...
+                </div>
               )}
           </div>
         ))}
@@ -601,14 +762,14 @@ export default function CompanionOverlayPage() {
 
       <div className="companion-input-area">
         <div className="companion-capture-row">
-          {screenSupported && (
+          {(screenSupported || isAndroidBridge) && (
             <button
-              className={`companion-capture-btn${pendingCapture ? ' active' : ''}`}
+              className={`companion-capture-btn${pendingCapture || androidCapturing ? ' active' : ''}`}
               onClick={handleScreen}
               disabled={isGenerating}
-              title="Share your screen with Based"
+              title={androidCapturing ? 'Stop screen sharing' : 'Share your screen with Based'}
             >
-              ◉ Screen
+              {androidCapturing ? 'â—‰ Watching' : 'â—‰ Screen'}
             </button>
           )}
           <button
@@ -628,9 +789,9 @@ export default function CompanionOverlayPage() {
                 window.electronAPI?.setSpeaking(false);
               }
             }}
-            title={voiceEnabled ? 'Voice on — click to mute' : 'Voice off — click to enable'}
+            title={voiceEnabled ? 'Voice on â€” click to mute' : 'Voice off â€” click to enable'}
           >
-            {voiceEnabled ? '◉ Voice' : '⊙ Voice'}
+            {voiceEnabled ? 'â—‰ Voice' : 'âŠ™ Voice'}
           </button>
           {voiceEnabled && (
             <button
@@ -641,9 +802,9 @@ export default function CompanionOverlayPage() {
                 setVoiceGender(next);
                 localStorage.setItem('based_companion_voice_gender', next);
               }}
-              title={`Voice: ${voiceGender} — click to switch`}
+              title={`Voice: ${voiceGender} â€” click to switch`}
             >
-              {voiceGender === 'male' ? '⬡ Male' : '⬡ Female'}
+              {voiceGender === 'male' ? 'â¬¡ Male' : 'â¬¡ Female'}
             </button>
           )}
           {captureError && <span className="companion-capture-error">{captureError}</span>}
@@ -651,9 +812,9 @@ export default function CompanionOverlayPage() {
 
         {pendingCapture && (
           <div className="companion-pending-badge">
-            ◉ Screen captured
+            â—‰ Screen captured
             <button className="companion-pending-clear" onClick={() => setPendingCapture(null)}>
-              ✕
+              âœ•
             </button>
           </div>
         )}
@@ -683,7 +844,7 @@ export default function CompanionOverlayPage() {
             onClick={() => void send()}
             disabled={isGenerating || !input.trim()}
           >
-            {isGenerating ? <span className="spinner" /> : '▶'}
+            {isGenerating ? <span className="spinner" /> : 'â–¶'}
           </button>
         </div>
       </div>

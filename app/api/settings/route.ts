@@ -40,7 +40,9 @@ export async function GET(req: NextRequest) {
     const isCanceled = subStatus === 'canceled' || subStatus === 'cancelled';
     const bonusExpiresAt = data?.pro_bonus_expires_at as string | null;
     const hasBonusPro = !!bonusExpiresAt && new Date(bonusExpiresAt) > new Date();
-    const alwaysPro = process.env.ALWAYS_PRO === 'true';
+    // ALWAYS_PRO=true → set on beta Vercel deployment to give all authenticated users pro access.
+    // BETA_ACCESS_CODE being set is also sufficient: if the gate is active, this is beta.
+    const alwaysPro = process.env.ALWAYS_PRO === 'true' || !!process.env.BETA_ACCESS_CODE;
     const effectiveTier: 'free' | 'pro' =
       alwaysPro || (paidTier === 'pro' && !isCanceled) || hasBonusPro ? 'pro' : 'free';
     const bonusDaysLeft = hasBonusPro

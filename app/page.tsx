@@ -790,13 +790,34 @@ export default function Home() {
     return () => window.removeEventListener('memory-updated', handler);
   }, [user, getHeaders]);
 
+  // ── Detect intermediate in-progress message content (never persist these) ─
+  function isInProgressContent(content: Message['content']): boolean {
+    if (typeof content !== 'string') return false;
+    return (
+      content === '... Working' ||
+      content === '◈ Working...' ||
+      content === '◈ Planning...' ||
+      content.startsWith('◈ Searching') ||
+      content.startsWith('◈ Checking') ||
+      content.startsWith('◈ Retrying') ||
+      content.startsWith('⟳ Building')
+    );
+  }
+
   // ── Auto-save project on files/messages change ───────────────────────────
   useEffect(() => {
     if (!currentProject || !user) return;
     if (files.length === 0 && messages.length === 0) return;
     // Never overwrite persisted files with an empty array — guards against timing edge cases
     if (files.length === 0 && (currentProject.files?.length ?? 0) > 0) return;
-    const strippedMessages = messages.map(m => ({
+    // Drop the last message if it's still in-progress streaming state — never persist "Working"
+    const msgsToSave =
+      messages.length > 0 &&
+      messages[messages.length - 1].role === 'assistant' &&
+      isInProgressContent(messages[messages.length - 1].content)
+        ? messages.slice(0, -1)
+        : messages;
+    const strippedMessages = msgsToSave.map(m => ({
       ...m,
       content: Array.isArray(m.content)
         ? m.content.map(b => (b.type === 'image' ? { type: 'text' as const, text: '[image]' } : b))
@@ -825,7 +846,15 @@ export default function Home() {
 
   // ── Project CRUD ─────────────────────────────────────────────────────────
   const newProject = () => {
-    if (subscription.tier === 'free' && projects.length >= 3) {
+    // Beta deployments are always treated as Pro — ALWAYS_PRO=true (or BETA_ACCESS_CODE set)
+    // on the server mirrors this on every gated API, so the client-side 3-project limit must
+    // also be lifted for beta users to avoid a mismatched gate.
+    // Use NEXT_PUBLIC_BUILD_ENV when set; fall back to hostname detection so the gate
+    // is skipped even if the env var is missing from the Vercel beta project settings.
+    const isBetaEnv =
+      process.env.NEXT_PUBLIC_BUILD_ENV === 'beta' ||
+      (typeof window !== 'undefined' && window.location.hostname === 'beta.getbased.dev');
+    if (!isBetaEnv && subscription.tier === 'free' && projects.length >= 3) {
       setPricingReason('projects');
       setShowPricing(true);
       return;
@@ -885,9 +914,16 @@ export default function Home() {
   };
 
   const loadProject = (project: Project) => {
-    setCurrentProject(project);
+    // Sanitize: drop any stale in-progress message that was persisted before a crash/reload
+    const sanitizedMessages =
+      project.messages.length > 0 &&
+      project.messages[project.messages.length - 1].role === 'assistant' &&
+      isInProgressContent(project.messages[project.messages.length - 1].content)
+        ? project.messages.slice(0, -1)
+        : project.messages;
+    setCurrentProject({ ...project, messages: sanitizedMessages });
     setFiles(project.files);
-    setMessages(project.messages);
+    setMessages(sanitizedMessages);
     setActiveFile(project.files[0] ?? null);
     setActivePanel('chat');
     setShareUrl('');

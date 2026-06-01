@@ -35,10 +35,24 @@ export default function SplashScreen({ onDone }: Props) {
   const exit = useCallback(() => {
     if (exitedRef.current) return;
     exitedRef.current = true;
-    // Start audio on tap — guaranteed user interaction unlocks AudioContext
-    const audioCtx = new AudioContext();
-    audioCtxRef.current = audioCtx;
-    audioCtx.resume().then(() => startAudio(audioCtx));
+    // Start audio on tap — guaranteed user interaction unlocks AudioContext.
+    // Wrapped in try/catch because AudioContext can throw on iOS 16 Safari and
+    // some Android WebViews. A failure must never block the exit flow.
+    try {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (AudioCtx) {
+        const audioCtx = new AudioCtx();
+        audioCtxRef.current = audioCtx;
+        audioCtx
+          .resume()
+          .then(() => startAudio(audioCtx))
+          .catch(() => {});
+      }
+    } catch {
+      // Audio unavailable — continue silently
+    }
     setExiting(true);
     setTimeout(onDone, 500);
   }, [onDone]);

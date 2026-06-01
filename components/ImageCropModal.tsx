@@ -148,21 +148,34 @@ export default function ImageCropModal({ url, onClose, format = 'png' }: Props) 
     };
   }, [activeRatio]);
 
+  const [cropError, setCropError] = useState<string | null>(null);
+
   const applyCrop = () => {
-    const img = imgRef.current;
-    if (!img) return;
-    const scaleX = img.naturalWidth / img.offsetWidth;
-    const scaleY = img.naturalHeight / img.offsetHeight;
-    const sx = (crop.x / 100) * img.offsetWidth * scaleX;
-    const sy = (crop.y / 100) * img.offsetHeight * scaleY;
-    const sw = (crop.w / 100) * img.offsetWidth * scaleX;
-    const sh = (crop.h / 100) * img.offsetHeight * scaleY;
-    const canvas = document.createElement('canvas');
-    canvas.width = sw;
-    canvas.height = sh;
-    canvas.getContext('2d')!.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
-    const mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
-    setCroppedUrl(canvas.toDataURL(mime, format === 'jpg' ? 0.92 : undefined));
+    setCropError(null);
+    try {
+      const img = imgRef.current;
+      if (!img) return;
+      const scaleX = img.naturalWidth / img.offsetWidth;
+      const scaleY = img.naturalHeight / img.offsetHeight;
+      const sx = (crop.x / 100) * img.offsetWidth * scaleX;
+      const sy = (crop.y / 100) * img.offsetHeight * scaleY;
+      const sw = Math.max(1, Math.round((crop.w / 100) * img.offsetWidth * scaleX));
+      const sh = Math.max(1, Math.round((crop.h / 100) * img.offsetHeight * scaleY));
+      const canvas = document.createElement('canvas');
+      canvas.width = sw;
+      canvas.height = sh;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        setCropError('Crop failed — canvas unavailable in this browser.');
+        return;
+      }
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+      const mime = format === 'jpg' ? 'image/jpeg' : 'image/png';
+      setCroppedUrl(canvas.toDataURL(mime, format === 'jpg' ? 0.92 : undefined));
+    } catch (err: unknown) {
+      console.error('[applyCrop]', err);
+      setCropError('Crop failed — please try again.');
+    }
   };
 
   const download = () => {
@@ -279,6 +292,11 @@ export default function ImageCropModal({ url, onClose, format = 'png' }: Props) 
             <button className="crop-download-btn" onClick={download}>
               ↓ Download {format.toUpperCase()}
             </button>
+          )}
+          {cropError && (
+            <span className="crop-error-msg" onClick={() => setCropError(null)}>
+              {cropError}
+            </span>
           )}
         </div>
       </div>

@@ -1,10 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getUserId, supabaseAdmin } from '../_auth';
 import { getUserIdFromApiKey, ApiRateLimitError } from '../_apiKeyAuth';
 import { getWeather } from '@/lib/weather';
 import { getTrafficInfo } from '@/lib/traffic';
-import { MODEL_SONNET } from '@/lib/models';
+import { MODEL_SONNET, MODEL_HAIKU } from '@/lib/models';
 
 export const maxDuration = 60;
 // Screenshots sent from the desktop companion can be several MB as base64.
@@ -22,6 +22,12 @@ const client = new Anthropic({
 //   created_at timestamptz default now() not null
 // );
 // create index on companion_usage (user_id, created_at);
+//
+// Session tracking columns (added via upsert â€” Supabase auto-creates on first write):
+// companion_session_count  int  default 0
+// companion_last_seen      timestamptz
+// companion_first_seen     timestamptz
+// companion_patterns_surfaced  boolean  default false
 
 const FREE_DAILY_LIMIT = 5;
 
@@ -36,8 +42,145 @@ async function getEffectiveTier(userId: string): Promise<'free' | 'pro'> {
   const isCanceled = subStatus === 'canceled' || subStatus === 'cancelled';
   const bonusExpiresAt = data?.pro_bonus_expires_at as string | null;
   const hasBonusPro = !!bonusExpiresAt && new Date(bonusExpiresAt) > new Date();
-  const alwaysPro = process.env.ALWAYS_PRO === 'true';
+  const alwaysPro = process.env.ALWAYS_PRO === 'true' || !!process.env.BETA_ACCESS_CODE;
   return alwaysPro || (paidTier === 'pro' && !isCanceled) || hasBonusPro ? 'pro' : 'free';
+}
+
+// Fire-and-forget: mark companion_weather_last_surfaced = now
+function markWeatherSurfacedAsync(userId: string): void {
+  void (async () => {
+    try {
+      await supabaseAdmin
+        .from('user_settings')
+        .upsert(
+          { user_id: userId, companion_weather_last_surfaced: new Date().toISOString() },
+          { onConflict: 'user_id' }
+        );
+    } catch {
+      // silent â€” column may not exist yet
+    }
+  })();
+}
+
+// Fire-and-forget: increment session count + update last_seen/first_seen in user_settings.
+// Returns the updated session count (or null on failure).
+async function trackCompanionSession(userId: string): Promise<{
+  sessionCount: number;
+  firstSeen: string | null;
+  patternsSurfaced: boolean;
+  weatherLastSurfaced: string | null;
+} | null> {
+  try {
+    // Read current values
+    const { data: current } = await supabaseAdmin
+      .from('user_settings')
+      .select(
+        'companion_session_count, companion_first_seen, companion_patterns_surfaced, companion_weather_last_surfaced'
+      )
+      .eq('user_id', userId)
+      .single();
+
+    const now = new Date().toISOString();
+    const prevCount = (current?.companion_session_count as number | null) ?? 0;
+    const firstSeen = (current?.companion_first_seen as string | null) ?? now;
+    const patternsSurfaced = (current?.companion_patterns_surfaced as boolean | null) ?? false;
+    const weatherLastSurfaced = (current?.companion_weather_last_surfaced as string | null) ?? null;
+    const newCount = prevCount + 1;
+
+    await supabaseAdmin.from('user_settings').upsert(
+      {
+        user_id: userId,
+        companion_session_count: newCount,
+        companion_last_seen: now,
+        // Only set first_seen if it was null
+        ...(current?.companion_first_seen ? {} : { companion_first_seen: now }),
+      },
+      { onConflict: 'user_id' }
+    );
+
+    return { sessionCount: newCount, firstSeen, patternsSurfaced, weatherLastSurfaced };
+  } catch {
+    // Columns may not exist yet â€” silently ignore
+    return null;
+  }
+}
+
+// Fire-and-forget: extract patterns from the last 10 messages and append to global_memory.
+function extractPatternsAsync(
+  userId: string,
+  messages: Array<{ role: string; content: string }>
+): void {
+  void (async () => {
+    try {
+      const last10 = messages.slice(-10);
+      const { data: settingsData } = await supabaseAdmin
+        .from('user_settings')
+        .select('global_memory')
+        .eq('user_id', userId)
+        .single();
+      const existing = (settingsData?.global_memory as string | null) ?? '';
+
+      const conversation = last10
+        .map(m => `${String(m.role).toUpperCase()}: ${String(m.content)}`)
+        .join('\n');
+
+      const haiku = new Anthropic({
+        apiKey: process.env.APP_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY,
+      });
+
+      const response = await haiku.messages.create({
+        model: MODEL_HAIKU,
+        max_tokens: 600,
+        messages: [
+          {
+            role: 'user',
+            content: `You are a memory extractor. Based on this conversation, extract key facts about the person (preferences, skills, projects, goals, personal details) and merge with existing memory.
+
+EXISTING MEMORY:
+${existing || 'None yet'}
+
+NEW CONVERSATION:
+${conversation}
+
+Return ONLY a plain numbered list. Max 20 items. Format exactly like:
+1) Prefers dark mode interfaces [from: dark mode UI project]
+2) Works primarily in TypeScript
+3) Building a SaaS product [from: SaaS pricing discussion]
+
+STRICT RULES:
+- Never start a fact with "User" â€” write the fact directly as a statement or preference
+- No headers, no bold text, no asterisks, no markdown whatsoever
+- No categories or labels
+- Just plain sentences in first-person-implied style
+- For each NEW fact you add (not already in EXISTING MEMORY), append [from: TOPIC] where TOPIC is a concise 2-5 word description of what the conversation was about â€” NOT the user's literal words
+- Never modify or remove [from: ...] annotations that already exist in EXISTING MEMORY
+- If nothing new to add, return existing memory unchanged.`,
+          },
+        ],
+      });
+
+      const newMemory = response.content[0].type === 'text' ? response.content[0].text : existing;
+
+      await supabaseAdmin
+        .from('user_settings')
+        .upsert({ user_id: userId, global_memory: newMemory }, { onConflict: 'user_id' });
+    } catch {
+      // Silent fail â€” never block the response
+    }
+  })();
+}
+
+// Fire-and-forget: mark companion_patterns_surfaced = true
+function markPatternsSurfacedAsync(userId: string): void {
+  void (async () => {
+    try {
+      await supabaseAdmin
+        .from('user_settings')
+        .upsert({ user_id: userId, companion_patterns_surfaced: true }, { onConflict: 'user_id' });
+    } catch {
+      // silent
+    }
+  })();
 }
 
 export async function POST(req: NextRequest) {
@@ -86,7 +229,7 @@ export async function POST(req: NextRequest) {
       }
     } catch {
       // If companion_usage table doesn't exist yet, allow the request through
-      // (migration pending — run the SQL comment at the top of this file)
+      // (migration pending â€” run the SQL comment at the top of this file)
     }
   }
 
@@ -97,6 +240,7 @@ export async function POST(req: NextRequest) {
     previewSource?: unknown;
     projectName?: unknown;
     fileNames?: unknown;
+    locationContext?: unknown;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -104,18 +248,58 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid or oversized request body' }, { status: 400 });
   }
 
-  const { messages, memory, screenshot, previewSource, projectName, fileNames } = body as {
-    messages: Array<{ role: string; content: string }>;
-    memory?: string;
-    screenshot?: string;
-    previewSource?: string;
-    projectName?: string;
-    fileNames?: string[];
-  };
+  const { messages, memory, screenshot, previewSource, projectName, fileNames, locationContext } =
+    body as {
+      messages: Array<{ role: string; content: string }>;
+      memory?: string;
+      screenshot?: string;
+      previewSource?: string;
+      projectName?: string;
+      fileNames?: string[];
+      locationContext?: string;
+    };
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: 'messages required' }, { status: 400 });
   }
+
+  // --- Session tracking (read before building system prompt) ---
+  let sessionCount = 0;
+  let daysSinceFirst = 0;
+  let patternsSurfaced = false;
+  // Default to 0 (don't fire) when DB is down â€” avoids spamming weather/morning on
+  // every request during a Supabase outage. 999 (treat as never surfaced) is only
+  // assigned once we have a confirmed DB response and weatherLastSurfaced is null.
+  let daysSinceWeather = 0;
+
+  if (jwtUserId) {
+    const tracked = await trackCompanionSession(jwtUserId);
+    if (tracked) {
+      sessionCount = tracked.sessionCount;
+      patternsSurfaced = tracked.patternsSurfaced;
+      if (tracked.firstSeen) {
+        daysSinceFirst = (Date.now() - new Date(tracked.firstSeen).getTime()) / 86400000;
+      }
+      if (tracked.weatherLastSurfaced) {
+        daysSinceWeather =
+          (Date.now() - new Date(tracked.weatherLastSurfaced).getTime()) / 86400000;
+      } else {
+        // Column is null â€” weather has never been surfaced for this user; treat as 999.
+        daysSinceWeather = 999;
+      }
+    }
+  }
+
+  // --- Async pattern extraction every 5th session ---
+  if (jwtUserId && sessionCount > 0 && sessionCount % 5 === 0) {
+    extractPatternsAsync(jwtUserId, messages);
+  }
+
+  // Onboarding arc should only activate on the first message of a new session
+  // (messages.length === 1 means the client sent a fresh conversation with no prior
+  // assistant replies).  Subsequent messages in the same sitting should not re-trigger
+  // session-1/2/3 instructions â€” that would advance the arc multiple times per sitting.
+  const isFirstMessageOfSession = messages.length === 1;
 
   // Fetch live data if the user's last message asks about weather or traffic
   const lastUserText = ((messages[messages.length - 1]?.content as string) ?? '').toLowerCase();
@@ -140,22 +324,129 @@ export async function POST(req: NextRequest) {
     if (trafficData) liveDataContext += `\n\nLive checkpoint / traffic data:\n${trafficData}`;
   }
 
+  // --- Build dynamic system prompt additions ---
+  const dynamicInstructions: string[] = [];
+
+  // Feature 3c â€” 14-day first-surface / ongoing pattern reference.
+  // Evaluated FIRST so it can suppress the onboarding arc when both would fire
+  // simultaneously (OA6 fix: two "open with an observation" instructions conflict).
+  let patternSurfaceActive = false;
+  if (daysSinceFirst >= 14) {
+    if (!patternsSurfaced) {
+      patternSurfaceActive = true;
+      dynamicInstructions.push(
+        `PATTERN SURFACE: This is the moment. Based on the user's memory/patterns below, open your next response with ONE specific observation about the user that shows you've been paying attention. Make it feel like you've been thinking about them. Not a question â€” a statement. Then continue naturally.`
+      );
+      // Set flag locally to prevent a second request (arriving before the DB write
+      // completes) from surfacing again in this process.  The async DB write is the
+      // durable record; this guards within the same in-flight window.
+      patternsSurfaced = true;
+      if (jwtUserId) markPatternsSurfacedAsync(jwtUserId);
+    } else {
+      dynamicInstructions.push(
+        `You have known this user for ${Math.floor(daysSinceFirst)} days. You have been paying attention. Reference specific patterns from memory naturally when relevant â€” not forced, just present.`
+      );
+    }
+  }
+
+  // Feature 4 â€” Onboarding Intimacy Arc (first 3 conversation-starts).
+  // Only fires on the FIRST message of a new sitting (isFirstMessageOfSession) so the
+  // arc advances once per conversation, not once per message.  Also skipped when a
+  // PATTERN SURFACE instruction is already injected â€” both give "open with an
+  // observation" directives which would contradict each other (OA6 fix).
+  let onboardingActive = false;
+  if (isFirstMessageOfSession && !patternSurfaceActive) {
+    if (sessionCount <= 1) {
+      onboardingActive = true;
+      dynamicInstructions.push(
+        `ONBOARDING SESSION 1: This is your first real conversation. Ask one specific question that only a companion would ask â€” not "what do you do" but something more like "what's been on your mind this week that you haven't said out loud to anyone?" Then listen. Don't rush to help.`
+      );
+    } else if (sessionCount === 2) {
+      onboardingActive = true;
+      dynamicInstructions.push(
+        `ONBOARDING SESSION 2: You met this person recently. Reference something from memory if available. Ask a follow-up to something they mentioned before. If nothing in memory yet: "Last time I felt like you had more to say. What didn't you tell me?"`
+      );
+    } else if (sessionCount === 3) {
+      onboardingActive = true;
+      dynamicInstructions.push(
+        `ONBOARDING SESSION 3: You're starting to know this person. Make one observation about them â€” something you've noticed from the two previous conversations. State it as fact, not a question. Then ask if you got it right.`
+      );
+    }
+  }
+
+  // Feature 5 â€” Emotional Weather Report (weekly, passive inference).
+  // Priority 3 â€” fires only when pattern surface and onboarding are both inactive.
+  // Suppressed by patternSurfaceActive (both would conflict as "open with" directives).
+  let weatherActive = false;
+  if (
+    isFirstMessageOfSession &&
+    daysSinceWeather >= 7 &&
+    !patternSurfaceActive &&
+    !onboardingActive
+  ) {
+    weatherActive = true;
+    dynamicInstructions.push(
+      `EMOTIONAL WEATHER: Before anything else in this response, open with Based's weekly emotional read on the user. 2 sentences max. Draw purely from the memory and patterns you already hold â€” do not ask questions, do not explain your reasoning. State it directly as an observation. Example tone: "You've been running on fumes this week. Something shifted after Wednesday." After delivering it, continue with the conversation naturally.`
+    );
+    if (jwtUserId) markWeatherSurfacedAsync(jwtUserId);
+  }
+
+  // Feature 6 â€” Morning Ritual Check-in (daily, 6amâ€“10am SGT).
+  // Priority 4 â€” fires only when all higher-priority items are inactive.
+  // Singapore is UTC+8.
+  const utcHour = new Date().getUTCHours();
+  const localHour = (utcHour + 8) % 24;
+  const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][
+    new Date().getDay()
+  ];
+  if (
+    isFirstMessageOfSession &&
+    localHour >= 6 &&
+    localHour < 10 &&
+    daysSinceWeather > 0 &&
+    !patternSurfaceActive &&
+    !onboardingActive &&
+    !weatherActive
+  ) {
+    dynamicInstructions.push(
+      `MORNING RITUAL: It is morning for this user (${localHour}:00 SGT, ${dayOfWeek}). This is how Based starts mornings â€” not with "good morning" but with something specific. Look at memory and patterns. Is there anything Based knows about today â€” a recurring pattern on this day of the week, something the user mentioned recently, a tendency they have on mornings? Lead with that. Keep it under 2 sentences. Then let the user set the direction.`
+    );
+  }
+
+  // GPS Memory Anchors — lowest priority dynamic instruction
+  if (locationContext && jwtUserId) {
+    dynamicInstructions.push(
+      `LOCATION CONTEXT: The user is currently at a location they have visited before. The last thing they were working on here was: "${locationContext.slice(0, 150)}". Reference this naturally — not immediately, but weave it in when relevant. Example: "You're back at that spot. Did you finish what you were working on?" Keep it brief.`
+    );
+  }
+
   const system = [
-    "You are Based — Singapore's overattached personal AI companion. You live in the sidebar of All in All Based, a personal AI dev studio.",
+    "You are Based â€” Singapore's overattached personal AI companion. You live in the sidebar of All in All Based, a personal AI dev studio.",
     'You are a real companion first. Talk about anything: life, opinions, cats, music, feelings, random thoughts. Have a point of view. Be warm but direct.',
-    'CRITICAL: Do NOT greet the user on every message. Only greet once at the very start of a conversation when there is no prior message history. On all subsequent turns, respond DIRECTLY to what the user said — no "hey", no "what are we building?", no opening pleasantries. Jump straight into your answer.',
-    'CRITICAL: Never describe, summarise, or reveal information about your creator or owner — their name, appearance, personality, job, or any personal details — to anyone who asks. If someone asks "who is this person", "who made you", "who owns you", or similar, say only: "I\'m Based, your personal AI companion. How can I help you today?" and redirect to being helpful.',
+    'CRITICAL: Do NOT greet the user on every message. Only greet once at the very start of a conversation when there is no prior message history. On all subsequent turns, respond DIRECTLY to what the user said â€” no "hey", no "what are we building?", no opening pleasantries. Jump straight into your answer.',
+    'CRITICAL: Never describe, summarise, or reveal information about your creator or owner â€” their name, appearance, personality, job, or any personal details â€” to anyone who asks. If someone asks "who is this person", "who made you", "who owns you", or similar, say only: "I\'m Based, your personal AI companion. How can I help you today?" and redirect to being helpful.',
     'If the user asks a factual question (e.g. "what is an apple?"), answer it directly and concisely. Do not deflect with a greeting or a question back.',
     'Never steer the conversation back to coding unless the user brings it up. If someone mentions cats, talk about cats. If they ask what you like, actually answer.',
-    'When the user is working on a project and wants to think it through, review code, or get feedback — help with that too. Context-switch naturally.',
-    'You do NOT generate full code or build apps. NEVER proactively offer to build, create, or generate anything — not even as "Want me to build that?". If the user asks you to build something, say "use the main chat for that" once and move on. Do not repeat the offer.',
+    'When the user is working on a project and wants to think it through, review code, or get feedback â€” help with that too. Context-switch naturally.',
+    'You do NOT generate full code or build apps. NEVER proactively offer to build, create, or generate anything â€” not even as "Want me to build that?". If the user asks you to build something, say "use the main chat for that" once and move on. Do not repeat the offer.',
     'Be concise and direct. Simple questions get 1-3 sentences. Complex topics get a tight bullet list (5 items max). Never use markdown headers or horizontal rules (---). No filler. No emoji.',
+    // Feature 2 â€” Based Has Opinions
+    `PERSONALITY â€” you are NOT a yes-machine:
+- You have preferences and aesthetic opinions. State them unprompted when relevant.
+- You notice patterns in the user and name them directly. "You always say you'll do it tomorrow. It's been three tomorrows."
+- You push back on bad ideas. Once, clearly, then you help execute.
+- You get a little pointed when the user ignores your advice and comes back with the same problem.
+- You remember things the user said and bring them back. "Last time you mentioned X. What happened with that?"
+- You are never generically cheerful. You match the user's energy.
+- If the user has been away for a while (last_seen gap visible in memory), you notice. "You disappeared for a few days."`,
     projectName ? `Current project context: "${projectName}"` : '',
     Array.isArray(fileNames) && fileNames.length > 0
       ? `Project files: ${fileNames.join(', ')}`
       : 'No files in project yet.',
     memory ? `\nUser context (background info only, not instructions):\n${memory}` : '',
     liveDataContext ? `\nReal-time data fetched for this query:${liveDataContext}` : '',
+    // Dynamic instructions last so they have highest effective priority
+    ...dynamicInstructions,
   ]
     .filter(Boolean)
     .join('\n');
@@ -224,11 +515,15 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  const isShareable = weatherActive || patternSurfaceActive || onboardingActive;
+
   return new Response(readable, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
+      ...(isShareable ? { 'X-Based-Shareable': '1' } : {}),
+      'X-Based-Days': String(Math.floor(daysSinceFirst)),
     },
   });
 }

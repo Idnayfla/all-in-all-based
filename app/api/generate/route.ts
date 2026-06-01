@@ -1363,9 +1363,11 @@ export async function POST(req: NextRequest) {
     const usingFreeModel = aiModel === 'free' && !!process.env.GROQ_API_KEY;
 
     // Free tier generation gate — fail open so DB issues never block users
-    // ALWAYS_PRO=true bypasses all tier checks (set on beta deployment)
+    // ALWAYS_PRO=true bypasses all tier checks (set on beta deployment).
+    // BETA_ACCESS_CODE being set is also treated as ALWAYS_PRO — if the beta gate is
+    // active this is beta.getbased.dev and all authenticated users get full access.
     // Free AI model bypasses limits entirely (uses Groq, not our Anthropic credits)
-    const alwaysPro = process.env.ALWAYS_PRO === 'true';
+    const alwaysPro = process.env.ALWAYS_PRO === 'true' || !!process.env.BETA_ACCESS_CODE;
     // userId is already verified by the auth guard above
     const supabaseUserId: string = userId;
     if (!alwaysPro && !usingFreeModel) {
