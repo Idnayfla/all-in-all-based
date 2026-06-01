@@ -26,6 +26,111 @@ type ChangeEntry = {
 
 const ENTRIES: ChangeEntry[] = [
   {
+    date: '2026-06-01',
+    label: 'v0.1.4',
+    title: 'Based Knows You',
+    sections: [
+      {
+        kind: 'added',
+        items: [
+          {
+            bold: 'Based has memory',
+            text: 'The companion loads your full memory on every session — it knows what you have told it before and builds on it without being reminded.',
+          },
+          {
+            bold: 'Based has opinions',
+            text: "Based pushes back, names patterns it notices, and matches your energy. It is not a yes-machine — it will tell you when something is a bad idea.",
+          },
+          {
+            bold: 'Pattern timeline',
+            text: 'Based tracks recurring themes across sessions. Every fifth session it extracts patterns. At 14 days it surfaces what it has noticed — unprompted.',
+          },
+          {
+            bold: 'Onboarding intimacy arc',
+            text: 'First three sessions are structured differently. Based asks specific questions and makes early observations that set the tone for the relationship.',
+          },
+          {
+            bold: 'Emotional weather',
+            text: 'Based reads your mood patterns weekly and fires a passive observation when it senses something worth naming. Never intrusive — only when it has something real to say.',
+          },
+          {
+            bold: 'Morning ritual',
+            text: 'Between 6–10am, Based opens with something specific to your day — not a generic greeting.',
+          },
+          {
+            bold: 'GPS memory anchors',
+            text: 'Based remembers where you were when you had important conversations. Opt-in, coarse location only (~111m), 20 anchors max.',
+          },
+          {
+            bold: 'Shareable read card',
+            text: "After emotional weather and pattern surface moments, a chip appears — share Based's read on you as a card.",
+          },
+          {
+            bold: 'Name your Based',
+            text: 'Give your companion a name. It persists across web and Android.',
+          },
+          {
+            bold: 'Bubble evolves over 100 days',
+            text: 'The Android bubble changes appearance as your relationship deepens — 6 visual stages from default to gold crown at day 100+.',
+          },
+        ],
+      },
+      {
+        kind: 'fixed',
+        items: [
+          {
+            bold: 'Image crop crash',
+            text: 'Cropping an image no longer crashes when canvas context is unavailable.',
+          },
+          {
+            bold: 'Export errors silent',
+            text: 'All seven export functions now catch errors and show an inline toast instead of blowing up the error boundary.',
+          },
+          {
+            bold: 'Stuck Working message',
+            text: '"Working..." no longer persists after a session is restored from localStorage.',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    date: '2026-06-01',
+    label: 'v0.1.4',
+    title: 'Android Companion',
+    sections: [
+      {
+        kind: 'added',
+        items: [
+          {
+            bold: 'Live screen',
+            text: 'Tap Screen in the Android companion and Based sees your screen in real time. Ask it what is on screen, explain an error, or describe a UI.',
+          },
+          {
+            bold: 'Face camera',
+            text: 'Tap Camera and Based sees you via the front camera. Show it something, get a reaction.',
+          },
+          {
+            bold: 'Photo capture',
+            text: 'Switch to the back camera and tap Photo for a still shot — useful for identifying objects or reading text.',
+          },
+          {
+            bold: 'Bubble animations',
+            text: 'Breathing pulse at rest, bounce on entry, ripple on tap, violet glow while Based is thinking.',
+          },
+          {
+            bold: 'Chat persistence',
+            text: 'Conversation is saved to device storage and restored exactly when you reopen the companion.',
+          },
+          {
+            bold: 'Keyboard fix',
+            text: 'The chat panel now shifts above the keyboard correctly on all Android versions.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     date: '2026-05-30',
     label: 'v0.1.2',
     title: 'Based Voice',
