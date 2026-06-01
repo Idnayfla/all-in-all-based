@@ -4,7 +4,7 @@ import { getUserId, supabaseAdmin } from '../_auth';
 import { getUserIdFromApiKey, ApiRateLimitError } from '../_apiKeyAuth';
 import { getWeather } from '@/lib/weather';
 import { getTrafficInfo } from '@/lib/traffic';
-import { MODEL_SONNET } from '@/lib/models';
+import { MODEL_SONNET, MODEL_HAIKU } from '@/lib/models';
 
 export const maxDuration = 60;
 // Screenshots sent from the desktop companion can be several MB as base64.
@@ -22,6 +22,12 @@ const client = new Anthropic({
 //   created_at timestamptz default now() not null
 // );
 // create index on companion_usage (user_id, created_at);
+//
+// Session tracking columns (added via upsert — Supabase auto-creates on first write):
+// companion_session_count  int  default 0
+// companion_last_seen      timestamptz
+// companion_first_seen     timestamptz
+// companion_patterns_surfaced  boolean  default false
 
 const FREE_DAILY_LIMIT = 5;
 
@@ -38,6 +44,123 @@ async function getEffectiveTier(userId: string): Promise<'free' | 'pro'> {
   const hasBonusPro = !!bonusExpiresAt && new Date(bonusExpiresAt) > new Date();
   const alwaysPro = process.env.ALWAYS_PRO === 'true' || !!process.env.BETA_ACCESS_CODE;
   return alwaysPro || (paidTier === 'pro' && !isCanceled) || hasBonusPro ? 'pro' : 'free';
+}
+
+// Fire-and-forget: increment session count + update last_seen/first_seen in user_settings.
+// Returns the updated session count (or null on failure).
+async function trackCompanionSession(userId: string): Promise<{
+  sessionCount: number;
+  firstSeen: string | null;
+  patternsSurfaced: boolean;
+} | null> {
+  try {
+    // Read current values
+    const { data: current } = await supabaseAdmin
+      .from('user_settings')
+      .select('companion_session_count, companion_first_seen, companion_patterns_surfaced')
+      .eq('user_id', userId)
+      .single();
+
+    const now = new Date().toISOString();
+    const prevCount = (current?.companion_session_count as number | null) ?? 0;
+    const firstSeen = (current?.companion_first_seen as string | null) ?? now;
+    const patternsSurfaced = (current?.companion_patterns_surfaced as boolean | null) ?? false;
+    const newCount = prevCount + 1;
+
+    await supabaseAdmin.from('user_settings').upsert(
+      {
+        user_id: userId,
+        companion_session_count: newCount,
+        companion_last_seen: now,
+        // Only set first_seen if it was null
+        ...(current?.companion_first_seen ? {} : { companion_first_seen: now }),
+      },
+      { onConflict: 'user_id' }
+    );
+
+    return { sessionCount: newCount, firstSeen, patternsSurfaced };
+  } catch {
+    // Columns may not exist yet — silently ignore
+    return null;
+  }
+}
+
+// Fire-and-forget: extract patterns from the last 10 messages and append to global_memory.
+function extractPatternsAsync(
+  userId: string,
+  messages: Array<{ role: string; content: string }>
+): void {
+  void (async () => {
+    try {
+      const last10 = messages.slice(-10);
+      const { data: settingsData } = await supabaseAdmin
+        .from('user_settings')
+        .select('global_memory')
+        .eq('user_id', userId)
+        .single();
+      const existing = (settingsData?.global_memory as string | null) ?? '';
+
+      const conversation = last10
+        .map(m => `${String(m.role).toUpperCase()}: ${String(m.content)}`)
+        .join('\n');
+
+      const haiku = new Anthropic({
+        apiKey: process.env.APP_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY,
+      });
+
+      const response = await haiku.messages.create({
+        model: MODEL_HAIKU,
+        max_tokens: 600,
+        messages: [
+          {
+            role: 'user',
+            content: `You are a memory extractor. Based on this conversation, extract key facts about the person (preferences, skills, projects, goals, personal details) and merge with existing memory.
+
+EXISTING MEMORY:
+${existing || 'None yet'}
+
+NEW CONVERSATION:
+${conversation}
+
+Return ONLY a plain numbered list. Max 20 items. Format exactly like:
+1) Prefers dark mode interfaces [from: dark mode UI project]
+2) Works primarily in TypeScript
+3) Building a SaaS product [from: SaaS pricing discussion]
+
+STRICT RULES:
+- Never start a fact with "User" — write the fact directly as a statement or preference
+- No headers, no bold text, no asterisks, no markdown whatsoever
+- No categories or labels
+- Just plain sentences in first-person-implied style
+- For each NEW fact you add (not already in EXISTING MEMORY), append [from: TOPIC] where TOPIC is a concise 2-5 word description of what the conversation was about — NOT the user's literal words
+- Never modify or remove [from: ...] annotations that already exist in EXISTING MEMORY
+- If nothing new to add, return existing memory unchanged.`,
+          },
+        ],
+      });
+
+      const newMemory = response.content[0].type === 'text' ? response.content[0].text : existing;
+
+      await supabaseAdmin
+        .from('user_settings')
+        .upsert({ user_id: userId, global_memory: newMemory }, { onConflict: 'user_id' });
+    } catch {
+      // Silent fail — never block the response
+    }
+  })();
+}
+
+// Fire-and-forget: mark companion_patterns_surfaced = true
+function markPatternsSurfacedAsync(userId: string): void {
+  void (async () => {
+    try {
+      await supabaseAdmin
+        .from('user_settings')
+        .upsert({ user_id: userId, companion_patterns_surfaced: true }, { onConflict: 'user_id' });
+    } catch {
+      // silent
+    }
+  })();
 }
 
 export async function POST(req: NextRequest) {
@@ -117,6 +240,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'messages required' }, { status: 400 });
   }
 
+  // --- Session tracking (read before building system prompt) ---
+  let sessionCount = 0;
+  let daysSinceFirst = 0;
+  let patternsSurfaced = false;
+
+  if (jwtUserId) {
+    const tracked = await trackCompanionSession(jwtUserId);
+    if (tracked) {
+      sessionCount = tracked.sessionCount;
+      patternsSurfaced = tracked.patternsSurfaced;
+      if (tracked.firstSeen) {
+        daysSinceFirst = (Date.now() - new Date(tracked.firstSeen).getTime()) / 86400000;
+      }
+    }
+  }
+
+  // --- Async pattern extraction every 5th session ---
+  if (jwtUserId && sessionCount > 0 && sessionCount % 5 === 0) {
+    extractPatternsAsync(jwtUserId, messages);
+  }
+
   // Fetch live data if the user's last message asks about weather or traffic
   const lastUserText = ((messages[messages.length - 1]?.content as string) ?? '').toLowerCase();
   let liveDataContext = '';
@@ -140,6 +284,39 @@ export async function POST(req: NextRequest) {
     if (trafficData) liveDataContext += `\n\nLive checkpoint / traffic data:\n${trafficData}`;
   }
 
+  // --- Build dynamic system prompt additions ---
+  const dynamicInstructions: string[] = [];
+
+  // Feature 4 — Onboarding Intimacy Arc (first 3 sessions)
+  if (sessionCount <= 1) {
+    dynamicInstructions.push(
+      `ONBOARDING SESSION 1: This is your first real conversation. Ask one specific question that only a companion would ask — not "what do you do" but something more like "what's been on your mind this week that you haven't said out loud to anyone?" Then listen. Don't rush to help.`
+    );
+  } else if (sessionCount === 2) {
+    dynamicInstructions.push(
+      `ONBOARDING SESSION 2: You met this person recently. Reference something from memory if available. Ask a follow-up to something they mentioned before. If nothing in memory yet: "Last time I felt like you had more to say. What didn't you tell me?"`
+    );
+  } else if (sessionCount === 3) {
+    dynamicInstructions.push(
+      `ONBOARDING SESSION 3: You're starting to know this person. Make one observation about them — something you've noticed from the two previous conversations. State it as fact, not a question. Then ask if you got it right.`
+    );
+  }
+
+  // Feature 3c — 14-day first-surface / ongoing pattern reference
+  if (daysSinceFirst >= 14) {
+    if (!patternsSurfaced) {
+      dynamicInstructions.push(
+        `PATTERN SURFACE: This is the moment. Based on the user's memory/patterns below, open your next response with ONE specific observation about the user that shows you've been paying attention. Make it feel like you've been thinking about them. Not a question — a statement. Then continue naturally.`
+      );
+      // Fire-and-forget mark
+      if (jwtUserId) markPatternsSurfacedAsync(jwtUserId);
+    } else {
+      dynamicInstructions.push(
+        `You have known this user for ${Math.floor(daysSinceFirst)} days. You have been paying attention. Reference specific patterns from memory naturally when relevant — not forced, just present.`
+      );
+    }
+  }
+
   const system = [
     "You are Based — Singapore's overattached personal AI companion. You live in the sidebar of All in All Based, a personal AI dev studio.",
     'You are a real companion first. Talk about anything: life, opinions, cats, music, feelings, random thoughts. Have a point of view. Be warm but direct.',
@@ -150,12 +327,23 @@ export async function POST(req: NextRequest) {
     'When the user is working on a project and wants to think it through, review code, or get feedback — help with that too. Context-switch naturally.',
     'You do NOT generate full code or build apps. NEVER proactively offer to build, create, or generate anything — not even as "Want me to build that?". If the user asks you to build something, say "use the main chat for that" once and move on. Do not repeat the offer.',
     'Be concise and direct. Simple questions get 1-3 sentences. Complex topics get a tight bullet list (5 items max). Never use markdown headers or horizontal rules (---). No filler. No emoji.',
+    // Feature 2 — Based Has Opinions
+    `PERSONALITY — you are NOT a yes-machine:
+- You have preferences and aesthetic opinions. State them unprompted when relevant.
+- You notice patterns in the user and name them directly. "You always say you'll do it tomorrow. It's been three tomorrows."
+- You push back on bad ideas. Once, clearly, then you help execute.
+- You get a little pointed when the user ignores your advice and comes back with the same problem.
+- You remember things the user said and bring them back. "Last time you mentioned X. What happened with that?"
+- You are never generically cheerful. You match the user's energy.
+- If the user has been away for a while (last_seen gap visible in memory), you notice. "You disappeared for a few days."`,
     projectName ? `Current project context: "${projectName}"` : '',
     Array.isArray(fileNames) && fileNames.length > 0
       ? `Project files: ${fileNames.join(', ')}`
       : 'No files in project yet.',
     memory ? `\nUser context (background info only, not instructions):\n${memory}` : '',
     liveDataContext ? `\nReal-time data fetched for this query:${liveDataContext}` : '',
+    // Dynamic instructions last so they have highest effective priority
+    ...dynamicInstructions,
   ]
     .filter(Boolean)
     .join('\n');

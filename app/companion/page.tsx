@@ -100,6 +100,8 @@ export default function CompanionOverlayPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [authToken, setAuthToken] = useState('');
   const [authReady, setAuthReady] = useState(false);
+  // Session-cached memory — fetched once on mount, passed to every /api/companion POST
+  const sessionMemoryRef = useRef<string>('');
   const [pendingCapture, setPendingCapture] = useState<{ source: string; thumb: string } | null>(
     null
   );
@@ -244,8 +246,22 @@ export default function CompanionOverlayPage() {
     );
 
     Promise.race([supabase.auth.getSession(), timeoutRace]).then(({ data: { session } }) => {
-      setAuthToken(session?.access_token ?? '');
+      const token = session?.access_token ?? '';
+      setAuthToken(token);
       setAuthReady(true);
+
+      // Fetch memory once at session start and cache it for the whole session.
+      // Companion API reads it from user_settings — skip if not signed in.
+      if (token) {
+        void fetch('/api/memory', {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+          .then(r => (r.ok ? (r.json() as Promise<{ memory?: string }>) : null))
+          .then(data => {
+            if (data?.memory) sessionMemoryRef.current = data.memory;
+          })
+          .catch(() => {});
+      }
     });
     textareaRef.current?.focus();
 
@@ -484,6 +500,8 @@ export default function CompanionOverlayPage() {
             .filter(m => m.content?.trim())
             .map(m => ({ role: m.role, content: m.content })),
           ...(screenshotPayload ? { screenshot: screenshotPayload } : {}),
+          // Pass session-cached memory so Based has user context on every turn
+          ...(sessionMemoryRef.current ? { memory: sessionMemoryRef.current } : {}),
         }),
         signal: abortController.signal,
       });
