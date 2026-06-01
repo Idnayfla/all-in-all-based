@@ -51,8 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         request_id: requestId,
       });
       if (decError) {
-        // Fallback: manual decrement
-        await supabaseAdmin.from('feature_requests').update({ vote_count: 0 }).eq('id', requestId);
+        // Fallback: read then decrement
         const { data: cur } = await supabaseAdmin
           .from('feature_requests')
           .select('vote_count')
