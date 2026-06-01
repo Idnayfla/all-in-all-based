@@ -7,3 +7,4 @@ public/
 electron/
 dist-electron/
 test-results/
+.claude/
