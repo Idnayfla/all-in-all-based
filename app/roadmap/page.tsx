@@ -60,6 +60,10 @@ const SHIPPED = [
     label: 'Windows Floating Companion',
     desc: 'Always-on-top Electron overlay. Draggable bubble, screen capture, chat without switching windows.',
   },
+  {
+    label: 'Feature Request Board',
+    desc: 'Live at /vote — submit requests and vote on what ships next. Highest votes go to the top of the queue.',
+  },
 ];
 
 const NEXT = [
@@ -94,10 +98,6 @@ const VISION = [
   {
     label: 'Self-Hosted AI Model',
     desc: 'Faster responses, lower cost, zero external limits. Funded by Pro subscriptions.',
-  },
-  {
-    label: 'Feature Request Board',
-    desc: 'Live at /vote — submit requests and vote on what ships next. Highest votes go to the top of the queue.',
   },
   { label: 'Based for Teams', desc: 'Shared workspace, shared memory, org billing.' },
   {
@@ -195,7 +195,7 @@ export default function RoadmapPage() {
             <span className="rm-stat-label">Features shipped</span>
           </div>
           <div className="rm-stat">
-            <span className="rm-stat-num">4</span>
+            <span className="rm-stat-num">5</span>
             <span className="rm-stat-label">Coming next</span>
           </div>
           <div className="rm-stat">
