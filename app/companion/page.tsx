@@ -305,6 +305,36 @@ export default function CompanionOverlayPage() {
     };
   }, []);
 
+  // Restore messages from localStorage on mount (survives WebView recreation)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('based_companion_messages');
+      if (stored) {
+        const parsed = JSON.parse(stored) as Msg[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      }
+    } catch {
+      // ignore parse errors — start fresh
+    }
+  }, []);
+
+  // Persist messages to localStorage on every change
+  useEffect(() => {
+    try {
+      if (messages.length === 0) {
+        localStorage.removeItem('based_companion_messages');
+      } else {
+        // Only persist completed messages (skip the live-streaming empty assistant bubble)
+        const toSave = messages.filter(m => m.content?.trim());
+        localStorage.setItem('based_companion_messages', JSON.stringify(toSave));
+      }
+    } catch {
+      // ignore storage errors (e.g. quota exceeded)
+    }
+  }, [messages]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);

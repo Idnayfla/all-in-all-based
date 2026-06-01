@@ -1932,6 +1932,7 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
+  position: relative;
 }
 .preview-header {
   padding: 10px 16px;
@@ -1953,6 +1954,22 @@ body {
   width: 100%;
   border: none;
   background: white;
+}
+.export-error-toast {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  background: #c0392b;
+  color: #fff;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 8px 16px;
+  border-radius: var(--r-lg);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  cursor: pointer;
 }
 .preview-empty {
   flex: 1;
@@ -10034,6 +10051,14 @@ body:has(.beta-banner) .app-root {
 }
 .crop-download-btn:hover {
   opacity: 0.8;
+}
+.crop-error-msg {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #c0392b;
+  margin-left: auto;
+  cursor: pointer;
+  align-self: center;
 }
 
 /* mobile: stack panes vertically */
