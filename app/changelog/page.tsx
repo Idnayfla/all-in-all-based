@@ -28,6 +28,30 @@ const ENTRIES: ChangeEntry[] = [
   {
     date: '2026-06-01',
     label: 'v0.1.4',
+    title: 'Feature Request Board',
+    sections: [
+      {
+        kind: 'added',
+        items: [
+          {
+            bold: 'Vote on what gets built',
+            text: 'Live at /vote — browse all open feature requests, vote on the ones you want most, and submit your own. Highest-voted requests go to the top of the build queue.',
+          },
+          {
+            bold: 'One vote per request',
+            text: 'Toggle your vote at any time. Vote count updates instantly with an optimistic UI — no page refresh needed.',
+          },
+          {
+            bold: 'Submit a request',
+            text: 'Signed-in users can submit new feature requests with a title (120 chars) and optional description (500 chars).',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    date: '2026-06-01',
+    label: 'v0.1.4',
     title: 'Based Knows You',
     sections: [
       {
