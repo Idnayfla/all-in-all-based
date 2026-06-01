@@ -52,8 +52,12 @@ public class FloatingBubbleService extends Service {
     // ── Animation state ────────────────────────────────────────────────────────
     private AnimatorSet breathingAnimator;   // idle breathing pulse (anim 1)
     private AnimatorSet entryAnimator;       // entry pop-in (anim 2) — stored so onDestroy can cancel it
+    private AnimatorSet exitAnimator;        // exit shrink (anim 2b) — guard against double-dismiss
+    private ObjectAnimator rippleAnimator;   // tap ripple (anim 3) — stored to cancel on double-tap
     private AnimatorSet glowAnimator;        // thinking glow (anim 4)
     private boolean     isThinking          = false;
+    private int         thinkingRefCount    = 0; // counts in-flight /api/companion fetches
+    private boolean     isDestroyed         = false; // set in onDestroy; guards post-destroy callbacks
 
     // ── Broadcast receivers ───────────────────────────────────────────────────
 
@@ -88,9 +92,15 @@ public class FloatingBubbleService extends Service {
             if (ACTION_BUBBLE_THINKING.equals(intent.getAction())) {
                 boolean active = intent.getBooleanExtra(EXTRA_THINKING_ACTIVE, false);
                 if (active) {
+                    // Increment ref count: each in-flight fetch votes to keep thinking active.
+                    thinkingRefCount++;
                     startThinking();
                 } else {
-                    stopThinking();
+                    // Decrement ref count: only stop thinking when all fetches have resolved.
+                    thinkingRefCount = Math.max(0, thinkingRefCount - 1);
+                    if (thinkingRefCount == 0) {
+                        stopThinking();
+                    }
                 }
             }
         }
@@ -144,10 +154,15 @@ public class FloatingBubbleService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        isDestroyed = true;
+        thinkingRefCount = 0;
+
         // Cancel all animators to prevent leaks
         cancelEntry();
         cancelBreathing();
         cancelGlow();
+        cancelRipple();
+        cancelExit();
 
         try { unregisterReceiver(companionClosedReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(screenCaptureReceiver);   } catch (Exception ignored) {}
@@ -155,6 +170,7 @@ public class FloatingBubbleService extends Service {
 
         if (bubbleView != null) {
             try { windowManager.removeView(bubbleView); } catch (Exception ignored) {}
+            bubbleView = null; // prevent post-destroy callbacks from animating a detached view
         }
     }
 
@@ -303,7 +319,7 @@ public class FloatingBubbleService extends Service {
     // ── Anim 1: Idle breathing pulse ──────────────────────────────────────────
 
     private void startBreathing() {
-        if (bubbleView == null) return;
+        if (isDestroyed || bubbleView == null) return;
         cancelBreathing();
 
         ObjectAnimator scaleX = ObjectAnimator.ofFloat(bubbleView, "scaleX", 1f, 1.08f, 1f);
@@ -373,16 +389,22 @@ public class FloatingBubbleService extends Service {
             @Override
             public void onAnimationEnd(Animator animation) {
                 entryAnimator = null;
-                // Guard: exit may have already removed the view before entry finished.
-                if (bubbleView == null) return;
+                // Guard: exit may have already removed the view, or service is torn down.
+                if (isDestroyed || bubbleView == null) return;
                 // Once entry is done, start idle breathing (use GlobalLayoutListener to ensure
                 // the view is fully laid out — remove after first callback to avoid repeat).
-                bubbleView.getViewTreeObserver().addOnGlobalLayoutListener(
+                final View capturedView = bubbleView;
+                capturedView.getViewTreeObserver().addOnGlobalLayoutListener(
                         new ViewTreeObserver.OnGlobalLayoutListener() {
                     @Override
                     public void onGlobalLayout() {
-                        if (bubbleView == null) return;
-                        bubbleView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                        // Always remove the listener first — even if we bail early — to prevent leak.
+                        if (capturedView.getViewTreeObserver().isAlive()) {
+                            capturedView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+                        }
+                        // Guard: service may have been destroyed between entry end and layout callback,
+                        // or exit may have already been initiated (don't start breathing during exit).
+                        if (isDestroyed || bubbleView == null || exitAnimator != null) return;
                         startBreathing();
                     }
                 });
@@ -393,16 +415,31 @@ public class FloatingBubbleService extends Service {
 
     // ── Anim 2: Exit animation ─────────────────────────────────────────────────
 
+    private void cancelExit() {
+        if (exitAnimator != null) {
+            exitAnimator.cancel();
+            exitAnimator = null;
+        }
+    }
+
     private void playExitAndRemove() {
         if (bubbleView == null) return;
+        // Guard against double-dismiss: if exit is already in progress, ignore.
+        if (exitAnimator != null && exitAnimator.isRunning()) return;
 
         cancelEntry();
         cancelBreathing();
         cancelGlow();
+        cancelRipple();
 
-        ObjectAnimator scaleX = ObjectAnimator.ofFloat(bubbleView, "scaleX", 1.0f, 0f);
-        ObjectAnimator scaleY = ObjectAnimator.ofFloat(bubbleView, "scaleY", 1.0f, 0f);
-        ObjectAnimator alpha  = ObjectAnimator.ofFloat(bubbleView, "alpha",  1.0f, 0f);
+        // Read actual current scale so there's no one-frame snap if an animation
+        // was cancelled mid-flight (e.g. breathing at 1.07f, thinking glow at 1.12f).
+        float fromScale = bubbleView.getScaleX();
+        float fromAlpha = bubbleView.getAlpha();
+
+        ObjectAnimator scaleX = ObjectAnimator.ofFloat(bubbleView, "scaleX", fromScale, 0f);
+        ObjectAnimator scaleY = ObjectAnimator.ofFloat(bubbleView, "scaleY", fromScale, 0f);
+        ObjectAnimator alpha  = ObjectAnimator.ofFloat(bubbleView, "alpha",  fromAlpha, 0f);
 
         scaleX.setDuration(200);
         scaleY.setDuration(200);
@@ -412,11 +449,12 @@ public class FloatingBubbleService extends Service {
         scaleY.setInterpolator(new AccelerateInterpolator());
         alpha.setInterpolator(new AccelerateInterpolator());
 
-        AnimatorSet exit = new AnimatorSet();
-        exit.playTogether(scaleX, scaleY, alpha);
-        exit.addListener(new AnimatorListenerAdapter() {
+        exitAnimator = new AnimatorSet();
+        exitAnimator.playTogether(scaleX, scaleY, alpha);
+        exitAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
+                exitAnimator = null;
                 if (bubbleView != null) {
                     try { windowManager.removeView(bubbleView); } catch (Exception ignored) {}
                     bubbleView = null;
@@ -424,15 +462,26 @@ public class FloatingBubbleService extends Service {
                 stopSelf();
             }
         });
-        exit.start();
+        exitAnimator.start();
     }
 
     // ── Anim 3: Tap ripple ────────────────────────────────────────────────────
 
+    private void cancelRipple() {
+        if (rippleAnimator != null) {
+            rippleAnimator.cancel();
+            rippleAnimator = null;
+        }
+    }
+
     private void playTapRipple() {
         if (bubbleView == null) return;
 
-        // Pause breathing while tap animation plays; resume after
+        // Cancel any in-flight ripple (double-tap) before starting a new one.
+        cancelRipple();
+
+        // Pause breathing while tap animation plays; resume after.
+        // Only pause if breathing is actually running — don't disturb entry animation.
         pauseBreathing();
 
         // keyframes: 0ms=1.0, 80ms=0.82, 180ms=1.15, 260ms=1.0
@@ -448,23 +497,27 @@ public class FloatingBubbleService extends Service {
                 Keyframe.ofFloat(180f / 260f, 1.15f),
                 Keyframe.ofFloat(1f,          1.0f));
 
-        ObjectAnimator ripple = ObjectAnimator.ofPropertyValuesHolder(bubbleView, pvhX, pvhY);
-        ripple.setDuration(260);
-        ripple.addListener(new AnimatorListenerAdapter() {
+        rippleAnimator = ObjectAnimator.ofPropertyValuesHolder(bubbleView, pvhX, pvhY);
+        rippleAnimator.setDuration(260);
+        rippleAnimator.addListener(new AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(Animator animation) {
-                if (!isThinking) {
+                rippleAnimator = null;
+                // Only resume breathing if:
+                //   • thinking is not active (thinking manages breathing itself), AND
+                //   • entry animation is not still running (entry will start breathing when done).
+                if (!isThinking && entryAnimator == null) {
                     resumeBreathing();
                 }
             }
         });
-        ripple.start();
+        rippleAnimator.start();
     }
 
     // ── Anim 4: Active / thinking state ──────────────────────────────────────
 
     private void startThinking() {
-        if (isThinking) return;
+        if (isDestroyed || isThinking) return;
         isThinking = true;
 
         pauseBreathing();
@@ -497,7 +550,7 @@ public class FloatingBubbleService extends Service {
     }
 
     private void stopThinking() {
-        if (!isThinking) return;
+        if (isDestroyed || !isThinking) return;
         isThinking = false;
 
         cancelGlow();
