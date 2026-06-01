@@ -35,17 +35,33 @@ public class ScreenCaptureService extends Service {
     static final String EXTRA_RESULT_CODE = "result_code";
     static final String EXTRA_RESULT_DATA = "result_data";
 
-    private static final String CHANNEL_ID         = "based_screen_capture";
-    private static final int    NOTIFICATION_ID     = 1002;
-    private static final int    CAPTURE_INTERVAL_MS = 2000;
-    private static final int    MAX_WIDTH           = 1280;
-    private static final int    JPEG_QUALITY        = 30;
+    private static final String CHANNEL_ID     = "based_screen_capture";
+    private static final int    NOTIFICATION_ID = 1002;
+    private static final int    MAX_WIDTH       = 1280;
+    private static final int    JPEG_QUALITY    = 30;
 
     /** Registered by CompanionActivity to receive frames in-process without Intent overhead. */
     public interface FrameCallback {
         void onFrame(String base64Jpeg);
     }
     public static volatile FrameCallback frameCallback = null;
+
+    /**
+     * Registered by CompanionActivity so grabFrame() can hide/show the companion window
+     * before/after the screen capture, preventing the companion UI from appearing in the frame.
+     */
+    public interface VisibilityCallback {
+        void hide();
+        void show();
+    }
+    public static volatile VisibilityCallback visibilityCallback = null;
+
+    /**
+     * Registered by CompanionActivity to handle the case where VirtualDisplay produces no
+     * frame within the retry window (all acquireLatestImage calls return null). The runnable
+     * must dispatch window.onScreenCaptureStopped to the WebView so the button is not stuck.
+     */
+    public static volatile Runnable captureFailedCallback = null;
 
     private MediaProjection mediaProjection;
     private VirtualDisplay  virtualDisplay;
@@ -55,15 +71,6 @@ public class ScreenCaptureService extends Service {
     private boolean         capturing      = false;
     private int             captureWidth;
     private int             captureHeight;
-
-    private final Runnable captureRunnable = new Runnable() {
-        @Override
-        public void run() {
-            if (!capturing) return;
-            grabFrame();
-            captureHandler.postDelayed(this, CAPTURE_INTERVAL_MS);
-        }
-    };
 
     @Override
     public void onCreate() {
@@ -129,7 +136,8 @@ public class ScreenCaptureService extends Service {
                     imageReader.getSurface(), null, captureHandler);
 
             capturing = true;
-            captureHandler.postDelayed(captureRunnable, CAPTURE_INTERVAL_MS);
+            // Single-shot: grab one frame immediately (with hide/show around it).
+            captureHandler.post(this::grabFrame);
         }
 
         return START_NOT_STICKY;
@@ -137,43 +145,67 @@ public class ScreenCaptureService extends Service {
 
     private void grabFrame() {
         if (imageReader == null) return;
-        Image image = null;
-        try {
+
+        // Companion is already hidden (hidden before permission dialog in CompanionActivity).
+        // Just wait for the VirtualDisplay to produce its first frame.
+        Image image = imageReader.acquireLatestImage();
+        if (image == null) {
+            try { Thread.sleep(150); } catch (InterruptedException ignored) {}
             image = imageReader.acquireLatestImage();
-            if (image == null) return;
+        }
+        if (image == null) {
+            try { Thread.sleep(150); } catch (InterruptedException ignored) {}
+            image = imageReader.acquireLatestImage();
+        }
 
-            Image.Plane[] planes   = image.getPlanes();
-            ByteBuffer    buffer   = planes[0].getBuffer();
-            int           pxStride = planes[0].getPixelStride();
-            int           rowStride= planes[0].getRowStride();
-            int           padding  = rowStride - pxStride * image.getWidth();
+        VisibilityCallback vc = visibilityCallback;
+        try {
+            if (image == null) {
+                // All three acquireLatestImage attempts returned null (slow device / warm-up
+                // timeout). Notify the WebView so the screen button is not permanently stuck
+                // at "Capturing…". The companion is still hidden; vc.show() in finally restores it.
+                Runnable failed = captureFailedCallback;
+                if (failed != null) failed.run();
+                // Do NOT return here — fall through to finally (restores companion) and then
+                // stopCapture()/stopSelf() below so the service and VirtualDisplay are released.
+            } else {
+                Image.Plane[] planes   = image.getPlanes();
+                ByteBuffer    buffer   = planes[0].getBuffer();
+                int           pxStride = planes[0].getPixelStride();
+                int           rowStride= planes[0].getRowStride();
+                int           padding  = rowStride - pxStride * image.getWidth();
 
-            Bitmap full = Bitmap.createBitmap(
-                    image.getWidth() + padding / pxStride,
-                    image.getHeight(),
-                    Bitmap.Config.ARGB_8888);
-            full.copyPixelsFromBuffer(buffer);
+                Bitmap full = Bitmap.createBitmap(
+                        image.getWidth() + padding / pxStride,
+                        image.getHeight(),
+                        Bitmap.Config.ARGB_8888);
+                full.copyPixelsFromBuffer(buffer);
 
-            Bitmap cropped = Bitmap.createBitmap(full, 0, 0, image.getWidth(), image.getHeight());
-            full.recycle();
+                Bitmap cropped = Bitmap.createBitmap(full, 0, 0, image.getWidth(), image.getHeight());
+                full.recycle();
 
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            cropped.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, baos);
-            cropped.recycle();
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                cropped.compress(Bitmap.CompressFormat.JPEG, JPEG_QUALITY, baos);
+                cropped.recycle();
 
-            String base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
-            FrameCallback cb = frameCallback;
-            if (cb != null) cb.onFrame(base64);
-
+                String base64 = Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP);
+                FrameCallback cb = frameCallback;
+                if (cb != null) cb.onFrame(base64);
+            }
         } catch (Exception ignored) {
         } finally {
             if (image != null) image.close();
+            // Restore companion visibility after frame is delivered (or after failure).
+            if (vc != null) vc.show();
         }
+
+        // Single-shot — stop the service after delivering one frame (or after a failed grab).
+        stopCapture();
+        stopSelf();
     }
 
     private void stopCapture() {
         capturing = false;
-        if (captureHandler != null) captureHandler.removeCallbacks(captureRunnable);
         if (virtualDisplay  != null) { virtualDisplay.release();  virtualDisplay  = null; }
         if (imageReader     != null) { imageReader.close();        imageReader     = null; }
         if (mediaProjection != null) { mediaProjection.stop();     mediaProjection = null; }
@@ -183,7 +215,8 @@ public class ScreenCaptureService extends Service {
     public void onDestroy() {
         super.onDestroy();
         stopCapture();
-        frameCallback = null;
+        frameCallback         = null;
+        captureFailedCallback = null;
         if (handlerThread != null) handlerThread.quitSafely();
     }
 
