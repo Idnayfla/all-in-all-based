@@ -97,7 +97,7 @@ const VISION = [
   },
   {
     label: 'Feature Request Board',
-    desc: 'Vote on what gets built next. The most-requested feature ships first.',
+    desc: 'Live at /vote — submit requests and vote on what ships next. Highest votes go to the top of the queue.',
   },
   { label: 'Based for Teams', desc: 'Shared workspace, shared memory, org billing.' },
   {
@@ -185,6 +185,9 @@ export default function RoadmapPage() {
           >
             ◈ Support the build
           </a>
+          <Link href="/vote" className="rm-cta-secondary">
+            ◈ Vote on what gets built →
+          </Link>
         </div>
         <div className="rm-stats-row">
           <div className="rm-stat">
