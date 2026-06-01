@@ -15,6 +15,17 @@ create table if not exists feature_votes (
   primary key (user_id, request_id)
 );
 
+-- Atomic vote count helpers (used by /api/vote/[id])
+create or replace function increment_vote_count(request_id uuid)
+returns void language sql security definer as $$
+  update feature_requests set vote_count = vote_count + 1 where id = request_id;
+$$;
+
+create or replace function decrement_vote_count(request_id uuid)
+returns void language sql security definer as $$
+  update feature_requests set vote_count = greatest(0, vote_count - 1) where id = request_id;
+$$;
+
 -- Seed with the vision items from the roadmap
 insert into feature_requests (title, description, status) values
   ('iOS + Android App', 'Full native apps on the App Store and Play Store.', 'planned'),
