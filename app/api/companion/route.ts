@@ -263,16 +263,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'messages required' }, { status: 400 });
   }
 
+  // Compute this first — tracking must be gated on it so sessionCount = conversation
+  // count, not message count. If tracking fired on every message, sessionCount would
+  // blow past 2 and 3 before the user ever starts conversation 2, breaking the
+  // onboarding arc and firing pattern extraction every 5th message instead of every
+  // 5th conversation.
+  const isFirstMessageOfSession = messages.length === 1;
+
   // --- Session tracking (read before building system prompt) ---
   let sessionCount = 0;
   let daysSinceFirst = 0;
   let patternsSurfaced = false;
-  // Default to 0 (don't fire) when DB is down â€” avoids spamming weather/morning on
+  // Default to 0 (don't fire) when DB is down — avoids spamming weather/morning on
   // every request during a Supabase outage. 999 (treat as never surfaced) is only
   // assigned once we have a confirmed DB response and weatherLastSurfaced is null.
   let daysSinceWeather = 0;
 
-  if (jwtUserId) {
+  if (jwtUserId && isFirstMessageOfSession) {
     const tracked = await trackCompanionSession(jwtUserId);
     if (tracked) {
       sessionCount = tracked.sessionCount;
@@ -284,22 +291,16 @@ export async function POST(req: NextRequest) {
         daysSinceWeather =
           (Date.now() - new Date(tracked.weatherLastSurfaced).getTime()) / 86400000;
       } else {
-        // Column is null â€” weather has never been surfaced for this user; treat as 999.
+        // Column is null — weather has never been surfaced for this user; treat as 999.
         daysSinceWeather = 999;
       }
     }
   }
 
-  // --- Async pattern extraction every 5th session ---
-  if (jwtUserId && sessionCount > 0 && sessionCount % 5 === 0) {
+  // --- Async pattern extraction every 5th conversation ---
+  if (jwtUserId && isFirstMessageOfSession && sessionCount > 0 && sessionCount % 5 === 0) {
     extractPatternsAsync(jwtUserId, messages);
   }
-
-  // Onboarding arc should only activate on the first message of a new session
-  // (messages.length === 1 means the client sent a fresh conversation with no prior
-  // assistant replies).  Subsequent messages in the same sitting should not re-trigger
-  // session-1/2/3 instructions â€” that would advance the arc multiple times per sitting.
-  const isFirstMessageOfSession = messages.length === 1;
 
   // Fetch live data if the user's last message asks about weather or traffic
   const lastUserText = ((messages[messages.length - 1]?.content as string) ?? '').toLowerCase();
