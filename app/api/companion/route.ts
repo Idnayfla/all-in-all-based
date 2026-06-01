@@ -46,18 +46,37 @@ async function getEffectiveTier(userId: string): Promise<'free' | 'pro'> {
   return alwaysPro || (paidTier === 'pro' && !isCanceled) || hasBonusPro ? 'pro' : 'free';
 }
 
+// Fire-and-forget: mark companion_weather_last_surfaced = now
+function markWeatherSurfacedAsync(userId: string): void {
+  void (async () => {
+    try {
+      await supabaseAdmin
+        .from('user_settings')
+        .upsert(
+          { user_id: userId, companion_weather_last_surfaced: new Date().toISOString() },
+          { onConflict: 'user_id' }
+        );
+    } catch {
+      // silent — column may not exist yet
+    }
+  })();
+}
+
 // Fire-and-forget: increment session count + update last_seen/first_seen in user_settings.
 // Returns the updated session count (or null on failure).
 async function trackCompanionSession(userId: string): Promise<{
   sessionCount: number;
   firstSeen: string | null;
   patternsSurfaced: boolean;
+  weatherLastSurfaced: string | null;
 } | null> {
   try {
     // Read current values
     const { data: current } = await supabaseAdmin
       .from('user_settings')
-      .select('companion_session_count, companion_first_seen, companion_patterns_surfaced')
+      .select(
+        'companion_session_count, companion_first_seen, companion_patterns_surfaced, companion_weather_last_surfaced'
+      )
       .eq('user_id', userId)
       .single();
 
@@ -65,6 +84,7 @@ async function trackCompanionSession(userId: string): Promise<{
     const prevCount = (current?.companion_session_count as number | null) ?? 0;
     const firstSeen = (current?.companion_first_seen as string | null) ?? now;
     const patternsSurfaced = (current?.companion_patterns_surfaced as boolean | null) ?? false;
+    const weatherLastSurfaced = (current?.companion_weather_last_surfaced as string | null) ?? null;
     const newCount = prevCount + 1;
 
     await supabaseAdmin.from('user_settings').upsert(
@@ -78,7 +98,7 @@ async function trackCompanionSession(userId: string): Promise<{
       { onConflict: 'user_id' }
     );
 
-    return { sessionCount: newCount, firstSeen, patternsSurfaced };
+    return { sessionCount: newCount, firstSeen, patternsSurfaced, weatherLastSurfaced };
   } catch {
     // Columns may not exist yet — silently ignore
     return null;
@@ -244,6 +264,10 @@ export async function POST(req: NextRequest) {
   let sessionCount = 0;
   let daysSinceFirst = 0;
   let patternsSurfaced = false;
+  // Default to 0 (don't fire) when DB is down — avoids spamming weather/morning on
+  // every request during a Supabase outage. 999 (treat as never surfaced) is only
+  // assigned once we have a confirmed DB response and weatherLastSurfaced is null.
+  let daysSinceWeather = 0;
 
   if (jwtUserId) {
     const tracked = await trackCompanionSession(jwtUserId);
@@ -252,6 +276,13 @@ export async function POST(req: NextRequest) {
       patternsSurfaced = tracked.patternsSurfaced;
       if (tracked.firstSeen) {
         daysSinceFirst = (Date.now() - new Date(tracked.firstSeen).getTime()) / 86400000;
+      }
+      if (tracked.weatherLastSurfaced) {
+        daysSinceWeather =
+          (Date.now() - new Date(tracked.weatherLastSurfaced).getTime()) / 86400000;
+      } else {
+        // Column is null — weather has never been surfaced for this user; treat as 999.
+        daysSinceWeather = 999;
       }
     }
   }
@@ -320,20 +351,63 @@ export async function POST(req: NextRequest) {
   // arc advances once per conversation, not once per message.  Also skipped when a
   // PATTERN SURFACE instruction is already injected — both give "open with an
   // observation" directives which would contradict each other (OA6 fix).
+  let onboardingActive = false;
   if (isFirstMessageOfSession && !patternSurfaceActive) {
     if (sessionCount <= 1) {
+      onboardingActive = true;
       dynamicInstructions.push(
         `ONBOARDING SESSION 1: This is your first real conversation. Ask one specific question that only a companion would ask — not "what do you do" but something more like "what's been on your mind this week that you haven't said out loud to anyone?" Then listen. Don't rush to help.`
       );
     } else if (sessionCount === 2) {
+      onboardingActive = true;
       dynamicInstructions.push(
         `ONBOARDING SESSION 2: You met this person recently. Reference something from memory if available. Ask a follow-up to something they mentioned before. If nothing in memory yet: "Last time I felt like you had more to say. What didn't you tell me?"`
       );
     } else if (sessionCount === 3) {
+      onboardingActive = true;
       dynamicInstructions.push(
         `ONBOARDING SESSION 3: You're starting to know this person. Make one observation about them — something you've noticed from the two previous conversations. State it as fact, not a question. Then ask if you got it right.`
       );
     }
+  }
+
+  // Feature 5 — Emotional Weather Report (weekly, passive inference).
+  // Priority 3 — fires only when pattern surface and onboarding are both inactive.
+  // Suppressed by patternSurfaceActive (both would conflict as "open with" directives).
+  let weatherActive = false;
+  if (
+    isFirstMessageOfSession &&
+    daysSinceWeather >= 7 &&
+    !patternSurfaceActive &&
+    !onboardingActive
+  ) {
+    weatherActive = true;
+    dynamicInstructions.push(
+      `EMOTIONAL WEATHER: Before anything else in this response, open with Based's weekly emotional read on the user. 2 sentences max. Draw purely from the memory and patterns you already hold — do not ask questions, do not explain your reasoning. State it directly as an observation. Example tone: "You've been running on fumes this week. Something shifted after Wednesday." After delivering it, continue with the conversation naturally.`
+    );
+    if (jwtUserId) markWeatherSurfacedAsync(jwtUserId);
+  }
+
+  // Feature 6 — Morning Ritual Check-in (daily, 6am–10am SGT).
+  // Priority 4 — fires only when all higher-priority items are inactive.
+  // Singapore is UTC+8.
+  const utcHour = new Date().getUTCHours();
+  const localHour = (utcHour + 8) % 24;
+  const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][
+    new Date().getDay()
+  ];
+  if (
+    isFirstMessageOfSession &&
+    localHour >= 6 &&
+    localHour < 10 &&
+    daysSinceWeather > 0 &&
+    !patternSurfaceActive &&
+    !onboardingActive &&
+    !weatherActive
+  ) {
+    dynamicInstructions.push(
+      `MORNING RITUAL: It is morning for this user (${localHour}:00 SGT, ${dayOfWeek}). This is how Based starts mornings — not with "good morning" but with something specific. Look at memory and patterns. Is there anything Based knows about today — a recurring pattern on this day of the week, something the user mentioned recently, a tendency they have on mornings? Lead with that. Keep it under 2 sentences. Then let the user set the direction.`
+    );
   }
 
   const system = [

@@ -259,6 +259,23 @@ public class CompanionActivity extends AppCompatActivity {
                     "window.close=function(){" +
                     "  if(window.AndroidBridge)window.AndroidBridge.close();};", null);
 
+                // Feature 7: companion name bridge — read from localStorage on load,
+                // and expose window.setBasedName() so the web UI can update it.
+                view.evaluateJavascript(
+                    "(function(){" +
+                    "  var stored=localStorage.getItem('based_companion_name');" +
+                    "  if(stored&&stored.trim()&&window.AndroidBridge){" +
+                    "    window.AndroidBridge.setCompanionName(stored.trim());" +
+                    "  }" +
+                    // Expose a global function the web UI can call to update the name
+                    "  window.setBasedName=function(name){" +
+                    "    if(!name||!name.trim())return;" +
+                    "    var n=name.trim().substring(0,20);" +
+                    "    localStorage.setItem('based_companion_name',n);" +
+                    "    if(window.AndroidBridge)window.AndroidBridge.setCompanionName(n);" +
+                    "  };" +
+                    "})()", null);
+
                 // Thinking-state bridge: wrap fetch to signal bubble when /api/companion is
                 // in-flight. Injected AFTER the existing fetch interceptor so it wraps the
                 // already-patched window.fetch (which attaches screenshot frames).
@@ -1073,6 +1090,26 @@ public class CompanionActivity extends AppCompatActivity {
         public void setThinking(boolean active) {
             Intent intent = new Intent(FloatingBubbleService.ACTION_BUBBLE_THINKING);
             intent.putExtra(FloatingBubbleService.EXTRA_THINKING_ACTIVE, active);
+            intent.setPackage(getPackageName());
+            sendBroadcast(intent);
+        }
+
+        /**
+         * Feature 7: Called from JS to update the companion name shown on the bubble.
+         * Validates input (non-empty, max 20 chars), updates the static field in
+         * FloatingBubbleService, and broadcasts ACTION_UPDATE_NAME so the bubble TextView
+         * updates live.
+         */
+        @JavascriptInterface
+        public void setCompanionName(String name) {
+            if (name == null || name.trim().isEmpty()) return;
+            String sanitised = name.trim();
+            if (sanitised.length() > 20) sanitised = sanitised.substring(0, 20);
+            // Update the static field directly (fast path if service is in same process)
+            FloatingBubbleService.companionName = sanitised;
+            // Also broadcast so the running service's TextView updates live
+            Intent intent = new Intent(FloatingBubbleService.ACTION_UPDATE_NAME);
+            intent.putExtra(FloatingBubbleService.EXTRA_NAME, sanitised);
             intent.setPackage(getPackageName());
             sendBroadcast(intent);
         }
