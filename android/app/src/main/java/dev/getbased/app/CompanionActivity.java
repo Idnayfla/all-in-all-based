@@ -1,4 +1,4 @@
-package dev.getbased.app;
+﻿package dev.getbased.app;
 
 import android.Manifest;
 import android.app.Activity;
@@ -22,6 +22,8 @@ import android.media.ImageReader;
 import android.media.projection.MediaProjectionManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.location.Location;
+import android.location.LocationManager;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Base64;
@@ -158,6 +160,9 @@ public class CompanionActivity extends AppCompatActivity {
                 view.evaluateJavascript(
                     "if(!localStorage.getItem('based_companion_voice')){" +
                     "  localStorage.setItem('based_companion_voice','true');}", null);
+
+                // GPS Memory Anchors — one-shot last-known location fetch
+                fetchLastKnownLocation();
 
                 // Message persistence: production may not have the localStorage save/restore
                 // code yet (dev branch not deployed). Inject it here so Android always has it.
@@ -509,7 +514,94 @@ public class CompanionActivity extends AppCompatActivity {
                     "    return _f.apply(this,arguments);" +
                     "  };" +
                     "})()", null);
-            }
+
+                // GPS Memory Anchors
+                view.evaluateJavascript(
+                    "(function(){" +
+                    "  window.__abLocationConsent=localStorage.getItem('based_location_consent');" +
+                    "  window.__abCurrentLoc=null;" +
+                    "  window.onLocationReady=function(lat,lng){" +
+                    "    window.__abCurrentLoc={lat:lat,lng:lng};" +
+                    "    if(window.__abLocationConsent!=='granted')return;" +
+                    "    var memory=[];" +
+                    "    try{memory=JSON.parse(localStorage.getItem('based_location_memory')||'[]');}catch(e){}" +
+                    "    var nearest=null;var THRESHOLD=0.003;" +
+                    "    for(var i=0;i<memory.length;i++){" +
+                    "      var d=Math.abs(memory[i].lat-lat)+Math.abs(memory[i].lng-lng);" +
+                    "      if(d<THRESHOLD&&(!nearest||d<nearest.dist))nearest={entry:memory[i],dist:d};" +
+                    "    }" +
+                    "    if(nearest&&nearest.entry.lastContext)window.__abLocationContext=nearest.entry.lastContext;" +
+                    "  };" +
+                    "  window.saveLocationContext=function(lat,lng,context){" +
+                    "    if(window.__abLocationConsent!=='granted')return;" +
+                    "    var memory=[];" +
+                    "    try{memory=JSON.parse(localStorage.getItem('based_location_memory')||'[]');}catch(e){}" +
+                    "    var THRESHOLD=0.003;var found=false;" +
+                    "    for(var i=0;i<memory.length;i++){" +
+                    "      var d=Math.abs(memory[i].lat-lat)+Math.abs(memory[i].lng-lng);" +
+                    "      if(d<THRESHOLD){" +
+                    "        memory[i].lastContext=context;" +
+                    "        memory[i].visitCount=(memory[i].visitCount||0)+1;" +
+                    "        memory[i].lastVisit=Date.now();" +
+                    "        found=true;break;" +
+                    "      }" +
+                    "    }" +
+                    "    if(!found)memory.push({lat:lat,lng:lng,lastContext:context,visitCount:1,lastVisit:Date.now()});" +
+                    "    if(memory.length>20)memory=memory.slice(-20);" +
+                    "    try{localStorage.setItem('based_location_memory',JSON.stringify(memory));}catch(e){}" +
+                    "  };" +
+                    "  var _gpsF=window.fetch;" +
+                    "  window.fetch=function(url,opts){" +
+                    "    if(typeof url==='string'&&url.includes('/api/companion')&&opts&&opts.body){" +
+                    "      try{" +
+                    "        if(typeof opts.body==='string'){" +
+                    "          var b=JSON.parse(opts.body);" +
+                    "          if(window.__abLocationContext)b.locationContext=window.__abLocationContext;" +
+                    "          opts=Object.assign({},opts,{body:JSON.stringify(b)});" +
+                    "        }" +
+                    "      }catch(e){}" +
+                    "    }" +
+                    "    var result=_gpsF.apply(this,arguments);" +
+                    "    if(typeof url==='string'&&url.includes('/api/companion')){" +
+                    "      result.then(function(){" +
+                    "        if(window.__abCurrentLoc&&window.__abLocationConsent==='granted'){" +
+                    "          var bubbles=document.querySelectorAll('.companion-bubble--user');" +
+                    "          var lastUserMsg=bubbles.length?bubbles[bubbles.length-1].textContent.substring(0,100):'';" +
+                    "          if(lastUserMsg)window.saveLocationContext(window.__abCurrentLoc.lat,window.__abCurrentLoc.lng,lastUserMsg);" +
+                    "        }" +
+                    "      }).catch(function(){});" +
+                    "    }" +
+                    "    return result;" +
+                    "  };" +
+                    "  function showLocationConsentIfNeeded(){" +
+                    "    if(window.__abLocationConsent!==null&&window.__abLocationConsent!==undefined&&window.__abLocationConsent!=='')return;" +
+                    "    if(document.getElementById('__ab_loc_consent'))return;" +
+                    "    var bar=document.createElement('div');" +
+                    "    bar.id='__ab_loc_consent';" +
+                    "    bar.style.cssText='position:fixed;bottom:70px;left:0;right:0;background:rgba(20,20,20,0.97);color:#e0e0e0;font-size:13px;padding:12px 16px;display:flex;align-items:center;gap:10px;z-index:99999;border-top:1px solid rgba(255,255,255,0.08);';" +
+                    "    bar.innerHTML='<span style=""flex:1"">◈ Remember where we talk?</span>'" +
+                    "      +'<button id=""__ab_loc_yes"" style=""background:#f5c842;color:#000;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;"">Yes</button>'" +
+                    "      +'<button id=""__ab_loc_no"" style=""background:transparent;color:#888;border:1px solid #444;padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;"">No</button>';" +
+                    "    document.body.appendChild(bar);" +
+                    "    document.getElementById('__ab_loc_yes').onclick=function(){" +
+                    "      localStorage.setItem('based_location_consent','granted');" +
+                    "      window.__abLocationConsent='granted';" +
+                    "      bar.remove();" +
+                    "      if(window.__abCurrentLoc)window.onLocationReady(window.__abCurrentLoc.lat,window.__abCurrentLoc.lng);" +
+                    "    };" +
+                    "    document.getElementById('__ab_loc_no').onclick=function(){" +
+                    "      localStorage.setItem('based_location_consent','denied');" +
+                    "      window.__abLocationConsent='denied';" +
+                    "      bar.remove();" +
+                    "    };" +
+                    "  }" +
+                    "  var locConsentObs=new MutationObserver(function(){" +
+                    "    if(document.querySelectorAll('.companion-bubble--user').length>=1){" +
+                    "      showLocationConsentIfNeeded();locConsentObs.disconnect();" +
+                    "    }" +
+                    "  });" +
+                    "  locConsentObs.observe(document.body,{childList:true,subtree:true});" +
+                    "})()", null);            }
         });
 
         webView.addJavascriptInterface(new AndroidBridge(), "AndroidBridge");
@@ -528,6 +620,8 @@ public class CompanionActivity extends AppCompatActivity {
                 add(Manifest.permission.RECORD_AUDIO);
             if (checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED)
                 add(Manifest.permission.CAMERA);
+            if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+                add(Manifest.permission.ACCESS_COARSE_LOCATION);
         }}.toArray(new String[0]);
         if (permsNeeded.length > 0) ActivityCompat.requestPermissions(this, permsNeeded, 1001);
 
@@ -621,6 +715,24 @@ public class CompanionActivity extends AppCompatActivity {
         };
     }
 
+    // ── GPS Memory Anchors — one-shot last-known location fetch ─────────────────
+    private void fetchLastKnownLocation() {
+        if (checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+                != PackageManager.PERMISSION_GRANTED) return;
+        LocationManager lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
+        Location loc = null;
+        for (String provider : lm.getProviders(true)) {
+            Location l = lm.getLastKnownLocation(provider);
+            if (l != null && (loc == null || l.getAccuracy() < loc.getAccuracy())) loc = l;
+        }
+        if (loc == null) return;
+        final double lat = Math.round(loc.getLatitude() * 1000.0) / 1000.0;
+        final double lng = Math.round(loc.getLongitude() * 1000.0) / 1000.0;
+        if (webView != null) {
+            runOnUiThread(() -> webView.evaluateJavascript(
+                "window.onLocationReady&&window.onLocationReady(" + lat + "," + lng + ")", null));
+        }
+    }
     // ── Camera2 implementation ────────────────────────────────────────────────
 
     private void startCameraCapture() {
@@ -1112,6 +1224,18 @@ public class CompanionActivity extends AppCompatActivity {
             intent.putExtra(FloatingBubbleService.EXTRA_NAME, sanitised);
             intent.setPackage(getPackageName());
             sendBroadcast(intent);
+        }
+
+        /**
+         * Share text via Android's native share sheet.
+         * Used by the shareable card feature — JS side calls window.AndroidBridge.shareText(text).
+         */
+        @JavascriptInterface
+        public void shareText(String text) {
+            Intent shareIntent = new Intent(Intent.ACTION_SEND);
+            shareIntent.setType("text/plain");
+            shareIntent.putExtra(Intent.EXTRA_TEXT, text);
+            runOnUiThread(() -> startActivity(Intent.createChooser(shareIntent, "Share via")));
         }
     }
 
