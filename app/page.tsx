@@ -150,6 +150,14 @@ export default function Home() {
   useEffect(() => {
     track('panel_switched', { panel: activePanel });
   }, [activePanel]);
+
+  const LATEST_CHANGELOG = '2026-06-02';
+  useEffect(() => {
+    try {
+      const seen = localStorage.getItem('based_changelog_seen');
+      setHasNewChangelog(!seen || seen < LATEST_CHANGELOG);
+    } catch {}
+  }, []);
   const [showSplash, setShowSplash] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
   const [authTab, setAuthTab] = useState<'signin' | 'signup'>('signin');
@@ -187,6 +195,7 @@ export default function Home() {
     'upgrade'
   );
   const [showFeedback, setShowFeedback] = useState(false);
+  const [hasNewChangelog, setHasNewChangelog] = useState(false);
   const [syncingSubscription, setSyncingSubscription] = useState(false);
   const [syncLabel, setSyncLabel] = useState<'idle' | 'syncing' | 'synced' | 'failed'>('idle');
   const [checkin, setCheckin] = useState<{
@@ -1255,6 +1264,22 @@ export default function Home() {
               ◉
             </button>
             <GetAppButton className="companion-header-btn" />
+            <a
+              href="/changelog"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="whats-new-header-btn"
+              title="What's new in Based"
+              onClick={() => {
+                try {
+                  localStorage.setItem('based_changelog_seen', LATEST_CHANGELOG);
+                  setHasNewChangelog(false);
+                } catch {}
+              }}
+            >
+              {hasNewChangelog && <span className="whats-new-dot" />}
+              What&apos;s New
+            </a>
             <button
               className="feedback-header-btn"
               onClick={() => setShowFeedback(true)}

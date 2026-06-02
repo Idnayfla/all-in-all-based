@@ -26,6 +26,35 @@ type ChangeEntry = {
 
 const ENTRIES: ChangeEntry[] = [
   {
+    date: '2026-06-02',
+    label: 'v0.1.5',
+    title: 'Resizable Companion',
+    sections: [
+      {
+        kind: 'added',
+        items: [
+          {
+            bold: 'Resizable companion panel',
+            text: 'Drag the left edge of the companion panel to make it wider or narrower (280px–600px). Width is saved between sessions.',
+          },
+        ],
+      },
+      {
+        kind: 'fixed',
+        items: [
+          {
+            bold: 'Voice playback',
+            text: 'TTS audio was silently failing due to a React state updater bug. Voice now plays correctly every time.',
+          },
+          {
+            bold: 'Symbol encoding',
+            text: 'Buttons and messages were rendering Based symbols (◈ ⬡ B>) as garbled characters on some systems. Now correct everywhere.',
+          },
+        ],
+      },
+    ],
+  },
+  {
     date: '2026-06-01',
     label: 'v0.1.4',
     title: 'Feature Request Board',
