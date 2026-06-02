@@ -56,6 +56,7 @@ declare global {
     onScreenFrame?: (base64Jpeg: string) => void;
     onScreenCaptureDenied?: () => void;
     onScreenCaptureStopped?: () => void;
+    jsQR?: (data: Uint8ClampedArray, width: number, height: number) => { data: string } | null;
   }
 }
 
@@ -68,6 +69,31 @@ interface Msg {
 
 const SCREEN_INTENT =
   /\b(screen|what'?s (on|here)|solve this|answer this|what do you see|help me with this|what is this)\b/i;
+
+function loadJsQR(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (typeof window !== 'undefined' && typeof window.jsQR !== 'undefined') {
+      resolve();
+      return;
+    }
+    const existing = document.querySelector('script[src*="jsqr"]') as HTMLScriptElement | null;
+    if (existing) {
+      // Script tag already in DOM — wait for it if not yet loaded
+      if (typeof window.jsQR !== 'undefined') {
+        resolve();
+        return;
+      }
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error('jsQR load failed')));
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('jsQR load failed'));
+    document.head.appendChild(s);
+  });
+}
 
 function base64ToBlob(b64: string, mime: string): Blob {
   const bytes = atob(b64);
@@ -127,6 +153,13 @@ export default function CompanionOverlayPage() {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const lastSpokenRef = useRef('');
+
+  // QR scanner state
+  const [qrScanActive, setQrScanActive] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
+  const qrVideoRef = useRef<HTMLVideoElement>(null);
+  const qrStreamRef = useRef<MediaStream | null>(null);
+  const qrAnimFrameRef = useRef<number | null>(null);
 
   const speak = async (text: string) => {
     if (!voiceEnabled) return;
@@ -323,6 +356,9 @@ export default function CompanionOverlayPage() {
     return () => {
       if (slowWarningTimerRef.current) clearTimeout(slowWarningTimerRef.current);
       if (hardResetTimerRef.current) clearTimeout(hardResetTimerRef.current);
+      // Stop QR scanner if active
+      if (qrAnimFrameRef.current !== null) cancelAnimationFrame(qrAnimFrameRef.current);
+      if (qrStreamRef.current) qrStreamRef.current.getTracks().forEach(t => t.stop());
     };
   }, []);
 
@@ -377,6 +413,87 @@ export default function CompanionOverlayPage() {
     setTimeout(() => setCaptureError(null), 2500);
   };
 
+  const stopQrScanner = () => {
+    if (qrAnimFrameRef.current !== null) {
+      cancelAnimationFrame(qrAnimFrameRef.current);
+      qrAnimFrameRef.current = null;
+    }
+    if (qrStreamRef.current) {
+      qrStreamRef.current.getTracks().forEach(t => t.stop());
+      qrStreamRef.current = null;
+    }
+    setQrScanActive(false);
+    setQrError(null);
+  };
+
+  const handleQrScan = async () => {
+    if (qrScanActive) {
+      stopQrScanner();
+      return;
+    }
+
+    setQrError(null);
+
+    try {
+      await loadJsQR();
+    } catch {
+      setQrError('Failed to load QR library');
+      return;
+    }
+
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+      });
+    } catch {
+      setQrError('Camera access denied');
+      return;
+    }
+
+    qrStreamRef.current = stream;
+    setQrScanActive(true);
+
+    // Wait one tick for the video element to mount, then attach stream
+    setTimeout(() => {
+      const video = qrVideoRef.current;
+      if (!video) {
+        stopQrScanner();
+        return;
+      }
+      video.srcObject = stream;
+      void video.play();
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      const scan = () => {
+        if (!qrStreamRef.current || !video) return;
+        if (video.readyState === video.HAVE_ENOUGH_DATA && ctx) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          if (typeof window.jsQR !== 'undefined') {
+            const result = window.jsQR(imageData.data, imageData.width, imageData.height);
+            if (result?.data) {
+              stopQrScanner();
+              const decoded = result.data;
+              const qrMessage = `I scanned a QR code. Here's what it contains: ${decoded}. What is this?`;
+              setInput(qrMessage);
+              // sendQrMessage fires send() with the decoded text directly
+              sendQrMessage(qrMessage);
+              return;
+            }
+          }
+        }
+        qrAnimFrameRef.current = requestAnimationFrame(scan);
+      };
+
+      qrAnimFrameRef.current = requestAnimationFrame(scan);
+    }, 100);
+  };
+
   const handleScreen = async () => {
     if (window.AndroidBridge) {
       if (androidCapturing) {
@@ -408,6 +525,202 @@ export default function CompanionOverlayPage() {
       return;
     }
     setPendingCapture({ source: dataUrl, thumb: dataUrl });
+  };
+
+  const sendQrMessage = (text: string) => {
+    // Called after QR decode — schedules a send() tick once input state settles.
+    // We call the full send pipeline directly with the provided text instead of
+    // reading from the input state ref, which hasn't updated yet.
+    void sendWithText(text);
+  };
+
+  const sendWithText = async (forcedText: string) => {
+    if (!forcedText.trim() || isGenerating) return;
+
+    const userMsg: Msg = { role: 'user', content: forcedText };
+
+    setInput('');
+    setPendingCapture(null);
+    if (textareaRef.current) textareaRef.current.style.height = 'auto';
+
+    const history = [...messages, userMsg];
+    setMessages([...history, { role: 'assistant', content: '' }]);
+    setIsGenerating(true);
+    setSlowWarning(false);
+
+    slowWarningTimerRef.current = setTimeout(() => setSlowWarning(true), 15000);
+    hardResetTimerRef.current = setTimeout(() => {
+      setIsGenerating(false);
+      setSlowWarning(false);
+      setMessages(prev => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last?.role === 'assistant' && !last.content?.trim()) {
+          next[next.length - 1] = { ...last, content: '✕ Request timed out. Please try again.' };
+        }
+        return next;
+      });
+    }, 45000);
+
+    const abortController = new AbortController();
+    const fetchTimeoutId = setTimeout(() => abortController.abort(), 30000);
+
+    try {
+      const token = authToken;
+      if (!token) {
+        setMessages(prev => {
+          const next = [...prev];
+          next[next.length - 1] = {
+            ...next[next.length - 1],
+            content: '✕ Not signed in. Please open Based and sign in first.',
+          };
+          return next;
+        });
+        return;
+      }
+
+      const res = await fetch('/api/companion', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          messages: history
+            .filter(m => m.content?.trim())
+            .map(m => ({ role: m.role, content: m.content })),
+          ...(sessionMemoryRef.current ? { memory: sessionMemoryRef.current } : {}),
+        }),
+        signal: abortController.signal,
+      });
+
+      if (res.status === 429) {
+        let limitMsg = '⬡ Daily limit reached. Upgrade to Pro for unlimited access → getbased.dev';
+        try {
+          const data = (await res.json()) as { error?: string; limit?: number };
+          if (data.error === 'free_limit_reached') {
+            limitMsg = `⬡ You've used your ${data.limit ?? 5} free companion messages today. Upgrade to Pro for unlimited access → getbased.dev`;
+          }
+        } catch {}
+        setMessages(prev => {
+          const next = [...prev];
+          next[next.length - 1] = { ...next[next.length - 1], content: limitMsg };
+          return next;
+        });
+        return;
+      }
+
+      if (!res.ok || !res.body) {
+        if (res.status === 401) throw new Error('session-expired');
+        throw new Error('failed');
+      }
+
+      nextResponseIsShareableRef.current = res.headers.get('X-Based-Shareable') === '1';
+      const daysHeader = res.headers.get('X-Based-Days');
+      if (daysHeader !== null) daysSinceFirstRef.current = parseInt(daysHeader, 10) || 0;
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      let streamDone = false;
+      let streamError: string | null = null;
+
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6).trim();
+          if (raw === '[DONE]') {
+            streamDone = true;
+            break;
+          }
+          try {
+            const parsed = JSON.parse(raw) as { text?: string; error?: string };
+            if (parsed.error) {
+              streamError = parsed.error;
+            } else if (parsed.text) {
+              setMessages(prev => {
+                const next = [...prev];
+                next[next.length - 1] = {
+                  ...next[next.length - 1],
+                  content: next[next.length - 1].content + parsed.text,
+                };
+                return next;
+              });
+            }
+          } catch {
+            /* malformed SSE chunk — skip */
+          }
+        }
+      }
+
+      if (nextResponseIsShareableRef.current && !streamError) {
+        nextResponseIsShareableRef.current = false;
+        setMessages(prev => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last?.role === 'assistant' && last.content?.trim()) {
+            next[next.length - 1] = { ...last, shareable: true };
+          }
+          return next;
+        });
+      }
+
+      if (voiceEnabled && !streamError) {
+        setMessages(prev => {
+          const last = prev[prev.length - 1];
+          if (last?.role === 'assistant' && last.content?.trim()) {
+            speak(last.content);
+          }
+          return prev;
+        });
+      }
+
+      if (streamError) {
+        const errorDisplay = streamError.toLowerCase().includes('unauthorized')
+          ? '✕ Session expired — sign in again in Based.'
+          : streamError.length <= 80
+            ? `✕ ${streamError}`
+            : '✕ Failed to connect.';
+        setMessages(prev => {
+          const next = [...prev];
+          next[next.length - 1] = { ...next[next.length - 1], content: errorDisplay };
+          return next;
+        });
+      }
+    } catch (err) {
+      const isExpired = err instanceof Error && err.message === 'session-expired';
+      const isAborted = err instanceof Error && err.name === 'AbortError';
+      const isTimeout = err instanceof Error && err.message === 'timeout';
+      setMessages(prev => {
+        const next = [...prev];
+        next[next.length - 1] = {
+          ...next[next.length - 1],
+          content: isExpired
+            ? '✕ Session expired. Please sign in again in Based.'
+            : isAborted || isTimeout
+              ? '✕ Connection timed out. Check your internet.'
+              : '✕ Failed to connect.',
+        };
+        return next;
+      });
+    } finally {
+      clearTimeout(fetchTimeoutId);
+      if (slowWarningTimerRef.current) {
+        clearTimeout(slowWarningTimerRef.current);
+        slowWarningTimerRef.current = null;
+      }
+      if (hardResetTimerRef.current) {
+        clearTimeout(hardResetTimerRef.current);
+        hardResetTimerRef.current = null;
+      }
+      setSlowWarning(false);
+      setIsGenerating(false);
+    }
   };
 
   const send = async () => {
@@ -807,8 +1120,34 @@ export default function CompanionOverlayPage() {
               {voiceGender === 'male' ? 'â¬¡ Male' : 'â¬¡ Female'}
             </button>
           )}
+          <button
+            className={`companion-capture-btn${qrScanActive ? ' active' : ''}`}
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            onClick={() => void handleQrScan()}
+            disabled={isGenerating}
+            title="Scan a QR code with your camera"
+          >
+            {qrScanActive ? '◈ Scanning...' : '◈ QR'}
+          </button>
           {captureError && <span className="companion-capture-error">{captureError}</span>}
         </div>
+
+        {qrScanActive && (
+          <div className="companion-qr-overlay">
+            <div className="companion-qr-header">
+              <span className="companion-qr-label">◈ Point at a QR code</span>
+              <button
+                className="companion-qr-cancel"
+                onClick={stopQrScanner}
+                title="Cancel QR scan"
+              >
+                ✕
+              </button>
+            </div>
+            <video ref={qrVideoRef} className="companion-qr-video" muted playsInline />
+            {qrError && <div className="companion-qr-error">{qrError}</div>}
+          </div>
+        )}
 
         {pendingCapture && (
           <div className="companion-pending-badge">

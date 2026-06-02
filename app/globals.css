@@ -7795,6 +7795,53 @@ html.has-wallpaper .editor-panel {
   color: #ff6b6b;
 }
 
+/* -- QR scanner overlay -- */
+.companion-qr-overlay {
+  background: rgba(10, 10, 20, 0.92);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.companion-qr-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px;
+  background: rgba(124, 58, 237, 0.12);
+  border-bottom: 1px solid rgba(124, 58, 237, 0.2);
+}
+.companion-qr-label {
+  font-size: 10px;
+  color: #c8c8e0;
+  letter-spacing: 0.04em;
+}
+.companion-qr-cancel {
+  background: none;
+  border: none;
+  color: #4a4a6a;
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.companion-qr-cancel:hover {
+  color: #ff6b6b;
+}
+.companion-qr-video {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  background: #000;
+}
+.companion-qr-error {
+  padding: 4px 8px;
+  font-size: 10px;
+  color: #ff6b6b;
+}
+
 .companion-input-row {
   display: flex;
   gap: 6px;
@@ -13697,8 +13744,13 @@ body:has(.legal-page) {
   animation: vt-pulse 1.4s infinite;
 }
 @keyframes vt-pulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .vt-empty {
