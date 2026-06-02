@@ -51,7 +51,8 @@ declare global {
       showAfterCapture: () => void;
       captureScreenMain: () => Promise<string | null>;
       setSpeaking: (speaking: boolean, text?: string) => void;
-      setCompanionWidth?: (width: number, rightEdge: number) => void;
+      resizeStart?: () => void;
+      setCompanionWidth?: (width: number) => void;
     };
     AndroidBridge?: {
       close: () => void;
@@ -344,7 +345,8 @@ export default function CompanionOverlayPage() {
         const parsed = parseInt(stored, 10);
         if (!isNaN(parsed) && parsed >= WIDTH_MIN && parsed <= WIDTH_MAX) {
           setPanelWidth(parsed);
-          window.electronAPI?.setCompanionWidth?.(parsed, Math.round(window.screenX + window.outerWidth));
+          window.electronAPI?.resizeStart?.();
+          window.electronAPI?.setCompanionWidth?.(parsed);
         }
       }
     } catch {
@@ -365,9 +367,8 @@ export default function CompanionOverlayPage() {
 
       const startScreenX = e.screenX;
       const startWidth = panelWidth;
-      // Capture right edge of the Electron window once at drag start (screen coords).
-      // Passed with every IPC call so main.js never reads stale getPosition() values.
-      const winRightEdge = Math.round(window.screenX + window.outerWidth);
+      // Tell main process to capture the current window right edge before any resize.
+      window.electronAPI?.resizeStart?.();
 
       const onMove = (mv: PointerEvent) => {
         if (!isResizingRef.current) return;
@@ -376,7 +377,7 @@ export default function CompanionOverlayPage() {
           Math.min(WIDTH_MAX, Math.max(WIDTH_MIN, startWidth - (mv.screenX - startScreenX)))
         );
         setPanelWidth(newWidth);
-        window.electronAPI?.setCompanionWidth?.(newWidth, winRightEdge);
+        window.electronAPI?.setCompanionWidth?.(newWidth);
       };
 
       const onUp = () => {

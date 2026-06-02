@@ -10,5 +10,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Notify the bubble window that Based started or stopped speaking.
   // Pass the spoken text (already the progressive slice) so the bubble can display it directly.
   setSpeaking: (speaking, text) => ipcRenderer.send('companion:speaking', speaking, text ?? ''),
-  setCompanionWidth: (width, rightEdge) => ipcRenderer.send('companion:set-width', width, rightEdge),
+  resizeStart: () => ipcRenderer.send('companion:resize-start'),
+  setCompanionWidth: (width) => ipcRenderer.send('companion:set-width', width),
 });

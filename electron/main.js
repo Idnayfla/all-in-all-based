@@ -281,14 +281,22 @@ app.whenReady().then(async () => {
     bubbleWin?.webContents.send('companion-bubble:speaking', speaking, text ?? '');
   });
 
-  ipcMain.on('companion:set-width', (_, panelWidth, winRightEdge) => {
+  // Captured once at drag start — used as the stable right-edge anchor for the whole drag.
+  let resizeRightEdge = null;
+
+  ipcMain.on('companion:resize-start', () => {
     if (!overlayWin) return;
+    const [w, ] = overlayWin.getSize();
+    const [x, ] = overlayWin.getPosition();
+    resizeRightEdge = x + w;
+  });
+
+  ipcMain.on('companion:set-width', (_, panelWidth) => {
+    if (!overlayWin || resizeRightEdge === null) return;
     const winWidth = Math.round(Math.max(300, Math.min(620, panelWidth + 20)));
     const [, winHeight] = overlayWin.getSize();
     const [, currentY] = overlayWin.getPosition();
-    // winRightEdge is captured once at drag start in the renderer (window.screenX +
-    // window.outerWidth) so it never drifts from stale getPosition() calls mid-drag.
-    const newX = Math.max(0, Math.round(winRightEdge) - winWidth);
+    const newX = Math.max(0, resizeRightEdge - winWidth);
     overlayWin.setSize(winWidth, winHeight);
     overlayWin.setPosition(newX, currentY);
   });
