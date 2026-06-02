@@ -281,15 +281,14 @@ app.whenReady().then(async () => {
     bubbleWin?.webContents.send('companion-bubble:speaking', speaking, text ?? '');
   });
 
-  ipcMain.on('companion:set-width', (_, panelWidth) => {
+  ipcMain.on('companion:set-width', (_, panelWidth, winRightEdge) => {
     if (!overlayWin) return;
     const winWidth = Math.round(Math.max(300, Math.min(620, panelWidth + 20)));
-    const [currentWidth, winHeight] = overlayWin.getSize();
-    const [currentX, currentY] = overlayWin.getPosition();
-    // Keep the right edge of the window fixed — only the left edge moves.
-    // Using workAreaSize would snap the window to the screen edge on every call.
-    const rightEdge = currentX + currentWidth;
-    const newX = Math.max(0, rightEdge - winWidth);
+    const [, winHeight] = overlayWin.getSize();
+    const [, currentY] = overlayWin.getPosition();
+    // winRightEdge is captured once at drag start in the renderer (window.screenX +
+    // window.outerWidth) so it never drifts from stale getPosition() calls mid-drag.
+    const newX = Math.max(0, Math.round(winRightEdge) - winWidth);
     overlayWin.setSize(winWidth, winHeight);
     overlayWin.setPosition(newX, currentY);
   });
