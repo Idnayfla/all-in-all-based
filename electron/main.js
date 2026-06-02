@@ -281,15 +281,34 @@ app.whenReady().then(async () => {
     bubbleWin?.webContents.send('companion-bubble:speaking', speaking, text ?? '');
   });
 
+  // Captured once at drag start — used as the stable right-edge anchor for the whole drag.
+  let resizeRightEdge = null;
+
+  ipcMain.on('companion:resize-start', () => {
+    if (!overlayWin) return;
+    const [w, ] = overlayWin.getSize();
+    const [x, ] = overlayWin.getPosition();
+    resizeRightEdge = x + w;
+  });
+
   ipcMain.on('companion:set-width', (_, panelWidth) => {
     if (!overlayWin) return;
-    const { workAreaSize } = screen.getPrimaryDisplay();
+    // Lazy-init: if resize-start wasn't processed yet, capture now (first call, window hasn't moved)
+    if (resizeRightEdge === null) {
+      const [w] = overlayWin.getSize();
+      const [x] = overlayWin.getPosition();
+      resizeRightEdge = x + w;
+    }
     const winWidth = Math.round(Math.max(300, Math.min(620, panelWidth + 20)));
     const [, winHeight] = overlayWin.getSize();
     const [, currentY] = overlayWin.getPosition();
-    const newX = Math.round(Math.max(0, workAreaSize.width - winWidth - 20));
-    overlayWin.setSize(winWidth, winHeight);
-    overlayWin.setPosition(newX, currentY);
+    const newX = Math.max(0, resizeRightEdge - winWidth);
+    // setBounds is atomic — no frame where size and position are out of sync
+    overlayWin.setBounds({ x: newX, y: currentY, width: winWidth, height: winHeight });
+  });
+
+  ipcMain.on('companion:resize-end', () => {
+    resizeRightEdge = null;
   });
 
   // Bubble renderer toggles OS-level mouse passthrough based on hover position

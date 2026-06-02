@@ -51,7 +51,9 @@ declare global {
       showAfterCapture: () => void;
       captureScreenMain: () => Promise<string | null>;
       setSpeaking: (speaking: boolean, text?: string) => void;
+      resizeStart?: () => void;
       setCompanionWidth?: (width: number) => void;
+      resizeEnd?: () => void;
     };
     AndroidBridge?: {
       close: () => void;
@@ -344,6 +346,7 @@ export default function CompanionOverlayPage() {
         const parsed = parseInt(stored, 10);
         if (!isNaN(parsed) && parsed >= WIDTH_MIN && parsed <= WIDTH_MAX) {
           setPanelWidth(parsed);
+          window.electronAPI?.resizeStart?.();
           window.electronAPI?.setCompanionWidth?.(parsed);
         }
       }
@@ -359,18 +362,28 @@ export default function CompanionOverlayPage() {
       e.preventDefault();
       isResizingRef.current = true;
 
-      // Pointer capture keeps events flowing even when the mouse leaves the window bounds
       const handle = e.currentTarget as HTMLElement;
       handle.setPointerCapture(e.pointerId);
-
       document.body.style.userSelect = 'none';
 
+      const startScreenX = e.screenX;
+      const startWidth = panelWidth;
+      // Capture right edge in main process ONCE before any resize fires.
+      window.electronAPI?.resizeStart?.();
+
+      let finalWidth = startWidth;
+
       const onMove = (mv: PointerEvent) => {
-        if (!isResizingRef.current || !containerRef.current) return;
-        const rect = containerRef.current.getBoundingClientRect();
-        const newWidth = Math.round(Math.min(WIDTH_MAX, Math.max(WIDTH_MIN, rect.right - mv.clientX)));
-        setPanelWidth(newWidth);
-        window.electronAPI?.setCompanionWidth?.(newWidth);
+        if (!isResizingRef.current) return;
+        // Dragging left widens, dragging right narrows. screenX is absolute so
+        // it stays correct even if the BrowserWindow position shifts mid-drag.
+        finalWidth = Math.round(
+          Math.min(WIDTH_MAX, Math.max(WIDTH_MIN, startWidth - (mv.screenX - startScreenX)))
+        );
+        // Update CSS and IPC on every move frame so the window tracks the drag live.
+        // setBounds in main.js is atomic, so no mid-drag position drift.
+        setPanelWidth(finalWidth);
+        window.electronAPI?.setCompanionWidth?.(finalWidth);
       };
 
       const onUp = () => {
@@ -378,20 +391,19 @@ export default function CompanionOverlayPage() {
         document.body.style.userSelect = '';
         handle.removeEventListener('pointermove', onMove);
         handle.removeEventListener('pointerup', onUp);
-        setPanelWidth(prev => {
-          try {
-            localStorage.setItem(COMPANION_WIDTH_KEY, String(prev));
-          } catch {
-            // ignore storage errors
-          }
-          return prev;
-        });
+        // Reset the right-edge anchor in main process so next drag starts fresh.
+        window.electronAPI?.resizeEnd?.();
+        try {
+          localStorage.setItem(COMPANION_WIDTH_KEY, String(finalWidth));
+        } catch {
+          // ignore storage errors
+        }
       };
 
       handle.addEventListener('pointermove', onMove);
       handle.addEventListener('pointerup', onUp);
     },
-    [isAndroidBridge]
+    [isAndroidBridge, panelWidth]
   );
 
   // Restore messages from localStorage on mount (survives WebView recreation)
