@@ -283,11 +283,13 @@ app.whenReady().then(async () => {
 
   ipcMain.on('companion:set-width', (_, panelWidth) => {
     if (!overlayWin) return;
-    const { workAreaSize } = screen.getPrimaryDisplay();
     const winWidth = Math.round(Math.max(300, Math.min(620, panelWidth + 20)));
-    const [, winHeight] = overlayWin.getSize();
-    const [, currentY] = overlayWin.getPosition();
-    const newX = Math.round(Math.max(0, workAreaSize.width - winWidth - 20));
+    const [currentWidth, winHeight] = overlayWin.getSize();
+    const [currentX, currentY] = overlayWin.getPosition();
+    // Keep the right edge of the window fixed — only the left edge moves.
+    // Using workAreaSize would snap the window to the screen edge on every call.
+    const rightEdge = currentX + currentWidth;
+    const newX = Math.max(0, rightEdge - winWidth);
     overlayWin.setSize(winWidth, winHeight);
     overlayWin.setPosition(newX, currentY);
   });
