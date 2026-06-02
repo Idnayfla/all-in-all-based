@@ -284,10 +284,10 @@ app.whenReady().then(async () => {
   ipcMain.on('companion:set-width', (_, panelWidth) => {
     if (!overlayWin) return;
     const { workAreaSize } = screen.getPrimaryDisplay();
-    const winWidth = Math.max(300, Math.min(620, panelWidth + 20));
+    const winWidth = Math.round(Math.max(300, Math.min(620, panelWidth + 20)));
     const [, winHeight] = overlayWin.getSize();
     const [, currentY] = overlayWin.getPosition();
-    const newX = Math.max(0, workAreaSize.width - winWidth - 20);
+    const newX = Math.round(Math.max(0, workAreaSize.width - winWidth - 20));
     overlayWin.setSize(winWidth, winHeight);
     overlayWin.setPosition(newX, currentY);
   });

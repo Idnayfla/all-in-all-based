@@ -368,7 +368,7 @@ export default function CompanionOverlayPage() {
       const onMove = (mv: PointerEvent) => {
         if (!isResizingRef.current || !containerRef.current) return;
         const rect = containerRef.current.getBoundingClientRect();
-        const newWidth = Math.min(WIDTH_MAX, Math.max(WIDTH_MIN, rect.right - mv.clientX));
+        const newWidth = Math.round(Math.min(WIDTH_MAX, Math.max(WIDTH_MIN, rect.right - mv.clientX)));
         setPanelWidth(newWidth);
         window.electronAPI?.setCompanionWidth?.(newWidth);
       };
