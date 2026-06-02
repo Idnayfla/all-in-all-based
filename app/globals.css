@@ -8215,6 +8215,36 @@ body:has(.beta-banner) .app-root {
 }
 
 /* â”€â”€ Feedback â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.whats-new-header-btn {
+  position: relative;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  padding: 5px 10px;
+  border-radius: 6px;
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.whats-new-header-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.whats-new-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1.5px solid var(--bg);
+}
+
 .feedback-header-btn {
   background: transparent;
   border: 1px solid var(--border);
@@ -12245,7 +12275,8 @@ body:has(.beta-banner) .app-root {
 /* â”€â”€ Changelog page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .cl-root {
-  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
   background: #0d0d0d;
   color: var(--text);
   font-family: var(--font-mono);
