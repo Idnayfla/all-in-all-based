@@ -359,16 +359,22 @@ export default function CompanionOverlayPage() {
       e.preventDefault();
       isResizingRef.current = true;
 
-      // Pointer capture keeps events flowing even when the mouse leaves the window bounds
       const handle = e.currentTarget as HTMLElement;
       handle.setPointerCapture(e.pointerId);
-
       document.body.style.userSelect = 'none';
 
+      // Use screenX (absolute) so the formula stays correct even when the
+      // BrowserWindow itself moves during resize (clientX shifts as window moves,
+      // causing expansion to work but contraction to fight itself).
+      const startScreenX = e.screenX;
+      const startWidth = panelWidth;
+
       const onMove = (mv: PointerEvent) => {
-        if (!isResizingRef.current || !containerRef.current) return;
-        const rect = containerRef.current.getBoundingClientRect();
-        const newWidth = Math.round(Math.min(WIDTH_MAX, Math.max(WIDTH_MIN, rect.right - mv.clientX)));
+        if (!isResizingRef.current) return;
+        // Dragging left (negative delta) widens; dragging right (positive) narrows.
+        const newWidth = Math.round(
+          Math.min(WIDTH_MAX, Math.max(WIDTH_MIN, startWidth - (mv.screenX - startScreenX)))
+        );
         setPanelWidth(newWidth);
         window.electronAPI?.setCompanionWidth?.(newWidth);
       };
@@ -391,7 +397,7 @@ export default function CompanionOverlayPage() {
       handle.addEventListener('pointermove', onMove);
       handle.addEventListener('pointerup', onUp);
     },
-    [isAndroidBridge]
+    [isAndroidBridge, panelWidth]
   );
 
   // Restore messages from localStorage on mount (survives WebView recreation)
