@@ -13607,7 +13607,8 @@ body:has(.legal-page) {
 /* ── Vote / Feature Request Board ─────────────────────────────────────────── */
 
 .vt-root {
-  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
   background: var(--bg);
   color: var(--text1);
   font-family: var(--font-mono);
