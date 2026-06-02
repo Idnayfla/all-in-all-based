@@ -12464,7 +12464,10 @@ body:has(.beta-banner) .app-root {
 /* â”€â”€ Companion Overlay (Electron floating window) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .companion-overlay-root {
   position: fixed;
-  inset: 10px;
+  top: 10px;
+  right: 10px;
+  bottom: 10px;
+  width: 360px;
   display: flex;
   flex-direction: column;
   background: var(--bg2);
@@ -12474,6 +12477,13 @@ body:has(.beta-banner) .app-root {
   z-index: 99999;
   transform-origin: bottom right;
   animation: overlay-slide-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (max-width: 767px) {
+  .companion-overlay-root {
+    left: 10px;
+    width: auto !important;
+  }
 }
 
 .companion-resize-handle {

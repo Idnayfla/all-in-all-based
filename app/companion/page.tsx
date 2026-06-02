@@ -361,6 +361,8 @@ export default function CompanionOverlayPage() {
       const handle = e.currentTarget as HTMLElement;
       handle.setPointerCapture(e.pointerId);
 
+      document.body.style.userSelect = 'none';
+
       const onMove = (mv: PointerEvent) => {
         if (!isResizingRef.current || !containerRef.current) return;
         const rect = containerRef.current.getBoundingClientRect();
@@ -370,6 +372,7 @@ export default function CompanionOverlayPage() {
 
       const onUp = () => {
         isResizingRef.current = false;
+        document.body.style.userSelect = '';
         handle.removeEventListener('pointermove', onMove);
         handle.removeEventListener('pointerup', onUp);
         setPanelWidth(prev => {
