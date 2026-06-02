@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { supabaseAdmin } from '../../_auth';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Use placeholder when key is absent so module load doesn't throw in dev
+const resend = new Resend(process.env.RESEND_API_KEY ?? 'placeholder_not_configured');
 
 export async function POST(req: NextRequest) {
   try {
