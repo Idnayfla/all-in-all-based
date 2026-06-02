@@ -367,17 +367,21 @@ export default function CompanionOverlayPage() {
 
       const startScreenX = e.screenX;
       const startWidth = panelWidth;
-      // Tell main process to capture the current window right edge before any resize.
+      // Capture right edge in main process ONCE before any resize fires.
       window.electronAPI?.resizeStart?.();
+
+      let finalWidth = startWidth;
 
       const onMove = (mv: PointerEvent) => {
         if (!isResizingRef.current) return;
-        // Dragging left (negative delta) widens; dragging right (positive) narrows.
-        const newWidth = Math.round(
+        // Dragging left widens, dragging right narrows. screenX is absolute so
+        // it stays correct even if the BrowserWindow position shifts mid-drag.
+        finalWidth = Math.round(
           Math.min(WIDTH_MAX, Math.max(WIDTH_MIN, startWidth - (mv.screenX - startScreenX)))
         );
-        setPanelWidth(newWidth);
-        window.electronAPI?.setCompanionWidth?.(newWidth);
+        // CSS-only during drag — no IPC. Window resize fires once on pointerup
+        // so there are no async race conditions or mid-drag position drift.
+        setPanelWidth(finalWidth);
       };
 
       const onUp = () => {
@@ -385,14 +389,13 @@ export default function CompanionOverlayPage() {
         document.body.style.userSelect = '';
         handle.removeEventListener('pointermove', onMove);
         handle.removeEventListener('pointerup', onUp);
-        setPanelWidth(prev => {
-          try {
-            localStorage.setItem(COMPANION_WIDTH_KEY, String(prev));
-          } catch {
-            // ignore storage errors
-          }
-          return prev;
-        });
+        // Single IPC call at drag end — resize window to final width.
+        window.electronAPI?.setCompanionWidth?.(finalWidth);
+        try {
+          localStorage.setItem(COMPANION_WIDTH_KEY, String(finalWidth));
+        } catch {
+          // ignore storage errors
+        }
       };
 
       handle.addEventListener('pointermove', onMove);
