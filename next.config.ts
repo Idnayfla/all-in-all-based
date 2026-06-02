@@ -121,10 +121,6 @@ const nextConfig: NextConfig = {
     ];
   },
   turbopack: {
-    // Pin workspace root to the project directory to avoid Next.js picking up
-    // a package-lock.json higher in the file system (C:\Users\Hus Alfyandi)
-    // which causes it to infer the wrong root and miscompile some routes.
-    root: __dirname,
     resolveAlias: {
       'framer-motion': 'framer-motion/dist/cjs/index.js',
     },
@@ -143,10 +139,6 @@ export default withSentryConfig(nextConfig, {
   silent: true,
   widenClientFileUpload: true,
   sourcemaps: { disable: process.env.NODE_ENV !== 'production' },
-  webpack: {
-    // Replaces deprecated disableLogger option
-    treeshake: { removeDebugLogging: true },
-    // Replaces deprecated automaticVercelMonitors option
-    automaticVercelMonitors: false,
-  },
+  disableLogger: true,
+  automaticVercelMonitors: false,
 });
