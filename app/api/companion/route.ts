@@ -4,6 +4,7 @@ import { getUserId, supabaseAdmin } from '../_auth';
 import { getUserIdFromApiKey, ApiRateLimitError } from '../_apiKeyAuth';
 import { getWeather } from '@/lib/weather';
 import { getTrafficInfo } from '@/lib/traffic';
+import { exaSearch } from '@/lib/tavily';
 import { MODEL_SONNET, MODEL_HAIKU } from '@/lib/models';
 
 export const maxDuration = 60;
@@ -318,6 +319,15 @@ export async function POST(req: NextRequest) {
       lastUserText
     );
 
+  // Web search: triggers on halal/product/price/factual queries that need live data.
+  // Deliberately excludes weather and traffic (handled above) and pure conversational messages.
+  const needsWebSearch =
+    !needsWeather &&
+    !needsTraffic &&
+    /halal|haram|kosher|certified|muis|is .+ (available|open|closed|real|legit|safe)|where (can|do) i (buy|find|get)|current (price|rate|cost)|latest|today'?s? (price|rate)|who (is|are|was)|what (is|are|does)|when (did|does|is)/.test(
+      lastUserText
+    );
+
   if (needsWeather || needsTraffic) {
     const [weatherResult, trafficResult] = await Promise.allSettled([
       needsWeather ? getWeather('Singapore') : Promise.resolve(''),
@@ -327,6 +337,22 @@ export async function POST(req: NextRequest) {
     const trafficData = trafficResult.status === 'fulfilled' ? trafficResult.value : '';
     if (weatherData) liveDataContext += `\nLive weather (Singapore):\n${weatherData}`;
     if (trafficData) liveDataContext += `\n\nLive checkpoint / traffic data:\n${trafficData}`;
+  }
+
+  if (needsWebSearch) {
+    try {
+      const rawQuery = (messages[messages.length - 1]?.content as string) ?? '';
+      const searchResults = await exaSearch(rawQuery, 3);
+      if (searchResults) {
+        const trimmed =
+          searchResults.length > 1500
+            ? searchResults.slice(0, 1500) + '\n\n[truncated]'
+            : searchResults;
+        liveDataContext += `\n\nWeb search results for "${rawQuery}":\n${trimmed}`;
+      }
+    } catch {
+      // Silent fail — never block the companion response
+    }
   }
 
   // --- Build dynamic system prompt additions ---
