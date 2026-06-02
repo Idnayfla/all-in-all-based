@@ -22,6 +22,7 @@ type ChangeEntry = {
   label: string;
   title: string;
   sections: ChangeSection[];
+  requestedByCommunity?: boolean;
 };
 
 const ENTRIES: ChangeEntry[] = [
@@ -29,6 +30,7 @@ const ENTRIES: ChangeEntry[] = [
     date: '2026-06-02',
     label: 'v0.1.5',
     title: 'Resizable Companion',
+    requestedByCommunity: true,
     sections: [
       {
         kind: 'added',
@@ -58,6 +60,7 @@ const ENTRIES: ChangeEntry[] = [
     date: '2026-06-01',
     label: 'v0.1.4',
     title: 'Feature Request Board',
+    requestedByCommunity: true,
     sections: [
       {
         kind: 'added',
@@ -82,6 +85,7 @@ const ENTRIES: ChangeEntry[] = [
     date: '2026-06-01',
     label: 'v0.1.4',
     title: 'Based Knows You',
+    requestedByCommunity: true,
     sections: [
       {
         kind: 'added',
@@ -489,6 +493,14 @@ const ENTRIES: ChangeEntry[] = [
   },
 ];
 
+function CommunityTag() {
+  return (
+    <Link href="/vote" className="cl-community-tag" title="This feature was requested by the community">
+      ◈ You asked, we built it
+    </Link>
+  );
+}
+
 function SectionLabel({ kind }: { kind: ChangeSection['kind'] }) {
   const labels: Record<ChangeSection['kind'], string> = {
     added: 'Added',
@@ -533,6 +545,7 @@ export default function ChangelogPage() {
             <div className="cl-entry-meta">
               <span className="cl-entry-date">{entry.date}</span>
               <span className="cl-entry-label">[{entry.label}]</span>
+              {entry.requestedByCommunity && <CommunityTag />}
             </div>
             <h2 className="cl-entry-title">{entry.title}</h2>
             {entry.sections.map(section => (
