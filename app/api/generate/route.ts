@@ -769,7 +769,8 @@ KEY RULE: pasting data + asking a question = CHAT. Asking to BUILD something = C
 EXISTING PROJECT RULE (overrides chat detection):
 If the prompt ends with "Existing files: ..." — the user already has a project open. In this context:
 - Short feedback like "nice", "looks good", "cool" → [{"chat":true}] (pure reaction, nothing to do)
-- Anything else — "make it faster", "the button is broken", "add sound", "improve it", "what should I change?", "can you add X?" → treat as a code modification request, output a file plan
+- Pure questions that contain no action verb — any message starting with or containing "how much", "how many", "how do", "what is", "what are", "what's", "why", "explain", "compare", "which is better", "should I", "difference between", or ending with "?" and containing no instruction to build/add/change/fix/create — → [{"chat":true}] (user wants an answer, not a rebuild)
+- Anything else — "make it faster", "the button is broken", "add sound", "improve it", "can you add X?" → treat as a code modification request, output a file plan
 - Never tell the user to "drop a request" or act like nothing has been built
 
 FILE LIMITS: Every file must be completable in under 600 lines. Split only when a single file would exceed that.
