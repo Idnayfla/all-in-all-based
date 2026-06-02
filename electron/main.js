@@ -292,13 +292,23 @@ app.whenReady().then(async () => {
   });
 
   ipcMain.on('companion:set-width', (_, panelWidth) => {
-    if (!overlayWin || resizeRightEdge === null) return;
+    if (!overlayWin) return;
+    // Lazy-init: if resize-start wasn't processed yet, capture now (first call, window hasn't moved)
+    if (resizeRightEdge === null) {
+      const [w] = overlayWin.getSize();
+      const [x] = overlayWin.getPosition();
+      resizeRightEdge = x + w;
+    }
     const winWidth = Math.round(Math.max(300, Math.min(620, panelWidth + 20)));
     const [, winHeight] = overlayWin.getSize();
     const [, currentY] = overlayWin.getPosition();
     const newX = Math.max(0, resizeRightEdge - winWidth);
-    overlayWin.setSize(winWidth, winHeight);
-    overlayWin.setPosition(newX, currentY);
+    // setBounds is atomic — no frame where size and position are out of sync
+    overlayWin.setBounds({ x: newX, y: currentY, width: winWidth, height: winHeight });
+  });
+
+  ipcMain.on('companion:resize-end', () => {
+    resizeRightEdge = null;
   });
 
   // Bubble renderer toggles OS-level mouse passthrough based on hover position

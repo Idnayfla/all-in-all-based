@@ -53,6 +53,7 @@ declare global {
       setSpeaking: (speaking: boolean, text?: string) => void;
       resizeStart?: () => void;
       setCompanionWidth?: (width: number) => void;
+      resizeEnd?: () => void;
     };
     AndroidBridge?: {
       close: () => void;
@@ -379,9 +380,10 @@ export default function CompanionOverlayPage() {
         finalWidth = Math.round(
           Math.min(WIDTH_MAX, Math.max(WIDTH_MIN, startWidth - (mv.screenX - startScreenX)))
         );
-        // CSS-only during drag — no IPC. Window resize fires once on pointerup
-        // so there are no async race conditions or mid-drag position drift.
+        // Update CSS and IPC on every move frame so the window tracks the drag live.
+        // setBounds in main.js is atomic, so no mid-drag position drift.
         setPanelWidth(finalWidth);
+        window.electronAPI?.setCompanionWidth?.(finalWidth);
       };
 
       const onUp = () => {
@@ -389,8 +391,8 @@ export default function CompanionOverlayPage() {
         document.body.style.userSelect = '';
         handle.removeEventListener('pointermove', onMove);
         handle.removeEventListener('pointerup', onUp);
-        // Single IPC call at drag end — resize window to final width.
-        window.electronAPI?.setCompanionWidth?.(finalWidth);
+        // Reset the right-edge anchor in main process so next drag starts fresh.
+        window.electronAPI?.resizeEnd?.();
         try {
           localStorage.setItem(COMPANION_WIDTH_KEY, String(finalWidth));
         } catch {

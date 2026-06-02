@@ -12,4 +12,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setSpeaking: (speaking, text) => ipcRenderer.send('companion:speaking', speaking, text ?? ''),
   resizeStart: () => ipcRenderer.send('companion:resize-start'),
   setCompanionWidth: (width) => ipcRenderer.send('companion:set-width', width),
+  resizeEnd: () => ipcRenderer.send('companion:resize-end'),
 });
