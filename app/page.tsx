@@ -1265,6 +1265,15 @@ export default function Home() {
             </button>
             <GetAppButton className="companion-header-btn" />
             <a
+              href="/vote"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="whats-new-header-btn"
+              title="Vote on features"
+            >
+              ⬡ Vote
+            </a>
+            <a
               href="/changelog"
               target="_blank"
               rel="noopener noreferrer"

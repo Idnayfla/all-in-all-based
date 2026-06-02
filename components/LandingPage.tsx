@@ -159,6 +159,9 @@ export default function LandingPage({ onSignIn }: Props) {
           <a href="/changelog" className="landing-nav-link">
             What&apos;s New
           </a>
+          <a href="/vote" className="landing-nav-link">
+            Vote
+          </a>
           <a href="/roadmap" className="landing-nav-link">
             Roadmap
           </a>
