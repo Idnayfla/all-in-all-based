@@ -51,6 +51,7 @@ declare global {
       showAfterCapture: () => void;
       captureScreenMain: () => Promise<string | null>;
       setSpeaking: (speaking: boolean, text?: string) => void;
+      setCompanionWidth?: (width: number) => void;
     };
     AndroidBridge?: {
       close: () => void;
@@ -343,6 +344,7 @@ export default function CompanionOverlayPage() {
         const parsed = parseInt(stored, 10);
         if (!isNaN(parsed) && parsed >= WIDTH_MIN && parsed <= WIDTH_MAX) {
           setPanelWidth(parsed);
+          window.electronAPI?.setCompanionWidth?.(parsed);
         }
       }
     } catch {
@@ -368,6 +370,7 @@ export default function CompanionOverlayPage() {
         const rect = containerRef.current.getBoundingClientRect();
         const newWidth = Math.min(WIDTH_MAX, Math.max(WIDTH_MIN, rect.right - mv.clientX));
         setPanelWidth(newWidth);
+        window.electronAPI?.setCompanionWidth?.(newWidth);
       };
 
       const onUp = () => {

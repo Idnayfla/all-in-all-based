@@ -281,6 +281,17 @@ app.whenReady().then(async () => {
     bubbleWin?.webContents.send('companion-bubble:speaking', speaking, text ?? '');
   });
 
+  ipcMain.on('companion:set-width', (_, panelWidth) => {
+    if (!overlayWin) return;
+    const { workAreaSize } = screen.getPrimaryDisplay();
+    const winWidth = Math.max(300, Math.min(620, panelWidth + 20));
+    const [, winHeight] = overlayWin.getSize();
+    const [, currentY] = overlayWin.getPosition();
+    const newX = Math.max(0, workAreaSize.width - winWidth - 20);
+    overlayWin.setSize(winWidth, winHeight);
+    overlayWin.setPosition(newX, currentY);
+  });
+
   // Bubble renderer toggles OS-level mouse passthrough based on hover position
   ipcMain.on('bubble:ignore-mouse', (_, ignore) => {
     bubbleWin?.setIgnoreMouseEvents(ignore, { forward: true });
