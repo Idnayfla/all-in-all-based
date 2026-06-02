@@ -12398,6 +12398,24 @@ body:has(.beta-banner) .app-root {
   border-radius: var(--r-full);
 }
 
+.cl-community-tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent3);
+  background: color-mix(in srgb, var(--accent3) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent3) 22%, transparent);
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+.cl-community-tag:hover {
+  background: color-mix(in srgb, var(--accent3) 15%, transparent);
+  border-color: color-mix(in srgb, var(--accent3) 40%, transparent);
+}
+
 .cl-entry-title {
   font-size: var(--fs-xl);
   font-weight: 700;
