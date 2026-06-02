@@ -351,12 +351,17 @@ export default function CompanionOverlayPage() {
   }, []);
 
   const startResize = useCallback(
-    (e: React.MouseEvent) => {
-      if (isAndroidBridge || window.innerWidth < 768) return;
+    (e: React.PointerEvent) => {
+      // Skip on Android bridge; allow on Electron (narrow window) and desktop browsers
+      if (isAndroidBridge) return;
       e.preventDefault();
       isResizingRef.current = true;
 
-      const onMove = (mv: MouseEvent) => {
+      // Pointer capture keeps events flowing even when the mouse leaves the window bounds
+      const handle = e.currentTarget as HTMLElement;
+      handle.setPointerCapture(e.pointerId);
+
+      const onMove = (mv: PointerEvent) => {
         if (!isResizingRef.current || !containerRef.current) return;
         const rect = containerRef.current.getBoundingClientRect();
         const newWidth = Math.min(WIDTH_MAX, Math.max(WIDTH_MIN, rect.right - mv.clientX));
@@ -365,8 +370,8 @@ export default function CompanionOverlayPage() {
 
       const onUp = () => {
         isResizingRef.current = false;
-        document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup', onUp);
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
         setPanelWidth(prev => {
           try {
             localStorage.setItem(COMPANION_WIDTH_KEY, String(prev));
@@ -377,8 +382,8 @@ export default function CompanionOverlayPage() {
         });
       };
 
-      document.addEventListener('mousemove', onMove);
-      document.addEventListener('mouseup', onUp);
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
     },
     [isAndroidBridge]
   );
@@ -724,7 +729,10 @@ export default function CompanionOverlayPage() {
     });
   };
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  // Electron companion window is narrow (<768px) but still desktop — use electronAPI as the
+  // true desktop signal rather than innerWidth to avoid incorrectly treating it as mobile.
+  const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
+  const isMobile = typeof window !== 'undefined' && !isElectron && window.innerWidth < 768;
   const panelStyle =
     !isAndroidBridge && !isMobile ? ({ width: panelWidth } as React.CSSProperties) : undefined;
 
@@ -734,7 +742,11 @@ export default function CompanionOverlayPage() {
       className={`companion-overlay-root${isClosing ? ' companion-overlay--closing' : ''}`}
       style={panelStyle}
     >
-      <div className="companion-resize-handle" onMouseDown={startResize} />
+      <div
+        className="companion-resize-handle"
+        onPointerDown={startResize}
+        style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+      />
       <div className="companion-overlay-header">
         <img
           src="/brand-icon-loop.svg"
