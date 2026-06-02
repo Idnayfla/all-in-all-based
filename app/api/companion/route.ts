@@ -320,10 +320,10 @@ export async function POST(req: NextRequest) {
     );
 
   // Web search: triggers on halal/product/price/factual queries that need live data.
-  // Deliberately excludes weather and traffic (handled above) and pure conversational messages.
+  // Independent of weather/traffic — a single message can need all three (e.g. "is it
+  // raining and is that restaurant halal?"). Each live-data path appends to liveDataContext
+  // independently, so there is no conflict in running them together.
   const needsWebSearch =
-    !needsWeather &&
-    !needsTraffic &&
     /halal|haram|kosher|certified|muis|is .+ (available|open|closed|real|legit|safe)|where (can|do) i (buy|find|get)|current (price|rate|cost)|latest|today'?s? (price|rate)|who (is|are|was)|what (is|are|does)|when (did|does|is)/.test(
       lastUserText
     );
