@@ -330,9 +330,13 @@ export async function POST(req: NextRequest) {
 
   // Feature 3c â€” 14-day first-surface / ongoing pattern reference.
   // Evaluated FIRST so it can suppress the onboarding arc when both would fire
-  // simultaneously (OA6 fix: two "open with an observation" instructions conflict).
+  // simultaneously (OA6 fix: two “open with an observation” instructions conflict).
+  // Guard: only fire PATTERN SURFACE when memory is non-empty. If the user has
+  // 14+ days elapsed but no memory yet (never used companion before, or memory
+  // extraction hasn't run), the model has nothing to draw from and will hallucinate
+  // or break tone. Suppress until there is actual content to reference.
   let patternSurfaceActive = false;
-  if (daysSinceFirst >= 14) {
+  if (daysSinceFirst >= 14 && !!memory) {
     if (!patternsSurfaced) {
       patternSurfaceActive = true;
       dynamicInstructions.push(
@@ -397,8 +401,12 @@ export async function POST(req: NextRequest) {
   // Singapore is UTC+8.
   const utcHour = new Date().getUTCHours();
   const localHour = (utcHour + 8) % 24;
+  // Use UTC day on the SGT-shifted timestamp so we get the correct Singapore day,
+  // not the UTC day (which would be wrong for UTC 16:00–23:59 when SGT has already
+  // crossed midnight into the next day).
+  const sgtDate = new Date(Date.now() + 8 * 60 * 60 * 1000);
   const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][
-    new Date().getDay()
+    sgtDate.getUTCDay()
   ];
   if (
     isFirstMessageOfSession &&
