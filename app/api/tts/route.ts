@@ -1,7 +1,7 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const MAX_CACHEABLE_LEN = 200;
 const TTL_SECONDS = 3 * 24 * 60 * 60; // 3 days
@@ -40,7 +40,7 @@ async function cacheSet(
     await client.set(key, JSON.stringify(value), { EX: TTL_SECONDS });
     await client.disconnect();
   } catch {
-    // Non-fatal â€” cache miss is acceptable
+    // Non-fatal — cache miss is acceptable
   }
 }
 
@@ -50,8 +50,8 @@ interface WordTimestamp {
 }
 
 const VOICES: Record<string, string> = {
-  male: '2gpuOKD5shp7mKh4qkta', // Based â€” warm, unhurried, intimately direct (saved permanent voice 2026-05-30)
-  female: 'HuUeqrT8e2PWVP3RIv1T', // Based-D-Female-2 â€” warm, grounded female (ElevenLabs Voice Design, mid-20s neutral American female)
+  male: '2gpuOKD5shp7mKh4qkta', // Based — warm, unhurried, intimately direct (saved permanent voice 2026-05-30)
+  female: 'HuUeqrT8e2PWVP3RIv1T', // Based-D-Female-2 — warm, grounded female (ElevenLabs Voice Design, mid-20s neutral American female)
 };
 
 async function tryModal(
@@ -61,7 +61,7 @@ async function tryModal(
   if (!endpoint) return null;
   try {
     const abort = new AbortController();
-    const timer = setTimeout(() => abort.abort(), 35000); // 35s hard timeout — allows cold-start to complete
+    const timer = setTimeout(() => abort.abort(), 20000); // 20s hard timeout — leaves ~40s for ElevenLabs fallback within the 60s maxDuration
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
