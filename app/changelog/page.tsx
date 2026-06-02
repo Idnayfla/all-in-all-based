@@ -495,7 +495,11 @@ const ENTRIES: ChangeEntry[] = [
 
 function CommunityTag() {
   return (
-    <Link href="/vote" className="cl-community-tag" title="This feature was requested by the community">
+    <Link
+      href="/vote"
+      className="cl-community-tag"
+      title="This feature was requested by the community"
+    >
       ◈ You asked, we built it
     </Link>
   );

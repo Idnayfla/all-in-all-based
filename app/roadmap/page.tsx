@@ -86,7 +86,7 @@ const SHIPPED = [
   },
   {
     label: 'Based Voice',
-    desc: "Based reads its responses aloud in its own voice — self-hosted, no third-party API, no rate limits.",
+    desc: 'Based reads its responses aloud in its own voice — self-hosted, no third-party API, no rate limits.',
   },
   {
     label: 'Based Knows You',
@@ -109,7 +109,7 @@ const NEXT = [
   },
   {
     label: 'Pantheon SDK',
-    desc: 'npm package + docs site. Use Based\'s AI routing layer in your own projects.',
+    desc: "npm package + docs site. Use Based's AI routing layer in your own projects.",
   },
   {
     label: 'Custom Domain Publishing',
