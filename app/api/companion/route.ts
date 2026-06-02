@@ -297,8 +297,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // --- Async pattern extraction every 5th conversation ---
-  if (jwtUserId && isFirstMessageOfSession && sessionCount > 0 && sessionCount % 5 === 0) {
+  // --- Async pattern extraction after every 5th message in any conversation ---
+  // Previously fired at session start (messages.length === 1) which meant extraction
+  // always ran on a 1-item array — useless signal. Now fires mid-conversation once
+  // there are at least 5 messages, then every 5 messages after that, so the extractor
+  // always has real content to work with.
+  if (jwtUserId && !isFirstMessageOfSession && messages.length >= 5 && messages.length % 5 === 0) {
     extractPatternsAsync(jwtUserId, messages);
   }
 
