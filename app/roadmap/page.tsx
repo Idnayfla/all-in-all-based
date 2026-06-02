@@ -57,27 +57,16 @@ const SHIPPED = [
     desc: 'Full DAW in your browser — 12 instruments, drum sequencer, voice recording, effects rack.',
   },
   {
-    label: 'Windows Floating Companion',
-    desc: 'Always-on-top Electron overlay. Draggable bubble, screen capture, chat without switching windows.',
-  },
-  {
-    label: 'Feature Request Board',
-    desc: 'Live at /vote — submit requests and vote on what ships next. Highest votes go to the top of the queue.',
-  },
-];
-
-const NEXT = [
-  {
-    label: 'Music Studio — Phase 2',
-    desc: 'MIDI import, auto-tune, loop browser, mix-down export to MP3.',
-  },
-  {
     label: 'Image Studio',
-    desc: 'Canvas paint with layers, filters, and AI-assisted edits — all in one panel.',
+    desc: 'Canvas paint with layers, filters, AI generate, inpaint — 30-step undo, text tool, eyedropper.',
   },
   {
     label: '3D / Blueprint Studio',
     desc: 'Three.js scene builder. Describe a 3D scene or blueprint; Based renders it live.',
+  },
+  {
+    label: 'Personal Notes',
+    desc: 'Rich text, drawing canvas, tables, code blocks. Export as Markdown, HTML, or plain text.',
   },
   {
     label: 'Proactive Check-ins',
@@ -87,22 +76,56 @@ const NEXT = [
     label: 'Mobile PWA',
     desc: 'Add to home screen on iOS and Android. Feels native, no App Store required.',
   },
+  {
+    label: 'Windows Floating Companion',
+    desc: 'Always-on-top Electron overlay. Draggable bubble, screen capture, chat without switching windows. Resizable panel.',
+  },
+  {
+    label: 'Android Companion',
+    desc: 'Floating bubble on Android. Live screen capture, front camera, back camera photo, chat persists between sessions.',
+  },
+  {
+    label: 'Based Voice',
+    desc: "Based reads its responses aloud in its own voice — self-hosted, no third-party API, no rate limits.",
+  },
+  {
+    label: 'Based Knows You',
+    desc: 'Memory loaded every session. Pattern timeline. Onboarding arc. Emotional weather. Morning ritual. GPS memory anchors. Shareable read card.',
+  },
+  {
+    label: 'Feature Request Board',
+    desc: 'Live at /vote — submit requests and vote on what ships next. Highest votes go to the top of the queue.',
+  },
+];
+
+const NEXT = [
+  {
+    label: 'Android App — Play Store',
+    desc: 'Full Play Store listing. Based as a native Android app, not just a PWA.',
+  },
+  {
+    label: 'iOS App — App Store',
+    desc: 'Full App Store listing. Based on every iPhone.',
+  },
+  {
+    label: 'Pantheon SDK',
+    desc: 'npm package + docs site. Use Based\'s AI routing layer in your own projects.',
+  },
+  {
+    label: 'Custom Domain Publishing',
+    desc: 'Publish your generated app to your own URL in one click.',
+  },
 ];
 
 const VISION = [
-  { label: 'iOS + Android App', desc: 'Full native apps on the App Store and Play Store.' },
-  {
-    label: 'Cross-Device Handoff',
-    desc: 'Start on your phone, continue on your desktop. Seamless.',
-  },
   {
     label: 'Self-Hosted AI Model',
     desc: 'Faster responses, lower cost, zero external limits. Funded by Pro subscriptions.',
   },
   { label: 'Based for Teams', desc: 'Shared workspace, shared memory, org billing.' },
   {
-    label: 'Custom Domain Publishing',
-    desc: 'Publish your generated app to your own URL in one click.',
+    label: 'Pantheon — Self-Hosted',
+    desc: 'Run Pantheon on your own GPU. Zero API cost, pure margin. Unlocked at ~500 paying users.',
   },
 ];
 
@@ -162,7 +185,7 @@ export default function RoadmapPage() {
       </header>
 
       <section className="rm-hero">
-        <div className="rm-hero-badge">Public Roadmap · Updated May 2026</div>
+        <div className="rm-hero-badge">Public Roadmap · Updated June 2026</div>
         <h1 className="rm-headline">
           Built in public.
           <br />
@@ -191,11 +214,11 @@ export default function RoadmapPage() {
         </div>
         <div className="rm-stats-row">
           <div className="rm-stat">
-            <span className="rm-stat-num">17</span>
+            <span className="rm-stat-num">25</span>
             <span className="rm-stat-label">Features shipped</span>
           </div>
           <div className="rm-stat">
-            <span className="rm-stat-num">5</span>
+            <span className="rm-stat-num">4</span>
             <span className="rm-stat-label">Coming next</span>
           </div>
           <div className="rm-stat">
