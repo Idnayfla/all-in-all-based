@@ -45,7 +45,13 @@ dist-electron/
 
 # local voice test artifacts
 voice-test/
+voice-samples/
 test-results/
+tests/*.wav
+
+# Claude Code local config
+.claude/settings.local.json
+.claude/worktrees/
 council-report*.html
 council-transcript*.md
 .gstack/
