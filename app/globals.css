@@ -13801,6 +13801,65 @@ body:has(.legal-page) {
   color: var(--accent-hover);
 }
 
+/* Filter tabs + sort toggle */
+.vt-filters {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.vt-filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text3);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.vt-filter-tab:hover {
+  color: var(--text1);
+}
+.vt-filter-tab--active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.vt-filter-count {
+  font-size: 10px;
+  opacity: 0.6;
+}
+.vt-sort-toggle {
+  display: inline-flex;
+  margin-left: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  overflow: hidden;
+}
+.vt-sort-btn {
+  background: none;
+  border: none;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text3);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.vt-sort-btn--active {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+}
+
 .vt-loading {
   display: flex;
   align-items: center;
@@ -13851,6 +13910,20 @@ body:has(.legal-page) {
   border-color: color-mix(in srgb, var(--accent) 50%, transparent);
   background: color-mix(in srgb, var(--accent) 4%, var(--surface));
 }
+.vt-card--done {
+  opacity: 0.65;
+  border-color: color-mix(in srgb, var(--accent3) 25%, transparent);
+  transition:
+    opacity 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+.vt-card--done:hover {
+  opacity: 1;
+}
+.vt-card--done.vt-card--voted {
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
+}
 
 .vt-card-body {
   flex: 1;
@@ -13866,6 +13939,12 @@ body:has(.legal-page) {
   align-items: center;
   gap: 8px;
   margin-bottom: 2px;
+}
+.vt-shipped-tag {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  color: var(--accent3);
+  letter-spacing: 0.3px;
 }
 
 .vt-card-title {
