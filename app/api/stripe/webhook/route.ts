@@ -166,6 +166,24 @@ export async function POST(req: NextRequest) {
         break;
       }
 
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerId =
+          typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
+        if (!customerId) break;
+        const userId = await getUidByCustomer(customerId);
+        if (!userId) break;
+        await supabaseAdmin.from('user_settings').upsert(
+          {
+            user_id: userId,
+            subscription_tier: 'pro',
+            subscription_status: 'active',
+          },
+          { onConflict: 'user_id' }
+        );
+        break;
+      }
+
       case 'invoice.payment_failed': {
         const invoice = event.data.object as Stripe.Invoice;
         const customerId =

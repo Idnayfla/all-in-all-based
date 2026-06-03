@@ -16,6 +16,7 @@ const REASON_MSG: Record<string, string> = {
   generations: "You've used all 10 free generations this month.",
   projects: 'Free accounts are limited to 3 projects.',
   upgrade: 'Unlock everything Based has to offer.',
+  companion: 'Unlock the full companion experience with Pro.',
 };
 
 const PRO_FEATURES = [

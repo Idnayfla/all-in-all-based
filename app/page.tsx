@@ -191,11 +191,12 @@ export default function Home() {
     periodEnd: null,
   });
   const [showPricing, setShowPricing] = useState(false);
-  const [pricingReason, setPricingReason] = useState<'generations' | 'projects' | 'upgrade'>(
-    'upgrade'
-  );
+  const [pricingReason, setPricingReason] = useState<
+    'generations' | 'projects' | 'upgrade' | 'companion'
+  >('upgrade');
   const [showFeedback, setShowFeedback] = useState(false);
   const [hasNewChangelog, setHasNewChangelog] = useState(false);
+  const [showProWelcome, setShowProWelcome] = useState(false);
   const [syncingSubscription, setSyncingSubscription] = useState(false);
   const [syncLabel, setSyncLabel] = useState<'idle' | 'syncing' | 'synced' | 'failed'>('idle');
   const [checkin, setCheckin] = useState<{
@@ -392,6 +393,8 @@ export default function Home() {
       });
       window.history.replaceState({}, '', window.location.pathname);
       setSubscription(s => ({ ...s, tier: 'pro' }));
+      setShowProWelcome(true);
+      setTimeout(() => setShowProWelcome(false), 4000);
     }
   }, []);
 
@@ -1296,15 +1299,28 @@ export default function Home() {
             >
               ⬡ Feedback
             </button>
-            <a
-              href="https://ko-fi.com/basedfund"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="donate-header-btn"
-              title="Support Based on Ko-fi"
-            >
-              ◈ Support
-            </a>
+            {subscription.tier === 'free' ? (
+              <button
+                className="header-upgrade-btn"
+                onClick={() => {
+                  setPricingReason('upgrade');
+                  setShowPricing(true);
+                }}
+                title="Upgrade to Pro"
+              >
+                ⬡ Go Pro
+              </button>
+            ) : (
+              <a
+                href="https://ko-fi.com/basedfund"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="donate-header-btn"
+                title="Support Based on Ko-fi"
+              >
+                ◈ Support
+              </a>
+            )}
             <button
               className={`icon-btn ${showSettings ? 'active' : ''}`}
               onClick={() => {
@@ -2250,6 +2266,20 @@ export default function Home() {
               return lines.join('\n');
             })()}
           />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showProWelcome && (
+          <motion.div
+            className="pro-welcome-toast"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            transition={{ duration: 0.2 }}
+          >
+            ⬡ You&apos;re Pro now. Build without limits.
+          </motion.div>
         )}
       </AnimatePresence>
 

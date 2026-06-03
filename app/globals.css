@@ -482,6 +482,27 @@ body {
   color: var(--danger);
   animation: pulse 1.5s ease-in-out infinite;
 }
+.header-upgrade-btn {
+  padding: 5px 12px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  color: var(--bg);
+  cursor: pointer;
+  border-radius: var(--r-full);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.header-upgrade-btn:hover {
+  opacity: 0.88;
+  transform: translateY(-1px);
+}
+
 .donate-header-btn {
   padding: 5px 12px;
   background: linear-gradient(135deg, rgba(139, 118, 255, 0.12), rgba(94, 245, 192, 0.08));
@@ -5087,6 +5108,26 @@ body {
 .memory-manage-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* Pro upgrade welcome toast */
+.pro-welcome-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 400;
+  background: var(--accent);
+  color: var(--bg2);
+  font-size: 13px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: var(--r-lg);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  pointer-events: none;
+  border: 1px solid var(--border);
 }
 
 /* Project creation error toast */
@@ -12409,7 +12450,9 @@ body:has(.beta-banner) .app-root {
   padding: 2px 8px;
   border-radius: var(--r-full);
   text-decoration: none;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 .cl-community-tag:hover {
   background: color-mix(in srgb, var(--accent3) 15%, transparent);
