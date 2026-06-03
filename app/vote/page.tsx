@@ -49,6 +49,11 @@ export default function VotePage() {
   const [submitted, setSubmitted] = useState(false);
 
   const formRef = useRef<HTMLDivElement>(null);
+  // Always-current sort ref so async vote callbacks don't close over stale sort state
+  const sortRef = useRef(sort);
+  useEffect(() => {
+    sortRef.current = sort;
+  }, [sort]);
 
   // Derived: filter + sort — source of truth stays in `requests`
   const displayed = useMemo(() => {
@@ -111,14 +116,16 @@ export default function VotePage() {
       .finally(() => setLoading(false));
   }, [authReady, authToken]);
 
-  // Extracted revert helper — flips back the optimistic update on vote failure
+  // Extracted revert helper — uses sortRef so it never closes over stale sort state
   function revertVote(prev: FeatureRequest[], id: string): FeatureRequest[] {
     const reverted = prev.map(r => {
       if (r.id !== id) return r;
       const wasVoted = !r.voted; // r.voted is already optimistically flipped
       return { ...r, voted: wasVoted, vote_count: r.vote_count + (wasVoted ? 1 : -1) };
     });
-    return sort === 'votes' ? reverted.sort((a, b) => b.vote_count - a.vote_count) : reverted;
+    return sortRef.current === 'votes'
+      ? reverted.sort((a, b) => b.vote_count - a.vote_count)
+      : reverted;
   }
 
   async function handleVote(id: string) {
@@ -126,14 +133,16 @@ export default function VotePage() {
     if (votingId) return;
     setVotingId(id);
 
-    // Optimistic update
+    // Optimistic update — use sortRef for stable sort regardless of when this fires
     setRequests(prev => {
       const updated = prev.map(r => {
         if (r.id !== id) return r;
         const nowVoted = !r.voted;
         return { ...r, voted: nowVoted, vote_count: r.vote_count + (nowVoted ? 1 : -1) };
       });
-      return sort === 'votes' ? updated.sort((a, b) => b.vote_count - a.vote_count) : updated;
+      return sortRef.current === 'votes'
+        ? updated.sort((a, b) => b.vote_count - a.vote_count)
+        : updated;
     });
 
     try {
@@ -147,7 +156,9 @@ export default function VotePage() {
           const updated = prev.map(r =>
             r.id === id ? { ...r, voted: json.voted, vote_count: json.vote_count } : r
           );
-          return sort === 'votes' ? updated.sort((a, b) => b.vote_count - a.vote_count) : updated;
+          return sortRef.current === 'votes'
+            ? updated.sort((a, b) => b.vote_count - a.vote_count)
+            : updated;
         });
       } else {
         setRequests(prev => revertVote(prev, id));
@@ -185,6 +196,7 @@ export default function VotePage() {
       }
       const newRequest = (await res.json()) as FeatureRequest;
       setRequests(prev => [newRequest, ...prev]);
+      setFilter('all'); // ensure new 'open' card is visible regardless of active filter
       // Auto-vote for the new request — creator always wants their own idea
       handleVote(newRequest.id);
       setTitle('');

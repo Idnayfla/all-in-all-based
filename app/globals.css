@@ -13915,10 +13915,14 @@ body:has(.legal-page) {
   border-color: color-mix(in srgb, var(--accent3) 25%, transparent);
   transition:
     opacity 0.15s,
-    border-color 0.15s;
+    border-color 0.15s,
+    background 0.15s;
 }
 .vt-card--done:hover {
   opacity: 1;
+}
+.vt-card--done.vt-card--voted {
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
 .vt-card-body {
