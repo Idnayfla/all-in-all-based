@@ -13,6 +13,7 @@ Go to the `feature_requests` table. Find the row. Set `status` → `done`.
 
 **Step 2 — `app/changelog/page.tsx`**
 Add `voteRequestId` to the new changelog entry:
+
 ```ts
 {
   date: '2026-06-10',
@@ -26,17 +27,24 @@ Add `voteRequestId` to the new changelog entry:
 
 **Step 3 — `lib/changelog-map.ts`**
 Add the same UUID to the map:
+
 ```ts
 export const CHANGELOG_MAP = {
   'paste-supabase-uuid-here': {
     label: 'v0.1.6',
     title: 'Your Feature Name',
     anchor: 'v0-1-6-your-feature-name', // label dots→dashes + title spaces→dashes, lowercase
+    date: '2026-06-10', // ship date — used to calculate "Built in X days" on share card
   },
 };
 ```
 
-**Result:** `◈ You asked, we built it` on the changelog links to the exact vote card. The done vote card shows `→ v0.1.6 · Your Feature Name` linking back to changelog.
+**Result:**
+
+- `◈ You asked, we built it` on the changelog links to the exact vote card
+- The done vote card shows `→ v0.1.6 · Your Feature Name` linking back to changelog
+- A shareable card lives at `getbased.dev/shipped/{uuid}` — the voter can share this link on social media
+- The `◈ Share` button appears on the done vote card automatically
 
 ---
 
@@ -70,10 +78,10 @@ If it fails, tell Claude what broke and it will fix it.
 
 Claude Code auto-switches based on task complexity. You can also force it:
 
-| Command | Model | Use when |
-|---|---|---|
-| `/build` | Opus 4.8 | New features, hard bugs, complex changes |
-| `/fix` | Sonnet 4.6 | CSS tweaks, small fixes, docs |
+| Command  | Model      | Use when                                 |
+| -------- | ---------- | ---------------------------------------- |
+| `/build` | Opus 4.8   | New features, hard bugs, complex changes |
+| `/fix`   | Sonnet 4.6 | CSS tweaks, small fixes, docs            |
 
 Claude will auto-invoke the right model — you only need these if you want to override.
 
@@ -107,6 +115,7 @@ vercel env pull   # requires Vercel CLI: npm i -g vercel
 ```
 
 Key env vars:
+
 - `ANTHROPIC_API_KEY` — Anthropic API
 - `NEXT_PUBLIC_SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` — Supabase
 - `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` — Stripe
@@ -120,6 +129,7 @@ Key env vars:
 Webhook endpoint: `POST /api/stripe/webhook`
 
 Handled events:
+
 - `checkout.session.completed` — new subscription, sets user to Pro
 - `customer.subscription.updated` — plan change or renewal metadata
 - `invoice.payment_succeeded` — renewal, re-confirms Pro status
@@ -165,14 +175,14 @@ Then merge to main and deploy.
 
 ## 10. Key URLs
 
-| What | URL |
-|---|---|
-| Production app | https://getbased.dev |
-| Changelog | https://getbased.dev/changelog |
-| Vote board | https://getbased.dev/vote |
-| Roadmap | https://getbased.dev/roadmap |
-| Companion | https://getbased.dev/companion |
+| What               | URL                            |
+| ------------------ | ------------------------------ |
+| Production app     | https://getbased.dev           |
+| Changelog          | https://getbased.dev/changelog |
+| Vote board         | https://getbased.dev/vote      |
+| Roadmap            | https://getbased.dev/roadmap   |
+| Companion          | https://getbased.dev/companion |
 | Supabase dashboard | https://supabase.com/dashboard |
-| Stripe dashboard | https://dashboard.stripe.com |
-| Vercel dashboard | https://vercel.com/dashboard |
-| Ko-fi | https://ko-fi.com/basedfund |
+| Stripe dashboard   | https://dashboard.stripe.com   |
+| Vercel dashboard   | https://vercel.com/dashboard   |
+| Ko-fi              | https://ko-fi.com/basedfund    |

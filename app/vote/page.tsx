@@ -345,6 +345,17 @@ export default function VotePage() {
                       <span className="vt-vote-hint">Sign in to vote</span>
                     </div>
                   )}
+                  {req.status === 'done' && (
+                    <a
+                      href={`/shipped/${req.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="vt-card-share"
+                      title="Share this shipped feature"
+                    >
+                      ◈ Share
+                    </a>
+                  )}
                 </div>
               </div>
             ))}

@@ -2,6 +2,7 @@ export type ChangelogRef = {
   label: string; // e.g. 'v0.1.5'
   title: string; // e.g. 'Resizable Companion'
   anchor: string; // article id on /changelog — `${label.replace(/\./g,'-')}-${title.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'')}` e.g. 'v0-1-5-resizable-companion'
+  date?: string; // YYYY-MM-DD ship date — used to calculate "Built in X days" on shareable card
 };
 
 /**
