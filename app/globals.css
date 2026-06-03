@@ -3245,12 +3245,14 @@ body {
   margin-bottom: 0;
 }
 .message-content strong {
-  color: var(--text);
+  color: var(--accent);
   font-weight: 700;
+  font-family: var(--font-mono);
 }
 .message-content em {
   color: var(--text2);
   font-style: italic;
+  font-family: var(--font-mono);
 }
 .message-content code {
   background: var(--bg);

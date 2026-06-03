@@ -3,7 +3,7 @@ import { useRef, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Message, FileNode, ContentBlock } from '@/app/page';
-import ReactMarkdown from 'react-markdown';
+import SimpleMarkdown from './SimpleMarkdown';
 import ImageEditorModal from './ImageEditorModal';
 import ImageCropModal from './ImageCropModal';
 import ModeDropdown, { GenerationMode } from './ModeDropdown';
@@ -1076,7 +1076,7 @@ export default function ChatPanel({
   };
 
   function renderContent(content: string | ContentBlock[], msgIdx = 0) {
-    if (typeof content === 'string') return <ReactMarkdown>{content}</ReactMarkdown>;
+    if (typeof content === 'string') return <SimpleMarkdown>{content}</SimpleMarkdown>;
     return (
       <>
         {content.map((block, i) => {
@@ -1226,7 +1226,7 @@ export default function ChatPanel({
             );
           }
           if (block.type === 'text') {
-            return <ReactMarkdown key={i}>{block.text}</ReactMarkdown>;
+            return <SimpleMarkdown key={i}>{block.text}</SimpleMarkdown>;
           }
           return null;
         })}
