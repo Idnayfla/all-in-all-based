@@ -154,7 +154,7 @@ const ENTRIES: ChangeEntry[] = [
   },
   {
     date: '2026-06-01',
-    label: 'v0.1.4',
+    label: 'v0.1.6',
     title: 'Android Companion',
     sections: [
       {

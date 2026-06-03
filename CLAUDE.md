@@ -107,13 +107,18 @@ CI runs automatically on every push to `dev` and `main` via `.github/workflows/c
 
 ## Model Guide
 
-| Task                                 | Model  |
-| ------------------------------------ | ------ |
-| Questions, explanations              | sonnet |
-| CSS / styling tweaks                 | sonnet |
-| Small fixes (1-2 files, clear bug)   | sonnet |
-| Discussing approach / planning       | sonnet |
-| New feature from scratch             | opus   |
-| Complex multi-file changes           | opus   |
-| Hard bug you've been stuck on        | opus   |
-| Changes to `generate/route.ts` logic | opus   |
+Default model is **Sonnet** (fast, cost-efficient). Automatically switch to **Opus 4.8** for quality-critical tasks using the `Skill` tool — no user action needed.
+
+- Auto-switch to Opus: invoke `Skill("build")` at the start of the task
+- Return to Sonnet: invoke `Skill("fix")` at the start of the task
+
+| Task                                 | Model                           |
+| ------------------------------------ | ------------------------------- |
+| Questions, explanations              | sonnet                          |
+| CSS / styling tweaks                 | sonnet                          |
+| Small fixes (1-2 files, clear bug)   | sonnet                          |
+| Discussing approach / planning       | sonnet                          |
+| New feature from scratch             | **auto-invoke** `/build` (Opus) |
+| Complex multi-file changes           | **auto-invoke** `/build` (Opus) |
+| Hard bug you've been stuck on        | **auto-invoke** `/build` (Opus) |
+| Changes to `generate/route.ts` logic | **auto-invoke** `/build` (Opus) |
