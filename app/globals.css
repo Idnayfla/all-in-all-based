@@ -13324,6 +13324,16 @@ body:has(.legal-page) {
   font-size: 13px;
 }
 
+.pricing-founder-note {
+  font-size: var(--fs-sm);
+  color: var(--text2);
+  text-align: center;
+  margin: 0 0 12px;
+  line-height: 1.5;
+  font-style: italic;
+  opacity: 0.8;
+}
+
 /* pricing-legal consent line */
 .pricing-legal {
   font-size: var(--fs-sm);
