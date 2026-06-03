@@ -13,23 +13,19 @@ interface PricingModalProps {
 }
 
 const REASON_MSG: Record<string, string> = {
-  generations: "You've used all 10 free generations this month.",
-  projects: 'Free accounts are limited to 3 projects.',
-  upgrade: 'Unlock everything Based has to offer.',
-  companion: 'Unlock the full companion experience with Pro.',
+  generations: "You've used all 10 free builds this month. Keep going with Pro.",
+  projects: "You've got 3 projects — Pro removes the cap entirely.",
+  upgrade: 'One subscription. Unlimited everything.',
+  companion: 'The full companion experience is a Pro feature.',
 };
 
 const PRO_FEATURES = [
-  'Unlimited builds — no monthly cap, no anxiety',
+  'Unlimited builds — no cap, no anxiety',
+  'Based AI — Claude Sonnet, not free-tier Llama',
+  'AI memory — remembers your style, projects, and context',
+  'All creative tools — images, video, and music generation',
   'Unlimited projects — save everything, lose nothing',
-  'Based AI — Claude Sonnet, not free-tier Groq',
-  'Priority speed — seconds, not minutes',
-  'All media generation — images, video, and music',
-  'Voice activation — talk to Based, it listens',
   'Windows companion — floating AI on your desktop',
-  'AI memory — remembers your style across every session',
-  'Gallery + sharing — publish builds, remix the community',
-  'You make this possible — every subscription funds the next feature',
 ];
 
 const FREE_LIMITS = [
@@ -153,6 +149,10 @@ export default function PricingModal({
           <span className="pricing-payment-badge">+ more</span>
         </div>
 
+        <p className="pricing-founder-note">
+          Made by one person in Singapore. Your $12/mo directly funds the next feature.
+        </p>
+
         <p className="pricing-legal">
           By upgrading you agree to our{' '}
           <a href="/terms" target="_blank" rel="noopener noreferrer" className="pricing-legal-link">
@@ -180,11 +180,11 @@ export default function PricingModal({
         </p>
 
         <button className="pricing-upgrade-btn" onClick={upgrade} disabled={loading}>
-          {loading ? 'Redirecting to Stripe...' : 'Upgrade to Pro — $12/month  ·  was $20'}
+          {loading ? 'Redirecting to Stripe...' : 'Keep building — $12/month  ·  was $20'}
         </button>
         {onSwitchToFreeAI && (
           <button className="pricing-free-ai-btn" onClick={onSwitchToFreeAI}>
-            Or use Free AI — Llama 3.3 70B, unlimited, unrestricted →
+            Not ready? Use Llama 3.3 instead — slower, no memory, no Claude
           </button>
         )}
         <p className="pricing-note">Cancel anytime. Powered by Stripe.</p>

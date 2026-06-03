@@ -395,7 +395,6 @@ export default function Home() {
       window.history.replaceState({}, '', window.location.pathname);
       setSubscription(s => ({ ...s, tier: 'pro' }));
       setShowProWelcome(true);
-      setTimeout(() => setShowProWelcome(false), 4000);
     }
   }, []);
 
@@ -2297,13 +2296,49 @@ export default function Home() {
       <AnimatePresence>
         {showProWelcome && (
           <motion.div
-            className="pro-welcome-toast"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 12 }}
-            transition={{ duration: 0.2 }}
+            className="pro-welcome-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={e => {
+              if (e.target === e.currentTarget) setShowProWelcome(false);
+            }}
           >
-            ⬡ You&apos;re Pro now. Build without limits.
+            <motion.div
+              className="pro-welcome-card"
+              initial={{ scale: 0.92, opacity: 0, y: 24 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.92, opacity: 0, y: 24 }}
+              transition={{ type: 'spring', stiffness: 340, damping: 28 }}
+            >
+              <button className="pro-welcome-close" onClick={() => setShowProWelcome(false)}>
+                ✕
+              </button>
+              <div className="pro-welcome-logo">B&gt;</div>
+              <h2 className="pro-welcome-headline">You&apos;re Pro now.</h2>
+              <p className="pro-welcome-sub">No limits. No anxiety. Build whatever you want.</p>
+              <ul className="pro-welcome-list">
+                <li>
+                  <span>◈</span> Unlimited builds — generate as much as you like
+                </li>
+                <li>
+                  <span>⬡</span> Based AI — Claude Sonnet, not free-tier Llama
+                </li>
+                <li>
+                  <span>◉</span> AI memory — remembers your style across every session
+                </li>
+                <li>
+                  <span>⊙</span> All creative tools — images, video, and music
+                </li>
+              </ul>
+              <p className="pro-welcome-founder">
+                You&apos;re supporting a one-person team in Singapore. This directly funds the next
+                feature. Thank you.
+              </p>
+              <button className="pro-welcome-btn" onClick={() => setShowProWelcome(false)}>
+                Start building →
+              </button>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
