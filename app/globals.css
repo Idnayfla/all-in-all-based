@@ -210,8 +210,9 @@ body {
   border-radius: var(--r-full);
   font-size: 9px;
   color: var(--text3);
-  letter-spacing: 0.8px;
-  font-family: var(--font-mono);
+  letter-spacing: 1.5px;
+  font-family: var(--font-pixel);
+  text-transform: uppercase;
 }
 .early-access-note {
   margin-top: 10px;
@@ -882,16 +883,17 @@ body {
   object-fit: contain;
 }
 .chat-empty-title {
-  font-family: var(--font-pixel);
+  font-family: var(--font-brand);
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 3px;
   color: var(--text);
 }
 .chat-empty-sub {
-  font-size: 14px;
+  font-size: var(--fs-lg);
   font-family: var(--font-pixel);
-  color: var(--text3);
+  font-weight: 500;
+  color: var(--text2);
   text-align: center;
   max-width: 280px;
   line-height: 1.7;
