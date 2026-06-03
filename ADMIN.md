@@ -8,8 +8,23 @@ Operational reference for founder tasks. Not for code — for things you do once
 
 When a feature from the vote board gets built and deployed:
 
-**Step 1 — Supabase**
-Go to the `feature_requests` table. Find the row. Set `status` → `done`.
+**Step 1 — Call the ship API** (marks done + sends emails to all voters in one call)
+
+```bash
+curl -X POST https://getbased.dev/api/admin/ship-feature \
+  -H "Content-Type: application/json" \
+  -H "x-admin-secret: YOUR_ADMIN_SECRET" \
+  -d '{
+    "requestId": "paste-supabase-uuid-here",
+    "changelogLabel": "v0.1.6",
+    "changelogTitle": "Your Feature Name",
+    "changelogAnchor": "v0-1-6-your-feature-name"
+  }'
+```
+
+Response: `{ shipped: true, votersFound: 12, emailsSent: 12 }`
+
+Safe to retry — already-notified voters are skipped automatically.
 
 **Step 2 — `app/changelog/page.tsx`**
 Add `voteRequestId` to the new changelog entry:
@@ -34,17 +49,23 @@ export const CHANGELOG_MAP = {
     label: 'v0.1.6',
     title: 'Your Feature Name',
     anchor: 'v0-1-6-your-feature-name', // label dots→dashes + title spaces→dashes, lowercase
-    date: '2026-06-10', // ship date — used to calculate "Built in X days" on share card
+    date: '2026-06-10', // ship date — used for "Built in X days"
   },
 };
 ```
 
-**Result:**
+Then merge to main and deploy.
 
-- `◈ You asked, we built it` on the changelog links to the exact vote card
-- The done vote card shows `→ v0.1.6 · Your Feature Name` linking back to changelog
-- A shareable card lives at `getbased.dev/shipped/{uuid}` — the voter can share this link on social media
-- The `◈ Share` button appears on the done vote card automatically
+**What voters receive:**
+
+- Email: "◈ Your request was built — [title]" with link to the shareable card
+- `◈ You asked, we built it` on changelog links to their vote card
+- Done vote card shows `→ v0.1.6 · Your Feature Name` and `◈ Share` button
+
+**Prerequisites (one-time setup):**
+
+- `ADMIN_SECRET` env var set in Vercel dashboard
+- `feature_email_log` table created — run `supabase/migrations/20260603_feature_email_log.sql` in Supabase SQL editor
 
 ---
 
