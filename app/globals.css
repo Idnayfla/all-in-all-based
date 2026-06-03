@@ -14602,11 +14602,3 @@ body:has(.legal-page) {
 .gen-warning-upgrade:hover {
   opacity: 1;
 }
-
-/* ── Tips guide — sticky build-to-dismiss hint ──────────────────────────────── */
-.tips-build-hint {
-  font-size: 9px;
-  color: var(--text3);
-  font-family: var(--font-mono);
-  letter-spacing: 0.02em;
-}
