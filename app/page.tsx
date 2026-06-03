@@ -349,6 +349,7 @@ export default function Home() {
       const res = await fetch(`/api/gallery/remix/${remixShareId}`, { headers });
       if (!res.ok) return;
       const { projectName, files: remixFiles } = await res.json();
+      fetch(`/api/gallery/remix/${remixShareId}`, { method: 'POST', headers }).catch(() => {});
       const id = uuid();
       const project: Project = {
         id,
