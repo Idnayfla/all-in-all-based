@@ -47,6 +47,7 @@ function isRetryable(e: unknown): boolean {
 }
 
 const RETRY_DELAYS = [1500, 3000];
+// multiplies delay by 0.6–1.4x to spread concurrent retries
 const jittered = (ms: number) => ms * (0.6 + Math.random() * 0.8);
 
 async function callPantheon(
