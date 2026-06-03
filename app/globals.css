@@ -13947,6 +13947,31 @@ body:has(.legal-page) {
   letter-spacing: 0.3px;
 }
 
+.vt-card-changelog-link {
+  display: block;
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  color: var(--text3);
+  text-decoration: none;
+  margin-top: 8px;
+  transition: color 0.15s;
+}
+.vt-card-changelog-link:hover {
+  color: var(--accent3);
+  text-decoration: underline;
+}
+@keyframes highlight-card {
+  0% {
+    background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.vt-card:target {
+  animation: highlight-card 1.8s ease-out forwards;
+}
+
 .vt-card-title {
   font-size: var(--fs-sm);
   font-weight: 600;
@@ -13999,6 +14024,7 @@ body:has(.legal-page) {
 /* Vote button / display */
 .vt-card-side {
   display: flex;
+  flex-direction: column;
   align-items: stretch;
   border-left: 1px solid var(--border);
   flex-shrink: 0;
@@ -14289,6 +14315,174 @@ body:has(.legal-page) {
 
 .vt-footer-sep {
   color: var(--border);
+}
+
+/* Vote card share link (done cards) */
+.vt-card-share {
+  display: block;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text3);
+  text-decoration: none;
+  text-align: center;
+  margin-top: 6px;
+  transition: color 0.15s;
+}
+.vt-card-share:hover {
+  color: var(--accent3);
+}
+
+/* ── Shipped card page (/shipped/[requestId]) ── */
+.sp-root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text1);
+  font-family: var(--font-mono);
+}
+.sp-header {
+  display: flex;
+  align-items: center;
+  padding: 20px 32px;
+  border-bottom: 1px solid var(--border);
+}
+.sp-logo {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--accent);
+  text-decoration: none;
+}
+.sp-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 24px;
+  text-align: center;
+  max-width: 680px;
+  margin: 0 auto;
+  width: 100%;
+}
+.sp-badge {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent3);
+  margin-bottom: 24px;
+}
+.sp-title {
+  font-size: clamp(28px, 5vw, 44px);
+  font-weight: 600;
+  color: var(--text1);
+  line-height: 1.15;
+  margin: 0 0 28px;
+  font-family: var(--font-mono);
+}
+.sp-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: var(--fs-xs);
+  color: var(--text3);
+  margin-bottom: 48px;
+}
+.sp-meta-version {
+  color: var(--text3);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.sp-meta-version:hover {
+  color: var(--text1);
+  text-decoration: underline;
+}
+.sp-meta-sep {
+  color: var(--border);
+}
+.sp-meta-item {
+  color: var(--text3);
+}
+.sp-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.sp-btn {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+  transition:
+    opacity 0.15s,
+    color 0.15s;
+}
+.sp-btn--primary {
+  background: var(--accent3);
+  color: var(--bg);
+  padding: 10px 20px;
+  border-radius: var(--r-full);
+  letter-spacing: 0.03em;
+}
+.sp-btn--primary:hover {
+  opacity: 0.88;
+}
+.sp-btn--secondary {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text1);
+  padding: 10px 20px;
+  border-radius: var(--r-full);
+}
+.sp-btn--secondary:hover {
+  border-color: var(--text3);
+}
+.sp-btn--ghost {
+  background: none;
+  color: var(--text3);
+  padding: 10px 8px;
+}
+.sp-btn--ghost:hover {
+  color: var(--text1);
+  text-decoration: underline;
+}
+.sp-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  font-size: 12px;
+  color: var(--text3);
+}
+.sp-footer-link {
+  color: var(--text3);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+.sp-footer-link:hover {
+  color: var(--text1);
+}
+.sp-footer-sep {
+  color: var(--border);
+}
+@media (max-width: 600px) {
+  .sp-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  .sp-btn--primary,
+  .sp-btn--secondary {
+    width: 100%;
+    text-align: center;
+  }
 }
 
 @media (max-width: 600px) {

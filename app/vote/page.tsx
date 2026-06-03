@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { CHANGELOG_MAP } from '@/lib/changelog-map';
 
 type Status = 'open' | 'planned' | 'in_progress' | 'done';
 
@@ -306,6 +307,7 @@ export default function VotePage() {
             displayed.map(req => (
               <div
                 key={req.id}
+                id={`req-${req.id}`}
                 className={`vt-card${req.voted ? ' vt-card--voted' : ''}${req.status === 'done' ? ' vt-card--done' : ''}`}
               >
                 <div className="vt-card-body">
@@ -315,6 +317,14 @@ export default function VotePage() {
                   </div>
                   <div className="vt-card-title">{req.title}</div>
                   {req.description && <div className="vt-card-desc">{req.description}</div>}
+                  {req.status === 'done' && CHANGELOG_MAP[req.id] && (
+                    <a
+                      href={`/changelog#${CHANGELOG_MAP[req.id].anchor}`}
+                      className="vt-card-changelog-link"
+                    >
+                      → {CHANGELOG_MAP[req.id].label} · {CHANGELOG_MAP[req.id].title}
+                    </a>
+                  )}
                 </div>
                 <div className="vt-card-side">
                   {authToken ? (
@@ -334,6 +344,17 @@ export default function VotePage() {
                       <span className="vt-vote-count">{req.vote_count}</span>
                       <span className="vt-vote-hint">Sign in to vote</span>
                     </div>
+                  )}
+                  {req.status === 'done' && (
+                    <a
+                      href={`/shipped/${req.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="vt-card-share"
+                      title="Share this shipped feature"
+                    >
+                      ◈ Share
+                    </a>
                   )}
                 </div>
               </div>

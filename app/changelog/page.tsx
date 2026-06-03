@@ -23,6 +23,7 @@ type ChangeEntry = {
   title: string;
   sections: ChangeSection[];
   requestedByCommunity?: boolean;
+  voteRequestId?: string; // Supabase feature_request UUID — links CommunityTag to the exact vote card
 };
 
 const ENTRIES: ChangeEntry[] = [
@@ -153,7 +154,7 @@ const ENTRIES: ChangeEntry[] = [
   },
   {
     date: '2026-06-01',
-    label: 'v0.1.4',
+    label: 'v0.1.6',
     title: 'Android Companion',
     sections: [
       {
@@ -493,10 +494,11 @@ const ENTRIES: ChangeEntry[] = [
   },
 ];
 
-function CommunityTag() {
+function CommunityTag({ voteRequestId }: { voteRequestId?: string }) {
+  const href = voteRequestId ? `/vote#req-${voteRequestId}` : '/vote';
   return (
     <Link
-      href="/vote"
+      href={href}
       className="cl-community-tag"
       title="This feature was requested by the community"
     >
@@ -545,11 +547,18 @@ export default function ChangelogPage() {
 
       <div className="cl-feed">
         {ENTRIES.map(entry => (
-          <article key={`${entry.date}-${entry.title}`} className="cl-entry">
+          <article
+            key={`${entry.date}-${entry.title}`}
+            id={`${entry.label.replace(/\./g, '-')}-${entry.title
+              .toLowerCase()
+              .replace(/\s+/g, '-')
+              .replace(/[^a-z0-9-]/g, '')}`}
+            className="cl-entry"
+          >
             <div className="cl-entry-meta">
               <span className="cl-entry-date">{entry.date}</span>
               <span className="cl-entry-label">[{entry.label}]</span>
-              {entry.requestedByCommunity && <CommunityTag />}
+              {entry.requestedByCommunity && <CommunityTag voteRequestId={entry.voteRequestId} />}
             </div>
             <h2 className="cl-entry-title">{entry.title}</h2>
             {entry.sections.map(section => (
