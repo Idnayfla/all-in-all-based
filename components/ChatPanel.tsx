@@ -1234,8 +1234,24 @@ export default function ChatPanel({
     );
   }
 
+  const genLeft = 10 - Math.min(generationsUsed ?? 0, 10);
+
   return (
     <div className="chat-panel">
+      {subscriptionTier === 'free' &&
+        (generationsUsed ?? 0) >= 7 &&
+        (generationsUsed ?? 0) < 10 && (
+          <div className={`gen-warning-banner${genLeft <= 1 ? ' gen-warning-banner--danger' : ''}`}>
+            <span>
+              {genLeft} generation{genLeft === 1 ? '' : 's'} left this month
+            </span>
+            {onProRequired && (
+              <button className="gen-warning-upgrade" onClick={onProRequired}>
+                Go Pro →
+              </button>
+            )}
+          </div>
+        )}
       <div className="chat-messages">
         {messages.length === 0 ? (
           <div className="chat-empty">
