@@ -73,16 +73,20 @@ const BENTO = [
 ];
 
 const SHIPPED_RECENT = [
-  { icon: '⬡', label: 'Music Studio', desc: 'Full DAW — piano, drums, voice recording, effects' },
-  { icon: '▸', label: 'Video Editor', desc: 'Trim, text overlays, speed control, FFmpeg export' },
-  { icon: '◈', label: 'Music AI', desc: 'Generate original tracks from a description' },
-  { icon: '◉', label: 'Image Gen', desc: 'FLUX + Nano Banana — text-to-image and editing' },
-  { icon: '⊙', label: 'Game Engine', desc: 'Playable games built and rendered in the browser' },
+  { icon: '◈', label: 'Onboarding', desc: 'Gen counter, memory pitch, one-click quick-create' },
+  { icon: '⬡', label: 'Community Loop', desc: 'Vote on features, get notified when they ship' },
+  { icon: '◉', label: 'Gallery', desc: 'Public showcase — publish builds, remix the community' },
+  {
+    icon: '⊙',
+    label: 'Windows Companion',
+    desc: 'Floating AI overlay — always on top, always ready',
+  },
+  { icon: '▸', label: 'Music Studio', desc: 'Full DAW — piano, drums, voice recording, FX rack' },
 ];
 
 const COMING_NEXT = [
-  { label: 'Windows Companion', desc: 'Floating overlay that watches your screen — coming soon' },
-  { label: 'Mobile App', desc: 'iOS + Android, feels native' },
+  { label: 'Mobile App', desc: 'iOS + Android — native feel, companion on your phone' },
+  { label: 'Pantheon SDK', desc: "npm package — use Based's AI routing in your own apps" },
   { label: 'Team Workspaces', desc: 'Share projects, collaborate in real time' },
   { label: 'Based Model', desc: 'Our own fine-tuned model, trained on your builds' },
 ];
@@ -406,7 +410,7 @@ export default function LandingPage({ onSignIn }: Props) {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
         >
-          Simple pricing
+          Start free. Upgrade when you love it.
         </motion.div>
         <motion.div
           className="landing-pricing-tiers"
@@ -420,14 +424,14 @@ export default function LandingPage({ onSignIn }: Props) {
               $0<span>/mo</span>
             </div>
             <ul className="landing-tier-features">
-              <li>10 generations/month</li>
+              <li>10 builds/month</li>
               <li>3 projects</li>
               <li>Live preview</li>
-              <li>PNG &amp; Excel export</li>
-              <li>Per-project memory</li>
+              <li>Chat + code generation</li>
+              <li>Cloud sync</li>
             </ul>
             <button className="landing-tier-cta" onClick={() => onSignIn('signup')}>
-              Get Started
+              Start free →
             </button>
           </div>
           <div className="landing-tier landing-tier--pro">
@@ -439,24 +443,28 @@ export default function LandingPage({ onSignIn }: Props) {
             </div>
             <div className="pricing-founding-label">Founding member price</div>
             <ul className="landing-tier-features">
-              <li>Unlimited generations</li>
-              <li>Unlimited projects</li>
-              <li>Image generation — FLUX &amp; Nano Banana</li>
-              <li>Video generation — Seedance 2.0</li>
-              <li>Music generation — Stable Audio</li>
-              <li>AI Personality tuning</li>
-              <li>Incognito mode</li>
-              <li>Global AI memory across projects</li>
-              <li>Export — JPG, GIF, PDF, Word, PowerPoint</li>
+              <li>Unlimited builds — no cap, no anxiety</li>
+              <li>Based AI — Claude Sonnet, not free-tier Llama</li>
+              <li>AI memory — remembers your style forever</li>
+              <li>All creative tools — images, video, music</li>
+              <li>Unlimited projects + Windows companion</li>
             </ul>
             <button
               className="landing-tier-cta landing-tier-cta--pro"
               onClick={() => onSignIn('signup')}
             >
-              Upgrade to Pro
+              Keep building →
             </button>
           </div>
         </motion.div>
+        <motion.p
+          className="landing-pricing-founder"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.45 }}
+        >
+          Made by one person in Singapore. Every subscription directly funds the next feature.
+        </motion.p>
       </section>
 
       {/* ── Closing CTA ── */}
