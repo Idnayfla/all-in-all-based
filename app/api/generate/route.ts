@@ -47,6 +47,8 @@ function isRetryable(e: unknown): boolean {
 }
 
 const RETRY_DELAYS = [1500, 3000];
+// multiplies delay by 0.6–1.4x to spread concurrent retries
+const jittered = (ms: number) => ms * (0.6 + Math.random() * 0.8);
 
 async function callPantheon(
   messages: Array<{ role: string; content: string }>,
@@ -73,7 +75,7 @@ async function callPantheon(
       return data.text ?? '';
     } catch (e: unknown) {
       if (attempt < RETRY_DELAYS.length && isRetryable(e)) {
-        await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
+        await new Promise(r => setTimeout(r, jittered(RETRY_DELAYS[attempt])));
         continue;
       }
       throw e;
@@ -99,7 +101,7 @@ async function streamPantheonCollecting(
     } catch (e: unknown) {
       if (attempt < RETRY_DELAYS.length && isRetryable(e)) {
         onRetry();
-        await new Promise(r => setTimeout(r, RETRY_DELAYS[attempt]));
+        await new Promise(r => setTimeout(r, jittered(RETRY_DELAYS[attempt])));
         continue;
       }
       throw e;
@@ -1220,22 +1222,29 @@ async function callModel(
     const hasOwnKey =
       process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'placeholder';
     if (hasOwnKey) {
-      try {
-        const directModel =
-          modelType === 'planner' || modelType === 'summary' ? MODEL_HAIKU : MODEL_SONNET;
-        const res = await client.messages.create({
-          model: directModel,
-          max_tokens: maxTokens,
-          system: systemText,
-          messages: [{ role: 'user', content: userText }],
-        });
-        const c = res.content[0];
-        return c.type === 'text' ? c.text : '';
-      } catch (err: unknown) {
-        console.warn(
-          '[callModel] Direct Anthropic failed, falling back to Pantheon:',
-          err instanceof Error ? err.message : String(err)
-        );
+      const directModel =
+        modelType === 'planner' || modelType === 'summary' ? MODEL_HAIKU : MODEL_SONNET;
+      for (let attempt = 0; attempt <= 1; attempt++) {
+        try {
+          const res = await client.messages.create({
+            model: directModel,
+            max_tokens: maxTokens,
+            system: systemText,
+            messages: [{ role: 'user', content: userText }],
+          });
+          const c = res.content[0];
+          return c.type === 'text' ? c.text : '';
+        } catch (err: unknown) {
+          if (attempt === 0 && isRetryable(err)) {
+            await new Promise(r => setTimeout(r, jittered(1500)));
+            continue;
+          }
+          console.warn(
+            '[callModel] Direct Anthropic failed, falling back to Pantheon:',
+            err instanceof Error ? err.message : String(err)
+          );
+          break;
+        }
       }
     }
 
@@ -1272,31 +1281,39 @@ async function streamText(
   const hasOwnKey =
     process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'placeholder';
   if (hasOwnKey) {
-    try {
-      const systemMsg = messages.find(m => m.role === 'system');
-      const conversationMessages = messages.filter(m => m.role !== 'system');
+    const systemMsg = messages.find(m => m.role === 'system');
+    const conversationMessages = messages.filter(m => m.role !== 'system');
+    for (let attempt = 0; attempt <= 1; attempt++) {
       let accumulated = '';
-      const stream = client.messages.stream({
-        model: MODEL_OPUS,
-        max_tokens: maxTokens,
-        system: systemMsg?.content ?? '',
-        messages: conversationMessages.map(m => ({
-          role: m.role as 'user' | 'assistant',
-          content: m.content,
-        })),
-      });
-      for await (const chunk of stream) {
-        if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-          accumulated += chunk.delta.text;
-          onChunk(chunk.delta.text);
+      try {
+        const stream = client.messages.stream({
+          model: MODEL_OPUS,
+          max_tokens: maxTokens,
+          system: systemMsg?.content ?? '',
+          messages: conversationMessages.map(m => ({
+            role: m.role as 'user' | 'assistant',
+            content: m.content,
+          })),
+        });
+        for await (const chunk of stream) {
+          if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+            accumulated += chunk.delta.text;
+            onChunk(chunk.delta.text);
+          }
         }
+        return accumulated;
+      } catch (err: unknown) {
+        if (attempt === 0 && isRetryable(err)) {
+          onRetry();
+          await new Promise(r => setTimeout(r, jittered(1500)));
+          continue;
+        }
+        console.warn(
+          '[streamText] Direct Anthropic failed, falling back to Pantheon:',
+          err instanceof Error ? err.message : String(err)
+        );
+        break;
       }
-      return accumulated;
-    } catch (err: unknown) {
-      console.warn(
-        '[streamText] Direct Anthropic failed, falling back to Pantheon:',
-        err instanceof Error ? err.message : String(err)
-      );
     }
   }
 

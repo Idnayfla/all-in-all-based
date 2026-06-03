@@ -874,6 +874,20 @@ export default function Home() {
     setProjectModal(true);
   };
 
+  const quickProject = (prompt: string) => {
+    const isBetaEnv =
+      process.env.NEXT_PUBLIC_BUILD_ENV === 'beta' ||
+      (typeof window !== 'undefined' && window.location.hostname === 'beta.getbased.dev');
+    if (!isBetaEnv && subscription.tier === 'free' && projects.length >= 3) {
+      setPricingReason('projects');
+      setShowPricing(true);
+      return;
+    }
+    const name = prompt.trim().split(/\s+/).slice(0, 5).join(' ');
+    setPendingPrompt(prompt);
+    createProject(name);
+  };
+
   const createProject = async (name: string) => {
     setProjectModal(false);
 
@@ -1299,6 +1313,18 @@ export default function Home() {
             >
               ⬡ Feedback
             </button>
+            {user && subscription.tier === 'free' && (
+              <button
+                className={`gen-counter-badge${subscription.generationsUsed >= 9 ? ' gen-counter--danger' : subscription.generationsUsed >= 7 ? ' gen-counter--warn' : ''}`}
+                title={`${Math.min(subscription.generationsUsed, 10)} of 10 free generations used this month`}
+                onClick={() => {
+                  setPricingReason('upgrade');
+                  setShowPricing(true);
+                }}
+              >
+                {Math.min(subscription.generationsUsed, 10)}/10
+              </button>
+            )}
             {subscription.tier === 'free' ? (
               <button
                 className="header-upgrade-btn"
@@ -2103,18 +2129,16 @@ export default function Home() {
                     'Scientific calculator',
                     'Portfolio website',
                   ].map(p => (
-                    <span
-                      key={p}
-                      onClick={() => {
-                        setPendingPrompt(p);
-                        newProject();
-                      }}
-                    >
+                    <span key={p} onClick={() => quickProject(p)}>
                       {p}
                     </span>
                   ))}
                 </div>
                 <div className="no-project-hint">Sign in free · Projects save to your account</div>
+                <div className="memory-pitch">
+                  <span className="memory-pitch-icon">◉</span>
+                  Based learns from you — smarter every project
+                </div>
               </div>
             ) : (
               <>

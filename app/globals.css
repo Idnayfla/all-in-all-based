@@ -489,7 +489,8 @@ body {
   color: var(--bg);
   cursor: pointer;
   border-radius: var(--r-full);
-  font-size: 12px;
+  font-family: var(--font-pixel);
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.5px;
   transition: all 0.2s ease;
@@ -510,7 +511,8 @@ body {
   color: var(--accent3);
   cursor: pointer;
   border-radius: var(--r-full);
-  font-size: 12px;
+  font-family: var(--font-pixel);
+  font-size: var(--fs-sm);
   font-weight: 600;
   letter-spacing: 0.5px;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
@@ -539,13 +541,15 @@ body {
   box-shadow: 0 4px 18px rgba(94, 245, 192, 0.28);
 }
 .companion-header-btn {
-  font-size: 11px;
+  font-family: var(--font-pixel);
+  font-size: var(--fs-sm);
   font-weight: 500;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.5px;
   color: #c9a87c;
   background: none;
   border: 1px solid rgba(201, 168, 124, 0.3);
-  padding: 4px 10px;
+  border-radius: var(--r-md);
+  padding: 5px 10px;
   cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
@@ -565,10 +569,11 @@ body {
   color: #fff;
   cursor: pointer;
   border-radius: var(--r-md);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
+  letter-spacing: 0.5px;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  font-family: var(--font-mono);
+  font-family: var(--font-pixel);
 }
 .share-btn:hover {
   opacity: 0.9;
@@ -698,7 +703,9 @@ body {
   vertical-align: middle;
 }
 .status-text {
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0;
   color: var(--text3);
 }
 
@@ -3238,12 +3245,14 @@ body {
   margin-bottom: 0;
 }
 .message-content strong {
-  color: var(--text);
+  color: var(--accent);
   font-weight: 700;
+  font-family: var(--font-mono);
 }
 .message-content em {
   color: var(--text2);
   font-style: italic;
+  font-family: var(--font-mono);
 }
 .message-content code {
   background: var(--bg);
@@ -8262,9 +8271,10 @@ body:has(.beta-banner) .app-root {
   border: 1px solid var(--border);
   color: var(--text2);
   padding: 5px 10px;
-  border-radius: 6px;
-  font-size: var(--fs-xs);
-  font-family: var(--font-mono);
+  border-radius: var(--r-md);
+  font-family: var(--font-pixel);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.5px;
   cursor: pointer;
   text-decoration: none;
   transition:
@@ -8291,9 +8301,10 @@ body:has(.beta-banner) .app-root {
   border: 1px solid var(--border);
   color: var(--text2);
   padding: 5px 10px;
-  border-radius: 6px;
-  font-size: var(--fs-xs);
-  font-family: var(--font-mono);
+  border-radius: var(--r-md);
+  font-family: var(--font-pixel);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.5px;
   cursor: pointer;
   transition:
     border-color 0.15s,
@@ -14503,4 +14514,97 @@ body:has(.legal-page) {
   .vt-submit-form {
     padding: 18px;
   }
+}
+
+/* ── Generation counter badge (header) ─────────────────────────────────────── */
+.gen-counter-badge {
+  font-size: var(--fs-xs);
+  font-family: var(--font-mono);
+  padding: 3px 9px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  background: var(--bg2);
+  cursor: pointer;
+  transition:
+    color 0.2s,
+    border-color 0.2s;
+  white-space: nowrap;
+  line-height: 1;
+}
+.gen-counter-badge:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.gen-counter--warn {
+  color: #e5a020;
+  border-color: rgba(229, 160, 32, 0.35);
+}
+.gen-counter--danger {
+  color: var(--danger);
+  border-color: rgba(255, 107, 107, 0.35);
+}
+@media (max-width: 768px) {
+  .gen-counter-badge {
+    display: none;
+  }
+}
+
+/* ── Memory pitch (no-project empty state) ─────────────────────────────────── */
+.memory-pitch {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  color: var(--text3);
+  margin-top: 18px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.01em;
+}
+.memory-pitch-icon {
+  color: var(--accent);
+  opacity: 0.7;
+}
+
+/* ── Generation warning banner (chat panel top) ─────────────────────────────── */
+.gen-warning-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 14px;
+  background: rgba(229, 160, 32, 0.07);
+  border-bottom: 1px solid rgba(229, 160, 32, 0.18);
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: #e5a020;
+  flex-shrink: 0;
+}
+.gen-warning-banner--danger {
+  background: rgba(255, 107, 107, 0.07);
+  border-bottom-color: rgba(255, 107, 107, 0.2);
+  color: var(--danger);
+}
+.gen-warning-upgrade {
+  background: none;
+  border: none;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+.gen-warning-upgrade:hover {
+  opacity: 1;
+}
+
+/* ── Tips guide — sticky build-to-dismiss hint ──────────────────────────────── */
+.tips-build-hint {
+  font-size: 9px;
+  color: var(--text3);
+  font-family: var(--font-mono);
+  letter-spacing: 0.02em;
 }

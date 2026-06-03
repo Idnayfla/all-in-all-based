@@ -3,7 +3,7 @@ import { useRef, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Message, FileNode, ContentBlock } from '@/app/page';
-import ReactMarkdown from 'react-markdown';
+import SimpleMarkdown from './SimpleMarkdown';
 import ImageEditorModal from './ImageEditorModal';
 import ImageCropModal from './ImageCropModal';
 import ModeDropdown, { GenerationMode } from './ModeDropdown';
@@ -1076,7 +1076,7 @@ export default function ChatPanel({
   };
 
   function renderContent(content: string | ContentBlock[], msgIdx = 0) {
-    if (typeof content === 'string') return <ReactMarkdown>{content}</ReactMarkdown>;
+    if (typeof content === 'string') return <SimpleMarkdown>{content}</SimpleMarkdown>;
     return (
       <>
         {content.map((block, i) => {
@@ -1226,7 +1226,7 @@ export default function ChatPanel({
             );
           }
           if (block.type === 'text') {
-            return <ReactMarkdown key={i}>{block.text}</ReactMarkdown>;
+            return <SimpleMarkdown key={i}>{block.text}</SimpleMarkdown>;
           }
           return null;
         })}
@@ -1234,8 +1234,24 @@ export default function ChatPanel({
     );
   }
 
+  const genLeft = 10 - Math.min(generationsUsed ?? 0, 10);
+
   return (
     <div className="chat-panel">
+      {subscriptionTier === 'free' &&
+        (generationsUsed ?? 0) >= 7 &&
+        (generationsUsed ?? 0) < 10 && (
+          <div className={`gen-warning-banner${genLeft <= 1 ? ' gen-warning-banner--danger' : ''}`}>
+            <span>
+              {genLeft} generation{genLeft === 1 ? '' : 's'} left this month
+            </span>
+            {onProRequired && (
+              <button className="gen-warning-upgrade" onClick={onProRequired}>
+                Go Pro →
+              </button>
+            )}
+          </div>
+        )}
       <div className="chat-messages">
         {messages.length === 0 ? (
           <div className="chat-empty">
