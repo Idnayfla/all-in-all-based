@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
@@ -24,6 +24,8 @@ const STATUS_LABELS: Record<Status, string> = {
   done: 'Done',
 };
 
+const FILTER_TABS: Array<Status | 'all'> = ['all', 'open', 'planned', 'in_progress', 'done'];
+
 function StatusBadge({ status }: { status: Status }) {
   return (
     <span className={`vt-card-status vt-card-status--${status}`}>{STATUS_LABELS[status]}</span>
@@ -36,6 +38,8 @@ export default function VotePage() {
   const [authToken, setAuthToken] = useState('');
   const [authReady, setAuthReady] = useState(false);
   const [votingId, setVotingId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Status | 'all'>('all');
+  const [sort, setSort] = useState<'votes' | 'newest'>('votes');
 
   // Form state
   const [title, setTitle] = useState('');
@@ -45,6 +49,27 @@ export default function VotePage() {
   const [submitted, setSubmitted] = useState(false);
 
   const formRef = useRef<HTMLDivElement>(null);
+
+  // Derived: filter + sort — source of truth stays in `requests`
+  const displayed = useMemo(() => {
+    const filtered = filter === 'all' ? requests : requests.filter(r => r.status === filter);
+    if (sort === 'newest') {
+      return [...filtered].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    }
+    return filtered;
+  }, [requests, filter, sort]);
+
+  // Count badges always reflect the full unfiltered list
+  const counts = useMemo(() => {
+    const c = { all: requests.length, open: 0, planned: 0, in_progress: 0, done: 0 } as Record<
+      Status | 'all',
+      number
+    >;
+    for (const r of requests) c[r.status]++;
+    return c;
+  }, [requests]);
 
   // Auth setup — matches companion page pattern
   useEffect(() => {
@@ -82,11 +107,19 @@ export default function VotePage() {
           setRequests(data);
         }
       })
-      .catch(() => {
-        // silent — show empty state
-      })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [authReady, authToken]);
+
+  // Extracted revert helper — flips back the optimistic update on vote failure
+  function revertVote(prev: FeatureRequest[], id: string): FeatureRequest[] {
+    const reverted = prev.map(r => {
+      if (r.id !== id) return r;
+      const wasVoted = !r.voted; // r.voted is already optimistically flipped
+      return { ...r, voted: wasVoted, vote_count: r.vote_count + (wasVoted ? 1 : -1) };
+    });
+    return sort === 'votes' ? reverted.sort((a, b) => b.vote_count - a.vote_count) : reverted;
+  }
 
   async function handleVote(id: string) {
     if (!authToken) return;
@@ -94,19 +127,14 @@ export default function VotePage() {
     setVotingId(id);
 
     // Optimistic update
-    setRequests(prev =>
-      prev
-        .map(r => {
-          if (r.id !== id) return r;
-          const nowVoted = !r.voted;
-          return {
-            ...r,
-            voted: nowVoted,
-            vote_count: r.vote_count + (nowVoted ? 1 : -1),
-          };
-        })
-        .sort((a, b) => b.vote_count - a.vote_count)
-    );
+    setRequests(prev => {
+      const updated = prev.map(r => {
+        if (r.id !== id) return r;
+        const nowVoted = !r.voted;
+        return { ...r, voted: nowVoted, vote_count: r.vote_count + (nowVoted ? 1 : -1) };
+      });
+      return sort === 'votes' ? updated.sort((a, b) => b.vote_count - a.vote_count) : updated;
+    });
 
     try {
       const res = await fetch(`/api/vote/${id}`, {
@@ -115,42 +143,17 @@ export default function VotePage() {
       });
       if (res.ok) {
         const json = (await res.json()) as { voted: boolean; vote_count: number };
-        setRequests(prev =>
-          prev
-            .map(r => (r.id === id ? { ...r, voted: json.voted, vote_count: json.vote_count } : r))
-            .sort((a, b) => b.vote_count - a.vote_count)
-        );
+        setRequests(prev => {
+          const updated = prev.map(r =>
+            r.id === id ? { ...r, voted: json.voted, vote_count: json.vote_count } : r
+          );
+          return sort === 'votes' ? updated.sort((a, b) => b.vote_count - a.vote_count) : updated;
+        });
       } else {
-        // Revert optimistic update on failure
-        setRequests(prev =>
-          prev
-            .map(r => {
-              if (r.id !== id) return r;
-              const reverted = !r.voted;
-              return {
-                ...r,
-                voted: reverted,
-                vote_count: r.vote_count + (reverted ? 1 : -1),
-              };
-            })
-            .sort((a, b) => b.vote_count - a.vote_count)
-        );
+        setRequests(prev => revertVote(prev, id));
       }
     } catch {
-      // Revert on network error
-      setRequests(prev =>
-        prev
-          .map(r => {
-            if (r.id !== id) return r;
-            const reverted = !r.voted;
-            return {
-              ...r,
-              voted: reverted,
-              vote_count: r.vote_count + (reverted ? 1 : -1),
-            };
-          })
-          .sort((a, b) => b.vote_count - a.vote_count)
-      );
+      setRequests(prev => revertVote(prev, id));
     } finally {
       setVotingId(null);
     }
@@ -181,8 +184,9 @@ export default function VotePage() {
         return;
       }
       const newRequest = (await res.json()) as FeatureRequest;
-      // Optimistic: add to top, then let vote sort settle
       setRequests(prev => [newRequest, ...prev]);
+      // Auto-vote for the new request — creator always wants their own idea
+      handleVote(newRequest.id);
       setTitle('');
       setDescription('');
       setSubmitted(true);
@@ -235,12 +239,42 @@ export default function VotePage() {
         <div className="vt-list-col">
           <div className="vt-list-top">
             <span className="vt-list-count">
-              {loading ? '—' : `${requests.length} request${requests.length !== 1 ? 's' : ''}`}
+              {loading ? '—' : `${displayed.length} request${displayed.length !== 1 ? 's' : ''}`}
             </span>
             <button className="vt-submit-trigger" onClick={scrollToForm}>
               ◈ Submit a request →
             </button>
           </div>
+
+          {/* Filter tabs + sort toggle */}
+          {!loading && (
+            <div className="vt-filters">
+              {FILTER_TABS.map(f => (
+                <button
+                  key={f}
+                  className={`vt-filter-tab${filter === f ? ' vt-filter-tab--active' : ''}`}
+                  onClick={() => setFilter(f)}
+                >
+                  {f === 'all' ? 'All' : STATUS_LABELS[f]}
+                  <span className="vt-filter-count">{counts[f]}</span>
+                </button>
+              ))}
+              <div className="vt-sort-toggle">
+                <button
+                  className={`vt-sort-btn${sort === 'votes' ? ' vt-sort-btn--active' : ''}`}
+                  onClick={() => setSort('votes')}
+                >
+                  ◈ Votes
+                </button>
+                <button
+                  className={`vt-sort-btn${sort === 'newest' ? ' vt-sort-btn--active' : ''}`}
+                  onClick={() => setSort('newest')}
+                >
+                  ◉ Newest
+                </button>
+              </div>
+            </div>
+          )}
 
           {loading && (
             <div className="vt-loading">
@@ -248,16 +282,24 @@ export default function VotePage() {
             </div>
           )}
 
-          {!loading && requests.length === 0 && (
-            <div className="vt-empty">No requests yet. Be the first to submit one.</div>
+          {!loading && displayed.length === 0 && (
+            <div className="vt-empty">
+              {filter === 'all'
+                ? 'No requests yet. Be the first to submit one.'
+                : `No ${STATUS_LABELS[filter as Status].toLowerCase()} requests.`}
+            </div>
           )}
 
           {!loading &&
-            requests.map(req => (
-              <div key={req.id} className={`vt-card${req.voted ? ' vt-card--voted' : ''}`}>
+            displayed.map(req => (
+              <div
+                key={req.id}
+                className={`vt-card${req.voted ? ' vt-card--voted' : ''}${req.status === 'done' ? ' vt-card--done' : ''}`}
+              >
                 <div className="vt-card-body">
                   <div className="vt-card-top">
                     <StatusBadge status={req.status} />
+                    {req.status === 'done' && <span className="vt-shipped-tag">⬡ Shipped</span>}
                   </div>
                   <div className="vt-card-title">{req.title}</div>
                   {req.description && <div className="vt-card-desc">{req.description}</div>}
