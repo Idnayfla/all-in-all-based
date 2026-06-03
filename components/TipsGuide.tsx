@@ -35,23 +35,11 @@ export default function TipsGuide() {
   const [dismissed, setDismissed] = useState(true);
   const [idx, setIdx] = useState(0);
   const [animating, setAnimating] = useState(false);
-  const [hasBuild, setHasBuild] = useState(false);
 
   useEffect(() => {
     try {
       setDismissed(!!localStorage.getItem(LS_KEY));
     } catch {}
-  }, []);
-
-  useEffect(() => {
-    const check = () => {
-      try {
-        setHasBuild(parseInt(localStorage.getItem('based_build_count') || '0', 10) > 0);
-      } catch {}
-    };
-    check();
-    const id = setInterval(check, 2000);
-    return () => clearInterval(id);
   }, []);
 
   if (dismissed) return null;
@@ -81,13 +69,9 @@ export default function TipsGuide() {
           <span className="tips-counter">
             {idx + 1}/{TIPS.length}
           </span>
-          {hasBuild ? (
-            <button className="tips-close" onClick={dismiss} title="Dismiss">
-              ✕
-            </button>
-          ) : (
-            <span className="tips-build-hint">build to dismiss</span>
-          )}
+          <button className="tips-close" onClick={dismiss} title="Dismiss">
+            ✕
+          </button>
         </div>
         <div className="tips-body">
           <span className="tips-icon">{tip.icon}</span>
