@@ -17,27 +17,35 @@ const client = new Anthropic({
 
 // Module-level Redis singleton — avoids a new connection per request.
 let _redisClient: import('redis').RedisClientType | null = null;
-async function getRedis() {
+async function getRedis(): Promise<import('redis').RedisClientType | null> {
   if (!process.env.REDIS_URL) return null;
   try {
     // Drop a stale (closed) cached client so we reconnect instead of returning a
     // dead handle that throws ClientClosedError on every call until restart.
-    if (_redisClient && !_redisClient.isOpen) {
-      _redisClient = null;
-    }
-    if (!_redisClient) {
-      const { createClient } = await import('redis');
-      const client = createClient({
-        url: process.env.REDIS_URL,
-      }) as import('redis').RedisClientType;
-      // Must attach an 'error' listener BEFORE connect — node-redis throws
-      // emitted error events as unhandled exceptions when there is no listener.
-      client.on('error', () => {
-        if (_redisClient === client) _redisClient = null;
-      });
-      await client.connect();
-      _redisClient = client;
-    }
+    if (_redisClient?.isOpen) return _redisClient;
+    _redisClient = null;
+
+    const { createClient } = await import('redis');
+    const client = createClient({
+      url: process.env.REDIS_URL,
+      // connectTimeout caps the socket dial; reconnectStrategy:false stops
+      // node-redis from retrying forever in the background.
+      socket: { connectTimeout: 2000, reconnectStrategy: false },
+    }) as import('redis').RedisClientType;
+    // Must attach an 'error' listener BEFORE connect — node-redis throws
+    // emitted error events as unhandled exceptions when there is no listener.
+    client.on('error', () => {
+      if (_redisClient === client) _redisClient = null;
+    });
+    // Hard cap: race connect() against a 2s timeout so a slow/unreachable
+    // Redis can never block the entire generate request indefinitely.
+    await Promise.race([
+      client.connect(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Redis connect timeout')), 2000)
+      ),
+    ]);
+    _redisClient = client;
     return _redisClient;
   } catch {
     _redisClient = null;
