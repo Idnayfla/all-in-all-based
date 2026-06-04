@@ -2514,18 +2514,34 @@ export default function Home() {
                 <button
                   className="gpm-confirm"
                   onClick={async () => {
-                    const headers = await getHeaders();
-                    const res = await fetch('/api/gallery', {
-                      method: 'POST',
-                      headers,
-                      body: JSON.stringify({
-                        shareId,
-                        authorName: galleryAuthorName || user?.email?.split('@')[0] || 'Anonymous',
-                      }),
-                    });
-                    if (res.ok) {
-                      setGalleryPublished(true);
-                      setShowGalleryPublish(false);
+                    try {
+                      const headers = await getHeaders();
+                      const res = await fetch('/api/gallery', {
+                        method: 'POST',
+                        headers,
+                        body: JSON.stringify({
+                          shareId,
+                          authorName:
+                            galleryAuthorName || user?.email?.split('@')[0] || 'Anonymous',
+                        }),
+                      });
+                      const data = await res.json().catch(() => ({}));
+                      if (res.ok) {
+                        setGalleryPublished(true);
+                        setShowGalleryPublish(false);
+                      } else {
+                        // Never fail silently — the user clicked Publish and
+                        // nothing appearing in the gallery is the exact bug.
+                        console.error('[gallery] publish failed', data?.error ?? res.status);
+                        alert(
+                          'Publish failed: ' +
+                            (data?.error ?? `HTTP ${res.status}`) +
+                            '. Try Share again, then Publish.'
+                        );
+                      }
+                    } catch (e: unknown) {
+                      console.error('[gallery] publish error', e);
+                      alert('Publish failed: ' + (e instanceof Error ? e.message : String(e)));
                     }
                   }}
                 >
