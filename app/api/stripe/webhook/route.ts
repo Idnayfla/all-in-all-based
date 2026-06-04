@@ -37,10 +37,21 @@ export async function POST(req: NextRequest) {
       const email = (customer as Stripe.Customer).email;
       if (!email) return null;
 
-      const {
-        data: { users },
-      } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-      const user = users.find(u => u.email === email);
+      // Direct email lookup instead of paging through all users.
+      // The installed @supabase/auth-js lacks getUserByEmail, so we hit the
+      // GoTrue admin endpoint with an email filter directly.
+      const lookupUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users?email=${encodeURIComponent(email)}`;
+      const lookupRes = await fetch(lookupUrl, {
+        headers: {
+          apikey: process.env.SUPABASE_SERVICE_KEY!,
+          Authorization: `Bearer ${process.env.SUPABASE_SERVICE_KEY!}`,
+        },
+      });
+      if (!lookupRes.ok) return null;
+      const lookupJson = (await lookupRes.json()) as {
+        users?: Array<{ id: string; email?: string }>;
+      };
+      const user = lookupJson.users?.find(u => u.email === email);
       if (!user) return null;
 
       // Cache the link for future webhook events
