@@ -27,6 +27,9 @@ export async function POST(req: NextRequest) {
     try {
       const { createClient } = await import('redis');
       const redis = createClient({ url: process.env.REDIS_URL });
+      // Attach an error listener — without one, node-redis throws emitted
+      // 'error' events as unhandled exceptions that bypass try/catch.
+      redis.on('error', () => {});
       await redis.connect();
       const key = `exec:${userId}`;
       const count = await redis.incr(key);

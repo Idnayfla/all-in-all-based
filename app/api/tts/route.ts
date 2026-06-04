@@ -19,6 +19,9 @@ async function cacheGet(
   try {
     const { createClient } = await import('redis');
     const client = createClient({ url: process.env.REDIS_URL });
+    // Attach an error listener — without one, node-redis throws emitted
+    // 'error' events as unhandled exceptions that bypass try/catch.
+    client.on('error', () => {});
     await client.connect();
     const raw = await client.get(key);
     await client.disconnect();
@@ -37,6 +40,9 @@ async function cacheSet(
   try {
     const { createClient } = await import('redis');
     const client = createClient({ url: process.env.REDIS_URL });
+    // Attach an error listener — without one, node-redis throws emitted
+    // 'error' events as unhandled exceptions that bypass try/catch.
+    client.on('error', () => {});
     await client.connect();
     await client.set(key, JSON.stringify(value), { EX: TTL_SECONDS });
     await client.disconnect();
