@@ -147,6 +147,18 @@ export default function Home() {
     currentProjectRef.current = currentProject;
   }, [currentProject]);
 
+  // Share state is per-project. Whenever the active project changes, reset it so
+  // the publish/share button never inherits another project's "Update" state.
+  const sharedProjectIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (sharedProjectIdRef.current !== (currentProject?.id ?? null)) {
+      sharedProjectIdRef.current = currentProject?.id ?? null;
+      setShareUrl('');
+      setShareId('');
+      setGalleryPublished(false);
+    }
+  }, [currentProject?.id]);
+
   useEffect(() => {
     track('panel_switched', { panel: activePanel });
   }, [activePanel]);
@@ -915,6 +927,8 @@ export default function Home() {
     setActivePanel('chat');
     setCheckin(null);
     setShareUrl('');
+    setShareId('');
+    setGalleryPublished(false);
     setPersona('based');
     saveLastProject(id, name.trim());
     setTimeout(() => setPendingPrompt(''), 100);
