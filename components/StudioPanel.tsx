@@ -156,6 +156,7 @@ export default function StudioPanel({
   const [litKeys, setLitKeys] = useState<Set<string>>(new Set());
   const [micLevel, setMicLevel] = useState(0);
   const [aiInput, setAiInput] = useState('');
+  const [aiHint, setAiHint] = useState('');
   const [toneReady, setToneReady] = useState(false);
   const [exportUrl, setExportUrl] = useState('');
   const [exporting, setExporting] = useState(false);
@@ -567,7 +568,7 @@ export default function StudioPanel({
       mrRef.current = mr;
       setRecording(true);
     } catch {
-      alert('Microphone access denied.');
+      setAiHint('Microphone access denied. Allow mic access to record vocals.');
     }
   };
 
@@ -653,12 +654,13 @@ export default function StudioPanel({
   }, [octave, activeTab, playNote]);
 
   // ── AI music generation ──────────────────────────────────────────────────
-  const generateAiMusic = async () => {
-    if (!authToken || !musicPrompt.trim()) return;
+  const generateAiMusic = async (overridePrompt?: string) => {
+    const base = (overridePrompt ?? musicPrompt).trim();
+    if (!authToken || !base) return;
     setMusicGenerating(true);
     setMusicError('');
     try {
-      const fullPrompt = musicGenre ? `${musicGenre}: ${musicPrompt}` : musicPrompt;
+      const fullPrompt = musicGenre ? `${musicGenre}: ${base}` : base;
       const res = await fetch('/api/music', {
         method: 'POST',
         headers: {
@@ -739,9 +741,12 @@ export default function StudioPanel({
       ],
     };
 
+    // Normalise common multi-word genre spellings so "hip hop" matches "hiphop"
+    const sNorm = s.replace(/hip\s*hop/g, 'hiphop');
+
     if (!matched) {
       for (const [name, pattern] of Object.entries(patterns)) {
-        if (s.includes(name)) {
+        if (sNorm.includes(name)) {
           const drumTrack = tracks.find(tr => tr.type === 'instrument');
           if (drumTrack) {
             updateTrack(drumTrack.id, { drumPattern: pattern });
@@ -808,12 +813,35 @@ export default function StudioPanel({
       matched = true;
     }
 
-    if (matched) setAiInput('');
-    else
-      alert(
-        `Try: "120 BPM", "add drum track", "rock beat", "hip hop beat", "house beat", "chord progression jazz"`
-      );
+    if (matched) {
+      setAiInput('');
+      setAiHint('');
+      return;
+    }
+
+    // No local control matched — treat it as a free-form music description.
+    // Pro users get a full AI-generated track; everyone else gets guidance.
+    if (subscriptionTier === 'pro') {
+      const desc = aiInput.trim();
+      setActiveTab('ai');
+      setMusicPrompt(desc);
+      setAiInput('');
+      setAiHint('Generating a track from your description…');
+      generateAiMusic(desc);
+      return;
+    }
+
+    setAiHint(
+      'Try: "120 BPM", "add drum track", "rock beat", "hip hop beat", "house beat", or "chord progression jazz". Full AI track generation is a Pro feature.'
+    );
   };
+
+  // Auto-clear the inline hint after a few seconds
+  useEffect(() => {
+    if (!aiHint) return;
+    const id = setTimeout(() => setAiHint(''), 6000);
+    return () => clearTimeout(id);
+  }, [aiHint]);
 
   const sel = tracks.find(t => t.id === selTrack);
 
@@ -1252,7 +1280,7 @@ export default function StudioPanel({
                     ))}
                     <button
                       className="studio-btn studio-btn-primary"
-                      onClick={generateAiMusic}
+                      onClick={() => generateAiMusic()}
                       disabled={musicGenerating || !musicPrompt.trim()}
                     >
                       {musicGenerating ? '◈ Generating...' : '◈ Generate'}
@@ -1316,22 +1344,33 @@ export default function StudioPanel({
       </div>
 
       {/* AI bar */}
-      <div className="studio-ai-bar">
-        <span className="studio-ai-icon">◈</span>
-        <input
-          className="studio-ai-input"
-          placeholder={`AI: "120 BPM", "rock beat", "hip hop beat", "chord progression jazz", "add piano track"`}
-          value={aiInput}
-          onChange={e => setAiInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && applyAI()}
-        />
-        <button
-          className="studio-btn studio-btn-primary"
-          onClick={applyAI}
-          disabled={!aiInput.trim()}
-        >
-          Apply
-        </button>
+      <div className="studio-ai-bar-wrap">
+        {aiHint && (
+          <div className="studio-ai-hint" role="status">
+            {aiHint}
+          </div>
+        )}
+        <div className="studio-ai-bar">
+          <span className="studio-ai-icon">◈</span>
+          <input
+            className="studio-ai-input"
+            placeholder={
+              subscriptionTier === 'pro'
+                ? `AI: "120 BPM", "rock beat", "hip hop beat" — or describe a track to generate`
+                : `AI: "120 BPM", "rock beat", "hip hop beat", "chord progression jazz", "add piano track"`
+            }
+            value={aiInput}
+            onChange={e => setAiInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && applyAI()}
+          />
+          <button
+            className="studio-btn studio-btn-primary"
+            onClick={applyAI}
+            disabled={!aiInput.trim()}
+          >
+            Apply
+          </button>
+        </div>
       </div>
     </div>
   );
