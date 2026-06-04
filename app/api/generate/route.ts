@@ -11,8 +11,16 @@ import { MODEL_OPUS, MODEL_SONNET, MODEL_HAIKU, MODEL_GROQ, MODEL_CEREBRAS } fro
 
 export const maxDuration = 300;
 
+// Resolve the Anthropic key from either env var name so prod (which may set
+// APP_ANTHROPIC_API_KEY) and beta (ANTHROPIC_API_KEY) behave identically.
+const ANTHROPIC_KEY = process.env.ANTHROPIC_API_KEY || process.env.APP_ANTHROPIC_API_KEY;
+// Whether the direct Anthropic path is usable. Must match the key the client
+// is constructed with — otherwise generations silently fall through to Pantheon
+// and 500 if Pantheon is unconfigured (prod showed "something went wrong").
+const HAS_ANTHROPIC_KEY = !!ANTHROPIC_KEY && ANTHROPIC_KEY !== 'placeholder';
+
 const client = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY || process.env.APP_ANTHROPIC_API_KEY,
+  apiKey: ANTHROPIC_KEY,
 });
 
 // Module-level Redis singleton — avoids a new connection per request.
@@ -1257,8 +1265,7 @@ async function callModel(
     const maxTokens = modelType === 'generator' ? 8000 : modelType === 'planner' ? 300 : 800;
 
     // Direct Anthropic — fastest path when key is present
-    const hasOwnKey =
-      process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'placeholder';
+    const hasOwnKey = HAS_ANTHROPIC_KEY;
     if (hasOwnKey) {
       const directModel =
         modelType === 'planner' || modelType === 'summary' ? MODEL_HAIKU : MODEL_SONNET;
@@ -1316,8 +1323,7 @@ async function streamText(
   taskType: 'fast_chat' | 'chat' = 'chat'
 ): Promise<string> {
   // Direct Anthropic streaming — fastest path when key is present
-  const hasOwnKey =
-    process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'placeholder';
+  const hasOwnKey = HAS_ANTHROPIC_KEY;
   if (hasOwnKey) {
     const systemMsg = messages.find(m => m.role === 'system');
     const conversationMessages = messages.filter(m => m.role !== 'system');
@@ -2148,11 +2154,7 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
                   0
                 ),
                 latency_ms: Date.now() - startMs,
-                provider: usingFreeModel
-                  ? 'groq'
-                  : process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY !== 'placeholder'
-                    ? 'anthropic'
-                    : 'pantheon',
+                provider: usingFreeModel ? 'groq' : HAS_ANTHROPIC_KEY ? 'anthropic' : 'pantheon',
               });
             } catch {}
           })();
