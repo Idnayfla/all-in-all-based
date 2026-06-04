@@ -66,7 +66,17 @@ export default function PreviewPanel({
         : `<base href="${origin}">${html}`;
     }
     if (cssFile) html = html.replace('</head>', `<style>${cssFile.content}</style></head>`);
-    if (jsFile) html = html.replace('</body>', `<script>${jsFile.content}</script></body>`);
+    if (jsFile) {
+      // A <canvas> sized with CSS only keeps its 300x150 intrinsic buffer, which gets
+      // stretched to fill the container. Click handlers using getBoundingClientRect()
+      // then compute coords in displayed space and draw particles outside the 300x150
+      // buffer, so clicking the canvas does nothing. The inlined app script below runs
+      // before the deferred <head> canvas fix, so size the canvas synchronously here
+      // first (the canvas already exists in <body> at this point). Only canvases left
+      // at the default size (no width/height attribute) are touched.
+      const canvasFix = `<script>(function(){function fits(){var l=document.querySelectorAll('canvas');for(var i=0;i<l.length;i++){var c=l[i];if(c.dataset.basedSized==='manual')continue;if(c.getAttribute('width')!==null||c.getAttribute('height')!==null){c.dataset.basedSized='manual';continue;}var r=c.getBoundingClientRect();var dw=Math.round(r.width),dh=Math.round(r.height);if(dw<1||dh<1)continue;if(c.width!==dw||c.height!==dh){c.width=dw;c.height=dh;}}}function run(){try{fits();}catch(e){}}run();if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',run);}if(window.requestAnimationFrame)requestAnimationFrame(run);var t;window.addEventListener('resize',function(){clearTimeout(t);t=setTimeout(run,120);});})();</script>`;
+      html = html.replace('</body>', `${canvasFix}<script>${jsFile.content}</script></body>`);
+    }
     if (!html.includes('name="viewport"') && !html.includes("name='viewport'")) {
       html = html.replace(
         '<head>',
