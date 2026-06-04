@@ -67,16 +67,26 @@ export function mergeProjectToHtml(files: MergeableFile[]): string | null {
   // then compute coords in the DISPLAYED space (e.g. 800x600) and draw particles far
   // outside the 300x150 buffer — so clicking the canvas appears to do nothing.
   //
-  // In a merged document the app JS is inlined as a normal <script> that runs during
-  // parse, BEFORE the deferred <head> fix sanitizeHTML added. To guarantee the buffer
-  // is correct when the app first reads it, we prepend a synchronous, idempotent sizing
-  // pass right before the inlined app scripts (the canvas already exists in <body> at
-  // this point). It only adopts the displayed size while the author relied on CSS sizing
-  // (no width/height attribute), so intentionally-sized canvases are never touched.
-  const canvasFix = `<script>(function(){function fits(){var l=document.querySelectorAll('canvas');for(var i=0;i<l.length;i++){var c=l[i];if(c.dataset.basedSized==='manual')continue;if(c.getAttribute('width')!==null||c.getAttribute('height')!==null){c.dataset.basedSized='manual';continue;}var r=c.getBoundingClientRect();var dw=Math.round(r.width),dh=Math.round(r.height);if(dw<1||dh<1)continue;if(c.width!==dw||c.height!==dh){c.width=dw;c.height=dh;}}}function run(){try{fits();}catch(e){}}run();if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',run);}if(window.requestAnimationFrame)requestAnimationFrame(run);var t;window.addEventListener('resize',function(){clearTimeout(t);t=setTimeout(run,120);});})();</script>`;
+  // CRITICAL ordering rule: this fix is a standalone <head> script that runs ONLY on
+  // DOMContentLoaded. It must NEVER be injected between the app's JS files, because a
+  // multi-file app (e.g. particle.js defines `Particle`, then app.js does
+  // `new Particle()`) breaks if anything splits or reorders those scripts. The app JS
+  // files below are inlined in their ORIGINAL order, contiguous and untouched. The
+  // canvas sizing only runs after the DOM is parsed, so it never affects script scope
+  // or execution order.
+  const canvasFix = `<script>(function(){function fixCanvases(){var l=document.querySelectorAll('canvas');for(var i=0;i<l.length;i++){var c=l[i];if(c.dataset.basedSized==='manual')continue;if(c.getAttribute('width')!==null||c.getAttribute('height')!==null){c.dataset.basedSized='manual';continue;}var r=c.getBoundingClientRect();var dw=Math.round(r.width),dh=Math.round(r.height);if(dw<1||dh<1)continue;if(c.width!==dw||c.height!==dh){c.width=dw;c.height=dh;}}}function run(){try{fixCanvases();}catch(e){}}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',run);}else{run();}var t;window.addEventListener('resize',function(){clearTimeout(t);t=setTimeout(run,120);});})();</script>`;
 
-  const scriptBlock =
-    canvasFix + '\n' + jsFiles.map(f => `<script>${f.content}</script>`).join('\n');
+  // App JS files inlined in ORIGINAL order, untouched — never split by the canvas fix.
+  const scriptBlock = jsFiles.map(f => `<script>${f.content}</script>`).join('\n');
+
+  // Canvas fix goes in <head>, completely independent of the app scripts.
+  if (/<\/head>/i.test(html)) {
+    html = html.replace(/<\/head>/i, `${canvasFix}</head>`);
+  } else if (/<head>/i.test(html)) {
+    html = html.replace(/<head>/i, `<head>${canvasFix}`);
+  } else {
+    html = `${canvasFix}${html}`;
+  }
 
   if (styleBlock) {
     html = /<\/head>/i.test(html)
