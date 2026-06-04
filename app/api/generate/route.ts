@@ -15,6 +15,28 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || process.env.APP_ANTHROPIC_API_KEY,
 });
 
+// Module-level Redis singleton — avoids a new connection per request.
+let _redisClient: import('redis').RedisClientType | null = null;
+async function getRedis() {
+  if (!process.env.REDIS_URL) return null;
+  try {
+    if (!_redisClient) {
+      const { createClient } = await import('redis');
+      _redisClient = createClient({
+        url: process.env.REDIS_URL,
+      }) as import('redis').RedisClientType;
+      _redisClient.on('error', () => {
+        _redisClient = null;
+      });
+      await _redisClient.connect();
+    }
+    return _redisClient;
+  } catch {
+    _redisClient = null;
+    return null;
+  }
+}
+
 const PANTHEON_KEY = process.env.PANTHEON_API_KEY ?? process.env.PANTHEON_OWNER_KEY ?? '';
 const PANTHEON_URL = process.env.PANTHEON_API_URL ?? 'https://pantheon-api.vercel.app';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -1337,23 +1359,20 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Rate limiting: 10 requests per minute per user ──────────────────────
-  if (process.env.REDIS_URL) {
-    try {
-      const { createClient } = await import('redis');
-      const redis = createClient({ url: process.env.REDIS_URL });
-      await redis.connect();
+  try {
+    const redis = await getRedis();
+    if (redis) {
       const key = `rl:generate:${userId}`;
       const count = await redis.incr(key);
       if (count === 1) {
         await redis.expire(key, 60);
       }
-      await redis.disconnect();
       if (count > 10) {
         return NextResponse.json({ error: 'rate_limit' }, { status: 429 });
       }
-    } catch {
-      /* fail open — never block users due to Redis issues */
     }
+  } catch {
+    /* fail open — never block users due to Redis issues */
   }
 
   try {
@@ -1367,6 +1386,10 @@ export async function POST(req: NextRequest) {
       aiModel,
       persona,
     } = await req.json();
+
+    if (Array.isArray(existingFiles) && existingFiles.length > 50) {
+      return NextResponse.json({ error: 'Too many files' }, { status: 400 });
+    }
 
     const PERSONA_PROMPTS: Record<string, string> = {
       coder:
@@ -1384,11 +1407,10 @@ export async function POST(req: NextRequest) {
     // ALWAYS_PRO=true bypasses all tier checks (set on beta deployment).
     // BETA_ACCESS_CODE being set is also treated as ALWAYS_PRO — if the beta gate is
     // active this is beta.getbased.dev and all authenticated users get full access.
-    // Free AI model bypasses limits entirely (uses Groq, not our Anthropic credits)
     const alwaysPro = process.env.ALWAYS_PRO === 'true' || !!process.env.BETA_ACCESS_CODE;
     // userId is already verified by the auth guard above
     const supabaseUserId: string = userId;
-    if (!alwaysPro && !usingFreeModel) {
+    if (!alwaysPro) {
       try {
         const { data: s } = await supabaseAdmin
           .from('user_settings')
@@ -1487,10 +1509,11 @@ export async function POST(req: NextRequest) {
       text: string;
       cache_control?: { type: 'ephemeral' };
     }> = [{ type: 'text', text: SYSTEM, cache_control: { type: 'ephemeral' } }];
-    if (personality)
+    const safePersonality = personality?.slice(0, 500);
+    if (safePersonality)
       systemBlocks.push({
         type: 'text',
-        text: `\nPERSONALITY (adjusts tone and verbosity only — never changes what action to take, never adds greetings, never delays code generation):\n${personality}`,
+        text: `\nPERSONALITY (adjusts tone and verbosity only — never changes what action to take, never adds greetings, never delays code generation):\n${safePersonality}`,
       });
     if (persona && persona !== 'based' && PERSONA_PROMPTS[persona])
       systemBlocks.push({

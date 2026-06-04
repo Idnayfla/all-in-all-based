@@ -1,5 +1,6 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { getUserId } from '../_auth';
 
 export const maxDuration = 60;
 
@@ -125,6 +126,12 @@ async function tryElevenLabs(
 }
 
 export async function POST(req: NextRequest) {
+  try {
+    await getUserId(req);
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
   const { text, gender = 'male' } = (await req.json().catch(() => ({}))) as {
     text?: string;
     gender?: 'male' | 'female';

@@ -7,6 +7,30 @@ const resend = new Resend(process.env.RESEND_API_KEY ?? 'placeholder_not_configu
 
 export async function POST(req: NextRequest) {
   try {
+    // ── Rate limiting: max 3 requests per IP per 15 minutes ──────────────────
+    const ip =
+      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+      req.headers.get('x-real-ip') ??
+      'unknown';
+    if (process.env.REDIS_URL) {
+      try {
+        const { createClient } = await import('redis');
+        const redis = createClient({ url: process.env.REDIS_URL });
+        await redis.connect();
+        const key = `pw_reset:${ip}`;
+        const count = await redis.incr(key);
+        if (count === 1) {
+          await redis.expire(key, 900);
+        }
+        await redis.disconnect();
+        if (count > 3) {
+          return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+        }
+      } catch {
+        /* fail open — never block users due to Redis issues */
+      }
+    }
+
     const { email } = await req.json();
     if (!email?.trim()) {
       return NextResponse.json({ error: 'Email required' }, { status: 400 });

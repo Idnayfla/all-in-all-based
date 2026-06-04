@@ -15,15 +15,43 @@ async function run(sandbox: Sandbox, cmd: string, cwd?: string) {
 }
 
 export async function POST(req: NextRequest) {
+  let userId: string;
   try {
-    await getUserId(req);
+    userId = await getUserId(req);
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // ── Rate limiting: max 10 executions per user per hour ────────────────────
+  if (process.env.REDIS_URL) {
+    try {
+      const { createClient } = await import('redis');
+      const redis = createClient({ url: process.env.REDIS_URL });
+      await redis.connect();
+      const key = `exec:${userId}`;
+      const count = await redis.incr(key);
+      if (count === 1) {
+        await redis.expire(key, 3600);
+      }
+      await redis.disconnect();
+      if (count > 10) {
+        return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+      }
+    } catch {
+      /* fail open — never block users due to Redis issues */
+    }
   }
 
   let sandbox: Sandbox | null = null;
   try {
     const { files, projectType }: { files: SandboxFile[]; projectType: string } = await req.json();
+
+    if (Array.isArray(files) && files.length > 20) {
+      return NextResponse.json({ error: 'Too many files' }, { status: 400 });
+    }
+    if (JSON.stringify(files).length > 500_000) {
+      return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
+    }
 
     sandbox = await Sandbox.create({ apiKey: process.env.E2B_API_KEY });
     const workdir = '/home/user/project';
