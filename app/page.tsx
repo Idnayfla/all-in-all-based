@@ -997,11 +997,22 @@ export default function Home() {
     if (!currentProject || !files.length || isSharing) return;
     setIsSharing(true);
     const abort = new AbortController();
+    // Aborts the fetch AND is raced against getSession() so a hanging auth
+    // call can never leave the button stuck at "..." forever.
     const timeout = setTimeout(() => abort.abort(), 15000);
+    let timedOut = false;
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      // getSession() can hang indefinitely (Supabase/Electron). Race it against
+      // a timeout so we never block on it.
+      const session = await Promise.race([
+        supabase.auth.getSession().then(r => r.data.session),
+        new Promise<null>((_, reject) =>
+          setTimeout(() => {
+            timedOut = true;
+            reject(new Error('auth-timeout'));
+          }, 8000)
+        ),
+      ]);
       const res = await fetch('/api/share', {
         method: 'POST',
         signal: abort.signal,
@@ -1015,33 +1026,33 @@ export default function Home() {
           projectId: currentProject.id,
         }),
       });
-      clearTimeout(timeout);
-      const data = await res.json();
-      if (data.url) {
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.url) {
         const full = `https://getbased.dev${data.url}`;
         setShareUrl(full);
         setShareId(data.id ?? '');
         setGalleryPublished(false);
-        setIsSharing(false); // unblock UI before share dialog
         if (navigator.share) {
           navigator.share({ title: currentProject.name, url: full }).catch(() => {});
         } else {
           await navigator.clipboard.writeText(full).catch(() => {});
         }
       } else {
-        console.error('[share]', data.error);
-        setIsSharing(false);
-        alert('Share failed: ' + (data.error ?? 'Unknown error'));
+        console.error('[share]', data.error ?? res.status);
+        alert('Share failed: ' + (data.error ?? `HTTP ${res.status}`));
       }
     } catch (e: unknown) {
-      clearTimeout(timeout);
-      setIsSharing(false);
-      if (e instanceof Error && e.name === 'AbortError') {
+      console.error('[share]', e);
+      if (timedOut || (e instanceof Error && e.message === 'auth-timeout')) {
+        alert('Share timed out signing you in — please refresh and try again.');
+      } else if (e instanceof Error && e.name === 'AbortError') {
         alert('Share timed out — check your connection and try again.');
       } else {
-        console.error('[share]', e);
         alert('Share failed: ' + (e instanceof Error ? e.message : String(e)));
       }
+    } finally {
+      clearTimeout(timeout);
+      setIsSharing(false); // ALWAYS reset, success or failure
     }
   };
 
