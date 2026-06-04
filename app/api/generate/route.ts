@@ -1160,6 +1160,55 @@ function sanitizeHTML(html: string): string {
       : NULL_GUARD + html;
   }
 
+  // Canvas resolution fix — THE root cause of "clicking the canvas does nothing"
+  // in particle / paint / interactive-canvas apps.
+  //
+  // A <canvas> with no width/height ATTRIBUTES has a 300x150 intrinsic buffer.
+  // Generated apps routinely size the canvas with CSS only (#c{width:100%;height:100%}),
+  // so the 300x150 buffer is stretched to fill the container. The app then computes
+  // click coords with getBoundingClientRect() (the DISPLAYED size, e.g. 800x600) and
+  // draws a particle at (clickX, clickY) — far outside the 300x150 buffer. The particle
+  // spawns off-screen, so the user sees nothing happen on every click. No prompt rule
+  // fixes this reliably; it must be corrected structurally for every canvas app.
+  //
+  // This runs as a DEFERRED <head> script, so it executes BEFORE any deferred app.js
+  // (defer scripts run in document order, head before body) — the canvas already has a
+  // correct buffer size when the app attaches click handlers and reads dimensions.
+  // It only touches canvases left at the default 300x150 buffer whose displayed size
+  // differs, so intentionally-sized canvases (Phaser, Three.js, fixed-size art, profile
+  // icons that set canvas.width/height) are never altered.
+  const canvasFix = `<script defer id="__based_canvas_fix__">(function(){
+  function fits(){
+    var list=document.querySelectorAll('canvas');
+    for(var i=0;i<list.length;i++){
+      var c=list[i];
+      if(c.dataset.basedSized==='manual')continue;
+      var r=c.getBoundingClientRect();
+      var dw=Math.round(r.width), dh=Math.round(r.height);
+      if(dw<1||dh<1)continue;
+      // Only adopt the displayed size while the author relied on CSS sizing — i.e.
+      // neither width nor height attribute was ever set, so the buffer is the untouched
+      // 300x150 default. The moment the app sets its own width/height (Phaser,
+      // Three.js, fixed-size art, profile icons), we mark it manual and never touch it.
+      var explicitlySized=c.getAttribute('width')!==null||c.getAttribute('height')!==null;
+      if(explicitlySized){c.dataset.basedSized='manual';continue;}
+      if(c.width!==dw||c.height!==dh){c.width=dw;c.height=dh;}
+    }
+  }
+  function run(){try{fits();}catch(e){}}
+  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',run);}else{run();}
+  // Re-sync on container resize so responsive canvases stay sharp and click-mapped.
+  var t;
+  window.addEventListener('resize',function(){clearTimeout(t);t=setTimeout(run,120);});
+  // One more pass after first paint catches canvases mounted by late init code.
+  if(window.requestAnimationFrame)requestAnimationFrame(run);
+})();</script>`;
+  if (!html.includes('__based_canvas_fix__')) {
+    html = html.includes('<head>')
+      ? html.replace('<head>', '<head>' + canvasFix)
+      : canvasFix + html;
+  }
+
   return html.includes('</body>')
     ? html.replace('</body>', safetyNet + '\n</body>')
     : html + '\n' + safetyNet;
