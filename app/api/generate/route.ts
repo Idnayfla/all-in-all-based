@@ -478,6 +478,19 @@ INTERACTIVE CANVAS APPS — CLICK/DRAG TO SPAWN OR INTERACT:
 - For particle physics sandboxes: clicking the canvas spawns particles at click position; dragging spawns a stream of particles
 - Test mental model: after DOMContentLoaded, canvas exists → getBoundingClientRect works → click fires → x/y are canvas-relative → particle spawns at correct position
 
+SIMULATION & GAME LAYOUT — CANVAS MUST BE VISIBLE:
+- For particle sandboxes, physics simulations, and any canvas-based interactive app:
+  - Use a SPLIT LAYOUT: canvas takes 70% of viewport width, controls panel takes 30%
+  - CSS pattern: body { display: flex; margin: 0; height: 100vh; overflow: hidden; }
+               #canvas-container { flex: 1; position: relative; }
+               #controls { width: 280px; overflow-y: auto; padding: 16px; background: #111; }
+               canvas { width: 100%; height: 100%; display: block; }
+  - The canvas MUST be visible and interactable — never let controls cover it
+  - On mobile (max-width: 600px): stack vertically — canvas on top (60vh), controls below (40vh)
+  - Always give the canvas a dark background: background: #000 or #0a0a0a
+  - The canvas container must have explicit dimensions so getBoundingClientRect() returns non-zero values
+  - NEVER use a layout where controls take 100% width and push canvas off-screen
+
 PROMPT FAITHFULNESS — ALWAYS FOLLOW EXACTLY:
 - When the user describes a specific sequence of events, scenario, or experience: implement it EXACTLY as described, word for word
 - NEVER substitute the user's described concept with something vaguely similar
