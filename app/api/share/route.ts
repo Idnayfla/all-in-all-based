@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
         .select('id')
         .eq('user_id', userId)
         .eq('project_id', projectId)
-        .single();
+        .maybeSingle();
 
       if (existing?.id) {
         await supabaseAdmin

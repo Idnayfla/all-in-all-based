@@ -20,14 +20,20 @@ export async function POST(req: NextRequest) {
     const { shareId, authorName } = await req.json();
     if (!shareId) return NextResponse.json({ error: 'Missing shareId' }, { status: 400 });
 
+    // maybeSingle() returns null (not a thrown PGRST116) when no row matches,
+    // so a legitimate "not yours / not found" never surfaces as an opaque 500.
     const { data: share } = await supabaseAdmin
       .from('shares')
       .select('id, user_id')
       .eq('id', shareId)
       .eq('user_id', userId)
-      .single();
+      .maybeSingle();
 
-    if (!share) return NextResponse.json({ error: 'Share not found' }, { status: 404 });
+    if (!share)
+      return NextResponse.json(
+        { error: 'Share not found for this account — re-share the project, then publish.' },
+        { status: 404 }
+      );
 
     const { error: updateError } = await supabaseAdmin
       .from('shares')
