@@ -494,6 +494,19 @@ IMAGES IN GENERATED HTML — ABSOLUTE URLS ONLY:
 - Shake effect: CSS @keyframes translateX(-10px) → (10px) alternating fast
 - Always include a "Click to start" gate before autoplay effects
 
+WEATHER APPS — ALWAYS SHOW REAL LIVE DATA:
+- For any weather app, dashboard, or widget: NEVER use OpenWeatherMap or any API that needs a key — the sandbox has no key and the UI will show no data.
+- PREFERRED — Based weather proxy (same-origin, no CORS, most reliable): fetch('/api/weather-proxy?location=Singapore')
+  Response: { location, temp_c, temp_f, description, humidity, wind_kmph, feels_like_c }
+  Example: fetch('/api/weather-proxy?location=Singapore').then(r=>r.json()).then(w => { /* w.temp_c, w.description, w.humidity, w.wind_kmph */ });
+- FALLBACK — wttr.in (free, no API key, CORS-enabled): fetch('https://wttr.in/Singapore?format=j1').then(r=>r.json())
+  Response structure: data.current_condition[0] has temp_C, weatherDesc[0].value, humidity, windspeedKmph, FeelsLikeC
+  Example: fetch('https://wttr.in/Singapore?format=j1').then(r=>r.json()).then(data => { const w = data.current_condition[0]; /* w.temp_C, w.weatherDesc[0].value, w.humidity, w.windspeedKmph */ });
+- Default location is "Singapore" unless the user specifies otherwise. URL-encode the location.
+- Always render: temperature, weather description, humidity, wind speed (and feels-like when available).
+- Always add a location input so the user can change the city and re-fetch.
+- Show a loading state while fetching and a graceful "couldn't load weather" message on error.
+
 AUDIO — RULES (BREAKING THESE MAKES AUDIO SILENT OR CORRUPTED):
 RULE 1 — NEVER use local filenames: new Audio('sound.mp3'), fetch('jump.wav'), <audio src="file.mp3"> — these files do not exist in the sandbox. Silent failure every time.
 RULE 2 — NEVER create audio Blob files for download with .mp3 or .wav extension unless you encode them properly. Web Audio API cannot produce MP3. If you must export audio, encode as WAV manually (PCM header + raw Float32 samples) — not as a raw blob with an audio extension.
