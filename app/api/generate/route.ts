@@ -462,21 +462,23 @@ ANIMATION RULES — ALWAYS FOLLOW FOR ANY ANIMATED PROJECT:
 - When MODIFYING an existing animation: keep the same state machine structure, only change the affected phase — do not restructure the entire loop
 - Wrap the animation loop body in try/catch so errors surface visibly instead of freezing silently
 
-INTERACTIVE CANVAS APPS — CLICK/DRAG TO SPAWN OR INTERACT:
-- ALWAYS calculate mouse position relative to the canvas using getBoundingClientRect():
-  canvas.addEventListener('click', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    spawnParticle(x, y); // use x, y — never e.clientX/Y directly
-  });
-- For drag/continuous spawning: use mousedown + mousemove + mouseup pattern with an isDrawing flag
-- ALWAYS add both mouse AND touch equivalents:
-  canvas.addEventListener('touchstart', (e) => { e.preventDefault(); const t = e.touches[0]; const rect = canvas.getBoundingClientRect(); spawnParticle(t.clientX - rect.left, t.clientY - rect.top); });
-- NEVER use pointer-events: none on the main canvas element
-- ALWAYS ensure the canvas fills its container: canvas.width = container.clientWidth; canvas.height = container.clientHeight;
-- For particle physics sandboxes: clicking the canvas spawns particles at click position; dragging spawns a stream of particles
-- Test mental model: after DOMContentLoaded, canvas exists → getBoundingClientRect works → click fires → x/y are canvas-relative → particle spawns at correct position
+CANVAS SIZING — MANDATORY RULE, NO EXCEPTIONS:
+- NEVER size a canvas with CSS alone. CSS sizing stretches the canvas buffer causing all coordinates to be wrong.
+- ALWAYS set canvas width and height as explicit JS assignments that match the container:
+  const canvas = document.getElementById('canvas');
+  canvas.width = canvas.parentElement.clientWidth || window.innerWidth;
+  canvas.height = canvas.parentElement.clientHeight || window.innerHeight;
+- For split layouts: canvas.width = canvasContainer.clientWidth; canvas.height = canvasContainer.clientHeight;
+- Add a resize handler: window.addEventListener('resize', () => { canvas.width = canvas.parentElement.clientWidth; canvas.height = canvas.parentElement.clientHeight; });
+- CSS on canvas should only be: display: block; (nothing else that changes dimensions)
+- WRONG: #canvas { width: 100%; height: 100%; }  with no JS resize
+- RIGHT: canvas.width = container.clientWidth; canvas.height = container.clientHeight; in JS
+
+INTERACTIVE CANVAS — CLICK/DRAG TO SPAWN:
+- Always get mouse position relative to canvas: const rect = canvas.getBoundingClientRect(); const x = e.clientX - rect.left; const y = e.clientY - rect.top;
+- For particle sandboxes: mousedown spawns particle, mousemove while held streams particles
+- Add touch support: touchstart/touchmove with e.preventDefault() and e.touches[0]
+- Attach ALL event listeners inside DOMContentLoaded
 
 SIMULATION & GAME LAYOUT — CANVAS MUST BE VISIBLE:
 - For particle sandboxes, physics simulations, and any canvas-based interactive app:
@@ -484,8 +486,9 @@ SIMULATION & GAME LAYOUT — CANVAS MUST BE VISIBLE:
   - CSS pattern: body { display: flex; margin: 0; height: 100vh; overflow: hidden; }
                #canvas-container { flex: 1; position: relative; }
                #controls { width: 280px; overflow-y: auto; padding: 16px; background: #111; }
-               canvas { width: 100%; height: 100%; display: block; }
+               canvas { display: block; } /* size in JS, never with CSS width/height */
   - The canvas MUST be visible and interactable — never let controls cover it
+  - Set canvas.width/height in JS from #canvas-container.clientWidth/clientHeight — never with CSS
   - On mobile (max-width: 600px): stack vertically — canvas on top (60vh), controls below (40vh)
   - Always give the canvas a dark background: background: #000 or #0a0a0a
   - The canvas container must have explicit dimensions so getBoundingClientRect() returns non-zero values
@@ -1171,55 +1174,6 @@ function sanitizeHTML(html: string): string {
     html = html.includes('<body>')
       ? html.replace('<body>', '<body>' + NULL_GUARD)
       : NULL_GUARD + html;
-  }
-
-  // Canvas resolution fix — THE root cause of "clicking the canvas does nothing"
-  // in particle / paint / interactive-canvas apps.
-  //
-  // A <canvas> with no width/height ATTRIBUTES has a 300x150 intrinsic buffer.
-  // Generated apps routinely size the canvas with CSS only (#c{width:100%;height:100%}),
-  // so the 300x150 buffer is stretched to fill the container. The app then computes
-  // click coords with getBoundingClientRect() (the DISPLAYED size, e.g. 800x600) and
-  // draws a particle at (clickX, clickY) — far outside the 300x150 buffer. The particle
-  // spawns off-screen, so the user sees nothing happen on every click. No prompt rule
-  // fixes this reliably; it must be corrected structurally for every canvas app.
-  //
-  // This runs as a DEFERRED <head> script, so it executes BEFORE any deferred app.js
-  // (defer scripts run in document order, head before body) — the canvas already has a
-  // correct buffer size when the app attaches click handlers and reads dimensions.
-  // It only touches canvases left at the default 300x150 buffer whose displayed size
-  // differs, so intentionally-sized canvases (Phaser, Three.js, fixed-size art, profile
-  // icons that set canvas.width/height) are never altered.
-  const canvasFix = `<script defer id="__based_canvas_fix__">(function(){
-  function fits(){
-    var list=document.querySelectorAll('canvas');
-    for(var i=0;i<list.length;i++){
-      var c=list[i];
-      if(c.dataset.basedSized==='manual')continue;
-      var r=c.getBoundingClientRect();
-      var dw=Math.round(r.width), dh=Math.round(r.height);
-      if(dw<1||dh<1)continue;
-      // Only adopt the displayed size while the author relied on CSS sizing — i.e.
-      // neither width nor height attribute was ever set, so the buffer is the untouched
-      // 300x150 default. The moment the app sets its own width/height (Phaser,
-      // Three.js, fixed-size art, profile icons), we mark it manual and never touch it.
-      var explicitlySized=c.getAttribute('width')!==null||c.getAttribute('height')!==null;
-      if(explicitlySized){c.dataset.basedSized='manual';continue;}
-      if(c.width!==dw||c.height!==dh){c.width=dw;c.height=dh;}
-    }
-  }
-  function run(){try{fits();}catch(e){}}
-  if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',run);}else{run();}
-  // Re-sync on container resize so responsive canvases stay sharp and click-mapped.
-  var t;
-  window.addEventListener('resize',function(){clearTimeout(t);t=setTimeout(run,120);});
-  // One more pass after first paint catches canvases mounted by late init code.
-  if(window.requestAnimationFrame)requestAnimationFrame(run);
-})();</script>`;
-  if (!html.includes('__based_canvas_fix__')) {
-    html = html.includes('<head>')
-      ? html.replace('<head>', '<head>' + canvasFix)
-      : canvasFix + html;
   }
 
   return html.includes('</body>')
