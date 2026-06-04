@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { notFound } from 'next/navigation';
+import { mergeProjectToHtml } from '@/lib/mergeFiles';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -31,12 +32,10 @@ export default async function SharePage({ params }: { params: Promise<{ id: stri
 
   if (error || !data) notFound();
 
-  const htmlFile =
-    data.files.find((f: { name: string; content: string }) => f.name === 'index.html') ??
-    data.files[0];
-  if (!htmlFile) notFound();
-
-  const srcDoc = htmlFile.content;
+  // Merge HTML + CSS + JS into one self-contained document so the shared page
+  // renders with full styling (separate CSS/JS files have no URL here).
+  const srcDoc = mergeProjectToHtml(data.files ?? []);
+  if (!srcDoc) notFound();
 
   return (
     <div

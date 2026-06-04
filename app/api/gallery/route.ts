@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
     if (!share) return NextResponse.json({ error: 'Share not found' }, { status: 404 });
 
-    await supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
       .from('shares')
       .update({
         in_gallery: true,
@@ -37,6 +37,10 @@ export async function POST(req: NextRequest) {
         author_name: authorName?.trim() || null,
       })
       .eq('id', shareId);
+
+    // Surface failures (e.g. missing column) instead of reporting a false
+    // success — the client treats `ok` as "now in gallery".
+    if (updateError) throw updateError;
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {

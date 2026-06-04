@@ -755,6 +755,25 @@ export default function Home() {
         const storedToken = getStoredAccessToken();
         if (storedToken) {
           setAuthToken(storedToken);
+          // A bare token gives us auth headers but NOT the user object — without
+          // setUser()+loadCloudData() the account looks empty after login.
+          // getUser(token) is a separate network call that doesn't hang the same
+          // way getSession does, but race it against a short timeout to be safe.
+          try {
+            type SupabaseUser = Awaited<ReturnType<typeof supabase.auth.getUser>>['data']['user'];
+            const tokenUser = await Promise.race([
+              supabase.auth.getUser(storedToken).then(r => r.data.user),
+              new Promise<SupabaseUser>(resolve => setTimeout(() => resolve(null), 3000)),
+            ]);
+            if (tokenUser) {
+              setUser(tokenUser);
+              setAuthReady(true);
+              await loadCloudData();
+              return;
+            }
+          } catch {
+            // fall through — onAuthStateChange will backfill if it resolves later
+          }
         }
         // user info is unavailable from a bare token; onAuthStateChange will
         // backfill it if/when getSession eventually resolves.
