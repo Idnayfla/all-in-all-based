@@ -23,18 +23,26 @@ export default function FeedbackModal({
   const [email, setEmail] = useState(userEmail ?? '');
   const [sending, setSending] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
   const [snapshotExpanded, setSnapshotExpanded] = useState(false);
 
   const submit = async () => {
     if (!message.trim() || sending) return;
     setSending(true);
+    setError('');
     try {
       const res = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message, email, type, context: conversationContext ?? null }),
       });
-      if (res.ok) setDone(true);
+      if (res.ok) {
+        setDone(true);
+      } else {
+        setError("Couldn't send — please try again.");
+      }
+    } catch {
+      setError("Couldn't send — check your connection and try again.");
     } finally {
       setSending(false);
     }
@@ -121,6 +129,8 @@ export default function FeedbackModal({
                 value={email}
                 onChange={e => setEmail(e.target.value)}
               />
+
+              {error && <div className="feedback-error">{error}</div>}
 
               <div className="feedback-footer">
                 <span className="feedback-hint">
