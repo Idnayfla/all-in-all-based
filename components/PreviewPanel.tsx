@@ -22,13 +22,40 @@ export default function PreviewPanel({
   const [cropData, setCropData] = useState<{ url: string; format: 'png' | 'jpg' } | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const htmlFile = files.find(f => f.language === 'html');
+  // Match the renderable web entry point. Icon/logo/avatar requests can come
+  // back as a standalone SVG file (language "svg" or a *.svg name) instead of
+  // an HTML wrapper — those render fine in the iframe, so treat them as the
+  // preview source. Without this, the Preview tab is blank while the file is
+  // visible in the Editor tab.
+  const isWebFile = (f: FileNode) => {
+    const lang = f.language?.toLowerCase();
+    const name = f.name?.toLowerCase() ?? '';
+    return (
+      lang === 'html' ||
+      lang === 'svg' ||
+      name.endsWith('.html') ||
+      name.endsWith('.htm') ||
+      name.endsWith('.svg')
+    );
+  };
+  const htmlFile =
+    files.find(f => f.language === 'html') ??
+    files.find(f => (f.name?.toLowerCase() ?? '').match(/\.html?$/)) ??
+    files.find(isWebFile);
   const cssFile = files.find(f => f.language === 'css');
   const jsFile = files.find(f => f.language === 'javascript' || f.language === 'js');
 
   const previewHtml = useMemo(() => {
     if (!htmlFile) return null;
-    let html = htmlFile.content;
+    let html = htmlFile.content.trim();
+    // A bare SVG document (or fragment) has no <html>/<head>/<body>, so the
+    // <base>, <style>, viewport, and server-injected safety scripts never get
+    // attached. Wrap it in a minimal centered HTML document so it renders.
+    const looksLikeFullHtml = /<html[\s>]|<!doctype html/i.test(html);
+    const looksLikeSvg = /^<svg[\s>]/i.test(html) || html.startsWith('<?xml');
+    if (!looksLikeFullHtml && looksLikeSvg) {
+      html = `<!doctype html><html><head><style>html,body{margin:0;height:100%;display:flex;align-items:center;justify-content:center;background:#fff}svg{max-width:100%;max-height:100%}</style></head><body>${html}</body></html>`;
+    }
     // srcdoc iframes always have a null/opaque origin (MDN spec) — even with
     // allow-same-origin. Without <base>, relative URLs like /api/sfx?slug=...
     // resolve to null:///api/sfx?slug=... and never reach the server.
