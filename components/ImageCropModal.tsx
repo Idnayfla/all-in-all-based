@@ -186,8 +186,17 @@ export default function ImageCropModal({ url, onClose, format = 'png' }: Props) 
     a.click();
   };
 
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    // Only close when the backdrop itself is clicked, and swallow the event
+    // so it never bubbles to tab navigation rendered underneath the modal.
+    if (e.target !== e.currentTarget) return;
+    e.preventDefault();
+    e.stopPropagation();
+    onClose();
+  };
+
   return (
-    <div className="crop-overlay" onClick={onClose}>
+    <div className="crop-overlay" onClick={handleBackdropClick}>
       <div className="crop-modal" onClick={e => e.stopPropagation()}>
         <div className="crop-modal-header">
           <span className="crop-modal-title">◈ Crop Image</span>
