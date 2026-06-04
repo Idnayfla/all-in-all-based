@@ -11711,6 +11711,18 @@ body:has(.beta-banner) .app-root {
 .studio-ai-input::placeholder {
   color: var(--text3);
 }
+.studio-ai-bar-wrap {
+  flex-shrink: 0;
+}
+.studio-ai-hint {
+  padding: 7px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+  color: var(--text2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+}
 
 @media (max-width: 600px) {
   .studio-tracks {
