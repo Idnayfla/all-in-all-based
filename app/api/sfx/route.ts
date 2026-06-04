@@ -13,6 +13,9 @@ export async function GET(req: NextRequest) {
     try {
       const { createClient } = await import('redis');
       const redis = createClient({ url: process.env.REDIS_URL });
+      // Attach an error listener — without one, node-redis throws emitted
+      // 'error' events as unhandled exceptions that bypass try/catch.
+      redis.on('error', () => {});
       await redis.connect();
       const key = `sfx:${ip}`;
       const count = await redis.incr(key);
