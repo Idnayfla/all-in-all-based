@@ -997,28 +997,31 @@ export default function Home() {
     if (!currentProject || !files.length || isSharing) return;
     setIsSharing(true);
     const abort = new AbortController();
-    // Aborts the fetch AND is raced against getSession() so a hanging auth
-    // call can never leave the button stuck at "..." forever.
+    // Only aborts the fetch — we never block on getSession() anymore.
     const timeout = setTimeout(() => abort.abort(), 15000);
-    let timedOut = false;
     try {
-      // getSession() can hang indefinitely (Supabase/Electron). Race it against
-      // a timeout so we never block on it.
-      const session = await Promise.race([
-        supabase.auth.getSession().then(r => r.data.session),
-        new Promise<null>((_, reject) =>
-          setTimeout(() => {
-            timedOut = true;
-            reject(new Error('auth-timeout'));
-          }, 8000)
-        ),
-      ]);
+      // Use the cached session token kept fresh by onAuthStateChange. getSession()
+      // can hang indefinitely (Supabase/Electron), so never call it on the hot path.
+      // Fall back to a short 3s getSession() ONLY if no cached token exists.
+      let token = authToken;
+      if (!token) {
+        try {
+          token = await Promise.race([
+            supabase.auth.getSession().then(r => r.data.session?.access_token ?? ''),
+            new Promise<string>((_, reject) =>
+              setTimeout(() => reject(new Error('auth-timeout')), 3000)
+            ),
+          ]);
+        } catch {
+          token = '';
+        }
+      }
       const res = await fetch('/api/share', {
         method: 'POST',
         signal: abort.signal,
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.access_token ?? ''}`,
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           files,
@@ -1037,15 +1040,16 @@ export default function Home() {
         } else {
           await navigator.clipboard.writeText(full).catch(() => {});
         }
+      } else if (res.status === 401) {
+        console.error('[share] 401 unauthorized');
+        alert('Your session expired — please log in again and retry.');
       } else {
         console.error('[share]', data.error ?? res.status);
         alert('Share failed: ' + (data.error ?? `HTTP ${res.status}`));
       }
     } catch (e: unknown) {
       console.error('[share]', e);
-      if (timedOut || (e instanceof Error && e.message === 'auth-timeout')) {
-        alert('Share timed out signing you in — please refresh and try again.');
-      } else if (e instanceof Error && e.name === 'AbortError') {
+      if (e instanceof Error && e.name === 'AbortError') {
         alert('Share timed out — check your connection and try again.');
       } else {
         alert('Share failed: ' + (e instanceof Error ? e.message : String(e)));
