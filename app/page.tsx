@@ -51,6 +51,56 @@ function uuid(): string {
     .join('');
 }
 
+// Read the Supabase access token straight out of localStorage — NO network call.
+// supabase.auth.getSession() can hang indefinitely (Supabase/Electron), so the
+// hot path must never depend on it. Supabase persists the session under a key
+// shaped like `sb-<project-ref>-auth-token`. Recent supabase-js versions may:
+//   • store plain JSON,
+//   • prefix the value with `base64-` (base64-encoded JSON), and/or
+//   • chunk a large session across `<key>.0`, `<key>.1`, … keys.
+// This handles all three.
+function getStoredAccessToken(): string {
+  try {
+    if (typeof localStorage === 'undefined') return '';
+    const keys = Object.keys(localStorage);
+
+    // Base storage key (non-chunked), e.g. `sb-abcd-auth-token`.
+    const baseKey = keys.find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+    let raw = baseKey ? localStorage.getItem(baseKey) : null;
+
+    // Chunked storage: reassemble `<baseKey>.0`, `<baseKey>.1`, … in order.
+    if (!raw) {
+      const chunkBase = keys.find(k => /^sb-.*-auth-token\.0$/.test(k));
+      if (chunkBase) {
+        const prefix = chunkBase.slice(0, -2); // strip ".0"
+        const chunks = keys
+          .filter(k => k.startsWith(prefix + '.'))
+          .sort((a, b) => Number(a.split('.').pop()) - Number(b.split('.').pop()))
+          .map(k => localStorage.getItem(k) ?? '');
+        raw = chunks.join('');
+      }
+    }
+
+    if (!raw) return '';
+
+    // Decode the `base64-` envelope used by newer supabase-js versions.
+    if (raw.startsWith('base64-')) {
+      raw = atob(raw.slice('base64-'.length));
+    }
+
+    const parsed = JSON.parse(raw);
+    // Token may live at the top level, under `currentSession`, or `session`.
+    return (
+      parsed?.access_token ??
+      parsed?.currentSession?.access_token ??
+      parsed?.session?.access_token ??
+      ''
+    );
+  } catch {
+    return '';
+  }
+}
+
 export interface FileNode {
   name: string;
   content: string;
@@ -487,15 +537,16 @@ export default function Home() {
   }, []);
 
   // ── Auth headers helper ──────────────────────────────────────────────────
+  // Read the token from localStorage directly. getSession() can hang forever
+  // (Supabase/Electron), which previously blocked every authed request. The
+  // cached authToken state is preferred; localStorage is the no-network fallback.
   const getHeaders = useCallback(async (): Promise<HeadersInit> => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const token = authToken || getStoredAccessToken();
     return {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${session?.access_token ?? ''}`,
+      Authorization: `Bearer ${token}`,
     };
-  }, []);
+  }, [authToken]);
 
   // ── Cross-device heartbeat ───────────────────────────────────────────────
   function getDeviceType(): 'mobile' | 'tablet' | 'desktop' {
@@ -671,16 +722,49 @@ export default function Home() {
 
   // ── Auth state listener ──────────────────────────────────────────────────
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+    // getSession() can hang forever (Supabase/Electron). Race it against a 3s
+    // timeout; if it loses, fall back to reading the token straight from
+    // localStorage so the app stays usable (token works even without user info).
+    const SESSION_TIMEOUT = 3000;
+    (async () => {
+      type SessionResult = Awaited<ReturnType<typeof supabase.auth.getSession>>;
+      const timeoutResult: SessionResult = {
+        data: { session: null },
+        error: null,
+      };
+      const {
+        data: { session },
+        error,
+      } = await Promise.race([
+        supabase.auth.getSession(),
+        new Promise<SessionResult>(resolve =>
+          setTimeout(() => resolve(timeoutResult), SESSION_TIMEOUT)
+        ),
+      ]);
+
       if (error) {
         // Stale or invalid refresh token — clear it so the auth modal shows cleanly
         await supabase.auth.signOut();
         setAuthReady(true);
         return;
       }
-      const currentUser = session?.user ?? null;
+
+      if (!session) {
+        // getSession() timed out or returned no session. Try localStorage so a
+        // logged-in user can still make authed requests even if getSession hangs.
+        const storedToken = getStoredAccessToken();
+        if (storedToken) {
+          setAuthToken(storedToken);
+        }
+        // user info is unavailable from a bare token; onAuthStateChange will
+        // backfill it if/when getSession eventually resolves.
+        setAuthReady(true);
+        return;
+      }
+
+      const currentUser = session.user ?? null;
       setUser(currentUser);
-      setAuthToken(session?.access_token ?? '');
+      setAuthToken(session.access_token ?? '');
       setAuthReady(true);
       if (currentUser) {
         const headers = await getHeaders();
@@ -695,7 +779,7 @@ export default function Home() {
         }
         await loadCloudData();
       }
-    });
+    })();
 
     const {
       data: { subscription },
@@ -1000,22 +1084,10 @@ export default function Home() {
     // Only aborts the fetch — we never block on getSession() anymore.
     const timeout = setTimeout(() => abort.abort(), 15000);
     try {
-      // Use the cached session token kept fresh by onAuthStateChange. getSession()
-      // can hang indefinitely (Supabase/Electron), so never call it on the hot path.
-      // Fall back to a short 3s getSession() ONLY if no cached token exists.
-      let token = authToken;
-      if (!token) {
-        try {
-          token = await Promise.race([
-            supabase.auth.getSession().then(r => r.data.session?.access_token ?? ''),
-            new Promise<string>((_, reject) =>
-              setTimeout(() => reject(new Error('auth-timeout')), 3000)
-            ),
-          ]);
-        } catch {
-          token = '';
-        }
-      }
+      // Use the cached session token first; otherwise read it straight from
+      // localStorage. NEVER call getSession() here — it can hang indefinitely
+      // (Supabase/Electron), which is exactly what made Share time out.
+      const token = authToken || getStoredAccessToken();
       const res = await fetch('/api/share', {
         method: 'POST',
         signal: abort.signal,
