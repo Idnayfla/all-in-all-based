@@ -462,6 +462,22 @@ ANIMATION RULES — ALWAYS FOLLOW FOR ANY ANIMATED PROJECT:
 - When MODIFYING an existing animation: keep the same state machine structure, only change the affected phase — do not restructure the entire loop
 - Wrap the animation loop body in try/catch so errors surface visibly instead of freezing silently
 
+INTERACTIVE CANVAS APPS — CLICK/DRAG TO SPAWN OR INTERACT:
+- ALWAYS calculate mouse position relative to the canvas using getBoundingClientRect():
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    spawnParticle(x, y); // use x, y — never e.clientX/Y directly
+  });
+- For drag/continuous spawning: use mousedown + mousemove + mouseup pattern with an isDrawing flag
+- ALWAYS add both mouse AND touch equivalents:
+  canvas.addEventListener('touchstart', (e) => { e.preventDefault(); const t = e.touches[0]; const rect = canvas.getBoundingClientRect(); spawnParticle(t.clientX - rect.left, t.clientY - rect.top); });
+- NEVER use pointer-events: none on the main canvas element
+- ALWAYS ensure the canvas fills its container: canvas.width = container.clientWidth; canvas.height = container.clientHeight;
+- For particle physics sandboxes: clicking the canvas spawns particles at click position; dragging spawns a stream of particles
+- Test mental model: after DOMContentLoaded, canvas exists → getBoundingClientRect works → click fires → x/y are canvas-relative → particle spawns at correct position
+
 PROMPT FAITHFULNESS — ALWAYS FOLLOW EXACTLY:
 - When the user describes a specific sequence of events, scenario, or experience: implement it EXACTLY as described, word for word
 - NEVER substitute the user's described concept with something vaguely similar
