@@ -65,21 +65,6 @@ export default function PreviewPanel({
         ? html.replace('<head>', `<head><base href="${origin}">`)
         : `<base href="${origin}">${html}`;
     }
-    // A <canvas> sized with CSS only keeps its 300x150 intrinsic buffer, which gets
-    // stretched to fill the container. Click handlers using getBoundingClientRect()
-    // then compute coords in displayed space and draw particles outside the 300x150
-    // buffer, so clicking the canvas does nothing. The fix is a standalone <head>
-    // script that runs ONLY on DOMContentLoaded — it must NEVER sit between app JS
-    // files (it would reorder/split multi-file apps and break e.g. `new Particle()`).
-    // App JS is inlined unchanged in <body>; the sizing pass runs after DOM parse.
-    const canvasFix = `<script>(function(){function fixCanvases(){var l=document.querySelectorAll('canvas');for(var i=0;i<l.length;i++){var c=l[i];if(c.dataset.basedSized==='manual')continue;if(c.getAttribute('width')!==null||c.getAttribute('height')!==null){c.dataset.basedSized='manual';continue;}var r=c.getBoundingClientRect();var dw=Math.round(r.width),dh=Math.round(r.height);if(dw<1||dh<1)continue;if(c.width!==dw||c.height!==dh){c.width=dw;c.height=dh;}}}function run(){try{fixCanvases();}catch(e){}}if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',run);}else{run();}var t;window.addEventListener('resize',function(){clearTimeout(t);t=setTimeout(run,120);});})();</script>`;
-    if (html.includes('</head>')) {
-      html = html.replace('</head>', `${canvasFix}</head>`);
-    } else if (html.includes('<head>')) {
-      html = html.replace('<head>', `<head>${canvasFix}`);
-    } else {
-      html = `${canvasFix}${html}`;
-    }
     if (cssFile) html = html.replace('</head>', `<style>${cssFile.content}</style></head>`);
     if (jsFile) {
       html = html.replace('</body>', `<script>${jsFile.content}</script></body>`);
