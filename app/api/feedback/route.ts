@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserId, supabaseAdmin } from '@/app/api/_auth';
+import { supabaseAdmin } from '@/app/api/_auth';
 
 export async function POST(req: NextRequest) {
   try {
-    // ── Auth guard ───────────────────────────────────────────────────────────
-    try {
-      await getUserId(req);
-    } catch {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    // ── No auth guard ─────────────────────────────────────────────────────────
+    // Feedback is frequently submitted from error/degraded states (e.g. the
+    // "Report" button shown when generation fails), where the session token may
+    // be stale or unavailable. Requiring auth here caused reports to silently
+    // 401 while the UI still showed "Reported". IP rate limiting below already
+    // prevents spam, so we accept unauthenticated feedback by design.
 
     // ── IP rate limit: max 5 requests per IP per hour (belt-and-suspenders) ───
     const ip =
@@ -19,6 +19,9 @@ export async function POST(req: NextRequest) {
       try {
         const { createClient } = await import('redis');
         const redis = createClient({ url: process.env.REDIS_URL });
+        // Attach an error listener — without one, node-redis throws emitted
+        // 'error' events as unhandled exceptions that bypass try/catch.
+        redis.on('error', () => {});
         await redis.connect();
         const key = `feedback:${ip}`;
         const count = await redis.incr(key);

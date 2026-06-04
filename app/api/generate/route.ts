@@ -20,15 +20,23 @@ let _redisClient: import('redis').RedisClientType | null = null;
 async function getRedis() {
   if (!process.env.REDIS_URL) return null;
   try {
+    // Drop a stale (closed) cached client so we reconnect instead of returning a
+    // dead handle that throws ClientClosedError on every call until restart.
+    if (_redisClient && !_redisClient.isOpen) {
+      _redisClient = null;
+    }
     if (!_redisClient) {
       const { createClient } = await import('redis');
-      _redisClient = createClient({
+      const client = createClient({
         url: process.env.REDIS_URL,
       }) as import('redis').RedisClientType;
-      _redisClient.on('error', () => {
-        _redisClient = null;
+      // Must attach an 'error' listener BEFORE connect — node-redis throws
+      // emitted error events as unhandled exceptions when there is no listener.
+      client.on('error', () => {
+        if (_redisClient === client) _redisClient = null;
       });
-      await _redisClient.connect();
+      await client.connect();
+      _redisClient = client;
     }
     return _redisClient;
   } catch {
@@ -1455,11 +1463,14 @@ export async function POST(req: NextRequest) {
     let globalMemory = clientGlobalMemory || '';
     if (!globalMemory) {
       try {
-        const { createClient } = await import('redis');
-        const redis = createClient({ url: process.env.REDIS_URL });
-        await redis.connect();
-        globalMemory = (await redis.get('based_memory')) ?? '';
-        await redis.disconnect();
+        // Reuse the shared singleton (which attaches an 'error' listener) instead
+        // of creating an ad-hoc client. An ad-hoc client with no 'error' listener
+        // throws emitted error events as unhandled exceptions that bypass this
+        // try/catch and crash the whole generate request.
+        const redis = await getRedis();
+        if (redis) {
+          globalMemory = (await redis.get('based_memory')) ?? '';
+        }
       } catch {}
     }
 
