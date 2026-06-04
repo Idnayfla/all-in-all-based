@@ -18,11 +18,19 @@ async function cacheGet(
   if (!process.env.REDIS_URL) return null;
   try {
     const { createClient } = await import('redis');
-    const client = createClient({ url: process.env.REDIS_URL });
+    const client = createClient({
+      url: process.env.REDIS_URL,
+      socket: { connectTimeout: 2000, reconnectStrategy: false },
+    });
     // Attach an error listener — without one, node-redis throws emitted
     // 'error' events as unhandled exceptions that bypass try/catch.
     client.on('error', () => {});
-    await client.connect();
+    await Promise.race([
+      client.connect(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Redis connect timeout')), 2000)
+      ),
+    ]);
     const raw = await client.get(key);
     await client.disconnect();
     if (!raw) return null;
@@ -39,11 +47,19 @@ async function cacheSet(
   if (!process.env.REDIS_URL) return;
   try {
     const { createClient } = await import('redis');
-    const client = createClient({ url: process.env.REDIS_URL });
+    const client = createClient({
+      url: process.env.REDIS_URL,
+      socket: { connectTimeout: 2000, reconnectStrategy: false },
+    });
     // Attach an error listener — without one, node-redis throws emitted
     // 'error' events as unhandled exceptions that bypass try/catch.
     client.on('error', () => {});
-    await client.connect();
+    await Promise.race([
+      client.connect(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Redis connect timeout')), 2000)
+      ),
+    ]);
     await client.set(key, JSON.stringify(value), { EX: TTL_SECONDS });
     await client.disconnect();
   } catch {
