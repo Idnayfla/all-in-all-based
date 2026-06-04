@@ -713,7 +713,16 @@ export default function ChatPanel({
         window.dispatchEvent(new CustomEvent('generation-limit-reached'));
         throw new Error('limit');
       }
-      if (!res.ok) throw new Error('API error');
+      if (!res.ok) {
+        // Surface the server's reason (e.g. provider/config error) so prod
+        // failures are diagnosable instead of a blanket "something went wrong".
+        let serverMsg = '';
+        try {
+          const body = await res.clone().json();
+          serverMsg = body?.error || body?.reply || '';
+        } catch {}
+        throw new Error(serverMsg || `API error (${res.status})`);
+      }
       window.dispatchEvent(new CustomEvent('generation-used'));
       if (!res.body) throw new Error('No stream');
 
@@ -990,6 +999,14 @@ export default function ChatPanel({
           return prev;
         });
       } else {
+        // Prefer the server's reason when it gave one; fall back to the
+        // friendly generic for opaque network/parse failures.
+        const isNetworkError =
+          !eMsg ||
+          eMsg === 'API error' ||
+          eMsg === 'Failed to fetch' ||
+          eMsg === 'No stream' ||
+          eName === 'TypeError';
         setMessages(prev => [
           ...prev,
           {
@@ -997,8 +1014,9 @@ export default function ChatPanel({
             content: [
               {
                 type: 'error' as const,
-                message:
-                  'Something went wrong on my end — give it another shot. If it keeps happening, tap Report.',
+                message: isNetworkError
+                  ? 'Something went wrong on my end — give it another shot. If it keeps happening, tap Report.'
+                  : eMsg,
               },
             ],
           },
