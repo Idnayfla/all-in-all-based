@@ -690,6 +690,8 @@ export default function ChatPanel({
         });
       }
 
+      track('generation_started');
+
       const res = await fetch('/api/generate', {
         method: 'POST',
         signal: abort.signal,
