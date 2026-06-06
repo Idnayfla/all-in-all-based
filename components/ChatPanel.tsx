@@ -1136,13 +1136,26 @@ export default function ChatPanel({
   };
 
   const handleSend = () => {
+    const t = input.trim();
+
+    // Pyramid/infographic/ranking requests ALWAYS route to Claude — even when
+    // the user has manually selected image mode (they saw the example as an image
+    // and assume image mode is needed, but Claude builds it better as code)
+    const isStructuredVisual =
+      /\b(infographic|pyramid|triangle|tier list|tier chart|ranking chart|hierarchy|ranked list|leaderboard)\b/i.test(t) ||
+      (/\b(rank|ranking|tier|tiers|category|categories)\b/i.test(t) &&
+        /\b(hotel|restaurant|brand|product|company|logos?)\b/i.test(t)) ||
+      (/\b(triangle|pyramid)\b/i.test(t) &&
+        /\b(hotel|luxury|ranking|rank|category|list|logo)\b/i.test(t));
+    if (isStructuredVisual) { send(); return; }
+
     // Respect manually selected non-chat modes
     if (generationMode === 'seedance') { sendVideo(); return; }
     if (generationMode === 'music') { sendMusic(); return; }
     if (generationMode !== 'chat') { sendImage(); return; }
 
     // Auto-detect intent when in default chat mode
-    const detected = detectIntentMode(input.trim());
+    const detected = detectIntentMode(t);
     if (detected === 'flux') {
       setGenerationMode('flux');
       sendImage();
