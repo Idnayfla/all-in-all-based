@@ -456,9 +456,10 @@ ARCHITECTURE PATTERNS:
 
 INFOGRAPHICS, PYRAMIDS, RANKINGS, TIER LISTS, HIERARCHY CHARTS:
 - These are ALWAYS build requests. ALWAYS wrap output in forge_file tags. NEVER reply as plain text.
-- NEVER output a plain white page or unstyled list — must be a dark, visually rich, professional-looking graphic.
+- TARGET AESTHETIC: a shareable POSTER / magazine graphic — portrait layout, dark city background, gold accents, numbered tier circles with descriptions. NOT a website. NOT a scrollable page.
+- Must include a "Download as PNG" button using html2canvas so the user gets an actual image file.
 
-PYRAMID/TRIANGLE/HIERARCHY — output EXACTLY this structure (adapt content, keep the CSS and forge_file wrapper):
+PYRAMID/TRIANGLE/HIERARCHY — output EXACTLY this structure (adapt text, keep structure and forge_file wrapper):
 
 <forge_type>html</forge_type>
 <forge_file name="index.html" language="html">
@@ -467,44 +468,113 @@ PYRAMID/TRIANGLE/HIERARCHY — output EXACTLY this structure (adapt content, kee
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hierarchy</title>
+<title>Luxury Hierarchy</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#090909;color:#fff;font-family:Georgia,serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:48px 16px}
-h1{font-size:clamp(18px,3.5vw,32px);letter-spacing:8px;color:#c9a87c;text-transform:uppercase;text-align:center;margin-bottom:6px}
-.sub{font-size:11px;letter-spacing:3px;color:#666;text-transform:uppercase;text-align:center;margin-bottom:52px}
-.pyramid{display:flex;flex-direction:column;align-items:center;width:100%;max-width:860px;gap:4px}
-.tier{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 28px;min-height:72px}
-.t1{width:18%;background:linear-gradient(150deg,#8a6520,#c9a87c);clip-path:polygon(14% 0%,86% 0%,100% 100%,0% 100%)}
-.t2{width:38%;background:linear-gradient(150deg,#3d2e10,#7a5828);clip-path:polygon(9% 0%,91% 0%,100% 100%,0% 100%)}
-.t3{width:58%;background:linear-gradient(150deg,#0f2010,#1e4020);clip-path:polygon(6% 0%,94% 0%,100% 100%,0% 100%)}
-.t4{width:78%;background:linear-gradient(150deg,#0e0e28,#1c1c4c);clip-path:polygon(3% 0%,97% 0%,100% 100%,0% 100%)}
-.t5{width:100%;background:linear-gradient(150deg,#1a0606,#380c0c);clip-path:polygon(1% 0%,99% 0%,100% 100%,0% 100%)}
-.label{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:#c9a87c;font-weight:700;margin-bottom:8px;text-align:center}
-.badges{display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
-.badge{background:rgba(0,0,0,0.5);border:1px solid rgba(201,168,124,0.3);padding:3px 10px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#e8d5b0;font-weight:700;border-radius:2px;white-space:nowrap}
+body{background:#0a0a0f;font-family:Georgia,serif;display:flex;flex-direction:column;align-items:center;padding:24px 16px 40px;min-height:100vh}
+.poster{position:relative;width:100%;max-width:520px;background:linear-gradient(180deg,#0d0d1a 0%,#0a0a0f 100%);border:1px solid rgba(201,168,124,0.2);padding:32px 24px 40px;overflow:hidden}
+.poster::before{content:'';position:absolute;inset:0;background:url('https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=800&q=60') center/cover no-repeat;opacity:0.12;pointer-events:none}
+.header{position:relative;text-align:center;margin-bottom:28px}
+.city{font-size:clamp(22px,5vw,36px);letter-spacing:10px;color:#c9a87c;text-transform:uppercase;font-weight:400;line-height:1}
+.divider{display:flex;align-items:center;gap:10px;justify-content:center;margin:8px 0}
+.divider-line{flex:1;height:1px;background:rgba(201,168,124,0.4)}
+.divider-text{font-size:9px;letter-spacing:2px;color:#888;text-transform:uppercase}
+.pyramid{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%}
+.tier{position:relative;display:flex;align-items:flex-start;gap:12px;width:100%;padding:10px 14px 12px}
+.tier-num{flex-shrink:0;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#0a0a0f;margin-top:2px}
+.tier-body{flex:1;min-width:0}
+.tier-name{font-size:10px;letter-spacing:3px;text-transform:uppercase;font-weight:700;margin-bottom:3px}
+.tier-desc{font-size:9px;color:rgba(255,255,255,0.5);letter-spacing:0.5px;margin-bottom:8px;font-style:italic}
+.hotels{display:flex;flex-wrap:wrap;gap:4px}
+.hotel{padding:3px 9px;font-size:9.5px;letter-spacing:1px;text-transform:uppercase;font-weight:700;border-radius:2px;white-space:nowrap}
+.t1{background:rgba(201,168,124,0.15);border-left:3px solid #c9a87c}
+.t1 .tier-num{background:#c9a87c}
+.t1 .tier-name{color:#c9a87c}
+.t1 .hotel{background:rgba(201,168,124,0.2);border:1px solid rgba(201,168,124,0.5);color:#e8d5b0}
+.t2{background:rgba(180,140,80,0.1);border-left:3px solid #b48c50}
+.t2 .tier-num{background:#b48c50}
+.t2 .tier-name{color:#b48c50}
+.t2 .hotel{background:rgba(180,140,80,0.15);border:1px solid rgba(180,140,80,0.4);color:#d4c090}
+.t3{background:rgba(100,140,100,0.1);border-left:3px solid #6a9a6a}
+.t3 .tier-num{background:#6a9a6a}
+.t3 .tier-name{color:#8aba8a}
+.t3 .hotel{background:rgba(100,140,100,0.15);border:1px solid rgba(100,140,100,0.4);color:#c0d8c0}
+.t4{background:rgba(80,100,160,0.1);border-left:3px solid #5064a0}
+.t4 .tier-num{background:#5064a0}
+.t4 .tier-name{color:#8090c8}
+.t4 .hotel{background:rgba(80,100,160,0.15);border:1px solid rgba(80,100,160,0.4);color:#b0bce0}
+.t5{background:rgba(140,80,80,0.1);border-left:3px solid #8c5050}
+.t5 .tier-num{background:#8c5050}
+.t5 .tier-name{color:#c08080}
+.t5 .hotel{background:rgba(140,80,80,0.15);border:1px solid rgba(140,80,80,0.4);color:#d8b0b0}
+.footer{position:relative;text-align:center;margin-top:20px;font-size:8px;letter-spacing:2px;color:rgba(201,168,124,0.4);text-transform:uppercase}
+.dl-btn{margin-top:20px;padding:10px 28px;background:#c9a87c;color:#0a0a0f;border:none;font-family:Georgia,serif;font-size:12px;letter-spacing:3px;text-transform:uppercase;cursor:pointer;font-weight:700}
+.dl-btn:hover{background:#e8d5b0}
 </style>
 </head>
 <body>
-<h1>KUALA LUMPUR</h1>
-<div class="sub">Hotels Ranked · Most Luxurious to Least Luxurious</div>
-<div class="pyramid">
-  <div class="tier t1"><div class="label">I · Ultra Luxury</div><div class="badges"><span class="badge">PARK HYATT</span><span class="badge">FOUR SEASONS</span></div></div>
-  <div class="tier t2"><div class="label">II · Luxury</div><div class="badges"><span class="badge">RITZ-CARLTON</span><span class="badge">MANDARIN ORIENTAL</span><span class="badge">ST. REGIS</span><span class="badge">W HOTEL</span></div></div>
-  <div class="tier t3"><div class="label">III · Premium</div><div class="badges"><span class="badge">GRAND HYATT</span><span class="badge">SHANGRI-LA</span><span class="badge">BANYAN TREE</span><span class="badge">JW MARRIOTT</span><span class="badge">THE WESTIN</span></div></div>
-  <div class="tier t4"><div class="label">IV · Upscale</div><div class="badges"><span class="badge">HILTON</span><span class="badge">SHERATON IMPERIAL</span><span class="badge">DOUBLETREE</span><span class="badge">RENAISSANCE</span><span class="badge">PULLMAN</span></div></div>
-  <div class="tier t5"><div class="label">V · Comfort</div><div class="badges"><span class="badge">NOVOTEL</span><span class="badge">HOLIDAY INN</span><span class="badge">FURAMA</span><span class="badge">CONCORDE</span><span class="badge">THE BOULEVARD</span></div></div>
+<div class="poster" id="poster">
+  <div class="header">
+    <div class="city">KUALA LUMPUR</div>
+    <div class="divider"><div class="divider-line"></div><div class="divider-text">Hotels Ranked from Most Luxurious to Least Luxurious</div><div class="divider-line"></div></div>
+  </div>
+  <div class="pyramid">
+    <div class="tier t1">
+      <div class="tier-num">1</div>
+      <div class="tier-body">
+        <div class="tier-name">Ultra Luxury</div>
+        <div class="tier-desc">The finest iconic service and unparalleled experiences</div>
+        <div class="hotels"><span class="hotel">PARK HYATT</span><span class="hotel">FOUR SEASONS</span></div>
+      </div>
+    </div>
+    <div class="tier t2">
+      <div class="tier-num">2</div>
+      <div class="tier-body">
+        <div class="tier-name">Luxury</div>
+        <div class="tier-desc">World-class amenities with refined elegance</div>
+        <div class="hotels"><span class="hotel">RITZ-CARLTON</span><span class="hotel">MANDARIN ORIENTAL</span><span class="hotel">ST. REGIS</span><span class="hotel">W HOTEL</span></div>
+      </div>
+    </div>
+    <div class="tier t3">
+      <div class="tier-num">3</div>
+      <div class="tier-body">
+        <div class="tier-name">Premium</div>
+        <div class="tier-desc">Superior comfort with premium facilities</div>
+        <div class="hotels"><span class="hotel">GRAND HYATT</span><span class="hotel">SHANGRI-LA</span><span class="hotel">BANYAN TREE</span><span class="hotel">JW MARRIOTT</span><span class="hotel">THE WESTIN</span></div>
+      </div>
+    </div>
+    <div class="tier t4">
+      <div class="tier-num">4</div>
+      <div class="tier-body">
+        <div class="tier-name">Upscale</div>
+        <div class="tier-desc">Consistent quality with business-class service</div>
+        <div class="hotels"><span class="hotel">HILTON</span><span class="hotel">SHERATON IMPERIAL</span><span class="hotel">DOUBLETREE</span><span class="hotel">RENAISSANCE</span><span class="hotel">PULLMAN</span></div>
+      </div>
+    </div>
+    <div class="tier t5">
+      <div class="tier-num">5</div>
+      <div class="tier-body">
+        <div class="tier-name">Comfort</div>
+        <div class="tier-desc">Reliable service with essential amenities</div>
+        <div class="hotels"><span class="hotel">NOVOTEL</span><span class="hotel">HOLIDAY INN</span><span class="hotel">FURAMA</span><span class="hotel">CONCORDE</span><span class="hotel">THE BOULEVARD</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="footer">Rankings based on luxury standards · facilities · service quality · location</div>
 </div>
+<button class="dl-btn" onclick="html2canvas(document.getElementById('poster'),{scale:2,useCORS:true}).then(c=>{const a=document.createElement('a');a.download='ranking.png';a.href=c.toDataURL();a.click()})">↓ Download as PNG</button>
 </body>
 </html>
 </forge_file>
 
 RULES FOR INFOGRAPHIC OUTPUT:
-- The forge_type and forge_file tags above are MANDATORY — never omit them
-- Replace placeholder hotel names with real ones from the user's request
-- Keep all CSS exactly as shown — do not simplify or remove the dark theme
-- If user asks for more hotels, add more .badge spans to each tier
-- NEVER reply in plain text for these requests — always forge_file
+- forge_type and forge_file tags are MANDATORY — never omit them
+- Replace ALL placeholder hotel/brand names and tier descriptions with ones relevant to the user's request
+- Keep the poster layout, city background, numbered tier circles, tier descriptions, and Download button
+- Adapt the background image URL to match the city/topic (Unsplash photo search URLs work: https://images.unsplash.com/photo-[id]?w=800)
+- Add more .hotel spans per tier to hit the user's requested count
+- NEVER reply in plain text — always forge_file
 
 ANIMATION RULES — ALWAYS FOLLOW FOR ANY ANIMATED PROJECT:
 - Always wrap the entire animation init in: window.addEventListener('DOMContentLoaded', function() { ... })
