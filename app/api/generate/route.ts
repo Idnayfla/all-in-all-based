@@ -454,19 +454,61 @@ ARCHITECTURE PATTERNS:
 - Dashboards: fetch → transform → render, loading/error states always
 - Forms: validate on submit, show inline errors, disable during processing
 
-INFOGRAPHICS, PYRAMIDS, RANKINGS, TIER LISTS, HIERARCHY CHARTS:
-- When user asks for an infographic, pyramid chart, tier list, ranking visual, or hierarchy diagram → build it as a beautiful standalone HTML page
-- Use real text from the user's request — never hallucinate or invent names not mentioned
-- For pyramid/triangle layouts: use CSS clip-path polygon or SVG <polygon> for the triangle shape, divide into horizontal tiers with flexbox rows inside
-- For rankings: use a vertical stack of styled tier cards with distinct colors per tier
-- Visual quality bar: match the style of a professional infographic — rich background (dark gradient or themed color), gold/accent tier dividers, clean typography, drop shadows
-- For hotel/brand/company logos: render them as styled text badges (font-weight: 800, letter-spacing) since real logo images can't be fetched — make them look premium
-- Always include a title, subtitle, and legend if appropriate
-- Make it full-page and visually stunning — this is a shareable graphic, not a plain list
-- Example pyramid CSS pattern:
-  .pyramid { display: flex; flex-direction: column; align-items: center; gap: 0; }
-  .tier { display: flex; align-items: center; justify-content: center; clip-path: none; }
-  /* Use decreasing width per tier: tier-1 width 20%, tier-2 40%, tier-3 60%, tier-4 80%, tier-5 100% */
+INFOGRAPHICS, PYRAMIDS, RANKINGS, TIER LISTS, HIERARCHY CHARTS — MANDATORY VISUAL OUTPUT:
+- NEVER output a plain text list or unstyled HTML for these requests. ALWAYS build a fully styled, visually stunning HTML page.
+- The output must look like a professional shareable graphic — dark themed, rich colors, not a document.
+
+PYRAMID / TRIANGLE HIERARCHY — USE THIS EXACT STRUCTURE:
+Build the pyramid using a flex column of trapezoid-shaped divs using clip-path. Each tier is wider at the bottom. Tier 1 (top/most prestigious) is narrowest. Dark background (#0a0a0a or deep navy). Gold/amber accent colors for borders and labels. Each hotel name is a styled badge chip inside the tier.
+
+MANDATORY HTML TEMPLATE FOR PYRAMID REQUESTS:
+\`\`\`html
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0a0a0a; color: #fff; font-family: 'Georgia', serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; }
+  h1 { font-size: clamp(22px, 4vw, 36px); letter-spacing: 6px; color: #c9a87c; text-transform: uppercase; margin-bottom: 6px; text-align: center; }
+  .subtitle { font-size: 13px; letter-spacing: 3px; color: #888; text-transform: uppercase; margin-bottom: 48px; text-align: center; }
+  .pyramid { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 800px; gap: 3px; }
+  .tier { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 18px 24px; position: relative; border-top: 1px solid rgba(201,168,124,0.3); }
+  .tier-1 { width: 22%; background: linear-gradient(135deg, #7c5c2e, #c9a87c); clip-path: polygon(10% 0%, 90% 0%, 100% 100%, 0% 100%); }
+  .tier-2 { width: 42%; background: linear-gradient(135deg, #3a2e1e, #6b4f2a); clip-path: polygon(8% 0%, 92% 0%, 100% 100%, 0% 100%); }
+  .tier-3 { width: 62%; background: linear-gradient(135deg, #1e2a1e, #2d4a2d); clip-path: polygon(6% 0%, 94% 0%, 100% 100%, 0% 100%); }
+  .tier-4 { width: 82%; background: linear-gradient(135deg, #1a1a2e, #2d2d5a); clip-path: polygon(4% 0%, 96% 0%, 100% 100%, 0% 100%); }
+  .tier-5 { width: 100%; background: linear-gradient(135deg, #1a0a0a, #3a1a1a); clip-path: polygon(2% 0%, 98% 0%, 100% 100%, 0% 100%); }
+  .tier-label { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: #c9a87c; margin-bottom: 10px; font-weight: 700; }
+  .hotels { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .hotel-badge { background: rgba(0,0,0,0.4); border: 1px solid rgba(201,168,124,0.4); padding: 4px 12px; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #e8d5b0; font-weight: 700; border-radius: 2px; }
+  .legend { display: flex; gap: 24px; margin-top: 40px; flex-wrap: wrap; justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 2px; color: #888; text-transform: uppercase; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+</style>
+</head>
+<body>
+  <h1>KUALA LUMPUR</h1>
+  <div class="subtitle">Hotels ranked from most luxurious to least luxurious</div>
+  <div class="pyramid">
+    <div class="tier tier-1">
+      <div class="tier-label">I · Ultra Luxury</div>
+      <div class="hotels">
+        <span class="hotel-badge">PARK HYATT</span>
+        <span class="hotel-badge">FOUR SEASONS</span>
+      </div>
+    </div>
+    <!-- repeat for tiers 2–5 -->
+  </div>
+</body>
+</html>
+\`\`\`
+
+- clip-path trapezoid values: tier 1 widest angle, tier 5 nearly vertical sides
+- Every hotel name goes inside a .hotel-badge span
+- Use the exact tier color scheme above — dark jewel tones per tier
+- Title and subtitle always in ALL CAPS with letter-spacing
+- NEVER use a plain white background, NEVER output an unstyled list
 
 ANIMATION RULES — ALWAYS FOLLOW FOR ANY ANIMATED PROJECT:
 - Always wrap the entire animation init in: window.addEventListener('DOMContentLoaded', function() { ... })
