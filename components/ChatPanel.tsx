@@ -57,6 +57,50 @@ function getRandomSuggestions() {
   return shuffled.slice(0, 4);
 }
 
+function detectIntentMode(text: string): GenerationMode {
+  const t = text.toLowerCase().trim();
+  if (!t) return 'chat';
+
+  // If it looks like a code/app request, always stay in chat (Claude builds it)
+  const isAppRequest =
+    /\b(app|editor|player|tool|builder|website|site|dashboard|game|visualizer|analyzer|portfolio|calculator|tracker|widget|component|page|form|quiz|chatbot)\b/.test(t) &&
+    /\b(build|make|create|code|develop|program|write)\b/.test(t);
+  if (isAppRequest) return 'chat';
+
+  // ── Image intent ──────────────────────────────────────────────────────
+  // Unambiguous drawing verbs
+  if (/\b(draw|paint|sketch|illustrate)\b/.test(t)) return 'flux';
+  // "generate/create/make/render/design + image noun"
+  if (
+    /\b(generate|create|make|render|design|show me|give me|produce)\b/.test(t) &&
+    /\b(image|picture|photo|photograph|illustration|artwork|drawing|painting|portrait|logo|icon|banner|thumbnail|wallpaper|poster|cover|headshot|avatar|graphic|artwork|visual|art)\b/.test(t)
+  )
+    return 'flux';
+
+  // ── Video intent ──────────────────────────────────────────────────────
+  if (/\b(animate)\b/.test(t) && !/\b(animation (player|editor|app|tool))\b/.test(t))
+    return 'seedance';
+  if (
+    /\b(generate|create|make|produce|render)\b/.test(t) &&
+    /\b(video|animation|clip|film|reel|footage|cinematic)\b/.test(t) &&
+    !/\b(video (player|editor|app|tool|streaming|platform))\b/.test(t)
+  )
+    return 'seedance';
+
+  // ── Music intent ──────────────────────────────────────────────────────
+  // Unambiguous composition verbs
+  if (/\b(compose|write\s+a?\s*(song|melody|jingle|tune|beat|track))\b/.test(t)) return 'music';
+  if (
+    /\b(generate|create|make|produce)\b/.test(t) &&
+    /\b(music|song|melody|beat|track|soundtrack|jingle|tune|audio|sound)\b/.test(t) &&
+    !/\b(music (player|visualizer|app|editor|tool))\b/.test(t) &&
+    !/\b(sound (effects|design))\b/.test(t)
+  )
+    return 'music';
+
+  return 'chat';
+}
+
 interface GenerationProgress {
   files: string[];
   completed: number; // fully finished files
@@ -1085,13 +1129,32 @@ export default function ChatPanel({
     }
   };
 
+  const handleSend = () => {
+    // Respect manually selected non-chat modes
+    if (generationMode === 'seedance') { sendVideo(); return; }
+    if (generationMode === 'music') { sendMusic(); return; }
+    if (generationMode !== 'chat') { sendImage(); return; }
+
+    // Auto-detect intent when in default chat mode
+    const detected = detectIntentMode(input.trim());
+    if (detected === 'flux') {
+      setGenerationMode('flux');
+      sendImage();
+    } else if (detected === 'seedance') {
+      setGenerationMode('seedance');
+      sendVideo();
+    } else if (detected === 'music') {
+      setGenerationMode('music');
+      sendMusic();
+    } else {
+      send();
+    }
+  };
+
   const handleKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (generationMode === 'seedance') sendVideo();
-      else if (generationMode === 'music') sendMusic();
-      else if (generationMode !== 'chat') sendImage();
-      else send();
+      handleSend();
     }
   };
 
@@ -1654,12 +1717,7 @@ export default function ChatPanel({
           />
           <motion.button
             className={`send-btn${generationMode !== 'chat' ? ' send-btn-image' : ''}`}
-            onClick={() => {
-              if (generationMode === 'seedance') sendVideo();
-              else if (generationMode === 'music') sendMusic();
-              else if (generationMode !== 'chat') sendImage();
-              else send();
-            }}
+            onClick={handleSend}
             disabled={isGenerating || isGeneratingMedia || (!input.trim() && !pendingImage)}
             whileTap={{ scale: 0.95 }}
           >
@@ -1721,10 +1779,7 @@ export default function ChatPanel({
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     setMobileInputOpen(false);
-                    if (generationMode === 'seedance') sendVideo();
-                    else if (generationMode === 'music') sendMusic();
-                    else if (generationMode !== 'chat') sendImage();
-                    else send();
+                    handleSend();
                   }
                 }}
                 placeholder={
@@ -1748,10 +1803,7 @@ export default function ChatPanel({
                   disabled={!input.trim() && !pendingImage}
                   onClick={() => {
                     setMobileInputOpen(false);
-                    if (generationMode === 'seedance') sendVideo();
-                    else if (generationMode === 'music') sendMusic();
-                    else if (generationMode !== 'chat') sendImage();
-                    else send();
+                    handleSend();
                   }}
                 >
                   → Send
