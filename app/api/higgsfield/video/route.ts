@@ -8,8 +8,8 @@ export async function POST(req: NextRequest) {
   const limit = await checkMediaRateLimit(req, 'video');
   if (limit instanceof NextResponse) return limit;
 
-  if (!process.env.HIGGSFIELD_API_KEY || !process.env.HIGGSFIELD_SECRET) {
-    return NextResponse.json({ error: 'Higgsfield API keys not configured' }, { status: 500 });
+  if (!process.env.HIGGSFIELD_API_KEY) {
+    return NextResponse.json({ error: 'Higgsfield API key not configured' }, { status: 500 });
   }
 
   const { imageUrl, prompt, model } = await req.json();

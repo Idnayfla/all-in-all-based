@@ -129,7 +129,8 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
   }, []);
 
   const pushUndo = useCallback(() => {
-    setUndoStack(prev => [...prev.slice(-29), captureSnapshot()]);
+    const snap = captureSnapshot();
+    setUndoStack(prev => [...prev.slice(-29), snap]);
     setRedoStack([]);
   }, [captureSnapshot]);
 
@@ -139,32 +140,32 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
         const c = offscreens.current[id];
         if (c) c.getContext('2d')!.putImageData(data, 0, 0);
       });
+      // Clear any offscreen that wasn't in the snapshot — it was empty at that point
+      Object.entries(offscreens.current).forEach(([id, c]) => {
+        if (!snap.has(id)) c.getContext('2d')!.clearRect(0, 0, W, H);
+      });
       composite(layerList, false);
     },
     [composite]
   );
 
   const undo = useCallback(() => {
-    setUndoStack(prev => {
-      if (!prev.length) return prev;
-      const snap = prev[prev.length - 1];
-      const next = prev.slice(0, -1);
-      setRedoStack(r => [...r, captureSnapshot()]);
-      applySnapshot(snap, layers);
-      return next;
-    });
-  }, [captureSnapshot, applySnapshot, layers]);
+    if (!undoStack.length) return;
+    const snap = undoStack[undoStack.length - 1];
+    const currentSnap = captureSnapshot();
+    setRedoStack(r => [...r, currentSnap]);
+    applySnapshot(snap, layers);
+    setUndoStack(prev => prev.slice(0, -1));
+  }, [undoStack, captureSnapshot, applySnapshot, layers]);
 
   const redo = useCallback(() => {
-    setRedoStack(prev => {
-      if (!prev.length) return prev;
-      const snap = prev[prev.length - 1];
-      const next = prev.slice(0, -1);
-      setUndoStack(u => [...u, captureSnapshot()]);
-      applySnapshot(snap, layers);
-      return next;
-    });
-  }, [captureSnapshot, applySnapshot, layers]);
+    if (!redoStack.length) return;
+    const snap = redoStack[redoStack.length - 1];
+    const currentSnap = captureSnapshot();
+    setUndoStack(u => [...u, currentSnap]);
+    applySnapshot(snap, layers);
+    setRedoStack(prev => prev.slice(0, -1));
+  }, [redoStack, captureSnapshot, applySnapshot, layers]);
 
   useEffect(() => {
     composite(layers, tool === 'mask');
@@ -433,7 +434,11 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
         });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
-        await loadUrlToLayer(data.url, `AI: ${aiPrompt.slice(0, 24)}`);
+        await loadUrlToLayer(
+          data.url,
+          `AI: ${aiPrompt.slice(0, 24)}${data.provider === 'fal' ? ' (Flux)' : ''}`
+        );
+        if (data.note) setStatus(data.note);
       } else if (aiMode === 'transform') {
         const base64 = flatten(false).split(',')[1];
         const res = await fetch('/api/image', {
@@ -449,9 +454,31 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
         if (data.error) throw new Error(data.error);
         await loadUrlToLayer(data.url, `Transform: ${aiPrompt.slice(0, 20)}`);
       } else {
-        // inpaint
+        // inpaint — convert the red mask strokes to a white-on-black binary mask
+        // that inpaint models expect (white = area to repaint, black = keep)
         const sourceBase64 = flatten(false).split(',')[1];
-        const maskDataUrl = maskRef.current?.toDataURL('image/png') ?? '';
+        const mc = maskRef.current;
+        let maskDataUrl = '';
+        if (mc) {
+          const binCanvas = document.createElement('canvas');
+          binCanvas.width = W;
+          binCanvas.height = H;
+          const binCtx = binCanvas.getContext('2d')!;
+          binCtx.fillStyle = 'black';
+          binCtx.fillRect(0, 0, W, H);
+          const srcData = mc.getContext('2d')!.getImageData(0, 0, W, H);
+          const outData = binCtx.createImageData(W, H);
+          for (let i = 0; i < srcData.data.length; i += 4) {
+            const painted = srcData.data[i + 3] > 20; // any painted alpha = mask
+            outData.data[i] = painted ? 255 : 0;
+            outData.data[i + 1] = painted ? 255 : 0;
+            outData.data[i + 2] = painted ? 255 : 0;
+            outData.data[i + 3] = 255;
+          }
+          binCtx.putImageData(outData, 0, 0);
+          maskDataUrl = binCanvas.toDataURL('image/png');
+        }
+        if (!maskDataUrl) throw new Error('Paint a mask over the area to edit first.');
         const res = await fetch('/api/image/edit', {
           method: 'POST',
           headers: authHeaders,
@@ -465,7 +492,7 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
         });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
-        await loadUrlToLayer(data.url, `Inpaint: ${aiPrompt.slice(0, 20)}`);
+        await loadUrlToLayer(data.url, `AI Edit: ${aiPrompt.slice(0, 20)}`);
         clearMask();
       }
 
@@ -901,7 +928,7 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
                   [
                     { id: 'generate', label: 'Generate' },
                     { id: 'transform', label: 'Transform' },
-                    { id: 'inpaint', label: 'Inpaint' },
+                    { id: 'inpaint', label: 'AI Edit' },
                   ] as { id: AiMode; label: string }[]
                 ).map(m => (
                   <button
@@ -943,7 +970,8 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
                 {aiMode === 'generate' &&
                   imageProvider === 'fal' &&
                   'Describe an image to create on a new layer.'}
-                {aiMode === 'transform' && 'Describe how to transform the current canvas.'}
+                {aiMode === 'transform' &&
+                  'Give an edit instruction: "Turn the red apple blue", "Make the sky sunset", "Add snow to the ground".'}
                 {aiMode === 'inpaint' && 'Paint a mask, then describe what to place there.'}
               </div>
 
@@ -953,7 +981,7 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
                   aiMode === 'generate'
                     ? 'A neon cityscape at dusk, ultra detailed…'
                     : aiMode === 'transform'
-                      ? 'Make it look like a watercolour painting…'
+                      ? 'Turn the red apple blue, add rain, change the sky to sunset…'
                       : 'Replace the selected area with a cat…'
                 }
                 value={aiPrompt}
@@ -977,13 +1005,13 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
                       : '◈ Generate'
                     : aiMode === 'transform'
                       ? '◈ Transform'
-                      : '◈ Inpaint'}
+                      : '◈ AI Edit'}
               </button>
 
               {aiMode === 'inpaint' && (
                 <div className="image-ai-mask-note">
-                  Switch to <strong>Mask</strong> tool and paint the area to replace, then click
-                  Inpaint.
+                  Switch to <strong>Mask</strong> tool and paint the area to replace, then click AI
+                  Edit.
                 </div>
               )}
             </div>

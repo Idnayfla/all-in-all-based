@@ -44,18 +44,37 @@ export async function POST(req: NextRequest) {
       }
     } else {
       if (imageUrl) {
-        const result = await fal.subscribe('fal-ai/flux/dev/image-to-image', {
-          input: {
-            image_url: imageUrl,
-            prompt,
-            strength: 0.85,
-            num_inference_steps: 28,
-            guidance_scale: 3.5,
-            num_images: 1,
-            enable_safety_checker: true,
-          },
-        });
-        url = (result.data as { images?: { url: string }[] }).images?.[0]?.url;
+        // Flux Kontext — instruction-following image editor ("turn X into Y").
+        // Falls back to flux dev image-to-image if Kontext is unavailable.
+        try {
+          const result = await fal.subscribe('fal-ai/flux-pro/kontext/max', {
+            input: { image_url: imageUrl, prompt, num_images: 1 },
+          });
+          url = (result.data as { images?: { url: string }[] }).images?.[0]?.url;
+        } catch (kontextErr: unknown) {
+          const kontextMsg = String(
+            kontextErr instanceof Error ? kontextErr.message : kontextErr
+          ).toLowerCase();
+          const isUnavailable =
+            kontextMsg.includes('404') ||
+            kontextMsg.includes('not found') ||
+            kontextMsg.includes('403') ||
+            kontextMsg.includes('forbidden');
+          if (!isUnavailable) throw kontextErr;
+          // Fallback: flux dev i2i at lower strength for better instruction following
+          const result = await fal.subscribe('fal-ai/flux/dev/image-to-image', {
+            input: {
+              image_url: imageUrl,
+              prompt,
+              strength: 0.55, // 0.55 preserves structure better than 0.85
+              num_inference_steps: 20,
+              guidance_scale: 7.5,
+              num_images: 1,
+              enable_safety_checker: true,
+            },
+          });
+          url = (result.data as { images?: { url: string }[] }).images?.[0]?.url;
+        }
       } else {
         const result = await fal.subscribe('fal-ai/flux/dev', {
           input: {

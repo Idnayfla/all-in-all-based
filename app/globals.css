@@ -10934,6 +10934,31 @@ body:has(.beta-banner) .app-root {
   font-family: var(--font-mono);
 }
 
+.studio-audio-unlock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.studio-audio-unlock-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 18px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  letter-spacing: 0.04em;
+}
+
+.studio-audio-unlock-btn:hover {
+  opacity: 0.88;
+}
+
 /* Header */
 .studio-header {
   display: flex;

@@ -1,7 +1,296 @@
 'use client';
 import { useRef, useState, useCallback, useEffect, type ReactElement } from 'react';
 import type * as ToneTypes from 'tone';
+import * as ToneRuntime from 'tone';
 import GeneratedMusicCard from './GeneratedMusicCard';
+
+// ── Raw Web Audio helpers (no Tone.js — guaranteed cross-browser) ───────────
+const NOTE_STEPS: Record<string, number> = {
+  C: 0,
+  'C#': 1,
+  Db: 1,
+  D: 2,
+  'D#': 3,
+  Eb: 3,
+  E: 4,
+  F: 5,
+  'F#': 6,
+  Gb: 6,
+  G: 7,
+  'G#': 8,
+  Ab: 8,
+  A: 9,
+  'A#': 10,
+  Bb: 10,
+  B: 11,
+};
+function noteToFreq(note: string): number {
+  const m = note.match(/^([A-G](?:#|b)?)(\d+)$/);
+  if (!m) return 440;
+  const step = NOTE_STEPS[m[1]] ?? 0;
+  const octave = parseInt(m[2]);
+  return 440 * 2 ** ((step - 9 + (octave - 4) * 12) / 12);
+}
+const INST_OSC: Record<string, OscillatorType> = {
+  piano: 'triangle',
+  epiano: 'triangle',
+  synth: 'sawtooth',
+  pad: 'triangle',
+  strings: 'triangle',
+  organ: 'square',
+  bass: 'sine',
+  pluck: 'triangle',
+  choir: 'sine',
+  guitar: 'triangle',
+  brass: 'sawtooth',
+  flute: 'sine',
+};
+interface RawEffects {
+  reverb: number;
+  delay: number;
+  distortion: number;
+  pitchShift: number;
+}
+
+// Reverb impulse-response cache: reuse AudioBuffer across hits with same level
+const _reverbIRCache = new WeakMap<AudioContext, Map<string, AudioBuffer>>();
+function getReverbIR(ctx: AudioContext, amount: number): AudioBuffer {
+  let ctxMap = _reverbIRCache.get(ctx);
+  if (!ctxMap) {
+    ctxMap = new Map();
+    _reverbIRCache.set(ctx, ctxMap);
+  }
+  const key = amount.toFixed(2);
+  const cached = ctxMap.get(key);
+  if (cached) return cached;
+  const sr = ctx.sampleRate;
+  const decaySec = 0.4 + amount * 3.2;
+  const bufLen = Math.floor(sr * decaySec);
+  const buf = ctx.createBuffer(2, bufLen, sr);
+  for (let c = 0; c < 2; c++) {
+    const d = buf.getChannelData(c);
+    for (let i = 0; i < bufLen; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufLen, 2);
+    }
+  }
+  ctxMap.set(key, buf);
+  return buf;
+}
+
+function makeDistortionCurve(amount: number): Float32Array {
+  const n = 256;
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / n - 1;
+    curve[i] = ((Math.PI + amount * 400) * x) / (Math.PI + amount * 400 * Math.abs(x));
+  }
+  return curve;
+}
+
+function playRawNote(
+  ctx: AudioContext,
+  note: string,
+  instrument: string,
+  volume: number,
+  pan: number,
+  effects?: RawEffects
+): void {
+  const freq = noteToFreq(note);
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const panner = ctx.createStereoPanner();
+  osc.type = INST_OSC[instrument] ?? 'sawtooth';
+  // PitchShift: multiply frequency by semitone ratio
+  const pitchRatio = effects?.pitchShift ? Math.pow(2, effects.pitchShift / 12) : 1;
+  osc.frequency.value = freq * pitchRatio;
+  panner.pan.value = Math.max(-1, Math.min(1, pan));
+  const now = ctx.currentTime;
+  const peak = Math.max(0, Math.min(1, volume)) * 0.4;
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(peak, now + 0.015);
+  gain.gain.exponentialRampToValueAtTime(peak * 0.6, now + 0.12);
+  gain.gain.setValueAtTime(peak * 0.6, now + 0.22);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.65);
+  osc.connect(gain);
+
+  let lastNode: AudioNode = gain;
+
+  // Distortion
+  if (effects && effects.distortion > 0.01) {
+    const ws = ctx.createWaveShaper();
+    ws.curve = makeDistortionCurve(effects.distortion) as Float32Array<ArrayBuffer>;
+    ws.oversample = '2x';
+    lastNode.connect(ws);
+    lastNode = ws;
+  }
+
+  // Delay — merge dry+wet into a sum node so reverb can chain after
+  if (effects && effects.delay > 0.01) {
+    const dry = ctx.createGain();
+    const wet = ctx.createGain();
+    const delayNode = ctx.createDelay(1.0);
+    const fbGain = ctx.createGain();
+    const postDelay = ctx.createGain();
+    dry.gain.value = 1 - effects.delay * 0.5;
+    wet.gain.value = effects.delay * 0.6;
+    delayNode.delayTime.value = 0.25;
+    fbGain.gain.value = 0.35;
+    lastNode.connect(dry);
+    lastNode.connect(delayNode);
+    delayNode.connect(fbGain);
+    fbGain.connect(delayNode);
+    delayNode.connect(wet);
+    dry.connect(postDelay);
+    wet.connect(postDelay);
+    lastNode = postDelay;
+  }
+
+  // Reverb — ConvolverNode with cached synthetic impulse response
+  if (effects && effects.reverb > 0.01) {
+    const ir = getReverbIR(ctx, effects.reverb);
+    const conv = ctx.createConvolver();
+    conv.buffer = ir;
+    const dryG = ctx.createGain();
+    const wetG = ctx.createGain();
+    const postReverb = ctx.createGain();
+    dryG.gain.value = 1 - effects.reverb * 0.7;
+    wetG.gain.value = effects.reverb * 0.9;
+    lastNode.connect(dryG);
+    lastNode.connect(conv);
+    conv.connect(wetG);
+    dryG.connect(postReverb);
+    wetG.connect(postReverb);
+    lastNode = postReverb;
+  }
+
+  lastNode.connect(panner);
+  panner.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.75);
+}
+
+// ── Raw drum synthesis ────────────────────────────────────────────────────
+function drumKick(ctx: AudioContext, time: number, vol: number, dest: AudioNode) {
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(vol * 0.9, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.5);
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(150, time);
+  osc.frequency.exponentialRampToValueAtTime(0.001, time + 0.4);
+  osc.connect(gain);
+  gain.connect(dest);
+  osc.start(time);
+  osc.stop(time + 0.5);
+}
+
+function drumSnare(ctx: AudioContext, time: number, vol: number, dest: AudioNode) {
+  const bufLen = Math.floor(ctx.sampleRate * 0.2);
+  const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < bufLen; i++) d[i] = Math.random() * 2 - 1;
+  const noise = ctx.createBufferSource();
+  noise.buffer = buf;
+  const ng = ctx.createGain();
+  ng.gain.setValueAtTime(vol * 0.6, time);
+  ng.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
+  noise.connect(ng);
+  ng.connect(dest);
+  noise.start(time);
+  noise.stop(time + 0.2);
+  const osc = ctx.createOscillator();
+  osc.type = 'triangle';
+  osc.frequency.value = 180;
+  const og = ctx.createGain();
+  og.gain.setValueAtTime(vol * 0.25, time);
+  og.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+  osc.connect(og);
+  og.connect(dest);
+  osc.start(time);
+  osc.stop(time + 0.1);
+}
+
+function drumHiHat(ctx: AudioContext, time: number, vol: number, decay: number, dest: AudioNode) {
+  [400, 800, 1200, 1600, 2000, 2400].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.value = freq;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime((vol * 0.06) / (1 + i * 0.2), time);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + decay);
+    osc.connect(g);
+    g.connect(dest);
+    osc.start(time);
+    osc.stop(time + decay + 0.01);
+  });
+}
+
+function drumClap(ctx: AudioContext, time: number, vol: number, dest: AudioNode) {
+  [0, 0.01, 0.02].forEach(offset => {
+    const bufLen = Math.floor(ctx.sampleRate * 0.05);
+    const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) d[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol * 0.5, time + offset);
+    g.gain.exponentialRampToValueAtTime(0.001, time + offset + 0.09);
+    noise.connect(g);
+    g.connect(dest);
+    noise.start(time + offset);
+    noise.stop(time + offset + 0.1);
+  });
+}
+
+function drumTom(ctx: AudioContext, time: number, vol: number, startFreq: number, dest: AudioNode) {
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(startFreq, time);
+  osc.frequency.exponentialRampToValueAtTime(startFreq * 0.4, time + 0.3);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(vol * 0.7, time);
+  g.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
+  osc.connect(g);
+  g.connect(dest);
+  osc.start(time);
+  osc.stop(time + 0.45);
+}
+
+function playDrumHit(
+  ctx: AudioContext,
+  drumId: string,
+  time: number,
+  vol: number,
+  dest: AudioNode
+) {
+  switch (drumId) {
+    case 'kick':
+      drumKick(ctx, time, vol, dest);
+      break;
+    case 'snare':
+      drumSnare(ctx, time, vol, dest);
+      break;
+    case 'hhc':
+      drumHiHat(ctx, time, vol, 0.05, dest);
+      break;
+    case 'hhopen':
+      drumHiHat(ctx, time, vol, 0.4, dest);
+      break;
+    case 'clap':
+      drumClap(ctx, time, vol, dest);
+      break;
+    case 'tom1':
+      drumTom(ctx, time, vol, 200, dest);
+      break;
+    case 'tom2':
+      drumTom(ctx, time, vol, 120, dest);
+      break;
+    case 'ride':
+      drumHiHat(ctx, time, vol, 0.6, dest);
+      break;
+  }
+}
 
 // ── Tone state types ───────────────────────────────────────────────────────
 interface ToneFxChain {
@@ -118,7 +407,7 @@ function makeTrack(type: Track['type'], idx: number): Track {
     id: Date.now().toString() + Math.random(),
     name: labels[type],
     type,
-    instrument: 'piano',
+    instrument: 'synth',
     volume: 0.8,
     pan: 0,
     muted: false,
@@ -158,23 +447,55 @@ export default function StudioPanel({
   const [aiInput, setAiInput] = useState('');
   const [aiHint, setAiHint] = useState('');
   const [toneReady, setToneReady] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [exportUrl, setExportUrl] = useState('');
   const [exporting, setExporting] = useState(false);
   const [status, setStatus] = useState('');
 
   const tRef = useRef<ToneState | null>(null); // { Tone, synths, drums, fx }
+  const rawCtxRef = useRef<AudioContext | null>(null); // raw Web Audio ctx for all audio
   const seqRef = useRef<ToneTypes.Sequence | null>(null);
+  // Drum scheduler refs
+  const nextNoteTimeRef = useRef(0);
+  const currentStepRawRef = useRef(0);
+  const schedulerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tracksRef = useRef<Track[]>([]);
+  const bpmRef = useRef(120);
   const mrRef = useRef<MediaRecorder | null>(null);
   const micRafRef = useRef(0);
   const audioElRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   const connectedSourcesRef = useRef<Map<string, MediaElementAudioSourceNode>>(new Map());
+  // Per-vocal-track full Web Audio FX chain
+  const vocalChainsRef = useRef<
+    Map<
+      string,
+      {
+        gain: GainNode;
+        distWet: GainNode;
+        distDry: GainNode;
+        ws: WaveShaperNode;
+        delayWet: GainNode;
+        delayDry: GainNode;
+        reverbWet: GainNode;
+        reverbDry: GainNode;
+        convolver: ConvolverNode;
+        el: HTMLAudioElement;
+        pitchNode: AudioWorkletNode | null;
+      }
+    >
+  >(new Map());
+  const workletReadyRef = useRef<Promise<void> | null>(null);
 
   // ── Tone.js lazy init ───────────────────────────────────────────────────
   const initTone = useCallback(async () => {
     if (tRef.current) return tRef.current;
     setStatus('Loading audio engine…');
-    const Tone = (await import('tone')) as typeof ToneTypes;
-    await Tone.start();
+    // Use statically imported module — no dynamic chunk fetch, no Turbopack HMR abort possible.
+    const Tone = ToneRuntime as unknown as typeof ToneTypes;
+    // Do NOT catch AbortError here. If start() throws, tRef.current is never set,
+    // so the next key press retries the full init including AudioContext.resume().
+    // Desktop Chrome has stricter autoplay enforcement and may fail on first attempt.
+    await ToneRuntime.start();
     Tone.Transport.bpm.value = bpm;
 
     // Master bus — all audio forks to speakers and recorder
@@ -364,7 +685,7 @@ export default function StudioPanel({
     };
     tRef.current = obj;
     setToneReady(true);
-    setStatus('');
+    setStatus('Loading Grand Piano samples…');
     return obj;
   }, [bpm]);
 
@@ -386,29 +707,38 @@ export default function StudioPanel({
     return (tRef.current?.synths[map[instrument] ?? 'lead'] as PlayableInstrument) ?? null;
   };
 
-  // ── Play a note ─────────────────────────────────────────────────────────
+  // Keep tracksRef / bpmRef always current so the scheduler closure reads live values
+  useEffect(() => {
+    tracksRef.current = tracks;
+  }, [tracks]);
+  useEffect(() => {
+    bpmRef.current = bpm;
+  }, [bpm]);
+
+  // ── Play a note (raw Web Audio — no Tone.js context issues) ────────────
   const playNote = useCallback(
-    async (note: string, duration = '8n') => {
-      const t = await initTone();
-      const track = tracks.find(tr => tr.id === selTrack);
-      const instrument = track?.instrument ?? 'piano';
-      const synth = getSynth(instrument);
-      if (!synth) return;
-
-      synth.volume.value = track?.muted ? -Infinity : t.Tone.gainToDb(track?.volume ?? 0.8);
-      const fx = t.synthFx[instrument];
-      if (fx && track) {
-        fx.reverb.wet.value = track.effects.reverb;
-        fx.delay.wet.value = track.effects.delay;
-        fx.distortion.wet.value = track.effects.distortion;
-        fx.pitchShift.pitch = track.effects.pitchShift;
-        fx.pitchShift.wet.value = track.effects.pitchShift !== 0 ? 1 : 0;
-        fx.panner.pan.value = track.pan;
+    (note: string) => {
+      // Create AudioContext synchronously on first call — Chrome requires this
+      // to happen within a user gesture (click/touch). No awaits before it.
+      if (!rawCtxRef.current) {
+        rawCtxRef.current = new AudioContext();
       }
+      const ctx = rawCtxRef.current;
 
-      try {
-        synth.triggerAttackRelease(note, duration);
-      } catch {}
+      const track = tracks.find(tr => tr.id === selTrack);
+      const instrument = track?.instrument ?? 'synth';
+      const volume = track?.muted ? 0 : (track?.volume ?? 0.8);
+      const pan = track?.pan ?? 0;
+      const effects = track?.effects;
+
+      // resume() is always safe to call — no-op if already running
+      ctx.resume().then(() => {
+        setAudioUnlocked(true);
+        setToneReady(true);
+        setStatus('');
+        playRawNote(ctx, note, instrument, volume, pan, effects);
+      });
+
       setLitKeys(s => new Set([...s, note]));
       setTimeout(
         () =>
@@ -420,75 +750,96 @@ export default function StudioPanel({
         200
       );
     },
-    [initTone, selTrack, tracks]
+    [selTrack, tracks]
   );
 
-  // ── Transport ───────────────────────────────────────────────────────────
-  const startPlayback = async () => {
-    const { Tone, drums } = await initTone();
-    Tone.Transport.bpm.value = bpm;
-    if (seqRef.current) {
-      seqRef.current.dispose();
-      seqRef.current = null;
+  // ── Transport — raw Web Audio lookahead scheduler ──────────────────────
+  const scheduleStep = useCallback(() => {
+    const ctx = rawCtxRef.current;
+    if (!ctx) return;
+    const LOOKAHEAD = 0.1; // seconds ahead to schedule
+    const TICK_MS = 25; // how often to run (ms)
+
+    while (nextNoteTimeRef.current < ctx.currentTime + LOOKAHEAD) {
+      const step = currentStepRawRef.current;
+      const t = nextNoteTimeRef.current;
+
+      // UI update (draw) happens via setTimeout to avoid AudioContext scheduling conflicts
+      const stepCopy = step;
+      const timeDelta = Math.max(0, (t - ctx.currentTime) * 1000);
+      setTimeout(() => setCurrentStep(stepCopy), timeDelta);
+
+      const currentTracks = tracksRef.current;
+      const anySoloed = currentTracks.some(tr => tr.soloed);
+      currentTracks.forEach(track => {
+        if (track.type !== 'instrument') return;
+        const audible = anySoloed ? track.soloed : !track.muted;
+        if (!audible) return;
+
+        // Build per-track drum output bus (with reverb if configured)
+        let drumDest: AudioNode = ctx.destination;
+        if (track.effects.reverb > 0.01) {
+          const bus = ctx.createGain();
+          const dryG = ctx.createGain();
+          const wetG = ctx.createGain();
+          const conv = ctx.createConvolver();
+          conv.buffer = getReverbIR(ctx, track.effects.reverb);
+          dryG.gain.value = 1 - track.effects.reverb * 0.7;
+          wetG.gain.value = track.effects.reverb * 0.9;
+          bus.connect(dryG);
+          bus.connect(conv);
+          dryG.connect(ctx.destination);
+          conv.connect(wetG);
+          wetG.connect(ctx.destination);
+          drumDest = bus;
+        }
+
+        track.drumPattern.forEach((row, ri) => {
+          if (!row[step]) return;
+          const drumId = DRUM_ROWS[ri]?.id;
+          if (drumId) playDrumHit(ctx, drumId, t, track.volume, drumDest);
+        });
+      });
+
+      const secPer16th = 60 / (bpmRef.current * 4);
+      nextNoteTimeRef.current += secPer16th;
+      currentStepRawRef.current = (step + 1) % 16;
     }
 
-    // Collect all drum patterns, respecting solo > mute priority
-    const anySoloed = tracks.some(t => t.soloed);
-    const drumTracks = tracks.filter(tr => {
-      const audible = anySoloed ? tr.soloed : !tr.muted;
-      return audible && tr.drumPattern.some(row => row.some(Boolean));
+    schedulerTimerRef.current = setTimeout(scheduleStep, TICK_MS);
+  }, []);
+
+  const startPlayback = () => {
+    if (!rawCtxRef.current) rawCtxRef.current = new AudioContext();
+    const ctx = rawCtxRef.current;
+    ctx.resume().then(() => {
+      setAudioUnlocked(true);
+      setToneReady(true);
+      nextNoteTimeRef.current = ctx.currentTime + 0.05;
+      currentStepRawRef.current = 0;
+      scheduleStep();
+      setPlaying(true);
     });
-
-    seqRef.current = new Tone.Sequence(
-      (time: number, step: number) => {
-        Tone.getDraw().schedule(() => setCurrentStep(step), time);
-        drumTracks.forEach(track => {
-          track.drumPattern.forEach((row, ri) => {
-            if (!row[step]) return;
-            const drumId = DRUM_ROWS[ri]?.id;
-            const drumMap: Record<string, PlayableInstrument> = {
-              kick: drums.kick as PlayableInstrument,
-              snare: drums.snare as PlayableInstrument,
-              hhc: drums.hhc as PlayableInstrument,
-              hhopen: drums.hhopen as PlayableInstrument,
-              clap: drums.clap as PlayableInstrument,
-              tom1: drums.tom1 as PlayableInstrument,
-              tom2: drums.tom2 as PlayableInstrument,
-              ride: drums.ride as PlayableInstrument,
-            };
-            const d = drumMap[drumId];
-            if (!d) return;
-            try {
-              d.volume.value = Tone.gainToDb(track.volume);
-              if (drumId === 'kick') d.triggerAttackRelease('C1', '8n', time);
-              else if (drumId === 'snare' || drumId === 'clap') d.triggerAttackRelease('8n', time);
-              else d.triggerAttackRelease('8n', time);
-            } catch {}
-          });
-        });
-      },
-      [...Array(16).keys()],
-      '16n'
-    );
-
-    seqRef.current.start(0);
-    Tone.Transport.start();
-    setPlaying(true);
   };
 
   const stopPlayback = () => {
-    if (!tRef.current) return;
-    tRef.current.Tone.Transport.stop();
-    if (seqRef.current) {
-      seqRef.current.dispose();
-      seqRef.current = null;
+    if (schedulerTimerRef.current !== null) {
+      clearTimeout(schedulerTimerRef.current);
+      schedulerTimerRef.current = null;
     }
     setPlaying(false);
     setCurrentStep(-1);
   };
 
   const startExport = async () => {
-    const { recorder, masterGain, Tone } = await initTone();
+    let toneState: ToneState;
+    try {
+      toneState = await initTone();
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') return;
+      throw e;
+    }
+    const { recorder, masterGain, Tone } = toneState;
 
     // Connect vocal/audio elements into the Tone audio graph so they get captured
     const anySoloed = tracks.some(tr => tr.soloed);
@@ -532,8 +883,185 @@ export default function StudioPanel({
     if (tRef.current) tRef.current.Tone.Transport.bpm.value = bpm;
   }, [bpm]);
 
+  // Sync all vocal/audio FX to their Web Audio chains (or el.volume fallback before unlock)
+  useEffect(() => {
+    const ctx = rawCtxRef.current;
+    tracks.forEach(track => {
+      if (track.type !== 'vocal' && track.type !== 'audio') return;
+      const chain = vocalChainsRef.current.get(track.id);
+      if (chain) {
+        // Volume
+        chain.gain.gain.value = track.muted ? 0 : track.volume;
+        // Distortion
+        if (track.effects.distortion > 0.01) {
+          chain.ws.curve = makeDistortionCurve(
+            track.effects.distortion
+          ) as Float32Array<ArrayBuffer>;
+          chain.distDry.gain.value = 1 - track.effects.distortion * 0.5;
+          chain.distWet.gain.value = track.effects.distortion * 0.7;
+        } else {
+          chain.distDry.gain.value = 1;
+          chain.distWet.gain.value = 0;
+        }
+        // Delay
+        chain.delayDry.gain.value = track.effects.delay > 0.01 ? 1 - track.effects.delay * 0.5 : 1;
+        chain.delayWet.gain.value = track.effects.delay > 0.01 ? track.effects.delay * 0.6 : 0;
+        // Reverb
+        chain.reverbDry.gain.value =
+          track.effects.reverb > 0.01 ? 1 - track.effects.reverb * 0.7 : 1;
+        chain.reverbWet.gain.value = track.effects.reverb > 0.01 ? track.effects.reverb * 0.9 : 0;
+        if (track.effects.reverb > 0.01 && ctx)
+          chain.convolver.buffer = getReverbIR(ctx, track.effects.reverb);
+        // Pitch via AudioWorklet OLA pitch-shifter (no tempo change)
+        if (chain.pitchNode) {
+          chain.pitchNode.port.postMessage({ pitch: Math.pow(2, track.effects.pitchShift / 12) });
+        }
+      } else {
+        const el = audioElRefs.current.get(track.id);
+        if (el) el.volume = track.muted ? 0 : Math.min(1, track.volume);
+      }
+    });
+  }, [tracks]);
+
+  // Wire vocal/audio elements through the full FX chain once audio is unlocked
+  useEffect(() => {
+    if (!audioUnlocked) return;
+    const ctx = rawCtxRef.current;
+    if (!ctx) return;
+
+    // Load pitch-shifter AudioWorklet once (cached in workletReadyRef)
+    if (!workletReadyRef.current) {
+      workletReadyRef.current = ctx.audioWorklet.addModule('/pitch-worklet.js').catch(() => {});
+    }
+
+    void workletReadyRef.current.then(() => {
+      tracks.forEach(track => {
+        if ((track.type !== 'vocal' && track.type !== 'audio') || !track.audioUrl) return;
+        if (vocalChainsRef.current.has(track.id)) return;
+        const el = audioElRefs.current.get(track.id);
+        if (!el) return;
+        try {
+          const source = ctx.createMediaElementSource(el);
+
+          // Volume
+          const gainNode = ctx.createGain();
+          gainNode.gain.value = track.muted ? 0 : track.volume;
+
+          // Pitch shift — OLA AudioWorklet (no tempo change). Falls back to bypass on error.
+          let pitchNode: AudioWorkletNode | null = null;
+          try {
+            pitchNode = new AudioWorkletNode(ctx, 'pitch-shifter');
+            pitchNode.port.postMessage({ pitch: Math.pow(2, track.effects.pitchShift / 12) });
+            gainNode.connect(pitchNode);
+          } catch {
+            pitchNode = null;
+          }
+          const preDist: AudioNode = pitchNode ?? gainNode;
+
+          // Distortion bus: preDist → [ws wet + bypass dry] → postDist
+          const ws = ctx.createWaveShaper();
+          ws.curve = makeDistortionCurve(
+            track.effects.distortion > 0.01 ? track.effects.distortion : 0.001
+          ) as Float32Array<ArrayBuffer>;
+          ws.oversample = '2x';
+          const distDry = ctx.createGain();
+          const distWet = ctx.createGain();
+          const postDist = ctx.createGain();
+          distDry.gain.value =
+            track.effects.distortion > 0.01 ? 1 - track.effects.distortion * 0.5 : 1;
+          distWet.gain.value = track.effects.distortion > 0.01 ? track.effects.distortion * 0.7 : 0;
+          preDist.connect(distDry);
+          preDist.connect(ws);
+          ws.connect(distWet);
+          distDry.connect(postDist);
+          distWet.connect(postDist);
+
+          // Delay bus: postDist → [delayNode feedback wet + dry] → postDelay
+          const delayNode = ctx.createDelay(1.0);
+          const delayFb = ctx.createGain();
+          const delayDry = ctx.createGain();
+          const delayWet = ctx.createGain();
+          const postDelay = ctx.createGain();
+          delayNode.delayTime.value = 0.25;
+          delayFb.gain.value = 0.35;
+          delayDry.gain.value = track.effects.delay > 0.01 ? 1 - track.effects.delay * 0.5 : 1;
+          delayWet.gain.value = track.effects.delay > 0.01 ? track.effects.delay * 0.6 : 0;
+          postDist.connect(delayDry);
+          postDist.connect(delayNode);
+          delayNode.connect(delayFb);
+          delayFb.connect(delayNode);
+          delayNode.connect(delayWet);
+          delayDry.connect(postDelay);
+          delayWet.connect(postDelay);
+
+          // Reverb bus: postDelay → [conv wet + dry] → destination
+          const conv = ctx.createConvolver();
+          const reverbDry = ctx.createGain();
+          const reverbWet = ctx.createGain();
+          reverbDry.gain.value = track.effects.reverb > 0.01 ? 1 - track.effects.reverb * 0.7 : 1;
+          reverbWet.gain.value = track.effects.reverb > 0.01 ? track.effects.reverb * 0.9 : 0;
+          if (track.effects.reverb > 0.01) conv.buffer = getReverbIR(ctx, track.effects.reverb);
+          postDelay.connect(reverbDry);
+          postDelay.connect(conv);
+          conv.connect(reverbWet);
+          reverbDry.connect(ctx.destination);
+          reverbWet.connect(ctx.destination);
+
+          source.connect(gainNode);
+          vocalChainsRef.current.set(track.id, {
+            gain: gainNode,
+            distWet,
+            distDry,
+            ws,
+            delayWet,
+            delayDry,
+            reverbWet,
+            reverbDry,
+            convolver: conv,
+            el,
+            pitchNode,
+          });
+          connectedSourcesRef.current.set(track.id, source);
+        } catch {}
+      });
+    });
+  }, [audioUnlocked, tracks]);
+
+  // Apply selected track's FX/volume/pan to Tone nodes whenever React state changes
+  useEffect(() => {
+    if (!toneReady || !tRef.current) return;
+    const track = tracks.find(t => t.id === selTrack);
+    if (!track || track.type !== 'instrument') return;
+    const { synthFx, synths, Tone } = tRef.current;
+    const synthKeyMap: Record<string, string> = {
+      piano: 'piano',
+      epiano: 'epiano',
+      synth: 'lead',
+      pad: 'pad',
+      strings: 'strings',
+      organ: 'organ',
+      bass: 'bass',
+      pluck: 'pluck',
+      choir: 'choir',
+      guitar: 'guitar',
+      brass: 'brass',
+      flute: 'flute',
+    };
+    const synth = synths[synthKeyMap[track.instrument] ?? 'lead'] as PlayableInstrument | undefined;
+    const fx = synthFx[track.instrument];
+    if (synth) synth.volume.value = track.muted ? -Infinity : Tone.gainToDb(track.volume);
+    if (fx) {
+      fx.reverb.wet.value = track.effects.reverb;
+      fx.delay.wet.value = track.effects.delay;
+      fx.distortion.wet.value = track.effects.distortion;
+      fx.pitchShift.pitch = track.effects.pitchShift;
+      fx.pitchShift.wet.value = track.effects.pitchShift !== 0 ? 1 : 0;
+      fx.panner.pan.value = track.pan;
+    }
+  }, [tracks, selTrack, toneReady]);
+
   // ── Voice recording ─────────────────────────────────────────────────────
-  const startRecording = async () => {
+  const startRecording = async (existingTrackId?: string) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const ctx = new AudioContext();
@@ -548,10 +1076,17 @@ export default function StudioPanel({
       mr.onstop = () => {
         const blob = new Blob(chunks, { type: 'audio/webm' });
         const url = URL.createObjectURL(blob);
-        setTracks(prev => {
-          const idx = prev.filter(t => t.type === 'vocal').length + 1;
-          return [...prev, { ...makeTrack('vocal', idx), audioUrl: url }];
-        });
+        if (existingTrackId) {
+          // Update the placeholder track that addTrack already created
+          setTracks(prev =>
+            prev.map(t => (t.id === existingTrackId ? { ...t, audioUrl: url } : t))
+          );
+        } else {
+          setTracks(prev => {
+            const idx = prev.filter(t => t.type === 'vocal').length + 1;
+            return [...prev, { ...makeTrack('vocal', idx), audioUrl: url }];
+          });
+        }
         stream.getTracks().forEach(t => t.stop());
         cancelAnimationFrame(micRafRef.current);
         setMicLevel(0);
@@ -568,6 +1103,8 @@ export default function StudioPanel({
       mrRef.current = mr;
       setRecording(true);
     } catch {
+      // If mic was denied and we had a placeholder, remove it
+      if (existingTrackId) setTracks(prev => prev.filter(t => t.id !== existingTrackId));
       setAiHint('Microphone access denied. Allow mic access to record vocals.');
     }
   };
@@ -602,7 +1139,7 @@ export default function StudioPanel({
     if (type === 'instrument') setActiveTab('piano');
     else if (type === 'vocal') {
       setActiveTab('piano');
-      startRecording();
+      startRecording(track.id); // update the placeholder instead of creating a second track
     }
   };
 
@@ -845,6 +1382,21 @@ export default function StudioPanel({
 
   const sel = tracks.find(t => t.id === selTrack);
 
+  // ── Audio unlock (Opera GX Incognito / strict autoplay browsers) ─────────
+  // Some browsers block AudioContext.resume() unless it originates from a
+  // direct, synchronous click handler with no async hops before it.
+  // This button satisfies that requirement and unlocks audio for the session.
+  const unlockAudio = () => {
+    // Create and resume AudioContext synchronously within the click handler.
+    // This is the only path that satisfies Chrome's strict autoplay policy.
+    if (!rawCtxRef.current) rawCtxRef.current = new AudioContext();
+    rawCtxRef.current.resume().then(() => {
+      setAudioUnlocked(true);
+      setToneReady(true);
+      setStatus('');
+    });
+  };
+
   // ── Piano keyboard renderer ──────────────────────────────────────────────
   const renderPiano = (oct: number) => {
     const keys: ReactElement[] = [];
@@ -889,6 +1441,13 @@ export default function StudioPanel({
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="studio-panel">
+      {!audioUnlocked && !toneReady && (
+        <div className="studio-audio-unlock">
+          <button className="studio-audio-unlock-btn" onClick={unlockAudio}>
+            ▶ Click to enable audio
+          </button>
+        </div>
+      )}
       {/* Header: transport + BPM + export */}
       <div className="studio-header">
         <span className="studio-logo">⬡ Studio</span>
@@ -898,7 +1457,7 @@ export default function StudioPanel({
           </button>
           <button
             className={`studio-transport-btn${recording ? ' recording' : ''}`}
-            onClick={recording ? stopRecording : startRecording}
+            onClick={recording ? stopRecording : () => startRecording()}
           >
             {recording ? '⏹ Stop Rec' : '⏺ Record'}
           </button>

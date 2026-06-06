@@ -133,12 +133,20 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
+// Sentry's Turbopack plugin wraps route handlers with AbortSignal instrumentation
+// that fires during Turbopack's module compilation, surfacing as "Runtime AbortError"
+// in the dev overlay. Skip the wrapper entirely in dev — Sentry is already disabled
+// at runtime via `enabled: process.env.NODE_ENV === 'production'` in sentry.client.config.ts.
+const sentryOptions = {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
   silent: true,
   widenClientFileUpload: true,
-  sourcemaps: { disable: process.env.NODE_ENV !== 'production' },
+  sourcemaps: { disable: true },
   disableLogger: true,
   automaticVercelMonitors: false,
-});
+};
+
+export default process.env.NODE_ENV === 'production'
+  ? withSentryConfig(nextConfig, sentryOptions)
+  : nextConfig;
