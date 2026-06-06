@@ -908,8 +908,13 @@ CODE examples (output a file plan):
 - "build a budget tracker app"
 - "make a currency converter"
 - "create a trip planner tool"
+- "make a pyramid/triangle/tier list/ranking chart/infographic of [anything]"
+- "rank hotels/brands/products in a visual hierarchy"
+- "create a visual ranking of [anything] with logos/tiers/categories"
+- "make a picture/diagram/chart showing [hierarchy or ranking]"
 
 KEY RULE: pasting data + asking a question = CHAT. Asking to BUILD something = CODE. Never build an app when the user just wants an answer.
+VISUAL/INFOGRAPHIC RULE: Any request for a pyramid, triangle, tier list, ranking visual, hierarchy chart, or infographic = CODE (always output a file plan for index.html). These are never chat.
 
 EXISTING PROJECT RULE (overrides chat detection):
 If the prompt ends with "Existing files: ..." — the user already has a project open. In this context:
@@ -2018,7 +2023,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
               ];
               fullText = await streamText(
                 msgs,
-                4096,
+                12000,
                 t =>
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
                 () =>
