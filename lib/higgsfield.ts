@@ -4,13 +4,15 @@ const TIMEOUT_MS = 180_000; // 3 minutes
 
 function higgsHeaders(): Record<string, string> {
   const key = process.env.HIGGSFIELD_API_KEY;
-  const secret = process.env.HIGGSFIELD_SECRET;
-  if (!key || !secret) throw new Error('HIGGSFIELD_API_KEY or HIGGSFIELD_SECRET not configured');
-  return {
+  if (!key) throw new Error('HIGGSFIELD_API_KEY not configured');
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'hf-api-key': key,
-    'hf-secret': secret,
   };
+  // hf-secret is optional — only sent when explicitly configured
+  const secret = process.env.HIGGSFIELD_SECRET;
+  if (secret) headers['hf-secret'] = secret;
+  return headers;
 }
 
 interface JobSetResponse {

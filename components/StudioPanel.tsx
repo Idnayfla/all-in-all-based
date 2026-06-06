@@ -45,12 +45,30 @@ const INST_OSC: Record<string, OscillatorType> = {
   brass: 'sawtooth',
   flute: 'sine',
 };
+interface RawEffects {
+  reverb: number;
+  delay: number;
+  distortion: number;
+  pitchShift: number;
+}
+
+function makeDistortionCurve(amount: number): Float32Array {
+  const n = 256;
+  const curve = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i * 2) / n - 1;
+    curve[i] = ((Math.PI + amount * 400) * x) / (Math.PI + amount * 400 * Math.abs(x));
+  }
+  return curve;
+}
+
 function playRawNote(
   ctx: AudioContext,
   note: string,
   instrument: string,
   volume: number,
-  pan: number
+  pan: number,
+  effects?: RawEffects
 ): void {
   const freq = noteToFreq(note);
   const osc = ctx.createOscillator();
@@ -67,10 +85,160 @@ function playRawNote(
   gain.gain.setValueAtTime(peak * 0.6, now + 0.22);
   gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.65);
   osc.connect(gain);
-  gain.connect(panner);
+
+  let lastNode: AudioNode = gain;
+
+  // Distortion
+  if (effects && effects.distortion > 0.01) {
+    const ws = ctx.createWaveShaper();
+    ws.curve = makeDistortionCurve(effects.distortion) as Float32Array<ArrayBuffer>;
+    ws.oversample = '2x';
+    lastNode.connect(ws);
+    lastNode = ws;
+  }
+
+  // Delay (parallel wet path)
+  if (effects && effects.delay > 0.01) {
+    const dry = ctx.createGain();
+    const wet = ctx.createGain();
+    const delayNode = ctx.createDelay(1.0);
+    const fbGain = ctx.createGain();
+    dry.gain.value = 1 - effects.delay * 0.5;
+    wet.gain.value = effects.delay * 0.5;
+    delayNode.delayTime.value = 0.25;
+    fbGain.gain.value = 0.35;
+    lastNode.connect(dry);
+    lastNode.connect(delayNode);
+    delayNode.connect(fbGain);
+    fbGain.connect(delayNode);
+    delayNode.connect(wet);
+    dry.connect(panner);
+    wet.connect(panner);
+    lastNode = panner; // panner already connected below
+  } else {
+    lastNode.connect(panner);
+  }
+
   panner.connect(ctx.destination);
   osc.start(now);
   osc.stop(now + 0.75);
+}
+
+// ── Raw drum synthesis ────────────────────────────────────────────────────
+function drumKick(ctx: AudioContext, time: number, vol: number) {
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(vol * 0.9, time);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.5);
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(150, time);
+  osc.frequency.exponentialRampToValueAtTime(0.001, time + 0.4);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(time);
+  osc.stop(time + 0.5);
+}
+
+function drumSnare(ctx: AudioContext, time: number, vol: number) {
+  const bufLen = Math.floor(ctx.sampleRate * 0.2);
+  const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < bufLen; i++) d[i] = Math.random() * 2 - 1;
+  const noise = ctx.createBufferSource();
+  noise.buffer = buf;
+  const ng = ctx.createGain();
+  ng.gain.setValueAtTime(vol * 0.6, time);
+  ng.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
+  noise.connect(ng);
+  ng.connect(ctx.destination);
+  noise.start(time);
+  noise.stop(time + 0.2);
+  const osc = ctx.createOscillator();
+  osc.type = 'triangle';
+  osc.frequency.value = 180;
+  const og = ctx.createGain();
+  og.gain.setValueAtTime(vol * 0.25, time);
+  og.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
+  osc.connect(og);
+  og.connect(ctx.destination);
+  osc.start(time);
+  osc.stop(time + 0.1);
+}
+
+function drumHiHat(ctx: AudioContext, time: number, vol: number, decay: number) {
+  [400, 800, 1200, 1600, 2000, 2400].forEach((freq, i) => {
+    const osc = ctx.createOscillator();
+    osc.type = 'square';
+    osc.frequency.value = freq;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime((vol * 0.06) / (1 + i * 0.2), time);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + decay);
+    osc.connect(g);
+    g.connect(ctx.destination);
+    osc.start(time);
+    osc.stop(time + decay + 0.01);
+  });
+}
+
+function drumClap(ctx: AudioContext, time: number, vol: number) {
+  [0, 0.01, 0.02].forEach(offset => {
+    const bufLen = Math.floor(ctx.sampleRate * 0.05);
+    const buf = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) d[i] = Math.random() * 2 - 1;
+    const noise = ctx.createBufferSource();
+    noise.buffer = buf;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(vol * 0.5, time + offset);
+    g.gain.exponentialRampToValueAtTime(0.001, time + offset + 0.09);
+    noise.connect(g);
+    g.connect(ctx.destination);
+    noise.start(time + offset);
+    noise.stop(time + offset + 0.1);
+  });
+}
+
+function drumTom(ctx: AudioContext, time: number, vol: number, startFreq: number) {
+  const osc = ctx.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(startFreq, time);
+  osc.frequency.exponentialRampToValueAtTime(startFreq * 0.4, time + 0.3);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(vol * 0.7, time);
+  g.gain.exponentialRampToValueAtTime(0.001, time + 0.4);
+  osc.connect(g);
+  g.connect(ctx.destination);
+  osc.start(time);
+  osc.stop(time + 0.45);
+}
+
+function playDrumHit(ctx: AudioContext, drumId: string, time: number, vol: number) {
+  switch (drumId) {
+    case 'kick':
+      drumKick(ctx, time, vol);
+      break;
+    case 'snare':
+      drumSnare(ctx, time, vol);
+      break;
+    case 'hhc':
+      drumHiHat(ctx, time, vol, 0.05);
+      break;
+    case 'hhopen':
+      drumHiHat(ctx, time, vol, 0.4);
+      break;
+    case 'clap':
+      drumClap(ctx, time, vol);
+      break;
+    case 'tom1':
+      drumTom(ctx, time, vol, 200);
+      break;
+    case 'tom2':
+      drumTom(ctx, time, vol, 120);
+      break;
+    case 'ride':
+      drumHiHat(ctx, time, vol, 0.6);
+      break;
+  }
 }
 
 // ── Tone state types ───────────────────────────────────────────────────────
@@ -234,8 +402,14 @@ export default function StudioPanel({
   const [status, setStatus] = useState('');
 
   const tRef = useRef<ToneState | null>(null); // { Tone, synths, drums, fx }
-  const rawCtxRef = useRef<AudioContext | null>(null); // raw Web Audio ctx for keyboard notes
+  const rawCtxRef = useRef<AudioContext | null>(null); // raw Web Audio ctx for all audio
   const seqRef = useRef<ToneTypes.Sequence | null>(null);
+  // Drum scheduler refs
+  const nextNoteTimeRef = useRef(0);
+  const currentStepRawRef = useRef(0);
+  const schedulerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tracksRef = useRef<Track[]>([]);
+  const bpmRef = useRef(120);
   const mrRef = useRef<MediaRecorder | null>(null);
   const micRafRef = useRef(0);
   const audioElRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
@@ -462,6 +636,14 @@ export default function StudioPanel({
     return (tRef.current?.synths[map[instrument] ?? 'lead'] as PlayableInstrument) ?? null;
   };
 
+  // Keep tracksRef / bpmRef always current so the scheduler closure reads live values
+  useEffect(() => {
+    tracksRef.current = tracks;
+  }, [tracks]);
+  useEffect(() => {
+    bpmRef.current = bpm;
+  }, [bpm]);
+
   // ── Play a note (raw Web Audio — no Tone.js context issues) ────────────
   const playNote = useCallback(
     (note: string) => {
@@ -476,13 +658,14 @@ export default function StudioPanel({
       const instrument = track?.instrument ?? 'synth';
       const volume = track?.muted ? 0 : (track?.volume ?? 0.8);
       const pan = track?.pan ?? 0;
+      const effects = track?.effects;
 
       // resume() is always safe to call — no-op if already running
       ctx.resume().then(() => {
         setAudioUnlocked(true);
         setToneReady(true);
         setStatus('');
-        playRawNote(ctx, note, instrument, volume, pan);
+        playRawNote(ctx, note, instrument, volume, pan, effects);
       });
 
       setLitKeys(s => new Set([...s, note]));
@@ -499,74 +682,60 @@ export default function StudioPanel({
     [selTrack, tracks]
   );
 
-  // ── Transport ───────────────────────────────────────────────────────────
-  const startPlayback = async () => {
-    let toneState: ToneState;
-    try {
-      toneState = await initTone();
-    } catch (e) {
-      if (e instanceof Error && e.name === 'AbortError') return;
-      throw e;
-    }
-    const { Tone, drums } = toneState;
-    Tone.Transport.bpm.value = bpm;
-    if (seqRef.current) {
-      seqRef.current.dispose();
-      seqRef.current = null;
-    }
+  // ── Transport — raw Web Audio lookahead scheduler ──────────────────────
+  const scheduleStep = useCallback(() => {
+    const ctx = rawCtxRef.current;
+    if (!ctx) return;
+    const LOOKAHEAD = 0.1; // seconds ahead to schedule
+    const TICK_MS = 25; // how often to run (ms)
 
-    // Collect all drum patterns, respecting solo > mute priority
-    const anySoloed = tracks.some(t => t.soloed);
-    const drumTracks = tracks.filter(tr => {
-      const audible = anySoloed ? tr.soloed : !tr.muted;
-      return audible && tr.drumPattern.some(row => row.some(Boolean));
-    });
+    while (nextNoteTimeRef.current < ctx.currentTime + LOOKAHEAD) {
+      const step = currentStepRawRef.current;
+      const t = nextNoteTimeRef.current;
 
-    seqRef.current = new Tone.Sequence(
-      (time: number, step: number) => {
-        Tone.getDraw().schedule(() => setCurrentStep(step), time);
-        drumTracks.forEach(track => {
-          track.drumPattern.forEach((row, ri) => {
-            if (!row[step]) return;
-            const drumId = DRUM_ROWS[ri]?.id;
-            const drumMap: Record<string, PlayableInstrument> = {
-              kick: drums.kick as PlayableInstrument,
-              snare: drums.snare as PlayableInstrument,
-              hhc: drums.hhc as PlayableInstrument,
-              hhopen: drums.hhopen as PlayableInstrument,
-              clap: drums.clap as PlayableInstrument,
-              tom1: drums.tom1 as PlayableInstrument,
-              tom2: drums.tom2 as PlayableInstrument,
-              ride: drums.ride as PlayableInstrument,
-            };
-            const d = drumMap[drumId];
-            if (!d) return;
-            try {
-              d.volume.value = Tone.gainToDb(track.volume);
-              if (drumId === 'kick') d.triggerAttackRelease('C1', '8n', time);
-              else if (drumId === 'snare' || drumId === 'clap') d.triggerAttackRelease('8n', time);
-              else if (drumId === 'tom1') d.triggerAttackRelease('G2', '8n', time);
-              else if (drumId === 'tom2') d.triggerAttackRelease('D2', '8n', time);
-              else d.triggerAttackRelease('8n', time);
-            } catch {}
-          });
+      // UI update (draw) happens via setTimeout to avoid AudioContext scheduling conflicts
+      const stepCopy = step;
+      const timeDelta = Math.max(0, (t - ctx.currentTime) * 1000);
+      setTimeout(() => setCurrentStep(stepCopy), timeDelta);
+
+      const currentTracks = tracksRef.current;
+      const anySoloed = currentTracks.some(tr => tr.soloed);
+      currentTracks.forEach(track => {
+        if (track.type !== 'instrument') return;
+        const audible = anySoloed ? track.soloed : !track.muted;
+        if (!audible) return;
+        track.drumPattern.forEach((row, ri) => {
+          if (!row[step]) return;
+          const drumId = DRUM_ROWS[ri]?.id;
+          if (drumId) playDrumHit(ctx, drumId, t, track.volume);
         });
-      },
-      [...Array(16).keys()],
-      '16n'
-    );
+      });
 
-    seqRef.current.start(0);
-    Tone.Transport.start();
-    setPlaying(true);
+      const secPer16th = 60 / (bpmRef.current * 4);
+      nextNoteTimeRef.current += secPer16th;
+      currentStepRawRef.current = (step + 1) % 16;
+    }
+
+    schedulerTimerRef.current = setTimeout(scheduleStep, TICK_MS);
+  }, []);
+
+  const startPlayback = () => {
+    if (!rawCtxRef.current) rawCtxRef.current = new AudioContext();
+    const ctx = rawCtxRef.current;
+    ctx.resume().then(() => {
+      setAudioUnlocked(true);
+      setToneReady(true);
+      nextNoteTimeRef.current = ctx.currentTime + 0.05;
+      currentStepRawRef.current = 0;
+      scheduleStep();
+      setPlaying(true);
+    });
   };
 
   const stopPlayback = () => {
-    if (!tRef.current) return;
-    tRef.current.Tone.Transport.stop();
-    if (seqRef.current) {
-      seqRef.current.dispose();
-      seqRef.current = null;
+    if (schedulerTimerRef.current !== null) {
+      clearTimeout(schedulerTimerRef.current);
+      schedulerTimerRef.current = null;
     }
     setPlaying(false);
     setCurrentStep(-1);
