@@ -61,19 +61,24 @@ function detectIntentMode(text: string): GenerationMode {
   const t = text.toLowerCase().trim();
   if (!t) return 'chat';
 
-  // If it looks like a code/app request, always stay in chat (Claude builds it)
+  // Structured visual content → Claude builds HTML/CSS (better than any image model for text+layout)
+  const isStructuredVisual =
+    /\b(infographic|pyramid|tier list|tier chart|ranking chart|hierarchy|flowchart|diagram|chart|graph|table|comparison chart|bracket|leaderboard|ranked list)\b/.test(t) ||
+    (/\b(rank|ranking|ranked|tier|tiers|category|categories)\b/.test(t) &&
+      /\b(hotel|restaurant|brand|product|company|list|logos?)\b/.test(t));
+  if (isStructuredVisual) return 'chat';
+
+  // Code/app request → Claude builds it
   const isAppRequest =
     /\b(app|editor|player|tool|builder|website|site|dashboard|game|visualizer|analyzer|portfolio|calculator|tracker|widget|component|page|form|quiz|chatbot)\b/.test(t) &&
     /\b(build|make|create|code|develop|program|write)\b/.test(t);
   if (isAppRequest) return 'chat';
 
   // ── Image intent ──────────────────────────────────────────────────────
-  // Unambiguous drawing verbs
   if (/\b(draw|paint|sketch|illustrate)\b/.test(t)) return 'flux';
-  // "generate/create/make/render/design + image noun"
   if (
     /\b(generate|create|make|render|design|show me|give me|produce)\b/.test(t) &&
-    /\b(image|picture|photo|photograph|illustration|artwork|drawing|painting|portrait|logo|icon|banner|thumbnail|wallpaper|poster|cover|headshot|avatar|graphic|artwork|visual|art)\b/.test(t)
+    /\b(image|picture|photo|photograph|illustration|artwork|drawing|painting|portrait|banner|thumbnail|wallpaper|poster|cover|headshot|avatar|graphic|visual|art)\b/.test(t)
   )
     return 'flux';
 
@@ -88,7 +93,6 @@ function detectIntentMode(text: string): GenerationMode {
     return 'seedance';
 
   // ── Music intent ──────────────────────────────────────────────────────
-  // Unambiguous composition verbs
   if (/\b(compose|write\s+a?\s*(song|melody|jingle|tune|beat|track))\b/.test(t)) return 'music';
   if (
     /\b(generate|create|make|produce)\b/.test(t) &&

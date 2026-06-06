@@ -454,6 +454,20 @@ ARCHITECTURE PATTERNS:
 - Dashboards: fetch → transform → render, loading/error states always
 - Forms: validate on submit, show inline errors, disable during processing
 
+INFOGRAPHICS, PYRAMIDS, RANKINGS, TIER LISTS, HIERARCHY CHARTS:
+- When user asks for an infographic, pyramid chart, tier list, ranking visual, or hierarchy diagram → build it as a beautiful standalone HTML page
+- Use real text from the user's request — never hallucinate or invent names not mentioned
+- For pyramid/triangle layouts: use CSS clip-path polygon or SVG <polygon> for the triangle shape, divide into horizontal tiers with flexbox rows inside
+- For rankings: use a vertical stack of styled tier cards with distinct colors per tier
+- Visual quality bar: match the style of a professional infographic — rich background (dark gradient or themed color), gold/accent tier dividers, clean typography, drop shadows
+- For hotel/brand/company logos: render them as styled text badges (font-weight: 800, letter-spacing) since real logo images can't be fetched — make them look premium
+- Always include a title, subtitle, and legend if appropriate
+- Make it full-page and visually stunning — this is a shareable graphic, not a plain list
+- Example pyramid CSS pattern:
+  .pyramid { display: flex; flex-direction: column; align-items: center; gap: 0; }
+  .tier { display: flex; align-items: center; justify-content: center; clip-path: none; }
+  /* Use decreasing width per tier: tier-1 width 20%, tier-2 40%, tier-3 60%, tier-4 80%, tier-5 100% */
+
 ANIMATION RULES — ALWAYS FOLLOW FOR ANY ANIMATED PROJECT:
 - Always wrap the entire animation init in: window.addEventListener('DOMContentLoaded', function() { ... })
 - Always get canvas context inside DOMContentLoaded, never at top level: const ctx = canvas.getContext('2d'); if (!ctx) return;
