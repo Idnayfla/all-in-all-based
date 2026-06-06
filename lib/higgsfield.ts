@@ -5,14 +5,13 @@ const TIMEOUT_MS = 180_000; // 3 minutes
 function higgsHeaders(): Record<string, string> {
   const key = process.env.HIGGSFIELD_API_KEY;
   if (!key) throw new Error('HIGGSFIELD_API_KEY not configured');
-  const headers: Record<string, string> = {
+  const secret = process.env.HIGGSFIELD_SECRET;
+  if (!secret) throw new Error('HIGGSFIELD_SECRET not configured');
+  return {
     'Content-Type': 'application/json',
     'hf-api-key': key,
+    'hf-secret': secret,
   };
-  // hf-secret is optional — only sent when explicitly configured
-  const secret = process.env.HIGGSFIELD_SECRET;
-  if (secret) headers['hf-secret'] = secret;
-  return headers;
 }
 
 interface JobSetResponse {
@@ -49,14 +48,24 @@ export async function generateImage(prompt: string): Promise<string> {
     method: 'POST',
     headers: higgsHeaders(),
     body: JSON.stringify({
-      prompt,
-      aspect_ratio: '16:9',
+      params: {
+        prompt,
+        aspect_ratio: '16:9',
+        width_and_height: '2048x1152',
+      },
     }),
   });
   if (!res.ok) {
-    throw new Error(`Higgsfield image submit error: ${res.status} ${res.statusText}`);
+    let detail = '';
+    try {
+      detail = await res.text();
+    } catch {}
+    throw new Error(
+      `Higgsfield image submit error: ${res.status} ${res.statusText}${detail ? ` — ${detail.slice(0, 300)}` : ''}`
+    );
   }
-  const { id }: { id: string } = await res.json();
+  const body = await res.json();
+  const id: string = body.id ?? body.job_set_id ?? body.jobSetId ?? '';
   if (!id) throw new Error('Higgsfield did not return a job set ID for image generation');
   return pollJobSet(id);
 }

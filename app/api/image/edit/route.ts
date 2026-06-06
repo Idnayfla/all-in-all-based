@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fal } from '@fal-ai/client';
 import { checkMediaRateLimit } from '../../_mediaRateLimit';
 
+export const maxDuration = 180;
+
+if (process.env.FAL_KEY) fal.config({ credentials: process.env.FAL_KEY });
+
+type FalImagesResult = { images?: { url: string }[] };
+
 export async function POST(req: NextRequest) {
   const limit = await checkMediaRateLimit(req, 'image');
   if (limit instanceof NextResponse) return limit;
@@ -33,59 +39,100 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  fal.config({ credentials: process.env.FAL_KEY });
-
-  // Resolve source URL — either pre-uploaded or upload now from base64
-  let resolvedSourceUrl: string = sourceImageUrl ?? '';
-  if (!sourceImageUrl && sourceImageData) {
-    const buffer = Buffer.from(sourceImageData, 'base64');
-    const blob = new Blob([buffer], { type: sourceMediaType ?? 'image/png' });
-    resolvedSourceUrl = await fal.storage.upload(blob);
-  }
-  if (!resolvedSourceUrl) {
-    return NextResponse.json({ error: 'Could not resolve source image' }, { status: 400 });
-  }
-
   try {
+    // Upload source image if base64 provided — inside try so failures return JSON errors
+    let resolvedSourceUrl: string = sourceImageUrl ?? '';
+    if (!sourceImageUrl && sourceImageData) {
+      const buffer = Buffer.from(sourceImageData, 'base64');
+      const blob = new Blob([buffer], { type: sourceMediaType ?? 'image/png' });
+      resolvedSourceUrl = await fal.storage.upload(blob);
+    }
+    if (!resolvedSourceUrl) {
+      return NextResponse.json({ error: 'Could not resolve source image' }, { status: 400 });
+    }
+
+    // ── Transform — Flux Kontext (instruction-following editor) ─────────────
     if (mode === 'transform') {
-      const result = await fal.subscribe('fal-ai/flux/dev/image-to-image', {
-        input: {
-          image_url: resolvedSourceUrl,
-          prompt,
-          strength: 0.85,
-          num_inference_steps: 28,
-          guidance_scale: 3.5,
-          num_images: 1,
-          enable_safety_checker: true,
-        },
-      });
-      const url = (result.data as { images?: { url: string }[] }).images?.[0]?.url;
+      let url: string | undefined;
+      try {
+        const result = await fal.subscribe('fal-ai/flux-pro/kontext/max', {
+          input: { image_url: resolvedSourceUrl, prompt, num_images: 1 },
+        });
+        url = (result.data as FalImagesResult).images?.[0]?.url;
+      } catch (kontextErr: unknown) {
+        const kontextMsg = String(
+          kontextErr instanceof Error ? kontextErr.message : kontextErr
+        ).toLowerCase();
+        const isUnavailable =
+          kontextMsg.includes('404') ||
+          kontextMsg.includes('not found') ||
+          kontextMsg.includes('403') ||
+          kontextMsg.includes('forbidden');
+        if (!isUnavailable) throw kontextErr;
+        const result = await fal.subscribe('fal-ai/flux/dev/image-to-image', {
+          input: {
+            image_url: resolvedSourceUrl,
+            prompt,
+            strength: 0.55,
+            num_inference_steps: 20,
+            guidance_scale: 7.5,
+            num_images: 1,
+            enable_safety_checker: true,
+          },
+        });
+        url = (result.data as FalImagesResult).images?.[0]?.url;
+      }
       if (!url) return NextResponse.json({ error: 'No image returned' }, { status: 500 });
       return NextResponse.json({ url });
     }
 
-    // inpaint: upload mask, then call flux fill
+    // ── Inpaint ──────────────────────────────────────────────────────────
     const maskBase64 = maskDataUrl!.split(',')[1];
     const maskBuffer = Buffer.from(maskBase64, 'base64');
     const maskBlob = new Blob([maskBuffer], { type: 'image/png' });
     const maskUrl = await fal.storage.upload(maskBlob);
 
-    const result = await fal.subscribe('fal-ai/flux-pro/v1/fill', {
-      input: {
-        image_url: resolvedSourceUrl,
-        mask_url: maskUrl,
-        prompt,
-        num_images: 1,
-        safety_tolerance: '2',
-      },
-    });
-    const url = (result.data as { images?: { url: string }[] }).images?.[0]?.url;
+    // Try flux-pro/fill first (best quality); fall back to SD inpainting if plan-gated
+    let url: string | undefined;
+    try {
+      const result = await fal.subscribe('fal-ai/flux-pro/v1/fill', {
+        input: {
+          image_url: resolvedSourceUrl,
+          mask_url: maskUrl,
+          prompt,
+          num_images: 1,
+          safety_tolerance: '2',
+        },
+      });
+      url = (result.data as FalImagesResult).images?.[0]?.url;
+    } catch (fillErr: unknown) {
+      const fillMsg = String(fillErr instanceof Error ? fillErr.message : fillErr);
+      const isPlanGated =
+        fillMsg.includes('403') ||
+        fillMsg.toLowerCase().includes('forbidden') ||
+        fillMsg.toLowerCase().includes('not found') ||
+        fillMsg.toLowerCase().includes('404');
+
+      if (!isPlanGated) throw fillErr; // re-throw unexpected errors
+
+      console.warn('[image/edit] flux-pro/fill unavailable, falling back to SD inpainting');
+      const result = await fal.subscribe('fal-ai/stable-diffusion-inpainting', {
+        input: {
+          image_url: resolvedSourceUrl,
+          mask_url: maskUrl,
+          prompt,
+          num_inference_steps: 20,
+          num_images: 1,
+        },
+      });
+      url = (result.data as FalImagesResult).images?.[0]?.url;
+    }
+
     if (!url) return NextResponse.json({ error: 'No image returned' }, { status: 500 });
     return NextResponse.json({ url });
   } catch (err: unknown) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Edit failed' },
-      { status: 500 }
-    );
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[image/edit] error:', msg);
+    return NextResponse.json({ error: msg || 'Edit failed — please try again.' }, { status: 500 });
   }
 }

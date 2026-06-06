@@ -427,7 +427,11 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
         });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
-        await loadUrlToLayer(data.url, `AI: ${aiPrompt.slice(0, 24)}`);
+        await loadUrlToLayer(
+          data.url,
+          `AI: ${aiPrompt.slice(0, 24)}${data.provider === 'fal' ? ' (Flux)' : ''}`
+        );
+        if (data.note) setStatus(data.note);
       } else if (aiMode === 'transform') {
         const base64 = flatten(false).split(',')[1];
         const res = await fetch('/api/image', {
@@ -443,9 +447,31 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
         if (data.error) throw new Error(data.error);
         await loadUrlToLayer(data.url, `Transform: ${aiPrompt.slice(0, 20)}`);
       } else {
-        // inpaint
+        // inpaint — convert the red mask strokes to a white-on-black binary mask
+        // that inpaint models expect (white = area to repaint, black = keep)
         const sourceBase64 = flatten(false).split(',')[1];
-        const maskDataUrl = maskRef.current?.toDataURL('image/png') ?? '';
+        const mc = maskRef.current;
+        let maskDataUrl = '';
+        if (mc) {
+          const binCanvas = document.createElement('canvas');
+          binCanvas.width = W;
+          binCanvas.height = H;
+          const binCtx = binCanvas.getContext('2d')!;
+          binCtx.fillStyle = 'black';
+          binCtx.fillRect(0, 0, W, H);
+          const srcData = mc.getContext('2d')!.getImageData(0, 0, W, H);
+          const outData = binCtx.createImageData(W, H);
+          for (let i = 0; i < srcData.data.length; i += 4) {
+            const painted = srcData.data[i + 3] > 20; // any painted alpha = mask
+            outData.data[i] = painted ? 255 : 0;
+            outData.data[i + 1] = painted ? 255 : 0;
+            outData.data[i + 2] = painted ? 255 : 0;
+            outData.data[i + 3] = 255;
+          }
+          binCtx.putImageData(outData, 0, 0);
+          maskDataUrl = binCanvas.toDataURL('image/png');
+        }
+        if (!maskDataUrl) throw new Error('Paint a mask over the area to edit first.');
         const res = await fetch('/api/image/edit', {
           method: 'POST',
           headers: authHeaders,
@@ -937,7 +963,8 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
                 {aiMode === 'generate' &&
                   imageProvider === 'fal' &&
                   'Describe an image to create on a new layer.'}
-                {aiMode === 'transform' && 'Describe how to transform the current canvas.'}
+                {aiMode === 'transform' &&
+                  'Give an edit instruction: "Turn the red apple blue", "Make the sky sunset", "Add snow to the ground".'}
                 {aiMode === 'inpaint' && 'Paint a mask, then describe what to place there.'}
               </div>
 
@@ -947,7 +974,7 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
                   aiMode === 'generate'
                     ? 'A neon cityscape at dusk, ultra detailed…'
                     : aiMode === 'transform'
-                      ? 'Make it look like a watercolour painting…'
+                      ? 'Turn the red apple blue, add rain, change the sky to sunset…'
                       : 'Replace the selected area with a cat…'
                 }
                 value={aiPrompt}
