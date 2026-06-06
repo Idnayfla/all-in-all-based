@@ -20,6 +20,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
   }
 
+  // Auto-detect infographic/poster/text-heavy requests → Ideogram handles text far better than Flux
+  const isInfographic =
+    /\b(pyramid|triangle|infographic|tier list|tier chart|ranking chart|hierarchy|ranked list|leaderboard)\b/i.test(prompt) ||
+    (/\b(rank|ranking|tier|tiers|category|categories)\b/i.test(prompt) &&
+      /\b(hotel|restaurant|brand|product|company|logo)\b/i.test(prompt)) ||
+    (/\b(triangle|pyramid)\b/i.test(prompt) &&
+      /\b(hotel|luxury|ranking|rank|category|list|logo)\b/i.test(prompt));
+
+  const resolvedModel = isInfographic ? 'ideogram' : model;
+
   try {
     let imageUrl: string | undefined;
     if (sourceImageData) {
@@ -30,7 +40,19 @@ export async function POST(req: NextRequest) {
 
     let url: string | undefined;
 
-    if (model === 'nano-banana') {
+    if (resolvedModel === 'ideogram') {
+      // Ideogram v3 — best-in-class for text rendering, infographics, posters
+      const enhancedPrompt = `${prompt}. Dark luxury poster design. Solid gold triangle pyramid divided by horizontal gold lines into tiers. City skyline silhouette in background. White text labels clearly readable on each tier. Professional infographic style, sharp typography, elegant gold accents, high contrast dark background, magazine quality graphic design.`;
+      const ideogramInput: Record<string, unknown> = {
+        prompt: enhancedPrompt,
+        aspect_ratio: '2:3',
+        style_type: 'design',
+        negative_prompt: 'blurry text, distorted text, low quality, watermark, cartoon, anime, 3D render, overexposed',
+      };
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await fal.subscribe('fal-ai/ideogram/v3', { input: ideogramInput as any });
+      url = (result.data as { images?: { url: string }[] }).images?.[0]?.url;
+    } else if (resolvedModel === 'nano-banana') {
       if (imageUrl) {
         const result = await fal.subscribe('fal-ai/nano-banana-2/edit', {
           input: { image_urls: [imageUrl], prompt },
