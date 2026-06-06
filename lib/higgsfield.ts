@@ -48,10 +48,7 @@ export async function generateImage(prompt: string): Promise<string> {
     headers: higgsHeaders(),
     body: JSON.stringify({
       prompt,
-      width: 2048,
-      height: 1152,
-      quality: '1080p',
-      batch_size: 1,
+      aspect_ratio: '16:9',
     }),
   });
   if (!res.ok) {

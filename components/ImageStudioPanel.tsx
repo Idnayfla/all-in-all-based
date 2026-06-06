@@ -145,26 +145,20 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
   );
 
   const undo = useCallback(() => {
-    setUndoStack(prev => {
-      if (!prev.length) return prev;
-      const snap = prev[prev.length - 1];
-      const next = prev.slice(0, -1);
-      setRedoStack(r => [...r, captureSnapshot()]);
-      applySnapshot(snap, layers);
-      return next;
-    });
-  }, [captureSnapshot, applySnapshot, layers]);
+    if (!undoStack.length) return;
+    const snap = undoStack[undoStack.length - 1];
+    setRedoStack(r => [...r, captureSnapshot()]);
+    applySnapshot(snap, layers);
+    setUndoStack(prev => prev.slice(0, -1));
+  }, [undoStack, captureSnapshot, applySnapshot, layers]);
 
   const redo = useCallback(() => {
-    setRedoStack(prev => {
-      if (!prev.length) return prev;
-      const snap = prev[prev.length - 1];
-      const next = prev.slice(0, -1);
-      setUndoStack(u => [...u, captureSnapshot()]);
-      applySnapshot(snap, layers);
-      return next;
-    });
-  }, [captureSnapshot, applySnapshot, layers]);
+    if (!redoStack.length) return;
+    const snap = redoStack[redoStack.length - 1];
+    setUndoStack(u => [...u, captureSnapshot()]);
+    applySnapshot(snap, layers);
+    setRedoStack(prev => prev.slice(0, -1));
+  }, [redoStack, captureSnapshot, applySnapshot, layers]);
 
   useEffect(() => {
     composite(layers, tool === 'mask');
@@ -465,7 +459,7 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
         });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
-        await loadUrlToLayer(data.url, `Inpaint: ${aiPrompt.slice(0, 20)}`);
+        await loadUrlToLayer(data.url, `AI Edit: ${aiPrompt.slice(0, 20)}`);
         clearMask();
       }
 
@@ -901,7 +895,7 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
                   [
                     { id: 'generate', label: 'Generate' },
                     { id: 'transform', label: 'Transform' },
-                    { id: 'inpaint', label: 'Inpaint' },
+                    { id: 'inpaint', label: 'AI Edit' },
                   ] as { id: AiMode; label: string }[]
                 ).map(m => (
                   <button
@@ -977,13 +971,13 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
                       : '◈ Generate'
                     : aiMode === 'transform'
                       ? '◈ Transform'
-                      : '◈ Inpaint'}
+                      : '◈ AI Edit'}
               </button>
 
               {aiMode === 'inpaint' && (
                 <div className="image-ai-mask-note">
-                  Switch to <strong>Mask</strong> tool and paint the area to replace, then click
-                  Inpaint.
+                  Switch to <strong>Mask</strong> tool and paint the area to replace, then click AI
+                  Edit.
                 </div>
               )}
             </div>

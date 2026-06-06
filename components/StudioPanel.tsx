@@ -1,7 +1,77 @@
 'use client';
 import { useRef, useState, useCallback, useEffect, type ReactElement } from 'react';
 import type * as ToneTypes from 'tone';
+import * as ToneRuntime from 'tone';
 import GeneratedMusicCard from './GeneratedMusicCard';
+
+// ── Raw Web Audio helpers (no Tone.js — guaranteed cross-browser) ───────────
+const NOTE_STEPS: Record<string, number> = {
+  C: 0,
+  'C#': 1,
+  Db: 1,
+  D: 2,
+  'D#': 3,
+  Eb: 3,
+  E: 4,
+  F: 5,
+  'F#': 6,
+  Gb: 6,
+  G: 7,
+  'G#': 8,
+  Ab: 8,
+  A: 9,
+  'A#': 10,
+  Bb: 10,
+  B: 11,
+};
+function noteToFreq(note: string): number {
+  const m = note.match(/^([A-G](?:#|b)?)(\d+)$/);
+  if (!m) return 440;
+  const step = NOTE_STEPS[m[1]] ?? 0;
+  const octave = parseInt(m[2]);
+  return 440 * 2 ** ((step - 9 + (octave - 4) * 12) / 12);
+}
+const INST_OSC: Record<string, OscillatorType> = {
+  piano: 'triangle',
+  epiano: 'triangle',
+  synth: 'sawtooth',
+  pad: 'triangle',
+  strings: 'triangle',
+  organ: 'square',
+  bass: 'sine',
+  pluck: 'triangle',
+  choir: 'sine',
+  guitar: 'triangle',
+  brass: 'sawtooth',
+  flute: 'sine',
+};
+function playRawNote(
+  ctx: AudioContext,
+  note: string,
+  instrument: string,
+  volume: number,
+  pan: number
+): void {
+  const freq = noteToFreq(note);
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const panner = ctx.createStereoPanner();
+  osc.type = INST_OSC[instrument] ?? 'sawtooth';
+  osc.frequency.value = freq;
+  panner.pan.value = Math.max(-1, Math.min(1, pan));
+  const now = ctx.currentTime;
+  const peak = Math.max(0, Math.min(1, volume)) * 0.4;
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(peak, now + 0.015);
+  gain.gain.exponentialRampToValueAtTime(peak * 0.6, now + 0.12);
+  gain.gain.setValueAtTime(peak * 0.6, now + 0.22);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.65);
+  osc.connect(gain);
+  gain.connect(panner);
+  panner.connect(ctx.destination);
+  osc.start(now);
+  osc.stop(now + 0.75);
+}
 
 // ── Tone state types ───────────────────────────────────────────────────────
 interface ToneFxChain {
@@ -118,7 +188,7 @@ function makeTrack(type: Track['type'], idx: number): Track {
     id: Date.now().toString() + Math.random(),
     name: labels[type],
     type,
-    instrument: 'piano',
+    instrument: 'synth',
     volume: 0.8,
     pan: 0,
     muted: false,
@@ -158,11 +228,13 @@ export default function StudioPanel({
   const [aiInput, setAiInput] = useState('');
   const [aiHint, setAiHint] = useState('');
   const [toneReady, setToneReady] = useState(false);
+  const [audioUnlocked, setAudioUnlocked] = useState(false);
   const [exportUrl, setExportUrl] = useState('');
   const [exporting, setExporting] = useState(false);
   const [status, setStatus] = useState('');
 
   const tRef = useRef<ToneState | null>(null); // { Tone, synths, drums, fx }
+  const rawCtxRef = useRef<AudioContext | null>(null); // raw Web Audio ctx for keyboard notes
   const seqRef = useRef<ToneTypes.Sequence | null>(null);
   const mrRef = useRef<MediaRecorder | null>(null);
   const micRafRef = useRef(0);
@@ -173,8 +245,12 @@ export default function StudioPanel({
   const initTone = useCallback(async () => {
     if (tRef.current) return tRef.current;
     setStatus('Loading audio engine…');
-    const Tone = (await import('tone')) as typeof ToneTypes;
-    await Tone.start();
+    // Use statically imported module — no dynamic chunk fetch, no Turbopack HMR abort possible.
+    const Tone = ToneRuntime as unknown as typeof ToneTypes;
+    // Do NOT catch AbortError here. If start() throws, tRef.current is never set,
+    // so the next key press retries the full init including AudioContext.resume().
+    // Desktop Chrome has stricter autoplay enforcement and may fail on first attempt.
+    await ToneRuntime.start();
     Tone.Transport.bpm.value = bpm;
 
     // Master bus — all audio forks to speakers and recorder
@@ -364,7 +440,7 @@ export default function StudioPanel({
     };
     tRef.current = obj;
     setToneReady(true);
-    setStatus('');
+    setStatus('Loading Grand Piano samples…');
     return obj;
   }, [bpm]);
 
@@ -386,29 +462,29 @@ export default function StudioPanel({
     return (tRef.current?.synths[map[instrument] ?? 'lead'] as PlayableInstrument) ?? null;
   };
 
-  // ── Play a note ─────────────────────────────────────────────────────────
+  // ── Play a note (raw Web Audio — no Tone.js context issues) ────────────
   const playNote = useCallback(
-    async (note: string, duration = '8n') => {
-      const t = await initTone();
-      const track = tracks.find(tr => tr.id === selTrack);
-      const instrument = track?.instrument ?? 'piano';
-      const synth = getSynth(instrument);
-      if (!synth) return;
-
-      synth.volume.value = track?.muted ? -Infinity : t.Tone.gainToDb(track?.volume ?? 0.8);
-      const fx = t.synthFx[instrument];
-      if (fx && track) {
-        fx.reverb.wet.value = track.effects.reverb;
-        fx.delay.wet.value = track.effects.delay;
-        fx.distortion.wet.value = track.effects.distortion;
-        fx.pitchShift.pitch = track.effects.pitchShift;
-        fx.pitchShift.wet.value = track.effects.pitchShift !== 0 ? 1 : 0;
-        fx.panner.pan.value = track.pan;
+    (note: string) => {
+      // Create AudioContext synchronously on first call — Chrome requires this
+      // to happen within a user gesture (click/touch). No awaits before it.
+      if (!rawCtxRef.current) {
+        rawCtxRef.current = new AudioContext();
       }
+      const ctx = rawCtxRef.current;
 
-      try {
-        synth.triggerAttackRelease(note, duration);
-      } catch {}
+      const track = tracks.find(tr => tr.id === selTrack);
+      const instrument = track?.instrument ?? 'synth';
+      const volume = track?.muted ? 0 : (track?.volume ?? 0.8);
+      const pan = track?.pan ?? 0;
+
+      // resume() is always safe to call — no-op if already running
+      ctx.resume().then(() => {
+        setAudioUnlocked(true);
+        setToneReady(true);
+        setStatus('');
+        playRawNote(ctx, note, instrument, volume, pan);
+      });
+
       setLitKeys(s => new Set([...s, note]));
       setTimeout(
         () =>
@@ -420,12 +496,19 @@ export default function StudioPanel({
         200
       );
     },
-    [initTone, selTrack, tracks]
+    [selTrack, tracks]
   );
 
   // ── Transport ───────────────────────────────────────────────────────────
   const startPlayback = async () => {
-    const { Tone, drums } = await initTone();
+    let toneState: ToneState;
+    try {
+      toneState = await initTone();
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') return;
+      throw e;
+    }
+    const { Tone, drums } = toneState;
     Tone.Transport.bpm.value = bpm;
     if (seqRef.current) {
       seqRef.current.dispose();
@@ -462,6 +545,8 @@ export default function StudioPanel({
               d.volume.value = Tone.gainToDb(track.volume);
               if (drumId === 'kick') d.triggerAttackRelease('C1', '8n', time);
               else if (drumId === 'snare' || drumId === 'clap') d.triggerAttackRelease('8n', time);
+              else if (drumId === 'tom1') d.triggerAttackRelease('G2', '8n', time);
+              else if (drumId === 'tom2') d.triggerAttackRelease('D2', '8n', time);
               else d.triggerAttackRelease('8n', time);
             } catch {}
           });
@@ -488,7 +573,14 @@ export default function StudioPanel({
   };
 
   const startExport = async () => {
-    const { recorder, masterGain, Tone } = await initTone();
+    let toneState: ToneState;
+    try {
+      toneState = await initTone();
+    } catch (e) {
+      if (e instanceof Error && e.name === 'AbortError') return;
+      throw e;
+    }
+    const { recorder, masterGain, Tone } = toneState;
 
     // Connect vocal/audio elements into the Tone audio graph so they get captured
     const anySoloed = tracks.some(tr => tr.soloed);
@@ -531,6 +623,39 @@ export default function StudioPanel({
   useEffect(() => {
     if (tRef.current) tRef.current.Tone.Transport.bpm.value = bpm;
   }, [bpm]);
+
+  // Apply selected track's FX/volume/pan to Tone nodes whenever React state changes
+  useEffect(() => {
+    if (!toneReady || !tRef.current) return;
+    const track = tracks.find(t => t.id === selTrack);
+    if (!track || track.type !== 'instrument') return;
+    const { synthFx, synths, Tone } = tRef.current;
+    const synthKeyMap: Record<string, string> = {
+      piano: 'piano',
+      epiano: 'epiano',
+      synth: 'lead',
+      pad: 'pad',
+      strings: 'strings',
+      organ: 'organ',
+      bass: 'bass',
+      pluck: 'pluck',
+      choir: 'choir',
+      guitar: 'guitar',
+      brass: 'brass',
+      flute: 'flute',
+    };
+    const synth = synths[synthKeyMap[track.instrument] ?? 'lead'] as PlayableInstrument | undefined;
+    const fx = synthFx[track.instrument];
+    if (synth) synth.volume.value = track.muted ? -Infinity : Tone.gainToDb(track.volume);
+    if (fx) {
+      fx.reverb.wet.value = track.effects.reverb;
+      fx.delay.wet.value = track.effects.delay;
+      fx.distortion.wet.value = track.effects.distortion;
+      fx.pitchShift.pitch = track.effects.pitchShift;
+      fx.pitchShift.wet.value = track.effects.pitchShift !== 0 ? 1 : 0;
+      fx.panner.pan.value = track.pan;
+    }
+  }, [tracks, selTrack, toneReady]);
 
   // ── Voice recording ─────────────────────────────────────────────────────
   const startRecording = async () => {
@@ -845,6 +970,21 @@ export default function StudioPanel({
 
   const sel = tracks.find(t => t.id === selTrack);
 
+  // ── Audio unlock (Opera GX Incognito / strict autoplay browsers) ─────────
+  // Some browsers block AudioContext.resume() unless it originates from a
+  // direct, synchronous click handler with no async hops before it.
+  // This button satisfies that requirement and unlocks audio for the session.
+  const unlockAudio = () => {
+    // Create and resume AudioContext synchronously within the click handler.
+    // This is the only path that satisfies Chrome's strict autoplay policy.
+    if (!rawCtxRef.current) rawCtxRef.current = new AudioContext();
+    rawCtxRef.current.resume().then(() => {
+      setAudioUnlocked(true);
+      setToneReady(true);
+      setStatus('');
+    });
+  };
+
   // ── Piano keyboard renderer ──────────────────────────────────────────────
   const renderPiano = (oct: number) => {
     const keys: ReactElement[] = [];
@@ -889,6 +1029,13 @@ export default function StudioPanel({
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="studio-panel">
+      {!audioUnlocked && !toneReady && (
+        <div className="studio-audio-unlock">
+          <button className="studio-audio-unlock-btn" onClick={unlockAudio}>
+            ▶ Click to enable audio
+          </button>
+        </div>
+      )}
       {/* Header: transport + BPM + export */}
       <div className="studio-header">
         <span className="studio-logo">⬡ Studio</span>

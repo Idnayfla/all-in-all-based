@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import NextImage from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
 import ChatPanel from '@/components/ChatPanel';
@@ -29,8 +30,10 @@ import LandingPage from '@/components/LandingPage';
 import FeedbackModal from '@/components/FeedbackModal';
 import ReferralPanel from '@/components/ReferralPanel';
 import VideoEditorPanel from '@/components/VideoEditorPanel';
-import StudioPanel from '@/components/StudioPanel';
-import ImageStudioPanel from '@/components/ImageStudioPanel';
+// ssr:false prevents Web Audio API code from running server-side and
+// ensures the tone bundle is in its own chunk — no dynamic import() at key-press time.
+const StudioPanel = dynamic(() => import('@/components/StudioPanel'), { ssr: false });
+const ImageStudioPanel = dynamic(() => import('@/components/ImageStudioPanel'), { ssr: false });
 import NotesPanel from '@/components/NotesPanel';
 import ThreeDStudio from '@/components/ThreeDStudio';
 import ProactiveCheckin from '@/components/ProactiveCheckin';
@@ -460,6 +463,18 @@ export default function Home() {
     }
   }, []);
 
+  // ── Suppress unhandled AbortError rejections from Turbopack HMR ────────────
+  // Turbopack aborts its own internal chunk fetches during HMR and surfaces them
+  // as "Runtime AbortError" in the dev overlay. These are harmless noise — the
+  // browser retries automatically. We suppress them here so the overlay never fires.
+  useEffect(() => {
+    const handler = (e: PromiseRejectionEvent) => {
+      if (e.reason instanceof Error && e.reason.name === 'AbortError') e.preventDefault();
+    };
+    window.addEventListener('unhandledrejection', handler);
+    return () => window.removeEventListener('unhandledrejection', handler);
+  }, []);
+
   // ── Write interrupted-session marker on abrupt exit (refresh / tab close) ─
   useEffect(() => {
     const handleUnload = () => {
@@ -641,7 +656,7 @@ export default function Home() {
       setProjects(list);
       saveProjectsCache(list);
     } else {
-      console.error(
+      console.warn(
         '[Based] GET /api/projects failed:',
         projectsRes.status,
         await projectsRes.text().catch(() => '')
@@ -798,7 +813,7 @@ export default function Home() {
         }
         await loadCloudData();
       }
-    })();
+    })().catch(() => {});
 
     const {
       data: { subscription },
