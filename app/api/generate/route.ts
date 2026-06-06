@@ -454,61 +454,57 @@ ARCHITECTURE PATTERNS:
 - Dashboards: fetch → transform → render, loading/error states always
 - Forms: validate on submit, show inline errors, disable during processing
 
-INFOGRAPHICS, PYRAMIDS, RANKINGS, TIER LISTS, HIERARCHY CHARTS — MANDATORY VISUAL OUTPUT:
-- NEVER output a plain text list or unstyled HTML for these requests. ALWAYS build a fully styled, visually stunning HTML page.
-- The output must look like a professional shareable graphic — dark themed, rich colors, not a document.
+INFOGRAPHICS, PYRAMIDS, RANKINGS, TIER LISTS, HIERARCHY CHARTS:
+- These are ALWAYS build requests. ALWAYS wrap output in forge_file tags. NEVER reply as plain text.
+- NEVER output a plain white page or unstyled list — must be a dark, visually rich, professional-looking graphic.
 
-PYRAMID / TRIANGLE HIERARCHY — USE THIS EXACT STRUCTURE:
-Build the pyramid using a flex column of trapezoid-shaped divs using clip-path. Each tier is wider at the bottom. Tier 1 (top/most prestigious) is narrowest. Dark background (#0a0a0a or deep navy). Gold/amber accent colors for borders and labels. Each hotel name is a styled badge chip inside the tier.
+PYRAMID/TRIANGLE/HIERARCHY — output EXACTLY this structure (adapt content, keep the CSS and forge_file wrapper):
 
-MANDATORY HTML TEMPLATE FOR PYRAMID REQUESTS:
-\`\`\`html
+<forge_type>html</forge_type>
+<forge_file name="index.html" language="html">
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hierarchy</title>
 <style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #0a0a0a; color: #fff; font-family: 'Georgia', serif; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; }
-  h1 { font-size: clamp(22px, 4vw, 36px); letter-spacing: 6px; color: #c9a87c; text-transform: uppercase; margin-bottom: 6px; text-align: center; }
-  .subtitle { font-size: 13px; letter-spacing: 3px; color: #888; text-transform: uppercase; margin-bottom: 48px; text-align: center; }
-  .pyramid { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 800px; gap: 3px; }
-  .tier { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 18px 24px; position: relative; border-top: 1px solid rgba(201,168,124,0.3); }
-  .tier-1 { width: 22%; background: linear-gradient(135deg, #7c5c2e, #c9a87c); clip-path: polygon(10% 0%, 90% 0%, 100% 100%, 0% 100%); }
-  .tier-2 { width: 42%; background: linear-gradient(135deg, #3a2e1e, #6b4f2a); clip-path: polygon(8% 0%, 92% 0%, 100% 100%, 0% 100%); }
-  .tier-3 { width: 62%; background: linear-gradient(135deg, #1e2a1e, #2d4a2d); clip-path: polygon(6% 0%, 94% 0%, 100% 100%, 0% 100%); }
-  .tier-4 { width: 82%; background: linear-gradient(135deg, #1a1a2e, #2d2d5a); clip-path: polygon(4% 0%, 96% 0%, 100% 100%, 0% 100%); }
-  .tier-5 { width: 100%; background: linear-gradient(135deg, #1a0a0a, #3a1a1a); clip-path: polygon(2% 0%, 98% 0%, 100% 100%, 0% 100%); }
-  .tier-label { font-size: 10px; letter-spacing: 3px; text-transform: uppercase; color: #c9a87c; margin-bottom: 10px; font-weight: 700; }
-  .hotels { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
-  .hotel-badge { background: rgba(0,0,0,0.4); border: 1px solid rgba(201,168,124,0.4); padding: 4px 12px; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; color: #e8d5b0; font-weight: 700; border-radius: 2px; }
-  .legend { display: flex; gap: 24px; margin-top: 40px; flex-wrap: wrap; justify-content: center; }
-  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; letter-spacing: 2px; color: #888; text-transform: uppercase; }
-  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#090909;color:#fff;font-family:Georgia,serif;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:48px 16px}
+h1{font-size:clamp(18px,3.5vw,32px);letter-spacing:8px;color:#c9a87c;text-transform:uppercase;text-align:center;margin-bottom:6px}
+.sub{font-size:11px;letter-spacing:3px;color:#666;text-transform:uppercase;text-align:center;margin-bottom:52px}
+.pyramid{display:flex;flex-direction:column;align-items:center;width:100%;max-width:860px;gap:4px}
+.tier{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:14px 28px;min-height:72px}
+.t1{width:18%;background:linear-gradient(150deg,#8a6520,#c9a87c);clip-path:polygon(14% 0%,86% 0%,100% 100%,0% 100%)}
+.t2{width:38%;background:linear-gradient(150deg,#3d2e10,#7a5828);clip-path:polygon(9% 0%,91% 0%,100% 100%,0% 100%)}
+.t3{width:58%;background:linear-gradient(150deg,#0f2010,#1e4020);clip-path:polygon(6% 0%,94% 0%,100% 100%,0% 100%)}
+.t4{width:78%;background:linear-gradient(150deg,#0e0e28,#1c1c4c);clip-path:polygon(3% 0%,97% 0%,100% 100%,0% 100%)}
+.t5{width:100%;background:linear-gradient(150deg,#1a0606,#380c0c);clip-path:polygon(1% 0%,99% 0%,100% 100%,0% 100%)}
+.label{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:#c9a87c;font-weight:700;margin-bottom:8px;text-align:center}
+.badges{display:flex;flex-wrap:wrap;gap:5px;justify-content:center}
+.badge{background:rgba(0,0,0,0.5);border:1px solid rgba(201,168,124,0.3);padding:3px 10px;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:#e8d5b0;font-weight:700;border-radius:2px;white-space:nowrap}
 </style>
 </head>
 <body>
-  <h1>KUALA LUMPUR</h1>
-  <div class="subtitle">Hotels ranked from most luxurious to least luxurious</div>
-  <div class="pyramid">
-    <div class="tier tier-1">
-      <div class="tier-label">I · Ultra Luxury</div>
-      <div class="hotels">
-        <span class="hotel-badge">PARK HYATT</span>
-        <span class="hotel-badge">FOUR SEASONS</span>
-      </div>
-    </div>
-    <!-- repeat for tiers 2–5 -->
-  </div>
+<h1>KUALA LUMPUR</h1>
+<div class="sub">Hotels Ranked · Most Luxurious to Least Luxurious</div>
+<div class="pyramid">
+  <div class="tier t1"><div class="label">I · Ultra Luxury</div><div class="badges"><span class="badge">PARK HYATT</span><span class="badge">FOUR SEASONS</span></div></div>
+  <div class="tier t2"><div class="label">II · Luxury</div><div class="badges"><span class="badge">RITZ-CARLTON</span><span class="badge">MANDARIN ORIENTAL</span><span class="badge">ST. REGIS</span><span class="badge">W HOTEL</span></div></div>
+  <div class="tier t3"><div class="label">III · Premium</div><div class="badges"><span class="badge">GRAND HYATT</span><span class="badge">SHANGRI-LA</span><span class="badge">BANYAN TREE</span><span class="badge">JW MARRIOTT</span><span class="badge">THE WESTIN</span></div></div>
+  <div class="tier t4"><div class="label">IV · Upscale</div><div class="badges"><span class="badge">HILTON</span><span class="badge">SHERATON IMPERIAL</span><span class="badge">DOUBLETREE</span><span class="badge">RENAISSANCE</span><span class="badge">PULLMAN</span></div></div>
+  <div class="tier t5"><div class="label">V · Comfort</div><div class="badges"><span class="badge">NOVOTEL</span><span class="badge">HOLIDAY INN</span><span class="badge">FURAMA</span><span class="badge">CONCORDE</span><span class="badge">THE BOULEVARD</span></div></div>
+</div>
 </body>
 </html>
-\`\`\`
+</forge_file>
 
-- clip-path trapezoid values: tier 1 widest angle, tier 5 nearly vertical sides
-- Every hotel name goes inside a .hotel-badge span
-- Use the exact tier color scheme above — dark jewel tones per tier
-- Title and subtitle always in ALL CAPS with letter-spacing
-- NEVER use a plain white background, NEVER output an unstyled list
+RULES FOR INFOGRAPHIC OUTPUT:
+- The forge_type and forge_file tags above are MANDATORY — never omit them
+- Replace placeholder hotel names with real ones from the user's request
+- Keep all CSS exactly as shown — do not simplify or remove the dark theme
+- If user asks for more hotels, add more .badge spans to each tier
+- NEVER reply in plain text for these requests — always forge_file
 
 ANIMATION RULES — ALWAYS FOLLOW FOR ANY ANIMATED PROJECT:
 - Always wrap the entire animation init in: window.addEventListener('DOMContentLoaded', function() { ... })
