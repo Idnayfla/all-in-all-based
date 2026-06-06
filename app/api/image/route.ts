@@ -81,7 +81,13 @@ export async function POST(req: NextRequest) {
             kontextMsg.includes('404') ||
             kontextMsg.includes('not found') ||
             kontextMsg.includes('403') ||
-            kontextMsg.includes('forbidden');
+            kontextMsg.includes('forbidden') ||
+            kontextMsg.includes('downstream') ||
+            kontextMsg.includes('unavailable') ||
+            kontextMsg.includes('503') ||
+            kontextMsg.includes('502') ||
+            kontextMsg.includes('timeout') ||
+            kontextMsg.includes('overloaded');
           if (!isUnavailable) throw kontextErr;
           // Fallback: flux dev i2i at lower strength for better instruction following
           const result = await fal.subscribe('fal-ai/flux/dev/image-to-image', {
