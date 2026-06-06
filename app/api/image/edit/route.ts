@@ -63,12 +63,19 @@ export async function POST(req: NextRequest) {
         const kontextMsg = String(
           kontextErr instanceof Error ? kontextErr.message : kontextErr
         ).toLowerCase();
-        const isUnavailable =
+        const shouldFallback =
           kontextMsg.includes('404') ||
           kontextMsg.includes('not found') ||
           kontextMsg.includes('403') ||
-          kontextMsg.includes('forbidden');
-        if (!isUnavailable) throw kontextErr;
+          kontextMsg.includes('forbidden') ||
+          kontextMsg.includes('downstream') ||
+          kontextMsg.includes('unavailable') ||
+          kontextMsg.includes('503') ||
+          kontextMsg.includes('502') ||
+          kontextMsg.includes('timeout') ||
+          kontextMsg.includes('overloaded');
+        if (!shouldFallback) throw kontextErr;
+        console.warn('[image/edit] flux-pro/kontext/max unavailable, falling back to flux dev i2i');
         const result = await fal.subscribe('fal-ai/flux/dev/image-to-image', {
           input: {
             image_url: resolvedSourceUrl,
@@ -131,8 +138,16 @@ export async function POST(req: NextRequest) {
     if (!url) return NextResponse.json({ error: 'No image returned' }, { status: 500 });
     return NextResponse.json({ url });
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
+    const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
     console.error('[image/edit] error:', msg);
-    return NextResponse.json({ error: msg || 'Edit failed — please try again.' }, { status: 500 });
+    const friendly =
+      msg.includes('downstream') || msg.includes('unavailable') || msg.includes('503')
+        ? 'Image service is temporarily busy — please try again in a moment.'
+        : msg.includes('content') || msg.includes('moderat') || msg.includes('safety')
+          ? 'Prompt was flagged by content filters — try rephrasing.'
+          : msg.includes('timeout')
+            ? 'Request timed out — try a simpler edit or try again.'
+            : 'Edit failed — please try again.';
+    return NextResponse.json({ error: friendly }, { status: 500 });
   }
 }
