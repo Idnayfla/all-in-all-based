@@ -456,10 +456,10 @@ ARCHITECTURE PATTERNS:
 
 INFOGRAPHICS, PYRAMIDS, RANKINGS, TIER LISTS, HIERARCHY CHARTS:
 - These are ALWAYS build requests. ALWAYS wrap output in forge_file tags. NEVER reply as plain text.
-- TARGET AESTHETIC: a shareable POSTER / magazine graphic — portrait layout, dark city background, gold accents, numbered tier circles with descriptions. NOT a website. NOT a scrollable page.
-- Must include a "Download as PNG" button using html2canvas so the user gets an actual image file.
+- Use Canvas-based rendering (not HTML/CSS divs) — canvas gives pixel-perfect poster quality with photo backgrounds, glows, and real PNG export.
+- Adapt the TIERS data array for the user's request. Keep ALL render code exactly as shown.
 
-PYRAMID/TRIANGLE/HIERARCHY — output EXACTLY this structure (adapt text, keep structure and forge_file wrapper):
+PYRAMID/TRIANGLE — copy this EXACTLY, only change the TIERS data and TITLE/SUBTITLE/BG_URL:
 
 <forge_type>html</forge_type>
 <forge_file name="index.html" language="html">
@@ -468,112 +468,56 @@ PYRAMID/TRIANGLE/HIERARCHY — output EXACTLY this structure (adapt text, keep s
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Luxury Hierarchy</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:#0a0a0f;font-family:Georgia,serif;display:flex;flex-direction:column;align-items:center;padding:24px 16px 40px;min-height:100vh}
-.poster{position:relative;width:100%;max-width:520px;background:linear-gradient(180deg,#0d0d1a 0%,#0a0a0f 100%);border:1px solid rgba(201,168,124,0.2);padding:32px 24px 40px;overflow:hidden}
-.poster::before{content:'';position:absolute;inset:0;background:url('https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=800&q=60') center/cover no-repeat;opacity:0.12;pointer-events:none}
-.header{position:relative;text-align:center;margin-bottom:28px}
-.city{font-size:clamp(22px,5vw,36px);letter-spacing:10px;color:#c9a87c;text-transform:uppercase;font-weight:400;line-height:1}
-.divider{display:flex;align-items:center;gap:10px;justify-content:center;margin:8px 0}
-.divider-line{flex:1;height:1px;background:rgba(201,168,124,0.4)}
-.divider-text{font-size:9px;letter-spacing:2px;color:#888;text-transform:uppercase}
-.pyramid{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;width:100%}
-.tier{position:relative;display:flex;align-items:flex-start;gap:12px;width:100%;padding:10px 14px 12px}
-.tier-num{flex-shrink:0;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#0a0a0f;margin-top:2px}
-.tier-body{flex:1;min-width:0}
-.tier-name{font-size:10px;letter-spacing:3px;text-transform:uppercase;font-weight:700;margin-bottom:3px}
-.tier-desc{font-size:9px;color:rgba(255,255,255,0.5);letter-spacing:0.5px;margin-bottom:8px;font-style:italic}
-.hotels{display:flex;flex-wrap:wrap;gap:4px}
-.hotel{padding:3px 9px;font-size:9.5px;letter-spacing:1px;text-transform:uppercase;font-weight:700;border-radius:2px;white-space:nowrap}
-.t1{background:rgba(201,168,124,0.15);border-left:3px solid #c9a87c}
-.t1 .tier-num{background:#c9a87c}
-.t1 .tier-name{color:#c9a87c}
-.t1 .hotel{background:rgba(201,168,124,0.2);border:1px solid rgba(201,168,124,0.5);color:#e8d5b0}
-.t2{background:rgba(180,140,80,0.1);border-left:3px solid #b48c50}
-.t2 .tier-num{background:#b48c50}
-.t2 .tier-name{color:#b48c50}
-.t2 .hotel{background:rgba(180,140,80,0.15);border:1px solid rgba(180,140,80,0.4);color:#d4c090}
-.t3{background:rgba(100,140,100,0.1);border-left:3px solid #6a9a6a}
-.t3 .tier-num{background:#6a9a6a}
-.t3 .tier-name{color:#8aba8a}
-.t3 .hotel{background:rgba(100,140,100,0.15);border:1px solid rgba(100,140,100,0.4);color:#c0d8c0}
-.t4{background:rgba(80,100,160,0.1);border-left:3px solid #5064a0}
-.t4 .tier-num{background:#5064a0}
-.t4 .tier-name{color:#8090c8}
-.t4 .hotel{background:rgba(80,100,160,0.15);border:1px solid rgba(80,100,160,0.4);color:#b0bce0}
-.t5{background:rgba(140,80,80,0.1);border-left:3px solid #8c5050}
-.t5 .tier-num{background:#8c5050}
-.t5 .tier-name{color:#c08080}
-.t5 .hotel{background:rgba(140,80,80,0.15);border:1px solid rgba(140,80,80,0.4);color:#d8b0b0}
-.footer{position:relative;text-align:center;margin-top:20px;font-size:8px;letter-spacing:2px;color:rgba(201,168,124,0.4);text-transform:uppercase}
-.dl-btn{margin-top:20px;padding:10px 28px;background:#c9a87c;color:#0a0a0f;border:none;font-family:Georgia,serif;font-size:12px;letter-spacing:3px;text-transform:uppercase;cursor:pointer;font-weight:700}
-.dl-btn:hover{background:#e8d5b0}
-</style>
+<title>Ranking</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,400;1,700&family=Montserrat:wght@300;400;700&display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#020208;display:flex;flex-direction:column;align-items:center;padding:20px 12px 36px}canvas{max-width:100%;box-shadow:0 0 100px rgba(201,168,124,0.2)}.btn{margin-top:18px;padding:12px 40px;background:#c9a87c;color:#020208;border:none;font-family:'Montserrat',sans-serif;font-size:10px;letter-spacing:5px;text-transform:uppercase;font-weight:700;cursor:pointer}.btn:hover{background:#e8d5b0}</style>
 </head>
 <body>
-<div class="poster" id="poster">
-  <div class="header">
-    <div class="city">KUALA LUMPUR</div>
-    <div class="divider"><div class="divider-line"></div><div class="divider-text">Hotels Ranked from Most Luxurious to Least Luxurious</div><div class="divider-line"></div></div>
-  </div>
-  <div class="pyramid">
-    <div class="tier t1">
-      <div class="tier-num">1</div>
-      <div class="tier-body">
-        <div class="tier-name">Ultra Luxury</div>
-        <div class="tier-desc">The finest iconic service and unparalleled experiences</div>
-        <div class="hotels"><span class="hotel">PARK HYATT</span><span class="hotel">FOUR SEASONS</span></div>
-      </div>
-    </div>
-    <div class="tier t2">
-      <div class="tier-num">2</div>
-      <div class="tier-body">
-        <div class="tier-name">Luxury</div>
-        <div class="tier-desc">World-class amenities with refined elegance</div>
-        <div class="hotels"><span class="hotel">RITZ-CARLTON</span><span class="hotel">MANDARIN ORIENTAL</span><span class="hotel">ST. REGIS</span><span class="hotel">W HOTEL</span></div>
-      </div>
-    </div>
-    <div class="tier t3">
-      <div class="tier-num">3</div>
-      <div class="tier-body">
-        <div class="tier-name">Premium</div>
-        <div class="tier-desc">Superior comfort with premium facilities</div>
-        <div class="hotels"><span class="hotel">GRAND HYATT</span><span class="hotel">SHANGRI-LA</span><span class="hotel">BANYAN TREE</span><span class="hotel">JW MARRIOTT</span><span class="hotel">THE WESTIN</span></div>
-      </div>
-    </div>
-    <div class="tier t4">
-      <div class="tier-num">4</div>
-      <div class="tier-body">
-        <div class="tier-name">Upscale</div>
-        <div class="tier-desc">Consistent quality with business-class service</div>
-        <div class="hotels"><span class="hotel">HILTON</span><span class="hotel">SHERATON IMPERIAL</span><span class="hotel">DOUBLETREE</span><span class="hotel">RENAISSANCE</span><span class="hotel">PULLMAN</span></div>
-      </div>
-    </div>
-    <div class="tier t5">
-      <div class="tier-num">5</div>
-      <div class="tier-body">
-        <div class="tier-name">Comfort</div>
-        <div class="tier-desc">Reliable service with essential amenities</div>
-        <div class="hotels"><span class="hotel">NOVOTEL</span><span class="hotel">HOLIDAY INN</span><span class="hotel">FURAMA</span><span class="hotel">CONCORDE</span><span class="hotel">THE BOULEVARD</span></div>
-      </div>
-    </div>
-  </div>
-  <div class="footer">Rankings based on luxury standards · facilities · service quality · location</div>
-</div>
-<button class="dl-btn" onclick="html2canvas(document.getElementById('poster'),{scale:2,useCORS:true}).then(c=>{const a=document.createElement('a');a.download='ranking.png';a.href=c.toDataURL();a.click()})">↓ Download as PNG</button>
+<canvas id="c"></canvas>
+<button class="btn" id="dl">↓ Download as PNG</button>
+<script>
+// ── CHANGE ONLY THIS SECTION FOR EACH REQUEST ─────────────────────────────
+const TITLE='KUALA LUMPUR';
+const SUBTITLE='Hotels Ranked from Most Luxurious to Least Luxurious';
+const BG_URL='https://images.unsplash.com/photo-1596422846543-75c6fc197f07?w=1200&q=80';
+const TIERS=[
+  {num:1,name:'ULTRA LUXURY',col:'#c9a87c',stars:'★★★★★⁺',hotels:[['PARK HYATT','MERDEKA 118']]},
+  {num:2,name:'LUXURY',col:'#b08840',stars:'★★★★★',hotels:[['FOUR SEASONS'],['MANDARIN','ORIENTAL'],['THE RITZ-','CARLTON'],['ST. REGIS']]},
+  {num:3,name:'UPPER UPSCALE',col:'#4a7a50',stars:'★★★★★',hotels:[['W HOTEL'],['GRAND HYATT'],['SHANGRI-LA'],['BANYAN TREE'],['THE WESTIN']]},
+  {num:4,name:'UPSCALE',col:'#3a5898',stars:'★★★★',hotels:[['JW MARRIOTT'],['HILTON KL'],['SHERATON','IMPERIAL'],['INTER-','CONTINENTAL'],['DOUBLE-','TREE'],['PULLMAN']]},
+  {num:5,name:'COMFORT',col:'#8a4040',stars:'★★★',hotels:[['RENAISSANCE'],['NOVOTEL'],['HOLIDAY INN'],['FURAMA'],['CONCORDE'],['THE','BOULEVARD']]}
+];
+// ─────────────────────────────────────────────────────────────────────────
+const W=560,H=900;
+const C=document.getElementById('c');
+const ctx=C.getContext('2d');
+C.width=W;C.height=H;
+C.style.width=Math.min(520,window.innerWidth-24)+'px';
+document.getElementById('dl').onclick=()=>{const a=document.createElement('a');a.download='ranking.png';a.href=C.toDataURL('image/png');a.click()};
+const SHP={tl:{x:235,y:172},tr:{x:325,y:172},bl:{x:12,y:840},br:{x:548,y:840}};
+const TH=SHP.bl.y-SHP.tl.y;
+function lx(y){return SHP.tl.x+(SHP.bl.x-SHP.tl.x)*(y-SHP.tl.y)/TH}
+function rx(y){return SHP.tr.x+(SHP.br.x-SHP.tr.x)*(y-SHP.tr.y)/TH}
+function tw(y){return rx(y)-lx(y)}
+const TY=[172,306,439,573,706,840];
+function rr(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath()}
+function card(x,y,w,h,lines,stars,col,big){ctx.save();rr(x,y,w,h,3);const bg=ctx.createLinearGradient(x,y,x,y+h);bg.addColorStop(0,'rgba(255,255,255,0.09)');bg.addColorStop(1,'rgba(255,255,255,0.04)');ctx.fillStyle=bg;ctx.fill();ctx.shadowColor=col;ctx.shadowBlur=big?10:5;ctx.strokeStyle=col;ctx.lineWidth=big?1.4:0.9;ctx.stroke();ctx.restore();const fs=big?11:(w<75?7.5:8.5);ctx.font='700 '+fs+'px Montserrat,sans-serif';ctx.fillStyle=big?'#ecdcb8':'#cdc5b2';ctx.textAlign='center';const lh=fs*1.35;const textH=lh*lines.length+(big?12:9);let ty=y+(h-textH)/2+fs;lines.forEach(l=>{ctx.fillText(l,x+w/2,ty);ty+=lh});ctx.font=(big?10:7.5)+'px serif';ctx.fillStyle=col;ctx.fillText(stars,x+w/2,ty+1)}
+function tierLabel(i){const t=TIERS[i];const yDiv=TY[i];const lxD=lx(yDiv);const cr=12;const cx=Math.max(cr+4,lxD-cr-4);const cy=Math.min(yDiv+cr+2,TY[i+1]-cr-2);ctx.save();ctx.shadowColor=t.col;ctx.shadowBlur=6;ctx.beginPath();ctx.arc(cx,cy,cr,0,Math.PI*2);ctx.fillStyle=t.col;ctx.fill();ctx.restore();ctx.font='bold 11px Montserrat,sans-serif';ctx.fillStyle='#060610';ctx.textAlign='center';ctx.fillText(t.num,cx,cy+4);ctx.font='bold 7px Montserrat,sans-serif';ctx.fillStyle=t.col;ctx.textAlign='left';ctx.fillText(t.name,lxD+8,yDiv+14)}
+function tierHotels(i){const t=TIERS[i];const yc=(TY[i]+TY[i+1])/2;const big=i===0;if(big){const w=140,h=58;card(W/2-w/2,yc-h/2,w,h,t.hotels[0],t.stars,t.col,true);return}const n=t.hotels.length;const gap=5;const avail=tw(yc)-24;const maxW=[0,0,68,72,74,74][i];const ch=[0,0,46,42,38,34][i];let cw=Math.min(maxW,Math.floor((avail-gap*(n-1))/n));cw=Math.max(cw,56);const totalW=cw*n+gap*(n-1);const sx=W/2-totalW/2;if(totalW<=avail){t.hotels.forEach((h,j)=>card(sx+j*(cw+gap),yc-ch/2,cw,ch,h,t.stars,t.col,false))}else{const pr=Math.ceil(n/2);const rows=[t.hotels.slice(0,pr),t.hotels.slice(pr)];const totalRowH=ch*2+5;rows.forEach((row,ri)=>{const rw=cw*row.length+gap*(row.length-1);const rx0=W/2-rw/2;const ry=yc-totalRowH/2+ri*(ch+5);row.forEach((h,j)=>card(rx0+j*(cw+gap),ry,cw,ch,h,t.stars,t.col,false))})}}
+function render(bgImg){ctx.fillStyle='#080810';ctx.fillRect(0,0,W,H);if(bgImg){const asp=bgImg.naturalWidth/bgImg.naturalHeight;const dh=W/asp;ctx.save();ctx.globalAlpha=0.30;ctx.filter='grayscale(20%) contrast(1.1)';ctx.drawImage(bgImg,0,H-dh*1.05,W,dh*1.05);ctx.restore()}const ov=ctx.createLinearGradient(0,0,0,H);ov.addColorStop(0,'rgba(8,8,16,1)');ov.addColorStop(0.22,'rgba(8,8,16,0.8)');ov.addColorStop(0.55,'rgba(8,8,16,0.45)');ov.addColorStop(0.78,'rgba(8,8,16,0.65)');ov.addColorStop(1,'rgba(8,8,16,0.96)');ctx.fillStyle=ov;ctx.fillRect(0,0,W,H);ctx.textAlign='center';ctx.save();ctx.shadowColor='rgba(201,168,124,0.5)';ctx.shadowBlur=20;ctx.font='italic 700 52px "Playfair Display",Georgia,serif';ctx.fillStyle='#c9a87c';ctx.fillText(TITLE,W/2,80);ctx.restore();const oy=104;ctx.strokeStyle='rgba(201,168,124,0.42)';ctx.lineWidth=0.8;[[36,W/2-50],[W/2+50,W-36]].forEach(([a,b])=>{ctx.beginPath();ctx.moveTo(a,oy);ctx.lineTo(b,oy);ctx.stroke()});ctx.font='700 11px serif';ctx.fillStyle='rgba(201,168,124,0.75)';ctx.fillText('✦  ✦  ✦',W/2,oy+5);ctx.font='300 8px Montserrat,sans-serif';ctx.fillStyle='#484858';ctx.fillText('— '+SUBTITLE.toUpperCase()+' —',W/2,128);ctx.beginPath();ctx.moveTo(SHP.tl.x,SHP.tl.y);ctx.lineTo(SHP.tr.x,SHP.tr.y);ctx.lineTo(SHP.br.x,SHP.br.y);ctx.lineTo(SHP.bl.x,SHP.bl.y);ctx.closePath();const shpFill=ctx.createLinearGradient(W/2,SHP.tl.y,W/2,SHP.bl.y);shpFill.addColorStop(0,'rgba(201,168,124,0.10)');shpFill.addColorStop(1,'rgba(201,168,124,0.02)');ctx.fillStyle=shpFill;ctx.fill();ctx.save();ctx.shadowColor='rgba(201,168,124,0.40)';ctx.shadowBlur=12;ctx.beginPath();ctx.moveTo(SHP.tl.x,SHP.tl.y);ctx.lineTo(SHP.tr.x,SHP.tr.y);ctx.lineTo(SHP.br.x,SHP.br.y);ctx.lineTo(SHP.bl.x,SHP.bl.y);ctx.closePath();ctx.strokeStyle='#c9a87c';ctx.lineWidth=1.6;ctx.stroke();ctx.restore();for(let i=1;i<TY.length-1;i++){const y=TY[i];const alpha=0.40-i*0.06;ctx.strokeStyle='rgba(201,168,124,'+alpha+')';ctx.lineWidth=0.8;ctx.beginPath();ctx.moveTo(lx(y),y);ctx.lineTo(rx(y),y);ctx.stroke()}ctx.save();ctx.shadowColor='#c9a87c';ctx.shadowBlur=10;ctx.beginPath();ctx.arc(W/2,SHP.tl.y-1,3.5,0,Math.PI*2);ctx.fillStyle='#c9a87c';ctx.fill();ctx.restore();[[SHP.bl.x+1,SHP.bl.y],[SHP.br.x-1,SHP.br.y]].forEach(([bx,by])=>{ctx.beginPath();ctx.arc(bx,by,2.5,0,Math.PI*2);ctx.fillStyle='rgba(201,168,124,0.45)';ctx.fill()});TIERS.forEach((_,i)=>{tierLabel(i);tierHotels(i)});ctx.font='300 7px Montserrat,sans-serif';ctx.fillStyle='rgba(201,168,124,0.28)';ctx.textAlign='center';ctx.fillText('Rankings based on luxury standards · facilities · service quality · location & reputation',W/2,868);ctx.fillText('✦   Based AI · getbased.dev   ✦',W/2,882);ctx.strokeStyle='rgba(201,168,124,0.16)';ctx.lineWidth=1;ctx.strokeRect(1,1,W-2,H-2)}
+const img=new Image();img.crossOrigin='anonymous';img.onload=()=>document.fonts.ready.then(()=>render(img));img.onerror=()=>document.fonts.ready.then(()=>render(null));img.src=BG_URL;
+</script>
 </body>
 </html>
 </forge_file>
 
 RULES FOR INFOGRAPHIC OUTPUT:
 - forge_type and forge_file tags are MANDATORY — never omit them
-- Replace ALL placeholder hotel/brand names and tier descriptions with ones relevant to the user's request
-- Keep the poster layout, city background, numbered tier circles, tier descriptions, and Download button
-- Adapt the background image URL to match the city/topic (Unsplash photo search URLs work: https://images.unsplash.com/photo-[id]?w=800)
-- Add more .hotel spans per tier to hit the user's requested count
+- Only change TITLE, SUBTITLE, BG_URL, and the TIERS array — do NOT modify the render code
+- Adapt BG_URL to the topic city using Unsplash: https://images.unsplash.com/photo-[relevant-id]?w=1200&q=80
+- hotels: array of string arrays — each inner array = lines of text for that card (split long names across 2 lines)
+- Scale the number of TIERS to match the user's requested categories (3, 4, or 5)
+- Scale the number of hotels per tier to match the user's requested count — more hotels = more inner arrays
 - NEVER reply in plain text — always forge_file
 
 ANIMATION RULES — ALWAYS FOLLOW FOR ANY ANIMATED PROJECT:
@@ -2067,8 +2011,8 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             let fullText = '';
             if (imageBlocks.length > 0) {
               const stream = await client.messages.stream({
-                model: MODEL_SONNET,
-                max_tokens: 4096,
+                model: MODEL_OPUS,
+                max_tokens: 12000,
                 system: systemBlocks,
                 messages: anthropicMessages,
               });
