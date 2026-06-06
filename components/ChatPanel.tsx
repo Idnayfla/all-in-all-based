@@ -63,9 +63,11 @@ function detectIntentMode(text: string): GenerationMode {
 
   // Structured visual content → Claude builds HTML/CSS (better than any image model for text+layout)
   const isStructuredVisual =
-    /\b(infographic|pyramid|tier list|tier chart|ranking chart|hierarchy|flowchart|diagram|chart|graph|table|comparison chart|bracket|leaderboard|ranked list)\b/.test(t) ||
+    /\b(infographic|pyramid|triangle|tier list|tier chart|ranking chart|hierarchy|flowchart|diagram|chart|graph|table|comparison chart|bracket|leaderboard|ranked list)\b/.test(t) ||
     (/\b(rank|ranking|ranked|tier|tiers|category|categories)\b/.test(t) &&
-      /\b(hotel|restaurant|brand|product|company|list|logos?)\b/.test(t));
+      /\b(hotel|restaurant|brand|product|company|list|logos?)\b/.test(t)) ||
+    (/\b(triangle|pyramid)\b/.test(t) &&
+      /\b(hotel|restaurant|brand|luxury|ranking|rank|category|list)\b/.test(t));
   if (isStructuredVisual) return 'chat';
 
   // Code/app request → Claude builds it
