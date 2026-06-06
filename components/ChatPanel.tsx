@@ -1286,7 +1286,15 @@ export default function ChatPanel({
                 <motion.button
                   key={s}
                   className="suggestion-btn"
-                  onClick={() => send(s)}
+                  onClick={() => {
+                    setInput(s);
+                    if (window.innerWidth <= 768) {
+                      setMobileInputOpen(true);
+                      setTimeout(() => mobileTextareaRef.current?.focus(), 50);
+                    } else {
+                      setTimeout(() => textareaRef.current?.focus(), 0);
+                    }
+                  }}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.06, type: 'spring', stiffness: 400, damping: 30 }}
