@@ -130,11 +130,12 @@ Sub-text: _Free to try · 10 builds/month · No credit card_
 
 **Before launch:**
 
-- [ ] Create/claim PH account at producthunt.com — verify email
-- [ ] Follow 5-10 active PH hunters
+- [x] Create/claim PH account at producthunt.com — verify email ✅ DONE
+- [x] Follow 5-10 active PH hunters ✅ DONE
 - [x] Prepare all screenshots at 1270×952px ✅ DONE
-- [ ] Record 45-second demo video (script already written in PLANNER.md)
+- [x] Record 45-second demo video ✅ DONE
 - [x] Draft first comment ready to paste ✅ DONE
+- [x] Submit product draft — scheduled for June 10, 12:01am PST ✅ DONE
 
 **Launch day:**
 

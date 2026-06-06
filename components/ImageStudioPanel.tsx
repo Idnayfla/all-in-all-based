@@ -129,7 +129,8 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
   }, []);
 
   const pushUndo = useCallback(() => {
-    setUndoStack(prev => [...prev.slice(-29), captureSnapshot()]);
+    const snap = captureSnapshot();
+    setUndoStack(prev => [...prev.slice(-29), snap]);
     setRedoStack([]);
   }, [captureSnapshot]);
 
@@ -139,6 +140,10 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
         const c = offscreens.current[id];
         if (c) c.getContext('2d')!.putImageData(data, 0, 0);
       });
+      // Clear any offscreen that wasn't in the snapshot — it was empty at that point
+      Object.entries(offscreens.current).forEach(([id, c]) => {
+        if (!snap.has(id)) c.getContext('2d')!.clearRect(0, 0, W, H);
+      });
       composite(layerList, false);
     },
     [composite]
@@ -147,7 +152,8 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
   const undo = useCallback(() => {
     if (!undoStack.length) return;
     const snap = undoStack[undoStack.length - 1];
-    setRedoStack(r => [...r, captureSnapshot()]);
+    const currentSnap = captureSnapshot();
+    setRedoStack(r => [...r, currentSnap]);
     applySnapshot(snap, layers);
     setUndoStack(prev => prev.slice(0, -1));
   }, [undoStack, captureSnapshot, applySnapshot, layers]);
@@ -155,7 +161,8 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
   const redo = useCallback(() => {
     if (!redoStack.length) return;
     const snap = redoStack[redoStack.length - 1];
-    setUndoStack(u => [...u, captureSnapshot()]);
+    const currentSnap = captureSnapshot();
+    setUndoStack(u => [...u, currentSnap]);
     applySnapshot(snap, layers);
     setRedoStack(prev => prev.slice(0, -1));
   }, [redoStack, captureSnapshot, applySnapshot, layers]);

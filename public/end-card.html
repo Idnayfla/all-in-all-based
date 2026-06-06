@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Based — End Card</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+        background: #08070e;
+        font-family: 'Inter', system-ui, sans-serif;
+        color: #ede8d0;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      /* Warm ambient bloom — barely visible, just adds depth */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        background: radial-gradient(
+          ellipse 55% 38% at 50% 52%,
+          rgba(201, 168, 124, 0.05) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+      }
+
+      .content {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* ◈ BASED label */
+      .mark {
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.42em;
+        text-transform: uppercase;
+        color: #c9a87c;
+        margin-bottom: 30px;
+        opacity: 0;
+        animation: fadeUp 0.6s ease 0.1s forwards;
+      }
+
+      /* Main URL */
+      .url {
+        font-size: 96px;
+        font-weight: 700;
+        letter-spacing: -0.03em;
+        color: #ede8d0;
+        /* subtle warm breath — not a glow, just presence */
+        text-shadow: 0 0 120px rgba(201, 168, 124, 0.12);
+        margin-bottom: 18px;
+        opacity: 0;
+        animation: fadeUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.35s forwards;
+      }
+
+      /* Tagline */
+      .tagline {
+        font-size: 22px;
+        font-weight: 300;
+        color: rgba(237, 232, 208, 0.45);
+        letter-spacing: 0.005em;
+        margin-bottom: 44px;
+        opacity: 0;
+        animation: fadeUp 0.7s ease 0.8s forwards;
+      }
+
+      /* Gold → Mint divider — scales in from center */
+      .divider {
+        width: 80px;
+        height: 1px;
+        background: linear-gradient(90deg, #c9a87c 0%, #5ef5c0 100%);
+        border-radius: 1px;
+        margin-bottom: 32px;
+        transform-origin: center;
+        opacity: 0;
+        animation: scaleIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) 1.05s forwards;
+      }
+
+      /* Free tier callout */
+      .sub {
+        font-size: 14px;
+        font-weight: 500;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(237, 232, 208, 0.28);
+        opacity: 0;
+        animation: fadeUp 0.6s ease 1.25s forwards;
+      }
+
+      .sub span {
+        color: rgba(237, 232, 208, 0.12);
+        margin: 0 14px;
+      }
+
+      @keyframes fadeUp {
+        from {
+          opacity: 0;
+          transform: translateY(14px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @keyframes scaleIn {
+        from {
+          opacity: 0;
+          transform: scaleX(0);
+        }
+        to {
+          opacity: 1;
+          transform: scaleX(1);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="content">
+      <div class="mark">◈ Based</div>
+      <div class="url">getbased.dev</div>
+      <div class="tagline">Your overattached personal AI</div>
+      <div class="divider"></div>
+      <div class="sub">
+        Free to try<span>·</span>10 builds / month<span>·</span>No credit card
+      </div>
+    </div>
+  </body>
+</html>

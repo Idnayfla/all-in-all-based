@@ -15,11 +15,17 @@ export async function POST(req: NextRequest) {
     if (process.env.REDIS_URL) {
       try {
         const { createClient } = await import('redis');
-        const redis = createClient({ url: process.env.REDIS_URL });
-        // Attach an error listener — without one, node-redis throws emitted
-        // 'error' events as unhandled exceptions that bypass try/catch.
+        const redis = createClient({
+          url: process.env.REDIS_URL,
+          socket: { connectTimeout: 2000, reconnectStrategy: false },
+        });
         redis.on('error', () => {});
-        await redis.connect();
+        await Promise.race([
+          redis.connect(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Redis connect timeout')), 2000)
+          ),
+        ]);
         const key = `pw_reset:${ip}`;
         const count = await redis.incr(key);
         if (count === 1) {
