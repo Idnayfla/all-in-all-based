@@ -61,13 +61,15 @@ function detectIntentMode(text: string): GenerationMode {
   const t = text.toLowerCase().trim();
   if (!t) return 'chat';
 
-  // Infographic/pyramid/ranking → Ideogram (via image API) — handles text far better than Flux
+  // Infographic/pyramid/ranking → Ideogram — catches all natural-language phrasing variations
   const isStructuredVisual =
-    /\b(infographic|pyramid|triangle|tier list|tier chart|ranking chart|hierarchy|ranked list|leaderboard)\b/.test(t) ||
-    (/\b(rank|ranking|ranked|tier|tiers|category|categories)\b/.test(t) &&
-      /\b(hotel|restaurant|brand|product|company|list|logos?)\b/.test(t)) ||
-    (/\b(triangle|pyramid)\b/.test(t) &&
-      /\b(hotel|restaurant|brand|luxury|ranking|rank|category|list)\b/.test(t));
+    /\b(infographic|pyramid|triangle|tier list|tier chart|ranking chart|visual chart|hierarchy|ranked list|leaderboard)\b/i.test(t) ||
+    (/\b(rank|ranking|ranked|tier|tiers|category|categories|chart)\b/i.test(t) &&
+      /\b(hotels?|restaurants?|brands?|products?|company|companies|logos?|luxury|luxurious)\b/i.test(t)) ||
+    (/(most|least).{0,40}(luxurious|luxury)/i.test(t) &&
+      /\b(hotels?|brands?|logos?|restaurants?|ranking)\b/i.test(t)) ||
+    (/\blogo(s)?\b/i.test(t) &&
+      /\b(hotels?|restaurants?|brands?|luxury|luxurious|rank|ranking|tier|category)\b/i.test(t));
   if (isStructuredVisual) return 'flux';
 
   // Code/app request → Claude builds it
