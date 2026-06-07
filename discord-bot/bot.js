@@ -114,34 +114,14 @@ discord.on('messageCreate', async message => {
       await message.reply('Usage: `!council <task description>`');
       return;
     }
-    let thread;
-    try {
-      thread = await message.startThread({
-        name: `Council: ${task.slice(0, 80)}`,
-        autoArchiveDuration: 1440,
-      });
-    } catch (err) {
-      await message.reply(`◈ Could not create thread: ${err.message.slice(0, 200)}`);
-      return;
-    }
-    await runCouncil(task, thread);
+    await runCouncil(task, message.channel);
     return;
   }
 
   // ── Council mode: posting in #council channel ────────────────────────────────
   if (channelName === COUNCIL_CHANNEL) {
     scheduler.setCouncilChannel(message.channel.id);
-    let thread;
-    try {
-      thread = await message.startThread({
-        name: content.slice(0, 80),
-        autoArchiveDuration: 1440,
-      });
-    } catch (err) {
-      await message.reply(`◈ Could not create thread: ${err.message.slice(0, 200)}`);
-      return;
-    }
-    await runCouncil(content, thread);
+    await runCouncil(content, message.channel);
     return;
   }
 

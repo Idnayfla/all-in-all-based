@@ -65,29 +65,28 @@ function startTyping(channel) {
 }
 
 // ── Run a single agent in the council ────────────────────────────────────────
-async function runCouncilAgent(slug, task, thread) {
-  const typing = startTyping(thread);
+async function runCouncilAgent(slug, task, channel) {
+  const typing = startTyping(channel);
 
   try {
     const reply = await dispatchAgent(
       slug,
       [{ role: 'user', content: `Council task:\n${task}` }],
       { council: true, currentAgent: slug }
-      // No onProgress — typing indicator handles the "thinking" state
     );
 
     clearInterval(typing);
-    await sendAsAgent(thread, slug, reply || 'No response.');
+    await sendAsAgent(channel, slug, reply || 'No response.');
     return reply || '';
   } catch (err) {
     clearInterval(typing);
-    await sendAsAgent(thread, slug, `Ran into an issue: ${err.message.slice(0, 200)}`);
+    await sendAsAgent(channel, slug, `Ran into an issue: ${err.message.slice(0, 200)}`);
     return `Error: ${err.message}`;
   }
 }
 
 // ── Executor agent does the actual work ───────────────────────────────────────
-async function runExecutor(slug, task, responses, thread) {
+async function runExecutor(slug, task, responses, channel) {
   const discussionContext = Object.entries(responses)
     .map(([s, r]) => `**${AGENTS[s]?.name}:** ${r.slice(0, 600)}`)
     .join('\n\n');
@@ -99,7 +98,7 @@ async function runExecutor(slug, task, responses, thread) {
     `Do the work now. Read the files, make the changes, run tests, commit if appropriate. ` +
     `Report what you actually did — not what you plan to do.`;
 
-  const typing = startTyping(thread);
+  const typing = startTyping(channel);
 
   try {
     const result = await dispatchAgent(slug, [{ role: 'user', content: prompt }], {
@@ -107,27 +106,49 @@ async function runExecutor(slug, task, responses, thread) {
       council: true,
     });
     clearInterval(typing);
-    await sendAsAgent(thread, slug, result || 'Done.');
+    await sendAsAgent(channel, slug, result || 'Done.');
   } catch (err) {
     clearInterval(typing);
-    await sendAsAgent(thread, slug, `Execution failed: ${err.message.slice(0, 200)}`);
+    await sendAsAgent(channel, slug, `Execution failed: ${err.message.slice(0, 200)}`);
   }
 }
 
+// ── Detect if message is casual (greeting, question, not a task) ─────────────
+function isCasual(text) {
+  if (text.length < 30) return true;
+  const lower = text.toLowerCase().trim();
+  const casual = ['hey', 'hi', 'hello', 'sup', 'yo', 'what\'s up', 'hows it', 'how\'s it', 'wassup'];
+  return casual.some(w => lower === w || lower.startsWith(w + ' ') || lower.startsWith(w + ','));
+}
+
 // ── Main council entrypoint ───────────────────────────────────────────────────
-async function runCouncil(task, thread) {
+async function runCouncil(task, channel) {
+  // Casual messages: Orchestrator responds directly, no full team routing
+  if (isCasual(task)) {
+    const typing = startTyping(channel);
+    try {
+      const reply = await dispatchAgent('orchestrator', [{ role: 'user', content: task }], { council: true });
+      clearInterval(typing);
+      await sendAsOrchestrator(channel, reply);
+    } catch (err) {
+      clearInterval(typing);
+      await sendAsOrchestrator(channel, `Hey. (Error: ${err.message.slice(0, 100)})`);
+    }
+    return;
+  }
+
   // Step 1: Orchestrator opens the meeting
   let routing;
   try {
     routing = await getRouting(task);
   } catch (err) {
-    await sendAsOrchestrator(thread, `Couldn't parse the routing — defaulting to Senior Engineer. (${err.message.slice(0, 100)})`);
+    await sendAsOrchestrator(channel, `Couldn't parse the routing — defaulting to Senior Engineer. (${err.message.slice(0, 100)})`);
     routing = { reasoning: 'Fallback', agents: ['senior-engineer'], parallel: true, executor: 'senior-engineer' };
   }
 
   const agentNames = routing.agents.map(s => AGENTS[s]?.name).join(', ');
   await sendAsOrchestrator(
-    thread,
+    channel,
     `${routing.reasoning}\n\nBringing in: **${agentNames}**. Go ahead.`
   );
 
@@ -136,12 +157,12 @@ async function runCouncil(task, thread) {
 
   if (routing.parallel) {
     const results = await Promise.all(
-      routing.agents.map(async slug => [slug, await runCouncilAgent(slug, task, thread)])
+      routing.agents.map(async slug => [slug, await runCouncilAgent(slug, task, channel)])
     );
     for (const [slug, reply] of results) responses[slug] = reply;
   } else {
     for (const slug of routing.agents) {
-      responses[slug] = await runCouncilAgent(slug, task, thread);
+      responses[slug] = await runCouncilAgent(slug, task, channel);
     }
   }
 
@@ -155,20 +176,20 @@ async function runCouncil(task, thread) {
       `Task: ${task}\n\nTeam input:\n\n${context}\n\n` +
       `Wrap this up. State the decision, who's doing what, and what the outcome should be. Be direct.`;
 
-    const typing = startTyping(thread);
+    const typing = startTyping(channel);
     try {
       const synthesis = await dispatchAgent('orchestrator', [{ role: 'user', content: synthPrompt }], { council: true });
       clearInterval(typing);
-      await sendAsOrchestrator(thread, synthesis);
+      await sendAsOrchestrator(channel, synthesis);
     } catch (err) {
       clearInterval(typing);
-      await sendAsOrchestrator(thread, `Synthesis failed: ${err.message.slice(0, 200)}`);
+      await sendAsOrchestrator(channel, `Synthesis failed: ${err.message.slice(0, 200)}`);
     }
   }
 
   // Step 4: Executor acts
   if (routing.executor) {
-    await runExecutor(routing.executor, task, responses, thread);
+    await runExecutor(routing.executor, task, responses, channel);
   }
 }
 
