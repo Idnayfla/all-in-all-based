@@ -45,7 +45,8 @@ const { config, COUNCIL_CHANNEL }                 = require('./config');
 const { AGENTS, dispatchAgent, anthropic, groq }  = require('./agents');
 const { DEFINITIONS }                             = require('./tools');
 const { runCouncil }                              = require('./council');
-const { sendAsAgent, splitMessage }               = require('./webhooks');
+const { sendAsAgent, splitMessage }               = require('./messenger');
+const { initAgentClients, destroyAll }            = require('./clients');
 const scheduler                                   = require('./scheduler');
 
 // ── Discord client ────────────────────────────────────────────────────────────
@@ -227,9 +228,24 @@ discord.once('ready', () => {
 
   discord.user.setActivity('Based HQ', { type: ActivityType.Watching });
   scheduler.init(discord);
+
+  // Connect individual agent bots (if tokens configured)
+  if (config.agent_tokens && Object.keys(config.agent_tokens).length) {
+    console.log('\n[clients] Connecting individual agent bots...');
+    initAgentClients(config.agent_tokens).then(() => {
+      console.log('[clients] Agent bots ready.\n');
+    }).catch(err => {
+      console.error('[clients] Agent bot init failed:', err.message);
+    });
+  } else {
+    console.log('\n[clients] No agent_tokens in config — all agents using webhook fallback.');
+    console.log('          Add individual bot tokens to config.json to give each agent their own identity.\n');
+  }
 });
 
 discord.on('error', e => console.error('Discord error:', e));
 process.on('unhandledRejection', e => console.error('Unhandled:', e));
+process.on('SIGINT',  async () => { await destroyAll(); process.exit(0); });
+process.on('SIGTERM', async () => { await destroyAll(); process.exit(0); });
 
 discord.login(config.discord_token);
