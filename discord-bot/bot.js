@@ -1,63 +1,68 @@
 #!/usr/bin/env node
 /**
- * Based HQ — Discord Bot
+ * Based HQ — Agentic Discord Bot
  *
- * Setup (one-time):
- *   1. Go to https://discord.com/developers/applications → New Application → "Based HQ"
- *   2. Bot tab → Add Bot → copy Token → paste into config.json as discord_token
- *   3. Bot tab → enable MESSAGE CONTENT INTENT (required to read messages)
- *   4. OAuth2 → URL Generator → scopes: bot → permissions: Send Messages, Read Message History, Use Slash Commands
- *   5. Copy generated URL → open in browser → add bot to your server
- *   6. Get your Discord user ID: Settings → Advanced → Developer Mode ON → right-click your name → Copy ID
- *   7. Copy config.example.json → config.json, fill in all values
+ * Agents can:
+ *   - Search the web in real-time
+ *   - Read and write files in the codebase
+ *   - Run shell commands (npm, git, etc.)
+ *   - Search through the codebase
+ *   - Consult other specialist agents mid-response
+ *   - Create GitHub issues
+ *   - Get git status / recent commits
  *
- * Run:
- *   npm install
- *   node bot.js
+ * Setup:
+ *   1. discord.com/developers → New App → Bot → copy Token
+ *   2. Bot tab → enable MESSAGE CONTENT INTENT
+ *   3. OAuth2 → URL Generator → bot scope → Send Messages + Read Message History
+ *   4. Copy config.example.json → config.json, fill in values
+ *   5. npm install && node bot.js
  *
- * Run on Pi (always-on):
+ * Run always-on (Pi):
  *   npm install -g pm2
- *   pm2 start bot.js --name based-hq
- *   pm2 save && pm2 startup
+ *   pm2 start bot.js --name based-hq && pm2 save && pm2 startup
  *
- * Commands (in any agent channel):
- *   !clear   — reset conversation history for that channel
- *   !help    — show available agents
- *   !status  — show bot status
+ * Commands in any agent channel:
+ *   !clear   — reset conversation history
+ *   !help    — list all agents + tools
+ *   !status  — uptime + model info
  */
 
 const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
 const Anthropic = require('@anthropic-ai/sdk');
+const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
 // ── Config ────────────────────────────────────────────────────────────────
 const CONFIG_FILE = path.join(__dirname, 'config.json');
 if (!fs.existsSync(CONFIG_FILE)) {
-  console.error('ERROR: config.json not found. Copy config.example.json → config.json');
+  console.error('\nERROR: config.json not found.');
+  console.error('Run: cp config.example.json config.json  and fill in your values.\n');
   process.exit(1);
 }
 const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'));
+const PROJECT_ROOT = config.project_root || path.join(__dirname, '..');
 
 // ── Agent registry ────────────────────────────────────────────────────────
 const AGENTS = {
-  orchestrator:      { name: 'Orchestrator',     icon: '◉', opus: true  },
-  architect:         { name: 'Architect',         icon: '⬡', opus: true  },
-  'senior-engineer': { name: 'Senior Engineer',   icon: '◈', opus: true  },
-  'ai-engineer':     { name: 'AI Engineer',       icon: '⊙', opus: true  },
-  product:           { name: 'Product',           icon: '◈', opus: false },
-  designer:          { name: 'Designer',          icon: '◉', opus: false },
-  devops:            { name: 'DevOps',            icon: '⬡', opus: false },
-  security:          { name: 'Security',          icon: '◈', opus: false },
-  qa:                { name: 'QA',                icon: '⊙', opus: false },
-  growth:            { name: 'Growth',            icon: '◉', opus: false },
-  'data-analyst':    { name: 'Data Analyst',      icon: '⬡', opus: false },
-  mobile:            { name: 'Mobile',            icon: '◈', opus: false },
-  finance:           { name: 'Finance',           icon: '◉', opus: false },
-  legal:             { name: 'Legal',             icon: '⊙', opus: false },
-  community:         { name: 'Community',         icon: '⬡', opus: false },
-  'chief-of-staff':  { name: 'Chief of Staff',    icon: '◈', opus: false },
-  'technical-writer':{ name: 'Technical Writer',  icon: '◉', opus: false },
+  orchestrator:       { name: 'Orchestrator',      icon: '◉', opus: true  },
+  architect:          { name: 'Architect',          icon: '⬡', opus: true  },
+  'senior-engineer':  { name: 'Senior Engineer',    icon: '◈', opus: true  },
+  'ai-engineer':      { name: 'AI Engineer',        icon: '⊙', opus: true  },
+  product:            { name: 'Product',            icon: '◈', opus: false },
+  designer:           { name: 'Designer',           icon: '◉', opus: false },
+  devops:             { name: 'DevOps',             icon: '⬡', opus: false },
+  security:           { name: 'Security',           icon: '◈', opus: false },
+  qa:                 { name: 'QA',                 icon: '⊙', opus: false },
+  growth:             { name: 'Growth',             icon: '◉', opus: false },
+  'data-analyst':     { name: 'Data Analyst',       icon: '⬡', opus: false },
+  mobile:             { name: 'Mobile',             icon: '◈', opus: false },
+  finance:            { name: 'Finance',            icon: '◉', opus: false },
+  legal:              { name: 'Legal',              icon: '⊙', opus: false },
+  community:          { name: 'Community',          icon: '⬡', opus: false },
+  'chief-of-staff':   { name: 'Chief of Staff',     icon: '◈', opus: false },
+  'technical-writer': { name: 'Technical Writer',   icon: '◉', opus: false },
 };
 
 const MODEL_OPUS   = config.model_opus   || 'claude-opus-4-8';
@@ -71,25 +76,22 @@ const discord = new Client({
     GatewayIntentBits.MessageContent,
   ],
 });
-
 const anthropic = new Anthropic({ apiKey: config.anthropic_api_key });
 
-// ── Conversation histories (per channel, last 20 messages = 10 turns) ─────
-const histories = new Map();
+// ── Conversation histories ────────────────────────────────────────────────
+const histories = new Map(); // channelId → Message[]
 
 // ── System prompt loader ──────────────────────────────────────────────────
-function loadSystemPrompt(slug) {
-  const agentsDir = config.agents_dir
-    || path.join(__dirname, '..', '.claude', 'agents');
-
-  const DISCORD_ADDENDUM = `
+const DISCORD_ADDENDUM = `
 
 ---
-You are responding in the Based HQ Discord server — Hus's private team workspace.
-Be direct and concise. Use Discord markdown (bold, code blocks, bullet lists) when it adds clarity.
-Keep responses under 1800 characters unless the question genuinely requires depth.
-Never start with "I'm the [Agent]" — just respond directly.`;
+You are operating inside Based HQ — a private Discord workspace. You have access to powerful tools:
+use them proactively. Don't just advise — act. Read files before commenting on code. Search the web
+before answering questions about live data. Consult specialists when a question crosses domains.
+Use Discord markdown. Keep text concise; let tool outputs speak for themselves.`;
 
+function loadSystemPrompt(slug) {
+  const agentsDir = config.agents_dir || path.join(PROJECT_ROOT, '.claude', 'agents');
   try {
     return fs.readFileSync(path.join(agentsDir, `${slug}.md`), 'utf-8') + DISCORD_ADDENDUM;
   } catch {
@@ -97,67 +99,318 @@ Never start with "I'm the [Agent]" — just respond directly.`;
   }
 }
 
-// ── Call a single agent ───────────────────────────────────────────────────
-async function callAgent(slug, messages) {
+// ── Tool definitions ──────────────────────────────────────────────────────
+const TOOL_DEFINITIONS = [
+  {
+    name: 'web_search',
+    description: 'Search the web for live information — docs, prices, news, anything current.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'consult_agent',
+    description: 'Get a specialist opinion from another agent. Use when the question crosses your domain.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agent: {
+          type: 'string',
+          description: `Agent slug. Options: ${Object.keys(AGENTS).filter(s => s !== 'orchestrator').join(', ')}`,
+        },
+        question: { type: 'string', description: 'The specific question to ask the specialist.' },
+      },
+      required: ['agent', 'question'],
+    },
+  },
+  {
+    name: 'read_file',
+    description: 'Read any file in the codebase.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'File path relative to project root.' },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'write_file',
+    description: 'Write or overwrite a file in the codebase. Creates parent directories if needed.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        path:    { type: 'string', description: 'File path relative to project root.' },
+        content: { type: 'string', description: 'Full file content to write.' },
+      },
+      required: ['path', 'content'],
+    },
+  },
+  {
+    name: 'run_command',
+    description: 'Run a shell command in the project root (git, npm, grep, etc.). 30s timeout.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        command: { type: 'string', description: 'Shell command to execute.' },
+      },
+      required: ['command'],
+    },
+  },
+  {
+    name: 'search_codebase',
+    description: 'Search for a pattern across all source files. Returns matching file paths and lines.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        pattern:  { type: 'string', description: 'Text or regex to search for.' },
+        dir:      { type: 'string', description: 'Optional subdirectory to search in.' },
+        file_ext: { type: 'string', description: 'Optional file extension filter (e.g. ts, tsx, js).' },
+      },
+      required: ['pattern'],
+    },
+  },
+  {
+    name: 'list_files',
+    description: 'List files and folders in a directory.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Directory path relative to project root.' },
+      },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'get_git_info',
+    description: 'Get git status, recent commits, or diff.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        type: {
+          type: 'string',
+          enum: ['status', 'log', 'diff'],
+          description: 'What to retrieve.',
+        },
+      },
+      required: ['type'],
+    },
+  },
+  {
+    name: 'create_github_issue',
+    description: 'Create a GitHub issue in the repo. Requires gh CLI authenticated.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title:  { type: 'string' },
+        body:   { type: 'string' },
+        labels: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['title', 'body'],
+    },
+  },
+];
+
+// ── Tool implementations ──────────────────────────────────────────────────
+function safeResolvePath(filePath) {
+  const abs = path.resolve(PROJECT_ROOT, filePath);
+  if (!abs.startsWith(PROJECT_ROOT)) throw new Error('Path outside project root — access denied.');
+  return abs;
+}
+
+async function toolWebSearch({ query }) {
+  const key = config.exa_api_key;
+  if (!key) return 'Web search not configured. Add exa_api_key to config.json (get one at exa.ai).';
+  const res = await fetch('https://api.exa.ai/search', {
+    method: 'POST',
+    headers: { 'x-api-key': key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, numResults: 5, useAutoprompt: true, type: 'neural', contents: { text: { maxCharacters: 400 } } }),
+  });
+  if (!res.ok) return `Search failed: HTTP ${res.status}`;
+  const data = await res.json();
+  if (!data.results?.length) return 'No results found.';
+  return data.results
+    .map(r => `**${r.title}**\n${r.url}\n${r.text?.slice(0, 350) || ''}`)
+    .join('\n\n---\n\n');
+}
+
+async function toolConsultAgent({ agent, question }, context) {
+  if (!AGENTS[agent]) return `Unknown agent slug: ${agent}`;
+  if (agent === context.currentAgent) return 'An agent cannot consult itself.';
+  if ((context.consultDepth || 0) >= 2) return 'Max consultation depth reached (2 levels).';
+  const msgs = [{ role: 'user', content: question }];
+  const reply = await runAgentLoop(agent, msgs, { ...context, consultDepth: (context.consultDepth || 0) + 1 });
+  return `**${AGENTS[agent].icon} ${AGENTS[agent].name}:**\n${reply}`;
+}
+
+function toolReadFile({ path: filePath }) {
+  const abs = safeResolvePath(filePath);
+  if (!fs.existsSync(abs)) return `File not found: ${filePath}`;
+  const content = fs.readFileSync(abs, 'utf-8');
+  if (content.length > 10000) return content.slice(0, 10000) + `\n\n[truncated — ${content.length} total chars]`;
+  return content;
+}
+
+function toolWriteFile({ path: filePath, content }) {
+  const abs = safeResolvePath(filePath);
+  fs.mkdirSync(path.dirname(abs), { recursive: true });
+  fs.writeFileSync(abs, content, 'utf-8');
+  return `Written ${content.length} chars to ${filePath}`;
+}
+
+function toolRunCommand({ command }) {
+  try {
+    const out = execSync(command, {
+      cwd: PROJECT_ROOT,
+      timeout: 30000,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const result = (out || '').trim();
+    return result.slice(0, 3000) || '(command completed with no output)';
+  } catch (err) {
+    const msg = ((err.stdout || '') + (err.stderr || '') || err.message || '').trim();
+    return `Exit ${err.status ?? 1}:\n${msg.slice(0, 2000)}`;
+  }
+}
+
+function toolSearchCodebase({ pattern, dir, file_ext }) {
+  const target = dir ? path.join(PROJECT_ROOT, dir) : PROJECT_ROOT;
+  const extFlag = file_ext
+    ? `--include="*.${file_ext}"`
+    : '--include="*.ts" --include="*.tsx" --include="*.js" --include="*.json"';
+  try {
+    const result = execSync(
+      `grep -rn "${pattern.replace(/"/g, '\\"')}" "${target}" ${extFlag} --max-count=3 2>/dev/null | head -40`,
+      { encoding: 'utf-8', timeout: 10000 }
+    );
+    return result.trim() || 'No matches found.';
+  } catch {
+    return 'No matches found.';
+  }
+}
+
+function toolListFiles({ path: dirPath }) {
+  const abs = safeResolvePath(dirPath || '.');
+  if (!fs.existsSync(abs)) return `Directory not found: ${dirPath}`;
+  const items = fs.readdirSync(abs, { withFileTypes: true });
+  return items
+    .filter(i => i.name !== 'node_modules' && !i.name.startsWith('.node'))
+    .map(i => `${i.isDirectory() ? '📁' : '📄'} ${i.name}`)
+    .join('\n') || '(empty directory)';
+}
+
+function toolGetGitInfo({ type }) {
+  const cmds = { status: 'git status --short', log: 'git log --oneline -15', diff: 'git diff --stat HEAD~1' };
+  try {
+    return execSync(cmds[type] || 'git status', { cwd: PROJECT_ROOT, encoding: 'utf-8' }).trim() || '(clean)';
+  } catch (err) {
+    return `git error: ${err.message}`;
+  }
+}
+
+async function toolCreateGithubIssue({ title, body, labels = [] }) {
+  const labelFlag = labels.length ? `--label "${labels.join(',')}"` : '';
+  const safeTitle = title.replace(/"/g, '\\"').replace(/`/g, '\\`');
+  const safeBody  = body.replace(/"/g, '\\"').replace(/`/g, '\\`');
+  try {
+    const out = execSync(
+      `gh issue create --title "${safeTitle}" --body "${safeBody}" ${labelFlag}`,
+      { cwd: PROJECT_ROOT, encoding: 'utf-8', timeout: 30000 }
+    );
+    return `Issue created: ${out.trim()}`;
+  } catch (err) {
+    return `Failed to create issue: ${(err.stderr || err.message || '').slice(0, 500)}`;
+  }
+}
+
+async function executeTool(name, input, context) {
+  const tools = {
+    web_search:           () => toolWebSearch(input),
+    consult_agent:        () => toolConsultAgent(input, context),
+    read_file:            () => toolReadFile(input),
+    write_file:           () => toolWriteFile(input),
+    run_command:          () => toolRunCommand(input),
+    search_codebase:      () => toolSearchCodebase(input),
+    list_files:           () => toolListFiles(input),
+    get_git_info:         () => toolGetGitInfo(input),
+    create_github_issue:  () => toolCreateGithubIssue(input),
+  };
+  try {
+    return String(await (tools[name] ?? (() => `Unknown tool: ${name}`))());
+  } catch (err) {
+    return `Tool error (${name}): ${err.message}`;
+  }
+}
+
+// ── Agentic loop ──────────────────────────────────────────────────────────
+async function runAgentLoop(slug, messages, context = {}, depth = 0) {
+  if (depth > 12) return '[Max reasoning depth reached — stopping to avoid infinite loop]';
+
   const agent  = AGENTS[slug];
   const model  = agent?.opus ? MODEL_OPUS : MODEL_SONNET;
   const system = loadSystemPrompt(slug);
 
   const response = await anthropic.messages.create({
     model,
-    max_tokens: 2048,
+    max_tokens: 4096,
     system,
     messages,
+    tools: TOOL_DEFINITIONS,
+    tool_choice: { type: 'auto' },
   });
 
-  return response.content[0]?.type === 'text' ? response.content[0].text.trim() : '';
-}
-
-// ── Orchestrator: coordinates across agents ───────────────────────────────
-async function handleOrchestrator(userMessage, history) {
-  // Phase 1: Orchestrator plans + responds with its own synthesis
-  const orchestratorReply = await callAgent('orchestrator', history);
-
-  // Detect if the orchestrator is routing to specific agents
-  const involvedSlugs = Object.keys(AGENTS).filter(slug => {
-    if (slug === 'orchestrator') return false;
-    const agentName = AGENTS[slug].name.toLowerCase();
-    return orchestratorReply.toLowerCase().includes(agentName) ||
-           orchestratorReply.toLowerCase().includes(slug.replace('-', ' '));
-  });
-
-  // If orchestrator only references ≤1 agent, its own response is enough
-  if (involvedSlugs.length <= 1) return orchestratorReply;
-
-  // Multi-agent: call each involved agent and stitch outputs
-  const agentOutputs = await Promise.all(
-    involvedSlugs.slice(0, 4).map(async slug => { // cap at 4 agents
-      const agentMessages = [{ role: 'user', content: userMessage }];
-      const reply = await callAgent(slug, agentMessages);
-      const { name, icon } = AGENTS[slug];
-      return `**${icon} ${name}**\n${reply}`;
-    })
-  );
-
-  return `${orchestratorReply}\n\n---\n${agentOutputs.join('\n\n---\n')}`;
-}
-
-// ── Split long messages (Discord 2000 char limit) ─────────────────────────
-function splitMessage(text, maxLen = 1900) {
-  if (text.length <= maxLen) return [text];
-  const parts = [];
-  let remaining = text;
-  while (remaining.length > maxLen) {
-    let cut = remaining.lastIndexOf('\n', maxLen);
-    if (cut < maxLen * 0.6) cut = maxLen;
-    parts.push(remaining.slice(0, cut));
-    remaining = remaining.slice(cut).trimStart();
+  if (response.stop_reason === 'end_turn' || response.stop_reason === 'max_tokens') {
+    return response.content
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('')
+      .trim();
   }
-  if (remaining) parts.push(remaining);
+
+  if (response.stop_reason === 'tool_use') {
+    const toolBlocks = response.content.filter(b => b.type === 'tool_use');
+
+    const toolResults = await Promise.all(
+      toolBlocks.map(async block => ({
+        type: 'tool_result',
+        tool_use_id: block.id,
+        content: await executeTool(block.name, block.input, { ...context, currentAgent: slug }),
+      }))
+    );
+
+    const next = [
+      ...messages,
+      { role: 'assistant', content: response.content },
+      { role: 'user', content: toolResults },
+    ];
+
+    return runAgentLoop(slug, next, context, depth + 1);
+  }
+
+  const text = response.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
+  return text || '[No response]';
+}
+
+// ── Discord utilities ─────────────────────────────────────────────────────
+function splitMessage(text, max = 1900) {
+  if (text.length <= max) return [text];
+  const parts = [];
+  let rem = text;
+  while (rem.length > max) {
+    let cut = rem.lastIndexOf('\n', max);
+    if (cut < max * 0.5) cut = max;
+    parts.push(rem.slice(0, cut));
+    rem = rem.slice(cut).trimStart();
+  }
+  if (rem) parts.push(rem);
   return parts;
 }
 
-// ── Typing indicator helper ───────────────────────────────────────────────
 function startTyping(channel) {
   channel.sendTyping().catch(() => {});
   return setInterval(() => channel.sendTyping().catch(() => {}), 8000);
@@ -166,15 +419,13 @@ function startTyping(channel) {
 // ── Message handler ───────────────────────────────────────────────────────
 discord.on('messageCreate', async message => {
   if (message.author.bot) return;
-
-  // Admin gate — only Hus
   if (message.author.id !== config.authorized_user_id) return;
 
-  const channelName = message.channel.name?.toLowerCase();
+  const channelName = message.channel.name?.toLowerCase() ?? '';
   const content     = message.content.trim();
   if (!content) return;
 
-  // ── Built-in commands ────────────────────────────────────────────────
+  // Built-in commands
   if (content === '!clear') {
     histories.delete(message.channel.id);
     await message.reply('◈ Conversation cleared.');
@@ -182,33 +433,34 @@ discord.on('messageCreate', async message => {
   }
 
   if (content === '!status') {
-    const uptime = Math.floor(process.uptime());
-    const h = Math.floor(uptime / 3600);
-    const m = Math.floor((uptime % 3600) / 60);
-    const s = uptime % 60;
+    const up = Math.floor(process.uptime());
     await message.reply(
-      `**◈ Based HQ Status**\n` +
-      `Uptime: ${h}h ${m}m ${s}s\n` +
-      `Active histories: ${histories.size} channels\n` +
-      `LLM: Opus (${MODEL_OPUS}) / Sonnet (${MODEL_SONNET})`
+      `**◈ Based HQ**\n` +
+      `Uptime: ${Math.floor(up/3600)}h ${Math.floor((up%3600)/60)}m ${up%60}s\n` +
+      `Active histories: ${histories.size}\n` +
+      `Opus: \`${MODEL_OPUS}\` · Sonnet: \`${MODEL_SONNET}\`\n` +
+      `Project root: \`${PROJECT_ROOT}\``
     );
     return;
   }
 
   if (content === '!help') {
-    const agentList = Object.entries(AGENTS)
-      .map(([slug, { name, icon, opus }]) =>
-        `${icon} **#${slug}** — ${name}${opus ? ' *(Opus)*' : ''}`)
+    const list = Object.entries(AGENTS)
+      .map(([slug, { name, icon, opus }]) => `${icon} **#${slug}** — ${name}${opus ? ' *(Opus)*' : ''}`)
       .join('\n');
-    await message.reply(`**◈ Based HQ — Your Team**\n\n${agentList}\n\n**Commands:** !clear · !status · !help`);
+    const tools = TOOL_DEFINITIONS.map(t => `\`${t.name}\``).join(' · ');
+    await message.reply(
+      `**◈ Based HQ — Your Team**\n\n${list}\n\n` +
+      `**Tools every agent can use:**\n${tools}\n\n` +
+      `**Commands:** \`!clear\` · \`!help\` · \`!status\``
+    );
     return;
   }
 
-  // ── Route to agent based on channel name ─────────────────────────────
-  const agentSlug = Object.keys(AGENTS).find(slug => channelName === slug);
+  // Route by channel name
+  const agentSlug = Object.keys(AGENTS).find(s => channelName === s);
   if (!agentSlug) return;
 
-  // Get or init conversation history
   const channelId = message.channel.id;
   if (!histories.has(channelId)) histories.set(channelId, []);
   const history = histories.get(channelId);
@@ -218,13 +470,7 @@ discord.on('messageCreate', async message => {
   const typing = startTyping(message.channel);
 
   try {
-    let reply;
-
-    if (agentSlug === 'orchestrator') {
-      reply = await handleOrchestrator(content, history);
-    } else {
-      reply = await callAgent(agentSlug, history);
-    }
+    const reply = await runAgentLoop(agentSlug, [...history]);
 
     if (!reply) {
       clearInterval(typing);
@@ -233,12 +479,9 @@ discord.on('messageCreate', async message => {
     }
 
     history.push({ role: 'assistant', content: reply });
-
-    // Keep last 20 messages (10 turns)
     while (history.length > 20) history.shift();
 
     clearInterval(typing);
-
     const parts = splitMessage(reply);
     await message.reply(parts[0]);
     for (const part of parts.slice(1)) {
@@ -247,7 +490,7 @@ discord.on('messageCreate', async message => {
 
   } catch (err) {
     clearInterval(typing);
-    console.error(`[${agentSlug}] Error:`, err.message);
+    console.error(`[${agentSlug}]`, err);
     await message.reply(`◈ Error: ${(err.message || 'Something went wrong').slice(0, 200)}`);
   }
 });
@@ -255,15 +498,17 @@ discord.on('messageCreate', async message => {
 // ── Ready ─────────────────────────────────────────────────────────────────
 discord.once('ready', () => {
   console.log(`\n◈ Based HQ online  →  ${discord.user.tag}`);
-  console.log(`  Authorized user : ${config.authorized_user_id}`);
-  console.log(`  Opus model      : ${MODEL_OPUS}`);
-  console.log(`  Sonnet model    : ${MODEL_SONNET}`);
-  console.log(`  Agents dir      : ${config.agents_dir || path.join(__dirname, '..', '.claude', 'agents')}`);
-  console.log(`\n  Type !help in any agent channel to get started.\n`);
+  console.log(`  Authorized : ${config.authorized_user_id}`);
+  console.log(`  Opus       : ${MODEL_OPUS}`);
+  console.log(`  Sonnet     : ${MODEL_SONNET}`);
+  console.log(`  Root       : ${PROJECT_ROOT}`);
+  console.log(`  Tools      : ${TOOL_DEFINITIONS.map(t => t.name).join(', ')}`);
+  console.log(`\n  Ready. Say something in an agent channel.\n`);
   discord.user.setActivity('Based HQ', { type: ActivityType.Watching });
 });
 
-discord.on('error', err => console.error('Discord error:', err));
+discord.on('error',   err => console.error('Discord error:', err));
+discord.on('warn',    msg => console.warn('Discord warn:', msg));
 process.on('unhandledRejection', err => console.error('Unhandled:', err));
 
 discord.login(config.discord_token);

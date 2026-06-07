@@ -1,13 +1,16 @@
 {
-  "_setup": "Copy this file to config.json and fill in your values",
+  "_setup": "Copy this to config.json and fill in your values. config.json is gitignored.",
 
   "discord_token": "your-bot-token-from-discord-developer-portal",
   "authorized_user_id": "your-discord-user-id-numbers-only",
 
   "anthropic_api_key": "sk-ant-your-key-here",
 
+  "exa_api_key": "your-exa-api-key-for-web-search",
+
   "model_opus": "claude-opus-4-8",
   "model_sonnet": "claude-sonnet-4-6",
 
+  "project_root": "",
   "agents_dir": ""
 }
