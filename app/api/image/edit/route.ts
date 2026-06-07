@@ -40,14 +40,25 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Upload source image if base64 provided — inside try so failures return JSON errors
-    let resolvedSourceUrl: string = sourceImageUrl ?? '';
-    if (!sourceImageUrl && sourceImageData) {
+    // Upload source image — always re-upload to fal storage to guarantee a fresh, valid URL.
+    // If we pass a stale/expired fal CDN URL directly to the model it fetches a black frame
+    // and outputs black. Re-uploading avoids this for chained transformations.
+    let resolvedSourceUrl: string;
+    if (sourceImageData) {
       const buffer = Buffer.from(sourceImageData, 'base64');
       const blob = new Blob([buffer], { type: sourceMediaType ?? 'image/png' });
       resolvedSourceUrl = await fal.storage.upload(blob);
-    }
-    if (!resolvedSourceUrl) {
+    } else if (sourceImageUrl) {
+      // Download the URL (even if it's already a fal CDN URL) and re-upload for freshness
+      const fetchRes = await fetch(sourceImageUrl);
+      if (!fetchRes.ok) {
+        return NextResponse.json({ error: 'Could not fetch source image — try again.' }, { status: 400 });
+      }
+      const contentType = fetchRes.headers.get('content-type') ?? 'image/png';
+      const arrayBuffer = await fetchRes.arrayBuffer();
+      const blob = new Blob([arrayBuffer], { type: contentType });
+      resolvedSourceUrl = await fal.storage.upload(blob);
+    } else {
       return NextResponse.json({ error: 'Could not resolve source image' }, { status: 400 });
     }
 
