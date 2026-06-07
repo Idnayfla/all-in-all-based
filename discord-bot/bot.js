@@ -210,12 +210,6 @@ const TOOL_DEFINITIONS = [
   },
 ];
 
-// Groq uses OpenAI-compatible tool format
-const GROQ_TOOLS = TOOL_DEFINITIONS.map(t => ({
-  type: 'function',
-  function: { name: t.name, description: t.description, parameters: t.input_schema },
-}));
-
 // ── Tool implementations ──────────────────────────────────────────────────
 function safePath(p) {
   const abs = path.resolve(PROJECT_ROOT, p);
@@ -356,49 +350,19 @@ async function runAnthropicLoop(slug, messages, context = {}, depth = 0) {
   ], context, depth + 1);
 }
 
-// ── Groq agentic loop ─────────────────────────────────────────────────────
-async function _groqLoop(slug, groqMessages, context, depth) {
-  if (depth > 12) return '[Max depth reached]';
-
-  const res = await groq.chat.completions.create({
-    model: MODEL_GROQ,
-    messages: groqMessages,
-    tools: GROQ_TOOLS,
-    tool_choice: 'auto',
-    max_tokens: 4096,
-  });
-
-  const choice = res.choices[0];
-
-  if (choice.finish_reason !== 'tool_calls') {
-    return (choice.message.content || '').trim();
-  }
-
-  const toolCalls = choice.message.tool_calls || [];
-  const toolResults = await Promise.all(toolCalls.map(async tc => {
-    let input = {};
-    try { input = JSON.parse(tc.function.arguments || '{}'); } catch {}
-    return {
-      role: 'tool',
-      tool_call_id: tc.id,
-      content: String(await executeTool(tc.function.name, input, { ...context, currentAgent: slug })),
-    };
-  }));
-
-  return _groqLoop(slug, [
-    ...groqMessages,
-    { role: 'assistant', content: choice.message.content ?? null, tool_calls: toolCalls },
-    ...toolResults,
-  ], context, depth + 1);
-}
-
+// ── Groq loop — plain chat, no tools (Llama tool calling is unreliable) ──
 async function runGroqLoop(slug, messages, context = {}) {
   const system = loadSystemPrompt(slug);
   const groqMessages = [
     { role: 'system', content: system },
     ...messages.map(m => ({ role: m.role, content: typeof m.content === 'string' ? m.content : '' })),
   ];
-  return _groqLoop(slug, groqMessages, context, 0);
+  const res = await groq.chat.completions.create({
+    model: MODEL_GROQ,
+    messages: groqMessages,
+    max_tokens: 4096,
+  });
+  return (res.choices[0].message.content || '').trim();
 }
 
 // ── Main dispatch — picks provider per agent ──────────────────────────────
