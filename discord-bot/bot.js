@@ -252,4 +252,10 @@ process.on('unhandledRejection', e => console.error('Unhandled:', e));
 process.on('SIGINT',  async () => { await destroyAll(); process.exit(0); });
 process.on('SIGTERM', async () => { await destroyAll(); process.exit(0); });
 
-discord.login(config.discord_token);
+const listenerSlug  = config.listener_agent || 'orchestrator';
+const listenerToken = config.discord_token || config.agent_tokens?.[listenerSlug];
+if (!listenerToken) {
+  console.error(`ERROR: No discord_token and no agent_tokens.${listenerSlug} found in config.json`);
+  process.exit(1);
+}
+discord.login(listenerToken);
