@@ -9,24 +9,26 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const AGENT_GAP_MS = 4000; // 4 seconds between each agent starting
 
 // ── Orchestrator routing prompt ───────────────────────────────────────────────
-const ROUTING_SYSTEM = `You are the Orchestrator for Based HQ — a private dev team Discord server.
+const ROUTING_SYSTEM = `You are the Orchestrator for Based HQ — a private dev team Discord server for the Based AI studio. Hus is the CEO.
 
-A task has been posted. Decide who should handle it and respond with ONLY a valid JSON object.
-No markdown, no explanation — raw JSON only.
+A message was posted in the team channel. Respond with ONLY a valid JSON object — no markdown, no explanation.
 
 {
-  "reasoning": "one sentence: task type and why these agents",
+  "casual": false,
+  "reasoning": "one sentence",
   "agents": ["slug1", "slug2"],
-  "parallel": false,
   "executor": "slug"
 }
 
-Rules:
-- agents: 2–4 slugs, most relevant. Never include orchestrator.
-- parallel: almost always false — agents should respond one at a time so the conversation is readable
-- executor: slug of the agent who does the actual work after discussion (null for advice-only tasks)
+FIRST decide: is this casual conversation or a real task?
 
-Routing guide:
+casual: true  → general chat, questions about the team, venting, small talk, anything not requiring work
+casual: false → actual task, bug, feature, question about the codebase/product
+
+If casual: true → agents: [], executor: null. You will respond directly.
+If casual: false → pick 2–4 agents from the routing guide below.
+
+Routing guide (casual: false):
 - Bug fix           → ["senior-engineer", "qa"],                    executor: "senior-engineer"
 - New feature       → ["product", "architect", "senior-engineer"],  executor: "senior-engineer"
 - Infra / cost      → ["devops", "architect"],                      executor: "devops"
@@ -84,18 +86,11 @@ function startTyping(channel) {
   return setInterval(() => channel.sendTyping().catch(() => {}), 8000);
 }
 
-// ── Detect casual / conversational messages ───────────────────────────────────
-function isCasual(text) {
-  if (text.length < 60) return true;
-  const lower = text.toLowerCase().trim();
-  const starters = [
-    'hey', 'hi ', 'hi,', 'hello', 'sup', 'yo ', 'yo,',
-    'morning', 'good morning', 'good afternoon', 'good evening',
-    'what\'s up', 'whats up', 'wassup', 'anyone', 'you there',
-    'lol', 'haha', 'hahaha', 'wtf', 'omg', 'bruh', 'bro ',
-    'not talking', 'just checking', 'quick question', 'anyone around',
-  ];
-  return starters.some(p => lower === p || lower.startsWith(p + ' ') || lower.startsWith(p + ','));
+// ── Detect pure greetings only — everything else goes through routing ─────────
+function isPureGreeting(text) {
+  const lower = text.toLowerCase().trim().replace(/[!?.]+$/, '');
+  const greetings = ['hey', 'hi', 'hello', 'sup', 'yo', 'morning', 'haha', 'lol', 'hahaha', 'lmao'];
+  return text.length < 25 && greetings.some(g => lower === g || lower.startsWith(g + ' ') || lower.startsWith(g + ','));
 }
 
 // ── Run a single agent in the council ─────────────────────────────────────────
@@ -150,8 +145,8 @@ async function runExecutor(slug, task, responses, channel) {
 
 // ── Main council entrypoint ───────────────────────────────────────────────────
 async function runCouncil(task, channel) {
-  // Casual messages — fast direct reply, no tools, no routing
-  if (isCasual(task)) {
+  // Pure greetings — skip routing entirely, Orchestrator replies instantly
+  if (isPureGreeting(task)) {
     const typing = startTyping(channel);
     try {
       const reply = await quickReply('orchestrator', task);
@@ -164,13 +159,26 @@ async function runCouncil(task, channel) {
     return;
   }
 
-  // Step 1: Orchestrator routes and opens the meeting
+  // Step 1: Orchestrator decides — casual conversation or real task?
   let routing;
   try {
     routing = await getRouting(task);
   } catch (err) {
-    await sendAsOrchestrator(channel, `Routing failed, I'll handle this with Senior Engineer.`);
-    routing = { reasoning: 'Fallback', agents: ['senior-engineer'], parallel: false, executor: 'senior-engineer' };
+    await sendAsOrchestrator(channel, `Routing failed, defaulting to Senior Engineer.`);
+    routing = { casual: false, reasoning: 'Fallback', agents: ['senior-engineer'], executor: 'senior-engineer' };
+  }
+
+  // Casual conversation — Orchestrator responds directly, agents stay out
+  if (routing.casual) {
+    const typing = startTyping(channel);
+    try {
+      const reply = await quickReply('orchestrator', task);
+      clearInterval(typing);
+      await sendAsOrchestrator(channel, reply);
+    } catch (err) {
+      clearInterval(typing);
+    }
+    return;
   }
 
   const agentNames = routing.agents.map(s => AGENTS[s]?.name).join(', ');
