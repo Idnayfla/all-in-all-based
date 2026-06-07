@@ -46,7 +46,7 @@ const { AGENTS, dispatchAgent, anthropic, groq }  = require('./agents');
 const { DEFINITIONS }                             = require('./tools');
 const { runCouncil }                              = require('./council');
 const { sendAsAgent, splitMessage }               = require('./messenger');
-const { initAgentClients, destroyAll }            = require('./clients');
+const { initAgentClients, registerMainClient, destroyAll } = require('./clients');
 const scheduler                                   = require('./scheduler');
 
 // ── Discord client ────────────────────────────────────────────────────────────
@@ -229,10 +229,14 @@ discord.once('ready', () => {
   discord.user.setActivity('Based HQ', { type: ActivityType.Watching });
   scheduler.init(discord);
 
+  // Register main client under the listener agent slug (default: orchestrator)
+  const listenerSlug = config.listener_agent || 'orchestrator';
+  registerMainClient(listenerSlug, discord);
+
   // Connect individual agent bots (if tokens configured)
   if (config.agent_tokens && Object.keys(config.agent_tokens).length) {
     console.log('\n[clients] Connecting individual agent bots...');
-    initAgentClients(config.agent_tokens).then(() => {
+    initAgentClients(config.agent_tokens, config.discord_token).then(() => {
       console.log('[clients] Agent bots ready.\n');
     }).catch(err => {
       console.error('[clients] Agent bot init failed:', err.message);
