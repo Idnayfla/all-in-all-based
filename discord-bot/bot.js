@@ -25,6 +25,22 @@
 
 'use strict';
 const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
+
+// ── Single-instance lock — kill any previous bot process on startup ───────────
+const { execSync } = require('child_process');
+const pidFile = require('path').join(__dirname, 'bot.pid');
+const fs = require('fs');
+try {
+  if (fs.existsSync(pidFile)) {
+    const oldPid = parseInt(fs.readFileSync(pidFile, 'utf-8').trim(), 10);
+    if (oldPid && oldPid !== process.pid) {
+      try { process.kill(oldPid); console.log(`[boot] Killed previous instance (PID ${oldPid})`); }
+      catch {}
+    }
+  }
+} catch {}
+fs.writeFileSync(pidFile, String(process.pid));
+process.on('exit', () => { try { fs.unlinkSync(pidFile); } catch {} });
 const { config, COUNCIL_CHANNEL }                 = require('./config');
 const { AGENTS, dispatchAgent, anthropic, groq }  = require('./agents');
 const { DEFINITIONS }                             = require('./tools');

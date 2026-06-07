@@ -48,7 +48,9 @@ CRITICAL — read this before every response:
 
 5. Speak directly, like a real colleague. Short is better. One honest sentence beats three fabricated ones.
 
-6. Use your tools. If a task requires reading code or checking git — do it first, then speak. Never assume what the files say.`;
+6. Use your tools. If a task requires reading code or checking git — do it first, then speak. Never assume what the files say.
+
+7. Never use emoji. Not a single one.`;
 
 // ── LLM clients ───────────────────────────────────────────────────────────────
 const anthropic = config.anthropic_api_key

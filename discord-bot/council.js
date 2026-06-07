@@ -63,6 +63,21 @@ async function getRouting(task) {
   return routing;
 }
 
+// ── Fast no-tools reply — for casual messages only ───────────────────────────
+async function quickReply(slug, message) {
+  const { loadSystemPrompt } = require('./agents');
+  const { MODEL_SONNET }     = require('./config');
+  const system = loadSystemPrompt(slug);
+  const res = await anthropic.messages.create({
+    model:      MODEL_SONNET,
+    max_tokens: 120,
+    system,
+    messages:   [{ role: 'user', content: message }],
+    // No tools — this is intentionally a plain chat call
+  });
+  return res.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
+}
+
 // ── Keep typing indicator alive while agent works ─────────────────────────────
 function startTyping(channel) {
   channel.sendTyping().catch(() => {});
@@ -135,11 +150,11 @@ async function runExecutor(slug, task, responses, channel) {
 
 // ── Main council entrypoint ───────────────────────────────────────────────────
 async function runCouncil(task, channel) {
-  // Casual messages — Orchestrator responds, nobody else piles on
+  // Casual messages — fast direct reply, no tools, no routing
   if (isCasual(task)) {
     const typing = startTyping(channel);
     try {
-      const reply = await dispatchAgent('orchestrator', [{ role: 'user', content: task }], { council: true });
+      const reply = await quickReply('orchestrator', task);
       clearInterval(typing);
       await sendAsOrchestrator(channel, reply);
     } catch (err) {
