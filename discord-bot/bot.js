@@ -44,6 +44,9 @@ const discord = new Client({
 // Conversation histories for direct mode (per channel)
 const histories = new Map();
 
+// Deduplication — ignore messages already being processed
+const processing = new Set();
+
 // ── Utilities ─────────────────────────────────────────────────────────────────
 function startTyping(channel) {
   channel.sendTyping().catch(() => {});
@@ -60,6 +63,9 @@ async function sendSplit(channel, text) {
 discord.on('messageCreate', async message => {
   if (message.author.bot) return;
   if (message.author.id !== config.authorized_user_id) return;
+  if (processing.has(message.id)) return;
+  processing.add(message.id);
+  setTimeout(() => processing.delete(message.id), 60000);
 
   const channelName = message.channel.name?.toLowerCase() ?? '';
   const content     = message.content.trim();

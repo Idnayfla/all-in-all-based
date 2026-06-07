@@ -3,6 +3,11 @@ const { AGENTS, dispatchAgent, anthropic } = require('./agents');
 const { MODEL_SONNET }                     = require('./config');
 const { sendAsAgent, sendAsOrchestrator }  = require('./webhooks');
 
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ── Pacing — how long to wait between agents speaking ────────────────────────
+const AGENT_GAP_MS = 4000; // 4 seconds between each agent starting
+
 // ── Orchestrator routing prompt ───────────────────────────────────────────────
 const ROUTING_SYSTEM = `You are the Orchestrator for Based HQ — a private dev team Discord server.
 
@@ -12,25 +17,25 @@ No markdown, no explanation — raw JSON only.
 {
   "reasoning": "one sentence: task type and why these agents",
   "agents": ["slug1", "slug2"],
-  "parallel": true,
+  "parallel": false,
   "executor": "slug"
 }
 
 Rules:
 - agents: 2–4 slugs, most relevant. Never include orchestrator.
-- parallel: true when agents can work independently; false when output feeds forward
+- parallel: almost always false — agents should respond one at a time so the conversation is readable
 - executor: slug of the agent who does the actual work after discussion (null for advice-only tasks)
 
 Routing guide:
-- Bug fix           → ["senior-engineer", "qa"],                    parallel: false, executor: "senior-engineer"
-- New feature       → ["product", "architect", "senior-engineer"],  parallel: false, executor: "senior-engineer"
-- Infra / cost      → ["devops", "architect"],                      parallel: true,  executor: "devops"
-- Security issue    → ["security", "architect", "senior-engineer"], parallel: false, executor: "senior-engineer"
-- Growth / copy     → ["growth", "designer"],                       parallel: true,  executor: "growth"
-- Data / analytics  → ["data-analyst"],                             parallel: true,  executor: null
-- Legal / privacy   → ["legal"],                                    parallel: true,  executor: null
-- Decision / review → ["chief-of-staff", "product"],                parallel: true,  executor: null
-- Design            → ["designer", "senior-engineer"],              parallel: false, executor: "senior-engineer"
+- Bug fix           → ["senior-engineer", "qa"],                    executor: "senior-engineer"
+- New feature       → ["product", "architect", "senior-engineer"],  executor: "senior-engineer"
+- Infra / cost      → ["devops", "architect"],                      executor: "devops"
+- Security issue    → ["security", "architect", "senior-engineer"], executor: "senior-engineer"
+- Growth / copy     → ["growth", "designer"],                       executor: "growth"
+- Data / analytics  → ["data-analyst"],                             executor: null
+- Legal / privacy   → ["legal"],                                    executor: null
+- Decision / review → ["chief-of-staff", "product"],                executor: null
+- Design            → ["designer", "senior-engineer"],              executor: "senior-engineer"
 
 Valid slugs: architect, senior-engineer, ai-engineer, product, designer, devops, security, qa, growth, data-analyst, mobile, finance, legal, community, chief-of-staff, technical-writer`;
 
@@ -64,19 +69,36 @@ function startTyping(channel) {
   return setInterval(() => channel.sendTyping().catch(() => {}), 8000);
 }
 
-// ── Run a single agent in the council ────────────────────────────────────────
-async function runCouncilAgent(slug, task, channel) {
+// ── Detect casual / conversational messages ───────────────────────────────────
+function isCasual(text) {
+  if (text.length < 60) return true;
+  const lower = text.toLowerCase().trim();
+  const starters = [
+    'hey', 'hi ', 'hi,', 'hello', 'sup', 'yo ', 'yo,',
+    'morning', 'good morning', 'good afternoon', 'good evening',
+    'what\'s up', 'whats up', 'wassup', 'anyone', 'you there',
+    'lol', 'haha', 'hahaha', 'wtf', 'omg', 'bruh', 'bro ',
+    'not talking', 'just checking', 'quick question', 'anyone around',
+  ];
+  return starters.some(p => lower === p || lower.startsWith(p + ' ') || lower.startsWith(p + ','));
+}
+
+// ── Run a single agent in the council ─────────────────────────────────────────
+async function runCouncilAgent(slug, task, channel, priorContext = '') {
   const typing = startTyping(channel);
+
+  const prompt = priorContext
+    ? `The team is discussing:\n\n${priorContext}\n\nWeigh in from your perspective on: ${task}`
+    : `Council task:\n${task}`;
 
   try {
     const reply = await dispatchAgent(
       slug,
-      [{ role: 'user', content: `Council task:\n${task}` }],
+      [{ role: 'user', content: prompt }],
       { council: true, currentAgent: slug }
     );
-
     clearInterval(typing);
-    await sendAsAgent(channel, slug, reply || 'No response.');
+    await sendAsAgent(channel, slug, reply || '...');
     return reply || '';
   } catch (err) {
     clearInterval(typing);
@@ -99,11 +121,9 @@ async function runExecutor(slug, task, responses, channel) {
     `Report what you actually did — not what you plan to do.`;
 
   const typing = startTyping(channel);
-
   try {
     const result = await dispatchAgent(slug, [{ role: 'user', content: prompt }], {
-      currentAgent: slug,
-      council: true,
+      currentAgent: slug, council: true,
     });
     clearInterval(typing);
     await sendAsAgent(channel, slug, result || 'Done.');
@@ -113,17 +133,9 @@ async function runExecutor(slug, task, responses, channel) {
   }
 }
 
-// ── Detect if message is casual (greeting, question, not a task) ─────────────
-function isCasual(text) {
-  if (text.length < 30) return true;
-  const lower = text.toLowerCase().trim();
-  const casual = ['hey', 'hi', 'hello', 'sup', 'yo', 'what\'s up', 'hows it', 'how\'s it', 'wassup'];
-  return casual.some(w => lower === w || lower.startsWith(w + ' ') || lower.startsWith(w + ','));
-}
-
 // ── Main council entrypoint ───────────────────────────────────────────────────
 async function runCouncil(task, channel) {
-  // Casual messages: Orchestrator responds directly, no full team routing
+  // Casual messages — Orchestrator responds, nobody else piles on
   if (isCasual(task)) {
     const typing = startTyping(channel);
     try {
@@ -132,49 +144,44 @@ async function runCouncil(task, channel) {
       await sendAsOrchestrator(channel, reply);
     } catch (err) {
       clearInterval(typing);
-      await sendAsOrchestrator(channel, `Hey. (Error: ${err.message.slice(0, 100)})`);
+      await sendAsOrchestrator(channel, `Hey.`);
     }
     return;
   }
 
-  // Step 1: Orchestrator opens the meeting
+  // Step 1: Orchestrator routes and opens the meeting
   let routing;
   try {
     routing = await getRouting(task);
   } catch (err) {
-    await sendAsOrchestrator(channel, `Couldn't parse the routing — defaulting to Senior Engineer. (${err.message.slice(0, 100)})`);
-    routing = { reasoning: 'Fallback', agents: ['senior-engineer'], parallel: true, executor: 'senior-engineer' };
+    await sendAsOrchestrator(channel, `Routing failed, I'll handle this with Senior Engineer.`);
+    routing = { reasoning: 'Fallback', agents: ['senior-engineer'], parallel: false, executor: 'senior-engineer' };
   }
 
   const agentNames = routing.agents.map(s => AGENTS[s]?.name).join(', ');
-  await sendAsOrchestrator(
-    channel,
-    `${routing.reasoning}\n\nBringing in: **${agentNames}**. Go ahead.`
-  );
+  await sendAsOrchestrator(channel, `${routing.reasoning} — looping in ${agentNames}.`);
 
-  // Step 2: Agents weigh in
+  // Step 2: Agents respond one at a time with gaps between them
   const responses = {};
+  let priorContext = '';
 
-  if (routing.parallel) {
-    const results = await Promise.all(
-      routing.agents.map(async slug => [slug, await runCouncilAgent(slug, task, channel)])
-    );
-    for (const [slug, reply] of results) responses[slug] = reply;
-  } else {
-    for (const slug of routing.agents) {
-      responses[slug] = await runCouncilAgent(slug, task, channel);
-    }
+  for (const slug of routing.agents) {
+    await sleep(AGENT_GAP_MS);
+    responses[slug] = await runCouncilAgent(slug, task, channel, priorContext);
+    // Each agent's response becomes context for the next
+    priorContext += `\n**${AGENTS[slug]?.name}:** ${responses[slug].slice(0, 400)}\n`;
   }
 
-  // Step 3: Orchestrator synthesizes (only if multiple agents)
+  // Step 3: Orchestrator wraps up — only if multiple agents weighed in
   if (routing.agents.length > 1) {
+    await sleep(AGENT_GAP_MS);
     const context = Object.entries(responses)
       .map(([s, r]) => `**${AGENTS[s]?.name}:** ${r.slice(0, 600)}`)
-      .join('\n\n---\n\n');
+      .join('\n\n');
 
     const synthPrompt =
       `Task: ${task}\n\nTeam input:\n\n${context}\n\n` +
-      `Wrap this up. State the decision, who's doing what, and what the outcome should be. Be direct.`;
+      `Wrap this up briefly. Decision, owner, next step. No fluff.`;
 
     const typing = startTyping(channel);
     try {
@@ -183,12 +190,12 @@ async function runCouncil(task, channel) {
       await sendAsOrchestrator(channel, synthesis);
     } catch (err) {
       clearInterval(typing);
-      await sendAsOrchestrator(channel, `Synthesis failed: ${err.message.slice(0, 200)}`);
     }
   }
 
   // Step 4: Executor acts
   if (routing.executor) {
+    await sleep(AGENT_GAP_MS);
     await runExecutor(routing.executor, task, responses, channel);
   }
 }
