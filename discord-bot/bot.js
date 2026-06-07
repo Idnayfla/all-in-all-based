@@ -479,14 +479,37 @@ discord.on('messageCreate', async message => {
     return;
   }
 
-  // Route by channel name
-  const slug = Object.keys(AGENTS).find(s => channelName === s);
-  if (!slug) return;
+  // Route by channel name OR message prefix (e.g. "architect: ...")
+  let slug, messageContent;
+
+  const byChannel = Object.keys(AGENTS).find(s => channelName === s);
+  if (byChannel) {
+    slug = byChannel;
+    messageContent = content;
+  } else {
+    // Detect prefix: "architect: ..." or "Senior Engineer: ..."
+    const lower = content.toLowerCase();
+    for (const [s, { name }] of Object.entries(AGENTS)) {
+      if (lower.startsWith(s + ':')) {
+        slug = s;
+        messageContent = content.slice(s.length + 1).trim();
+        break;
+      }
+      const lname = name.toLowerCase();
+      if (lower.startsWith(lname + ':')) {
+        slug = s;
+        messageContent = content.slice(lname.length + 1).trim();
+        break;
+      }
+    }
+  }
+
+  if (!slug || !messageContent) return;
 
   const channelId = message.channel.id;
   if (!histories.has(channelId)) histories.set(channelId, []);
   const history = histories.get(channelId);
-  history.push({ role: 'user', content });
+  history.push({ role: 'user', content: messageContent });
 
   const typing = startTyping(message.channel);
 
