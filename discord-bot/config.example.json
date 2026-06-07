@@ -1,0 +1,13 @@
+{
+  "_setup": "Copy this file to config.json and fill in your values",
+
+  "discord_token": "your-bot-token-from-discord-developer-portal",
+  "authorized_user_id": "your-discord-user-id-numbers-only",
+
+  "anthropic_api_key": "sk-ant-your-key-here",
+
+  "model_opus": "claude-opus-4-8",
+  "model_sonnet": "claude-sonnet-4-6",
+
+  "agents_dir": ""
+}
