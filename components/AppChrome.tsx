@@ -12,7 +12,10 @@ import { LanguageProvider } from '@/lib/i18n';
 export default function AppChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isCompanion =
-    pathname === '/companion' || pathname === '/companion-bubble' || pathname === '/landing';
+    pathname === '/companion' ||
+    pathname === '/companion-bubble' ||
+    pathname === '/landing' ||
+    pathname === '/team';
 
   if (isCompanion) {
     return (

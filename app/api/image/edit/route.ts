@@ -52,7 +52,10 @@ export async function POST(req: NextRequest) {
       // Download the URL (even if it's already a fal CDN URL) and re-upload for freshness
       const fetchRes = await fetch(sourceImageUrl);
       if (!fetchRes.ok) {
-        return NextResponse.json({ error: 'Could not fetch source image — try again.' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'Could not fetch source image — try again.' },
+          { status: 400 }
+        );
       }
       const contentType = fetchRes.headers.get('content-type') ?? 'image/png';
       const arrayBuffer = await fetchRes.arrayBuffer();

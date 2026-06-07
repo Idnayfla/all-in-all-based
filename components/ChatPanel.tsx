@@ -63,9 +63,13 @@ function detectIntentMode(text: string): GenerationMode {
 
   // Infographic/pyramid/ranking → Ideogram — catches all natural-language phrasing variations
   const isStructuredVisual =
-    /\b(infographic|pyramid|triangle|tier list|tier chart|ranking chart|visual chart|hierarchy|ranked list|leaderboard)\b/i.test(t) ||
+    /\b(infographic|pyramid|triangle|tier list|tier chart|ranking chart|visual chart|hierarchy|ranked list|leaderboard)\b/i.test(
+      t
+    ) ||
     (/\b(rank|ranking|ranked|tier|tiers|category|categories|chart)\b/i.test(t) &&
-      /\b(hotels?|restaurants?|brands?|products?|company|companies|logos?|luxury|luxurious)\b/i.test(t)) ||
+      /\b(hotels?|restaurants?|brands?|products?|company|companies|logos?|luxury|luxurious)\b/i.test(
+        t
+      )) ||
     (/(most|least).{0,40}(luxurious|luxury)/i.test(t) &&
       /\b(hotels?|brands?|logos?|restaurants?|ranking)\b/i.test(t)) ||
     (/\blogo(s)?\b/i.test(t) &&
@@ -74,15 +78,18 @@ function detectIntentMode(text: string): GenerationMode {
 
   // Code/app request → Claude builds it
   const isAppRequest =
-    /\b(app|editor|player|tool|builder|website|site|dashboard|game|visualizer|analyzer|portfolio|calculator|tracker|widget|component|page|form|quiz|chatbot)\b/.test(t) &&
-    /\b(build|make|create|code|develop|program|write)\b/.test(t);
+    /\b(app|editor|player|tool|builder|website|site|dashboard|game|visualizer|analyzer|portfolio|calculator|tracker|widget|component|page|form|quiz|chatbot)\b/.test(
+      t
+    ) && /\b(build|make|create|code|develop|program|write)\b/.test(t);
   if (isAppRequest) return 'chat';
 
   // ── Image intent ──────────────────────────────────────────────────────
   if (/\b(draw|paint|sketch|illustrate)\b/.test(t)) return 'flux';
   if (
     /\b(generate|create|make|render|design|show me|give me|produce)\b/.test(t) &&
-    /\b(image|picture|photo|photograph|illustration|artwork|drawing|painting|portrait|banner|thumbnail|wallpaper|poster|cover|headshot|avatar|graphic|visual|art)\b/.test(t)
+    /\b(image|picture|photo|photograph|illustration|artwork|drawing|painting|portrait|banner|thumbnail|wallpaper|poster|cover|headshot|avatar|graphic|visual|art)\b/.test(
+      t
+    )
   )
     return 'flux';
 
@@ -1141,9 +1148,18 @@ export default function ChatPanel({
     const t = input.trim();
 
     // Respect manually selected non-chat modes
-    if (generationMode === 'seedance') { sendVideo(); return; }
-    if (generationMode === 'music') { sendMusic(); return; }
-    if (generationMode !== 'chat') { sendImage(); return; }
+    if (generationMode === 'seedance') {
+      sendVideo();
+      return;
+    }
+    if (generationMode === 'music') {
+      sendMusic();
+      return;
+    }
+    if (generationMode !== 'chat') {
+      sendImage();
+      return;
+    }
 
     // Auto-detect intent when in default chat mode
     const detected = detectIntentMode(t);

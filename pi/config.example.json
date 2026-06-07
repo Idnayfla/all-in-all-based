@@ -1,0 +1,19 @@
+{
+  "based_url": "https://getbased.dev",
+  "auth_token": "pk_live_your_api_key_here",
+
+  "wake_word_engine": "openwakeword",
+  "wake_word": "hey_jarvis",
+  "wake_word_threshold": 0.5,
+
+  "porcupine_key": "",
+
+  "llm_backend": "based",
+  "ollama_url": "http://localhost:11434",
+  "ollama_model": "llama3.2:3b",
+
+  "tts_backend": "based",
+
+  "gender": "male",
+  "memory": ""
+}
