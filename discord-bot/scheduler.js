@@ -20,13 +20,13 @@ function setCouncilChannel(id) {
 }
 
 // ── Post to #council ──────────────────────────────────────────────────────────
-async function postToCouncil(text) {
+async function postToCouncil(text, agentSlug = 'chief-of-staff') {
   if (!councilChannelId || !discordClient) return;
   try {
     const channel = await discordClient.channels.fetch(councilChannelId);
     if (!channel) return;
-    const parts = splitLong(text);
-    for (const p of parts) await channel.send(p);
+    const { sendAsAgent } = require('./webhooks');
+    await sendAsAgent(channel, agentSlug, text);
   } catch (err) {
     console.error('[scheduler] postToCouncil failed:', err.message);
   }
@@ -94,7 +94,7 @@ Be direct. Max 300 words. Use Discord markdown.`;
       [{ role: 'user', content: prompt }],
       { onProgress: async () => {} }
     );
-    await postToCouncil(`◈ **Daily Standup — ${day}**\n\n${standup}`);
+    await postToCouncil(`**Daily Standup — ${day}**\n\n${standup}`, 'chief-of-staff');
   } catch (err) {
     console.error('[scheduler] Standup failed:', err.message);
   }
@@ -102,8 +102,7 @@ Be direct. Max 300 words. Use Discord markdown.`;
 
 // ── Public: any agent can call this to alert the team ─────────────────────────
 async function teamAlert(agentSlug, message) {
-  const agent = AGENTS[agentSlug] || { icon: '◈', name: agentSlug };
-  await postToCouncil(`${agent.icon} **${agent.name} — Alert:**\n${message}`);
+  await postToCouncil(message, agentSlug);
 }
 
 module.exports = { init, setCouncilChannel, teamAlert, postToCouncil };

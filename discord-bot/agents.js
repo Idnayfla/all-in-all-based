@@ -7,36 +7,45 @@ const { config, AGENTS_DIR, PROVIDER, MODEL_OPUS, MODEL_SONNET, MODEL_GROQ } = r
 const { DEFINITIONS, execute, describeUse } = require('./tools');
 
 // ── Agent registry ────────────────────────────────────────────────────────────
+// avatarURL: DiceBear bottts-neutral — unique robot face per agent slug
+const AVATAR = slug =>
+  `https://api.dicebear.com/9.x/bottts-neutral/png?seed=${encodeURIComponent(slug)}&size=128`;
+
 const AGENTS = {
-  orchestrator:       { name: 'Orchestrator',     icon: '◉', opus: true  },
-  architect:          { name: 'Architect',         icon: '⬡', opus: true  },
-  'senior-engineer':  { name: 'Senior Engineer',   icon: '◈', opus: true  },
-  'ai-engineer':      { name: 'AI Engineer',       icon: '⊙', opus: true  },
-  product:            { name: 'Product',           icon: '◈', opus: false },
-  designer:           { name: 'Designer',          icon: '◉', opus: false },
-  devops:             { name: 'DevOps',            icon: '⬡', opus: false },
-  security:           { name: 'Security',          icon: '◈', opus: false },
-  qa:                 { name: 'QA',                icon: '⊙', opus: false },
-  growth:             { name: 'Growth',            icon: '◉', opus: false },
-  'data-analyst':     { name: 'Data Analyst',      icon: '⬡', opus: false },
-  mobile:             { name: 'Mobile',            icon: '◈', opus: false },
-  finance:            { name: 'Finance',           icon: '◉', opus: false },
-  legal:              { name: 'Legal',             icon: '⊙', opus: false },
-  community:          { name: 'Community',         icon: '⬡', opus: false },
-  'chief-of-staff':   { name: 'Chief of Staff',    icon: '◈', opus: false },
-  'technical-writer': { name: 'Technical Writer',  icon: '◉', opus: false },
+  orchestrator:       { name: 'Orchestrator',     icon: '◉', opus: true,  avatarURL: AVATAR('orchestrator')       },
+  architect:          { name: 'Architect',         icon: '⬡', opus: true,  avatarURL: AVATAR('architect')           },
+  'senior-engineer':  { name: 'Senior Engineer',   icon: '◈', opus: true,  avatarURL: AVATAR('senior-engineer')    },
+  'ai-engineer':      { name: 'AI Engineer',       icon: '⊙', opus: true,  avatarURL: AVATAR('ai-engineer')        },
+  product:            { name: 'Product',           icon: '◈', opus: false, avatarURL: AVATAR('product')            },
+  designer:           { name: 'Designer',          icon: '◉', opus: false, avatarURL: AVATAR('designer')           },
+  devops:             { name: 'DevOps',            icon: '⬡', opus: false, avatarURL: AVATAR('devops')             },
+  security:           { name: 'Security',          icon: '◈', opus: false, avatarURL: AVATAR('security')           },
+  qa:                 { name: 'QA',                icon: '⊙', opus: false, avatarURL: AVATAR('qa')                 },
+  growth:             { name: 'Growth',            icon: '◉', opus: false, avatarURL: AVATAR('growth')             },
+  'data-analyst':     { name: 'Data Analyst',      icon: '⬡', opus: false, avatarURL: AVATAR('data-analyst')       },
+  mobile:             { name: 'Mobile',            icon: '◈', opus: false, avatarURL: AVATAR('mobile')             },
+  finance:            { name: 'Finance',           icon: '◉', opus: false, avatarURL: AVATAR('finance')            },
+  legal:              { name: 'Legal',             icon: '⊙', opus: false, avatarURL: AVATAR('legal')              },
+  community:          { name: 'Community',         icon: '⬡', opus: false, avatarURL: AVATAR('community')          },
+  'chief-of-staff':   { name: 'Chief of Staff',    icon: '◈', opus: false, avatarURL: AVATAR('chief-of-staff')     },
+  'technical-writer': { name: 'Technical Writer',  icon: '◉', opus: false, avatarURL: AVATAR('technical-writer')   },
 };
 
 const DISCORD_ADDENDUM = `
 
 ---
-You are inside Based HQ — a private Discord server for the Based AI studio dev team.
-Rules:
-- Use Discord markdown (**, \`code\`, bullet lists)
-- Be concise and direct — no fluff
-- Don't just advise: act. Read files before commenting on code.
-- Post what you find and what you did, not what you plan to do
-- You are part of a team. Other agents may be working in parallel.`;
+You are a real member of the Based HQ team — a private Discord server where the Based AI studio team works together.
+
+You are speaking as yourself in this group chat. Behave exactly like a real person on a real team:
+- Never start your message with your own name or role. Discord already shows who you are.
+- Speak naturally and directly, like a colleague in Slack — not a formal report.
+- Address teammates by their role when relevant ("@Architect, does this affect the pipeline?")
+- If you disagree with someone, say so plainly.
+- When you've done work, say what you found — not what you're about to do.
+- Use Discord markdown where it helps (code blocks, bullet lists, bold for key points).
+- Don't pad. One clear sentence beats three vague ones.
+- You have tools. Use them before you speak. Read the actual files, run the actual commands.
+- You are accountable. If you say you'll check something, check it now.`;
 
 // ── LLM clients ───────────────────────────────────────────────────────────────
 const anthropic = config.anthropic_api_key

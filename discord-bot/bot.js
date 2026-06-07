@@ -28,7 +28,8 @@ const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
 const { config, COUNCIL_CHANNEL }                 = require('./config');
 const { AGENTS, dispatchAgent, anthropic, groq }  = require('./agents');
 const { DEFINITIONS }                             = require('./tools');
-const { runCouncil, splitMessage }                = require('./council');
+const { runCouncil }                              = require('./council');
+const { sendAsAgent, splitMessage }               = require('./webhooks');
 const scheduler                                   = require('./scheduler');
 
 // ── Discord client ────────────────────────────────────────────────────────────
@@ -199,9 +200,7 @@ discord.on('messageCreate', async message => {
     while (history.length > 20) history.shift();
 
     clearInterval(typing);
-    const parts = splitMessage(reply);
-    await message.reply(parts[0]);
-    for (const p of parts.slice(1)) await message.channel.send(p);
+    await sendAsAgent(message.channel, slug, reply);
 
   } catch (err) {
     clearInterval(typing);
