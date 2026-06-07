@@ -1,16 +1,20 @@
 {
-  "_setup": "Copy this to config.json and fill in your values. config.json is gitignored.",
+  "_setup": "Copy to config.json and fill in your values. config.json is gitignored.",
 
   "discord_token": "your-bot-token-from-discord-developer-portal",
   "authorized_user_id": "your-discord-user-id-numbers-only",
 
+  "groq_api_key": "your-groq-key-from-console.groq.com",
   "anthropic_api_key": "sk-ant-your-key-here",
 
-  "exa_api_key": "your-exa-api-key-for-web-search",
+  "provider": "auto",
 
-  "model_opus": "claude-opus-4-8",
+  "model_groq":   "llama-3.3-70b-versatile",
+  "model_opus":   "claude-opus-4-8",
   "model_sonnet": "claude-sonnet-4-6",
 
+  "exa_api_key": "your-exa-key-for-web-search",
+
   "project_root": "",
-  "agents_dir": ""
+  "agents_dir":   ""
 }
