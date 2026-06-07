@@ -152,7 +152,9 @@ async function runCouncilAgent(slug, task, channel, priorContext = '') {
     : `Council task:\n${task}`;
 
   try {
-    const reply = await dispatchAgent(slug, [{ role: 'user', content: prompt }], { council: true, currentAgent: slug });
+    const reply = await dispatchAgent(slug, [{ role: 'user', content: prompt }], {
+      council: true, currentAgent: slug, channel,
+    });
     clearInterval(typing);
     const clean = sanitize(reply) || '...';
     await sendAsAgent(channel, slug, clean);
@@ -179,7 +181,7 @@ async function runExecutor(slug, task, responses, channel) {
 
   const typing = startTyping(channel);
   try {
-    const result = await dispatchAgent(slug, [{ role: 'user', content: prompt }], { currentAgent: slug, council: true });
+    const result = await dispatchAgent(slug, [{ role: 'user', content: prompt }], { currentAgent: slug, council: true, channel });
     clearInterval(typing);
     await sendAsAgent(channel, slug, sanitize(result) || 'Done.');
   } catch (err) {
@@ -272,7 +274,7 @@ async function runCouncil(task, channel) {
     try {
       const synthesis = await dispatchAgent('orchestrator',
         [{ role: 'user', content: `Task: ${task}\n\nTeam input:\n\n${ctx}\n\nWrap up: decision, owner, next step. Brief.` }],
-        { council: true }
+        { council: true, currentAgent: 'orchestrator', channel }
       );
       clearInterval(typing);
       await sendAsOrchestrator(channel, sanitize(synthesis));

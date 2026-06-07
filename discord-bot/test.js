@@ -231,6 +231,7 @@ test('all tools have name, description, input_schema', () => {
 
 test('describeUse returns string for all known tools', () => {
   const cases = [
+    // Existing
     ['read_file',           { path: 'app/page.tsx' }],
     ['write_file',          { path: 'out.txt', content: 'x' }],
     ['run_command',         { command: 'git status' }],
@@ -240,11 +241,78 @@ test('describeUse returns string for all known tools', () => {
     ['web_search',          { query: 'Next.js 15' }],
     ['consult_agent',       { agent: 'qa', question: 'is this safe?' }],
     ['create_github_issue', { title: 'Bug', body: 'details' }],
+    // New
+    ['fetch_url',           { url: 'https://example.com', method: 'GET' }],
+    ['browse_web',          { url: 'https://example.com', action: 'read' }],
+    ['download_file',       { url: 'https://example.com/x.png', destination: 'tmp/x.png' }],
+    ['send_email',          { to: 'test@example.com', subject: 'Hi', body: 'Hello' }],
+    ['notify_desktop',      { title: 'Alert', message: 'Something happened' }],
+    ['create_github_pr',    { title: 'Fix drum bug', body: 'details' }],
+    ['manage_files',        { action: 'mkdir', source: 'tmp/new' }],
+    ['get_system_info',     { type: 'all' }],
+    ['send_file',           { file: 'tmp/screenshot.png', caption: 'Here it is' }],
   ];
   for (const [name, input] of cases) {
     const result = describeUse(name, input);
     assert(typeof result === 'string' && result.length > 0, `describeUse('${name}') returned empty`);
   }
+});
+
+// ── New tool definitions ──────────────────────────────────────────────────────
+console.log('\n── New tool definitions ─────────────────────────────────────────');
+
+test('18 tools total', () => {
+  assertEqual(DEFINITIONS.length, 18);
+});
+
+test('all new tools present', () => {
+  const names = DEFINITIONS.map(t => t.name);
+  const newTools = ['fetch_url','browse_web','download_file','send_email','notify_desktop','create_github_pr','manage_files','get_system_info','send_file'];
+  for (const t of newTools) assert(names.includes(t), `Missing tool: ${t}`);
+});
+
+test('send_file definition has required: file', () => {
+  const def = DEFINITIONS.find(t => t.name === 'send_file');
+  assert(def, 'send_file definition missing');
+  assert(def.input_schema.required.includes('file'), 'send_file must require file');
+});
+
+test('browse_web definition has required: url, action', () => {
+  const def = DEFINITIONS.find(t => t.name === 'browse_web');
+  assert(def.input_schema.required.includes('url'),    'browse_web must require url');
+  assert(def.input_schema.required.includes('action'), 'browse_web must require action');
+});
+
+test('fetch_url definition has required: url', () => {
+  const def = DEFINITIONS.find(t => t.name === 'fetch_url');
+  assert(def.input_schema.required.includes('url'), 'fetch_url must require url');
+});
+
+test('no duplicate tool names', () => {
+  const names = DEFINITIONS.map(t => t.name);
+  const unique = new Set(names);
+  assertEqual(names.length, unique.size);
+});
+
+// ── send_file — no-channel context returns helpful error ─────────────────────
+console.log('\n── send_file behaviour ──────────────────────────────────────────');
+
+test('send_file without channel context returns error string', async () => {
+  const { execute } = require('./tools');
+  const result = await execute('send_file', { file: 'nonexistent.png' }, {});
+  assert(typeof result === 'string', 'should return string');
+  assert(result.includes('channel') || result.includes('context'), `expected channel/context message, got: ${result}`);
+});
+
+test('send_file with missing local file returns error string', async () => {
+  const { execute } = require('./tools');
+  // Pass a fake channel object — file doesn't exist so should fail before trying to send
+  const fakeChannel = { id: '123', isThread: () => false };
+  const result = await execute('send_file', { file: 'definitely_does_not_exist_xyz.png' }, {
+    channel: fakeChannel, currentAgent: 'qa',
+  });
+  assert(typeof result === 'string', 'should return string');
+  assert(result.toLowerCase().includes('not found') || result.toLowerCase().includes('error'), `expected not-found error, got: ${result}`);
 });
 
 // ── Config fields ─────────────────────────────────────────────────────────────

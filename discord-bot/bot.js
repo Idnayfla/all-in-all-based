@@ -190,7 +190,7 @@ discord.on('messageCreate', async message => {
     };
 
     const reply = await dispatchAgent(slug, [...history], {
-      onProgress, currentAgent: slug,
+      onProgress, currentAgent: slug, channel: message.channel,
     });
 
     if (!reply) {
