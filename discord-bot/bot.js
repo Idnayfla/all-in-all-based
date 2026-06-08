@@ -253,6 +253,21 @@ discord.on('messageCreate', async message => {
     // Extract memory in background — non-blocking
     extractMemory(slug, getHistory(channelId), anthropic, config.model_sonnet || 'claude-sonnet-4-6').catch(() => {});
 
+    // 12% chance: agent sends a quick self-correction
+    if (Math.random() < 0.12) {
+      setTimeout(async () => {
+        try {
+          const { quickReply: qr } = require('./council');
+          const correction = await qr(slug,
+            `You just said: "${reply.slice(0, 200)}"\n\nIf you want to send a quick follow-up correction or add something you missed (start with "wait," or "actually,"), do it in one line. If you have nothing to correct or add, respond with exactly: [fine]`
+          );
+          if (correction && !correction.toLowerCase().includes('[fine]') && correction.length > 4) {
+            await sendAsAgent(message.channel, slug, correction);
+          }
+        } catch {}
+      }, 2000 + Math.random() * 3000);
+    }
+
     clearInterval(typing);
     await sendAsAgent(message.channel, slug, reply);
 

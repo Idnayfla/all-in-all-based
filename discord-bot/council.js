@@ -11,6 +11,18 @@ const AGENT_GAP_MS = 4000;
 // Random human-like pause before responding (300–2000ms)
 const humanDelay = () => sleep(300 + Math.random() * 1700);
 
+// Detect Hus's tone to inject into agent prompts
+function detectTone(text) {
+  const allCaps = text === text.toUpperCase() && /[A-Z]{2,}/.test(text);
+  const excited = (text.match(/!/g) || []).length >= 2 || allCaps;
+  const veryShort = text.trim().length < 25;
+  const detailed = text.trim().length > 250;
+  if (excited)    return 'Hus is excited — match the energy, be punchy';
+  if (veryShort)  return 'Hus is being brief — keep your reply very short';
+  if (detailed)   return 'Hus sent a detailed message — being thorough is fine';
+  return '';
+}
+
 // ── Strip XML tool-call artifacts that models sometimes output as plain text ──
 function sanitize(text) {
   if (!text) return '';
@@ -250,10 +262,12 @@ async function runCouncil(task, channel) {
 
   // Casual conversation → Maya responds + occasionally 1-2 others chime in
   if (routing.casual) {
+    const tone = detectTone(task);
+    const toneCtx = tone ? `\n\nTone note: ${tone}.` : '';
     let mayaReply = '';
     const typing = startTyping(channel);
     try {
-      mayaReply = await quickReply('orchestrator', task);
+      mayaReply = await quickReply('orchestrator', task + toneCtx);
       clearInterval(typing);
       await sendAsOrchestrator(channel, mayaReply);
     } catch (err) { clearInterval(typing); return; }
@@ -269,7 +283,7 @@ async function runCouncil(task, channel) {
         const t = startTyping(channel);
         try {
           const chime = await quickReply(slug,
-            `In your team Discord, Hus said: "${task}"\nMaya replied: "${mayaReply}"\n\nIf you genuinely have something to add — a reaction, a take, a question — say it in one line. If you have nothing to add, respond with exactly: [pass]`
+            `In your team Discord, Hus said: "${task}"\nMaya replied: "${mayaReply}"\n${toneCtx}\nIf you genuinely have something to add — a reaction, a take, a question — say it in one line. If you have nothing to add, respond with exactly: [pass]`
           );
           clearInterval(t);
           const clean = sanitize(chime);
@@ -312,6 +326,20 @@ async function runCouncil(task, channel) {
       );
       clearInterval(typing);
       await sendAsOrchestrator(channel, sanitize(synthesis));
+
+      // Priya pins the decision via her own client
+      const priya = getAgentClient('chief-of-staff');
+      if (priya) {
+        setTimeout(async () => {
+          try {
+            const ch   = await priya.channels.fetch(channel.id).catch(() => null);
+            if (!ch) return;
+            const msgs = await ch.messages.fetch({ limit: 1 });
+            const last = msgs.first();
+            if (last) await last.pin();
+          } catch {}
+        }, 2500);
+      }
     } catch (err) { clearInterval(typing); }
   }
 
@@ -347,4 +375,4 @@ async function runCelebration(task, channel) {
 }
 
 // Exported for testing
-module.exports = { runCouncil, sanitize, isPureGreeting };
+module.exports = { runCouncil, sanitize, isPureGreeting, quickReply };
