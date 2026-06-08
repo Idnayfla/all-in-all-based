@@ -54,11 +54,18 @@ const groq = config.groq_api_key
 
 // ── System prompt loader ──────────────────────────────────────────────────────
 function loadSystemPrompt(slug) {
-  try {
-    return fs.readFileSync(path.join(AGENTS_DIR, `${slug}.md`), 'utf-8') + DISCORD_ADDENDUM;
-  } catch {
-    return `You are the ${AGENTS[slug]?.name || slug} specialist for Based AI studio.${DISCORD_ADDENDUM}`;
-  }
+  const { getMemory } = require('./memory');
+  const base = (() => {
+    try { return fs.readFileSync(path.join(AGENTS_DIR, `${slug}.md`), 'utf-8'); }
+    catch { return `You are the ${AGENTS[slug]?.name || slug} specialist for Based AI studio.`; }
+  })();
+
+  const memory = getMemory(slug);
+  const memoryBlock = memory
+    ? `\n\n---\n## What you remember\n${memory}`
+    : '';
+
+  return base + memoryBlock + DISCORD_ADDENDUM;
 }
 
 // ── Anthropic agentic loop (with live progress updates) ───────────────────────

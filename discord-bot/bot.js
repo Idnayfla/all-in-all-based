@@ -48,6 +48,7 @@ const { runCouncil }                              = require('./council');
 const { sendAsAgent, splitMessage }               = require('./messenger');
 const { initAgentClients, registerMainClient, destroyAll } = require('./clients');
 const scheduler                                   = require('./scheduler');
+const { getHistory, pushHistory, clearHistory, extractMemory } = require('./memory');
 
 // ── Discord client ────────────────────────────────────────────────────────────
 const discord = new Client({
@@ -57,9 +58,6 @@ const discord = new Client({
     GatewayIntentBits.MessageContent,
   ],
 });
-
-// Conversation histories for direct mode (per channel)
-const histories = new Map();
 
 // Deduplication — ignore messages already being processed
 const processing = new Set();
@@ -97,7 +95,7 @@ discord.on('messageCreate', async message => {
 
   // ── Commands ────────────────────────────────────────────────────────────────
   if (content === '!clear') {
-    histories.delete(message.channel.id);
+    clearHistory(message.channel.id);
     await message.reply('◈ Conversation cleared.');
     return;
   }
@@ -139,7 +137,7 @@ discord.on('messageCreate', async message => {
       `Uptime: ${Math.floor(up / 3600)}h ${Math.floor((up % 3600) / 60)}m\n` +
       `Provider: ${provider}\n` +
       `Groq: ${groq ? '✓' : '✗'}  ·  Anthropic: ${anthropic ? '✓' : '✗'}\n` +
-      `Active histories: ${histories.size}\n` +
+      `Active histories: persisted to disk\n` +
       `Council: #${COUNCIL_CHANNEL}`
     );
     return;
@@ -216,9 +214,8 @@ discord.on('messageCreate', async message => {
 
   // ── Direct mode: run agent with conversation history ──────────────────────────
   const channelId = message.channel.id;
-  if (!histories.has(channelId)) histories.set(channelId, []);
-  const history = histories.get(channelId);
-  history.push({ role: 'user', content: messageContent });
+  const history   = getHistory(channelId);
+  pushHistory(channelId, 'user', messageContent);
 
   const typing = startTyping(message.channel);
 
@@ -226,8 +223,7 @@ discord.on('messageCreate', async message => {
     // Orchestrator channel → council, so agents actually post as themselves
     if (slug === 'orchestrator') {
       clearInterval(typing);
-      history.push({ role: 'assistant', content: '[council]' });
-      while (history.length > 20) history.shift();
+      pushHistory(channelId, 'assistant', '[council]');
       await runCouncil(messageContent, message.channel);
       return;
     }
@@ -246,8 +242,10 @@ discord.on('messageCreate', async message => {
       return;
     }
 
-    history.push({ role: 'assistant', content: reply });
-    while (history.length > 20) history.shift();
+    pushHistory(channelId, 'assistant', reply);
+
+    // Extract memory in background — non-blocking
+    extractMemory(slug, getHistory(channelId), anthropic, config.model_sonnet || 'claude-sonnet-4-6').catch(() => {});
 
     clearInterval(typing);
     await sendAsAgent(message.channel, slug, reply);
