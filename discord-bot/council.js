@@ -168,12 +168,13 @@ async function quickReply(slug, message) {
   return sanitize(res.content.filter(b => b.type === 'text').map(b => b.text).join('').trim());
 }
 
-// ── Council discussion reply — 250 tokens (~190 words, 3-4 sentences) ────────
+// ── Council discussion reply — generous but not unlimited ────────────────────
+// 400 tokens (~300 words). Enough to say something real without writing an essay.
 async function councilReply(slug, message) {
   const { loadSystemPrompt } = require('./agents');
   const system = loadSystemPrompt(slug);
   const res = await anthropic.messages.create({
-    model: MODEL_SONNET, max_tokens: 250, system,
+    model: MODEL_SONNET, max_tokens: 400, system,
     messages: [{ role: 'user', content: message }],
   });
   return sanitize(res.content.filter(b => b.type === 'text').map(b => b.text).join('').trim());
@@ -305,9 +306,9 @@ async function runCouncil(task, channel) {
     return id ? `<@${id}>` : (AGENTS[s]?.name || s);
   }).join(', ');
 
-  // Create a thread for multi-agent discussions (2+ agents)
+  // Create a thread for multi-agent discussions — but not if already in one
   let discussionChannel = channel;
-  if (routing.agents.length >= 2) {
+  if (routing.agents.length >= 2 && !channel.isThread?.()) {
     try {
       const threadName = task.slice(0, 97).replace(/[^\w\s\-.,!?]/g, '').trim() || 'discussion';
       const thread = await channel.threads.create({
@@ -320,7 +321,9 @@ async function runCouncil(task, channel) {
       await sendAsOrchestrator(channel, `${routing.reasoning} — looping in ${mentions}.`);
     }
   } else {
-    await sendAsOrchestrator(channel, `${routing.reasoning} — looping in ${mentions}.`);
+    if (!channel.isThread?.()) {
+      await sendAsOrchestrator(channel, `${routing.reasoning} — looping in ${mentions}.`);
+    }
   }
 
   const responses   = {};

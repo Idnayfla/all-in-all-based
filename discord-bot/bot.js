@@ -177,6 +177,19 @@ discord.on('messageCreate', async message => {
   // Track Hus's last active timestamp for check-in scheduler
   updateLastHusMessage();
 
+  // ── Thread continuation — Hus replying inside a council thread ───────────────
+  if (message.channel.isThread?.()) {
+    const typing = startTyping(message.channel);
+    try {
+      await runCouncil(content, message.channel);
+    } catch (err) {
+      log(`[thread] follow-up failed: ${err.message?.slice(0, 100)}`);
+    } finally {
+      clearInterval(typing);
+    }
+    return;
+  }
+
   // ── Commands ────────────────────────────────────────────────────────────────
   if (content === '!clear') {
     clearHistory(message.channel.id);
