@@ -133,7 +133,7 @@ async function runAnthropicLoop(slug, messages, context = {}, depth = 0) {
   const system = loadSystemPrompt(slug);
 
   const res = await anthropic.messages.create({
-    model, max_tokens: 4096, system, messages,
+    model, max_tokens: 8192, system, messages,
     tools: DEFINITIONS, tool_choice: { type: 'auto' },
   });
 
