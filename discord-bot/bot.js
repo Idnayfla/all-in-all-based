@@ -96,15 +96,21 @@ discord.on('messageCreate', async message => {
   }
 
   if (/^(!?purge[d]?|clear\s+chat|wipe\s+chat|delete\s+messages?)\b/i.test(content)) {
+    console.log('[purge] triggered by:', content);
     const numMatch = content.match(/\d+/);
     const limit = Math.min(numMatch ? parseInt(numMatch[0]) : 100, 100);
     try {
       const fetched = await message.channel.messages.fetch({ limit });
-      const deleted = await message.channel.bulkDelete(fetched, true);
-      const confirm = await message.channel.send(`Deleted ${deleted.size} messages.`).catch(() => null);
+      console.log('[purge] fetched', fetched.size, 'messages');
+      let count = 0;
+      for (const [, msg] of fetched) {
+        await msg.delete().then(() => count++).catch(() => {});
+      }
+      console.log('[purge] deleted', count);
+      const confirm = await message.channel.send(`Deleted ${count} messages.`).catch(() => null);
       if (confirm) setTimeout(() => confirm.delete().catch(() => {}), 4000);
     } catch (err) {
-      console.error('[purge]', err.message);
+      console.error('[purge] error:', err.message);
       const hint = err.message.includes('Missing Permissions')
         ? 'Bot needs Manage Messages permission in this channel.'
         : err.message.slice(0, 150);
