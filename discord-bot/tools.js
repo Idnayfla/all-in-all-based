@@ -721,22 +721,21 @@ async function sendFile({ file, caption = '' }, context) {
   return `File sent: ${path.basename(file)}${caption ? ` with caption "${caption.slice(0,60)}"` : ''}`;
 }
 
-// ── search_gif — Tenor GIF search ────────────────────────────────────────────
+// ── search_gif — Giphy search ─────────────────────────────────────────────────
 async function searchGif({ query }) {
-  const key = config.tenor_api_key;
-  if (!key) return 'Tenor not configured (add tenor_api_key to config.json)';
+  const key = config.giphy_api_key;
+  if (!key) return 'Giphy not configured (get a free key at developers.giphy.com, add giphy_api_key to config.json)';
   try {
-    const url = `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=${encodeURIComponent(key)}&limit=8`;
+    const url = `https://api.giphy.com/v1/gifs/search?api_key=${encodeURIComponent(key)}&q=${encodeURIComponent(query)}&limit=25&rating=g`;
     const res  = await fetch(url);
-    if (!res.ok) return `Tenor error: HTTP ${res.status}`;
+    if (!res.ok) return `Giphy error: HTTP ${res.status}`;
     const data    = await res.json();
-    const results = data.results || [];
+    const results = data.data || [];
     if (!results.length) return 'No GIFs found.';
     const pick   = results[Math.floor(Math.random() * results.length)];
-    const gifUrl = pick.media_formats?.gif?.url || pick.media_formats?.tinygif?.url;
-    return gifUrl || 'No URL in result.';
+    return pick.images?.original?.url || pick.images?.downsized?.url || 'No URL in result.';
   } catch (err) {
-    return `Tenor failed: ${err.message}`;
+    return `Giphy failed: ${err.message}`;
   }
 }
 

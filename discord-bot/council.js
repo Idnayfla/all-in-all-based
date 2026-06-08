@@ -405,7 +405,7 @@ async function runCelebration(task, channel) {
 
   // 10% chance: drop a celebration GIF
   const { config } = require('./config');
-  if (Math.random() < 0.10 && config.tenor_api_key) {
+  if (Math.random() < 0.10 && config.giphy_api_key) {
     const queries = ['ship it', 'celebrating', 'lets go', 'great job', 'nice work'];
     const query   = queries[Math.floor(Math.random() * queries.length)];
     const gifUrl  = await searchGifUrl(query).catch(() => null);
