@@ -230,9 +230,10 @@ discord.on('messageCreate', async message => {
 
   if (content === '!help') {
     const list = Object.entries(AGENTS)
-      .map(([s, { name, icon, tier }]) =>
-        `${icon} **#${s}** — ${name} *(${tier === 'opus' ? 'Opus' : 'Groq+tools'})*`
-      )
+      .map(([s, { name, icon, tier }]) => {
+        const label = tier === 'opus' ? 'Opus' : tier === 'haiku' ? 'Haiku' : 'Groq';
+        return `${icon} **#${s}** — ${name} *(${label})*`;
+      })
       .join('\n');
     const tools = DEFINITIONS.map(t => `\`${t.name}\``).join(' · ');
     await message.reply(

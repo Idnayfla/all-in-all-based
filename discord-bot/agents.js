@@ -4,6 +4,7 @@ const path      = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const Groq      = require('groq-sdk');
 const { config, AGENTS_DIR, PROVIDER, MODEL_OPUS, MODEL_SONNET, MODEL_GROQ, MODEL_OLLAMA, OLLAMA_BASE_URL } = require('./config');
+const MODEL_HAIKU = config.model_haiku || 'claude-haiku-4-5-20251001';
 const { DEFINITIONS, execute, describeUse } = require('./tools');
 
 // ── Agent registry ────────────────────────────────────────────────────────────
@@ -11,27 +12,28 @@ const { DEFINITIONS, execute, describeUse } = require('./tools');
 const AVATAR = slug =>
   `https://api.dicebear.com/9.x/bottts-neutral/png?seed=${encodeURIComponent(slug)}&size=128`;
 
-// tier: 'opus' = Anthropic Opus (complex reasoning, critical data)
-//        'groq' = Groq llama (free, fast, now with full tool support)
-// Mac Mini arrival → add 'local' tier here, no other changes needed
+// tier: 'opus'  = Anthropic Opus  — complex reasoning, critical data (Yuki, Felix, Kai...)
+//       'haiku' = Anthropic Haiku — reliable tool use, 60x cheaper than Opus (Lars, Dani...)
+//       'groq'  = Groq llama      — free, chat-only agents who never need tools
+// Mac Mini arrives → add 'local' tier, no other changes needed
 const AGENTS = {
-  orchestrator:       { name: 'Maya',    tier: 'opus', icon: '◉', avatarURL: AVATAR('maya')    },
-  architect:          { name: 'Marcus',  tier: 'opus', icon: '⬡', avatarURL: AVATAR('marcus')  },
-  'senior-engineer':  { name: 'Kai',     tier: 'opus', icon: '◈', avatarURL: AVATAR('kai')     },
-  'ai-engineer':      { name: 'Zoe',     tier: 'opus', icon: '⊙', avatarURL: AVATAR('zoe')     },
-  'data-analyst':     { name: 'Felix',   tier: 'opus', icon: '⬡', avatarURL: AVATAR('felix')   },
-  finance:            { name: 'Yuki',    tier: 'opus', icon: '◉', avatarURL: AVATAR('yuki')    },
-  product:            { name: 'Jordan',  tier: 'groq', icon: '◈', avatarURL: AVATAR('jordan')  },
-  designer:           { name: 'Ren',     tier: 'groq', icon: '◉', avatarURL: AVATAR('ren')     },
-  devops:             { name: 'Lars',    tier: 'groq', icon: '⬡', avatarURL: AVATAR('lars')    },
-  security:           { name: 'Dani',    tier: 'groq', icon: '◈', avatarURL: AVATAR('dani')    },
-  qa:                 { name: 'Samara',  tier: 'groq', icon: '⊙', avatarURL: AVATAR('samara')  },
-  growth:             { name: 'Leila',   tier: 'groq', icon: '◉', avatarURL: AVATAR('leila')   },
-  mobile:             { name: 'Tomás',   tier: 'groq', icon: '◈', avatarURL: AVATAR('tomas')   },
-  legal:              { name: 'Asha',    tier: 'groq', icon: '⊙', avatarURL: AVATAR('asha')    },
-  community:          { name: 'Beatrix', tier: 'groq', icon: '⬡', avatarURL: AVATAR('beatrix') },
-  'chief-of-staff':   { name: 'Priya',   tier: 'groq', icon: '◈', avatarURL: AVATAR('priya')   },
-  'technical-writer': { name: 'Owen',    tier: 'groq', icon: '◉', avatarURL: AVATAR('owen')    },
+  orchestrator:       { name: 'Maya',    tier: 'opus',  icon: '◉', avatarURL: AVATAR('maya')    },
+  architect:          { name: 'Marcus',  tier: 'opus',  icon: '⬡', avatarURL: AVATAR('marcus')  },
+  'senior-engineer':  { name: 'Kai',     tier: 'opus',  icon: '◈', avatarURL: AVATAR('kai')     },
+  'ai-engineer':      { name: 'Zoe',     tier: 'opus',  icon: '⊙', avatarURL: AVATAR('zoe')     },
+  'data-analyst':     { name: 'Felix',   tier: 'opus',  icon: '⬡', avatarURL: AVATAR('felix')   },
+  finance:            { name: 'Yuki',    tier: 'opus',  icon: '◉', avatarURL: AVATAR('yuki')    },
+  product:            { name: 'Jordan',  tier: 'haiku', icon: '◈', avatarURL: AVATAR('jordan')  },
+  devops:             { name: 'Lars',    tier: 'haiku', icon: '⬡', avatarURL: AVATAR('lars')    },
+  security:           { name: 'Dani',    tier: 'haiku', icon: '◈', avatarURL: AVATAR('dani')    },
+  qa:                 { name: 'Samara',  tier: 'haiku', icon: '⊙', avatarURL: AVATAR('samara')  },
+  'chief-of-staff':   { name: 'Priya',   tier: 'haiku', icon: '◈', avatarURL: AVATAR('priya')   },
+  'technical-writer': { name: 'Owen',    tier: 'haiku', icon: '◉', avatarURL: AVATAR('owen')    },
+  designer:           { name: 'Ren',     tier: 'groq',  icon: '◉', avatarURL: AVATAR('ren')     },
+  growth:             { name: 'Leila',   tier: 'groq',  icon: '◉', avatarURL: AVATAR('leila')   },
+  mobile:             { name: 'Tomás',   tier: 'groq',  icon: '◈', avatarURL: AVATAR('tomas')   },
+  legal:              { name: 'Asha',    tier: 'groq',  icon: '⊙', avatarURL: AVATAR('asha')    },
+  community:          { name: 'Beatrix', tier: 'groq',  icon: '⬡', avatarURL: AVATAR('beatrix') },
 };
 
 const DISCORD_ADDENDUM = `
@@ -108,12 +110,13 @@ function loadSystemPrompt(slug) {
   return base + memoryBlock + weekendBlock + DISCORD_ADDENDUM + getSGTTimeNote();
 }
 
-// ── Anthropic agentic loop (with live progress updates) ───────────────────────
+// ── Anthropic agentic loop (Opus or Haiku, with live progress updates) ────────
 async function runAnthropicLoop(slug, messages, context = {}, depth = 0) {
   if (depth > 12) return '[Max depth reached]';
 
   const agent  = AGENTS[slug];
-  const model  = agent?.opus ? MODEL_OPUS : MODEL_SONNET;
+  const tier   = agent?.tier || 'opus';
+  const model  = tier === 'haiku' ? MODEL_HAIKU : MODEL_OPUS;
   const system = loadSystemPrompt(slug);
 
   const res = await anthropic.messages.create({
@@ -148,7 +151,8 @@ async function runAnthropicLoop(slug, messages, context = {}, depth = 0) {
 
 // ── Groq agentic loop — full tool support via OpenAI-compatible function calling
 async function runGroqLoop(slug, messages, context = {}) {
-  const system = loadSystemPrompt(slug);
+  const system = loadSystemPrompt(slug) +
+    '\n\nYou have tools available. When asked about code, git, files, GitHub, Stripe, PostHog, or any live system state — call the relevant tool. Never fabricate data you could look up.';
   const groqMsgs = [
     { role: 'system', content: system },
     ...messages.map(m => ({
@@ -243,14 +247,14 @@ async function dispatchAgent(slug, messages, context = {}) {
   }
 
   // Auto mode — route by tier
-  if (tier === 'opus') {
+  if (tier === 'opus' || tier === 'haiku') {
     if (anthropic) return runAnthropicLoop(slug, messages, context);
     console.warn(`[${slug}] Anthropic unavailable — Groq fallback`);
     if (groq) return runGroqLoop(slug, messages, context);
     throw new Error('No provider available.');
   }
 
-  // groq tier: Ollama → Groq (with tools) → Anthropic fallback
+  // groq tier — chat only (Leila, Ren, Beatrix, Asha, Tomás)
   try { return await runOllamaLoop(slug, messages); }
   catch { /* Ollama not running, continue */ }
 
