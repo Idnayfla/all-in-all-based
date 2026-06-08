@@ -543,12 +543,28 @@ async function consultAgent({ agent, question }, context) {
     await sendAsAgentBurst(targetChannel, context.currentAgent, question).catch(() => {});
   }
 
-  const reply = await dispatchAgent(agent_slug, [{ role: 'user', content: question }], {
-    ...context, consultDepth: (context.consultDepth || 0) + 1, channel: targetChannel,
+  // Progress updates go to the target channel, not Maya's channel
+  const targetOnProgress = async (text) => {
+    try { await targetChannel.send(text); } catch {}
+  };
+
+  let reply = await dispatchAgent(agent_slug, [{ role: 'user', content: question }], {
+    ...context,
+    onProgress: targetOnProgress,
+    consultDepth: (context.consultDepth || 0) + 1,
+    channel: targetChannel,
   });
 
+  // If the model finished tool use but produced no text summary, ask for one explicitly
+  if (!reply?.trim()) {
+    const { quickReply } = require('./council');
+    reply = await quickReply(agent_slug,
+      `You just ran several tools to answer this: "${question.slice(0, 300)}"\n\nSummarise your findings in 2-4 sentences. Be specific — no hedging.`
+    ).catch(() => '(no response)');
+  }
+
   // Post the agent's reply in their own channel
-  if (targetChannel && reply) {
+  if (targetChannel && reply?.trim()) {
     await sendAsAgentBurst(targetChannel, agent_slug, reply).catch(() => {});
   }
 
