@@ -125,7 +125,7 @@ function loadSystemPrompt(slug) {
 
 // ── Anthropic agentic loop (Opus or Haiku, with live progress updates) ────────
 async function runAnthropicLoop(slug, messages, context = {}, depth = 0) {
-  if (depth > 12) return '[Max depth reached]';
+  if (depth > 50) return '[Max depth reached]';
 
   const agent  = AGENTS[slug];
   const tier   = agent?.tier || 'opus';

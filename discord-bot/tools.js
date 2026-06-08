@@ -555,11 +555,12 @@ async function consultAgent({ agent, question }, context) {
     channel: targetChannel,
   });
 
-  // If the model finished tool use but produced no text summary, ask for one explicitly
-  if (!reply?.trim()) {
+  // If the agent hit a depth/tool limit or returned nothing, ask for a human summary
+  const isBad = !reply?.trim() || reply.includes('[Max depth reached]') || reply.includes('Max depth');
+  if (isBad) {
     const { quickReply } = require('./council');
     reply = await quickReply(agent_slug,
-      `You just ran several tools to answer this: "${question.slice(0, 300)}"\n\nSummarise your findings in 2-4 sentences. Be specific — no hedging.`
+      `You just ran several tools to answer this: "${question.slice(0, 300)}"\n\nGive your verdict in 2-4 sentences — plain language, your own voice. Be direct. No bullet lists.`
     ).catch(() => '(no response)');
   }
 
