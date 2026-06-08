@@ -607,12 +607,26 @@ async function browseWeb({ url, action, selector, text, wait = 0 }) {
 
     switch (action) {
       case 'read': {
-        const content = await page.evaluate(() => {
-          // Remove scripts, styles, navs for cleaner output
-          document.querySelectorAll('script,style,nav,header,footer').forEach(el => el.remove());
-          return document.body?.innerText || '';
+        const { text, interactive } = await page.evaluate(() => {
+          const text = document.body?.innerText || '';
+          const els = [...document.querySelectorAll('a, button, input, textarea, [role="button"], [onclick]')];
+          const interactive = els.map(el => {
+            const tag = el.tagName.toLowerCase();
+            const label = (el.innerText || el.value || el.placeholder || el.getAttribute('aria-label') || '').trim().slice(0, 60);
+            const id = el.id ? `#${el.id}` : null;
+            const cls = el.className && typeof el.className === 'string'
+              ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.')
+              : null;
+            const href = el.getAttribute('href');
+            const selector = id || (tag + (cls || ''));
+            return `${selector}${href ? ` [href="${href}"]` : ''}${label ? ` — "${label}"` : ''}`;
+          }).filter(Boolean).slice(0, 40);
+          return { text, interactive };
         });
-        return content.trim().slice(0, 6000);
+        const interactiveSection = interactive.length
+          ? `\n\n--- Interactive elements ---\n${interactive.join('\n')}`
+          : '';
+        return (text.trim().slice(0, 5000) + interactiveSection);
       }
 
       case 'screenshot': {
