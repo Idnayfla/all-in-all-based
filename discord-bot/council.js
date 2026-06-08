@@ -168,13 +168,12 @@ async function quickReply(slug, message) {
   return sanitize(res.content.filter(b => b.type === 'text').map(b => b.text).join('').trim());
 }
 
-// ── Council discussion reply — generous but not unlimited ────────────────────
-// 400 tokens (~300 words). Enough to say something real without writing an essay.
+// ── Council discussion reply — 300 tokens (~220 words, safely under 2000 chars)
 async function councilReply(slug, message) {
   const { loadSystemPrompt } = require('./agents');
   const system = loadSystemPrompt(slug);
   const res = await anthropic.messages.create({
-    model: MODEL_SONNET, max_tokens: 400, system,
+    model: MODEL_SONNET, max_tokens: 300, system,
     messages: [{ role: 'user', content: message }],
   });
   return sanitize(res.content.filter(b => b.type === 'text').map(b => b.text).join('').trim());
