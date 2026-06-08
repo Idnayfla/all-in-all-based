@@ -127,6 +127,7 @@ Routing guide:
 - New feature              → ["product", "architect", "senior-engineer"], executor: "senior-engineer"
 - Infra / cost             → ["devops", "architect"],                     executor: "devops"
 - Security                 → ["security", "architect", "senior-engineer"],executor: "senior-engineer"
+- Launch / go-to-market    → ["growth", "community"],                     executor: null
 - Growth / copy            → ["growth", "designer"],                      executor: "growth"
 - Data / analytics         → ["data-analyst"],                            executor: null
 - Legal / privacy          → ["legal"],                                   executor: null
@@ -165,12 +166,23 @@ async function getRouting(task) {
   return routing;
 }
 
-// ── Fast no-tools reply for casual/greeting messages ─────────────────────────
+// ── Fast reply — casual/greeting (120 tokens hard cap) ───────────────────────
 async function quickReply(slug, message) {
   const { loadSystemPrompt } = require('./agents');
   const system = loadSystemPrompt(slug);
   const res = await anthropic.messages.create({
     model: MODEL_SONNET, max_tokens: 120, system,
+    messages: [{ role: 'user', content: message }],
+  });
+  return sanitize(res.content.filter(b => b.type === 'text').map(b => b.text).join('').trim());
+}
+
+// ── Council discussion reply — hard 150 token cap, guaranteed short ───────────
+async function councilReply(slug, message) {
+  const { loadSystemPrompt } = require('./agents');
+  const system = loadSystemPrompt(slug);
+  const res = await anthropic.messages.create({
+    model: MODEL_SONNET, max_tokens: 150, system,
     messages: [{ role: 'user', content: message }],
   });
   return sanitize(res.content.filter(b => b.type === 'text').map(b => b.text).join('').trim());
@@ -182,35 +194,22 @@ function startTyping(channel) {
   return setInterval(() => channel.sendTyping().catch(() => {}), 8000);
 }
 
-// ── Run a single council agent ────────────────────────────────────────────────
-const ACKS = ['give me a sec', 'let me look at this', 'one sec', 'checking', 'on it'];
-
+// ── Run a single council agent — hard token cap, never cuts off ───────────────
 async function runCouncilAgent(slug, task, channel, priorContext = '') {
-  // 30% chance for complex tasks: send a brief ack before diving in
-  if (task.length > 200 && Math.random() < 0.30) {
-    const ack = ACKS[Math.floor(Math.random() * ACKS.length)];
-    await sendAsAgent(channel, slug, ack);
-    await sleep(3000 + Math.random() * 5000);
-  }
-
   const typing = startTyping(channel);
   const prompt = priorContext
-    ? `The team is discussing:\n\n${priorContext}\n\nWeigh in from your perspective on: ${task}\n\nKeep it to 2-3 sentences max. Discord chat — no lists, no headers, no essays.`
-    : `Council task:\n${task}\n\nKeep it to 2-3 sentences max. Discord chat — no lists, no headers, no essays.`;
+    ? `Team discussion: ${task}\n\nWhat others said:\n${priorContext}\n\nYour take — 1-2 sentences in your own voice. No lists.`
+    : `Team discussion: ${task}\n\nYour take — 1-2 sentences in your own voice. No lists.`;
 
   try {
-    const reply = await dispatchAgent(slug, [{ role: 'user', content: prompt }], {
-      council: true, currentAgent: slug, channel, discordClient: channel.client,
-    });
+    const reply = await councilReply(slug, prompt);
     clearInterval(typing);
-    const clean = sanitize(reply) || '...';
-    await sendAsAgent(channel, slug, clean);
-    return clean;
+    const clean = sanitize(reply);
+    if (clean) await sendAsAgent(channel, slug, clean);
+    return clean || '';
   } catch (err) {
     clearInterval(typing);
-    const msg = `Ran into an issue: ${err.message.slice(0, 200)}`;
-    await sendAsAgent(channel, slug, msg);
-    return `Error: ${err.message}`;
+    return '';
   }
 }
 
@@ -351,9 +350,8 @@ async function runCouncil(task, channel) {
       .join('\n\n');
     const typing = startTyping(discussionChannel);
     try {
-      const synthesis = await dispatchAgent('orchestrator',
-        [{ role: 'user', content: `Task: ${task}\n\nTeam input:\n\n${ctx}\n\nWrap up: decision, owner, next step. Brief.` }],
-        { council: true, currentAgent: 'orchestrator', channel: discussionChannel, discordClient: channel.client }
+      const synthesis = await councilReply('orchestrator',
+        `Team just discussed: ${task}\n\nWhat they said:\n${ctx}\n\nOne sentence: decision, who owns it, what's next.`
       );
       clearInterval(typing);
       await sendAsOrchestrator(discussionChannel, sanitize(synthesis));
