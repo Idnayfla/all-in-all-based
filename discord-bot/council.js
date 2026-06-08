@@ -36,6 +36,58 @@ function isPureGreeting(text) {
   );
 }
 
+// ── Detect broadcast directive ("tell them all to X", "have everyone Y") ────────
+function isBroadcastRequest(text) {
+  const lower = text.toLowerCase().trim();
+  return (
+    /^(tell|ask|have|make)\s+(them|everyone|all\s+of\s+(you|them)|the\s+team)\s+(all\s+)?(to\s+)?\S/.test(lower) ||
+    /^everyone\s+(say|do|introduce|reply|respond|jump\s+in|go\s+ahead)\b/.test(lower) ||
+    /\bi\s+(need|want)\s+everyone\s+to\s+\S/.test(lower)
+  );
+}
+
+function extractBroadcastAction(text) {
+  const lower = text.toLowerCase().trim();
+  return lower
+    .replace(/^(tell|ask|have|make)\s+(them|everyone|all\s+of\s+(you|them)|the\s+team)\s+(all\s+)?(to\s+)?/, '')
+    .replace(/^everyone\s+/, '')
+    .replace(/^i\s+(need|want)\s+everyone\s+to\s+/, '')
+    .trim() || text;
+}
+
+// ── Broadcast — every agent posts as themselves, staggered parallel ───────────
+async function runBroadcast(originalMessage, channel) {
+  const action   = extractBroadcastAction(originalMessage);
+  const allSlugs = Object.keys(AGENTS).filter(s => s !== 'orchestrator');
+
+  // Orchestrator acknowledges and goes first
+  const mayaTyping = startTyping(channel);
+  try {
+    const kickoff = await quickReply('orchestrator', `Hus said: "${originalMessage}". Acknowledge briefly, then respond yourself.`);
+    clearInterval(mayaTyping);
+    await sendAsOrchestrator(channel, sanitize(kickoff) || 'alright, everyone.');
+  } catch {
+    clearInterval(mayaTyping);
+    await sendAsOrchestrator(channel, 'alright, everyone.').catch(() => {});
+  }
+
+  // All other agents — staggered starts, run in parallel so they trickle in naturally
+  const prompt = `Hus is asking everyone: ${action}. Respond briefly in your own voice.`;
+  await Promise.all(
+    allSlugs.map((slug, i) =>
+      sleep(i * 1200).then(async () => {
+        const t = startTyping(channel);
+        try {
+          const reply = await quickReply(slug, prompt);
+          clearInterval(t);
+          const clean = sanitize(reply);
+          if (clean) await sendAsAgent(channel, slug, clean);
+        } catch { clearInterval(t); }
+      })
+    )
+  );
+}
+
 // ── Detect explicit group address ("hey everyone", "morning team") ────────────
 function isGroupGreeting(text) {
   const lower = text.toLowerCase().trim();
@@ -193,6 +245,12 @@ async function runExecutor(slug, task, responses, channel) {
 // ── Main council entrypoint ───────────────────────────────────────────────────
 async function runCouncil(task, channel) {
 
+  // Broadcast directive ("tell them all to say hi") → every agent posts as themselves
+  if (isBroadcastRequest(task)) {
+    await runBroadcast(task, channel);
+    return;
+  }
+
   // Group greeting ("hey everyone", "morning team") → Orchestrator + 2 others say hi
   if (isPureGreeting(task) && isGroupGreeting(task)) {
     const typing = startTyping(channel);
@@ -289,4 +347,4 @@ async function runCouncil(task, channel) {
 }
 
 // Exported for testing
-module.exports = { runCouncil, sanitize, isPureGreeting, isGroupGreeting };
+module.exports = { runCouncil, sanitize, isPureGreeting, isGroupGreeting, isBroadcastRequest };
