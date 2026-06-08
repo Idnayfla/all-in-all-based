@@ -170,7 +170,7 @@ async function quickReply(slug, message) {
   const { loadSystemPrompt } = require('./agents');
   const system = loadSystemPrompt(slug);
   const res = await anthropic.messages.create({
-    model: MODEL_SONNET, max_tokens: 200, system,
+    model: MODEL_SONNET, max_tokens: 120, system,
     messages: [{ role: 'user', content: message }],
   });
   return sanitize(res.content.filter(b => b.type === 'text').map(b => b.text).join('').trim());
@@ -195,8 +195,8 @@ async function runCouncilAgent(slug, task, channel, priorContext = '') {
 
   const typing = startTyping(channel);
   const prompt = priorContext
-    ? `The team is discussing:\n\n${priorContext}\n\nWeigh in from your perspective on: ${task}`
-    : `Council task:\n${task}`;
+    ? `The team is discussing:\n\n${priorContext}\n\nWeigh in from your perspective on: ${task}\n\nKeep it to 2-3 sentences max. Discord chat — no lists, no headers, no essays.`
+    : `Council task:\n${task}\n\nKeep it to 2-3 sentences max. Discord chat — no lists, no headers, no essays.`;
 
   try {
     const reply = await dispatchAgent(slug, [{ role: 'user', content: prompt }], {
@@ -335,11 +335,12 @@ async function runCouncil(task, channel) {
 
   const responses   = {};
   let priorContext  = '';
+  const capped      = routing.agents.slice(0, 3); // max 3 agents — keeps it a conversation not a monologue wall
 
-  for (const slug of routing.agents) {
-    await sleep(AGENT_GAP_MS);
+  for (const slug of capped) {
+    await sleep(AGENT_GAP_MS + Math.random() * 3000); // 4-7s between agents
     responses[slug]  = await runCouncilAgent(slug, task, discussionChannel, priorContext);
-    priorContext     += `\n**${AGENTS[slug]?.name}:** ${responses[slug].slice(0, 400)}\n`;
+    priorContext     += `\n**${AGENTS[slug]?.name}:** ${responses[slug].slice(0, 300)}\n`;
   }
 
   // Orchestrator wraps up (only when multiple agents weighed in)

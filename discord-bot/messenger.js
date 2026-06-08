@@ -91,7 +91,7 @@ async function sendViaClient(agentClient, channel, content, files = [], replyToI
   return lastMsg;
 }
 
-// ── Send via webhook ──────────────────────────────────────────────────────────
+// ── Send via webhook — with retry so multi-part messages don't get cut off ────
 async function sendViaWebhook(channel, slug, content, files = []) {
   const agent = AGENTS[slug] || { name: slug, icon: '◈', avatarURL: null };
   const wh    = await getWebhook(channel);
@@ -103,15 +103,25 @@ async function sendViaWebhook(channel, slug, content, files = []) {
   };
   if (channel.isThread?.()) base.threadId = channel.id;
 
+  const whSend = async (payload) => {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try { return await wh.send(payload); }
+      catch (err) {
+        if (attempt === 2) throw err;
+        await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
+      }
+    }
+  };
+
   const attachments = buildAttachments(files);
 
   if (attachments.length) {
     const parts = splitMessage(content);
-    await wh.send({ ...base, content: parts[0] || undefined, files: attachments });
-    for (const p of parts.slice(1)) await wh.send({ ...base, content: p });
+    await whSend({ ...base, content: parts[0] || undefined, files: attachments });
+    for (const p of parts.slice(1)) await whSend({ ...base, content: p });
   } else {
     const parts = splitMessage(content);
-    for (const p of parts) await wh.send({ ...base, content: p });
+    for (const p of parts) await whSend({ ...base, content: p });
   }
 }
 
