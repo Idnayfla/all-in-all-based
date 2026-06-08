@@ -13,6 +13,8 @@ function init(discord) {
   scheduleProactiveCheckins();
   scheduleAgentConversations();
   scheduleHusCheckin();
+  scheduleBrbBack();
+  scheduleStatusRotation();
   console.log(`[scheduler] Standup set for ${STANDUP_HOUR_UTC}:00 UTC daily (9am SGT)`);
 }
 
@@ -259,6 +261,55 @@ function scheduleHusCheckin() {
     }
   }, 20 * 60 * 1000);
   console.log('[scheduler] Hus check-in watcher scheduled');
+}
+
+// ── brb / back — agent steps away and comes back ─────────────────────────────
+const BRB_AGENTS   = ['community', 'growth', 'designer', 'qa', 'chief-of-staff', 'product', 'data-analyst'];
+const BRB_PHRASES  = ['brb', 'brb one sec', 'brb real quick', 'stepping away for a bit'];
+const BACK_PHRASES = ['back', 'back.', 'k back', 'ok back', 'back now'];
+
+async function runBrbBack() {
+  if (!councilChannelId || !discordClient) return;
+  const slug = BRB_AGENTS[Math.floor(Math.random() * BRB_AGENTS.length)];
+  try {
+    const channel = await discordClient.channels.fetch(councilChannelId);
+    if (!channel) return;
+    const { sendAsAgent } = require('./messenger');
+    await sendAsAgent(channel, slug, BRB_PHRASES[Math.floor(Math.random() * BRB_PHRASES.length)]);
+    console.log(`[scheduler] ${slug} went brb`);
+    await new Promise(r => setTimeout(r, (4 + Math.random() * 8) * 60 * 1000)); // 4-12 min
+    await sendAsAgent(channel, slug, BACK_PHRASES[Math.floor(Math.random() * BACK_PHRASES.length)]);
+    console.log(`[scheduler] ${slug} is back`);
+  } catch (err) {
+    console.error('[scheduler] brb/back failed:', err.message);
+  }
+}
+
+function scheduleBrbBack() {
+  const fireNext = () => {
+    setTimeout(async () => { await runBrbBack(); fireNext(); },
+      (8 + Math.random() * 8) * 60 * 60 * 1000); // every 8-16h
+  };
+  setTimeout(async () => { await runBrbBack(); fireNext(); },
+    (4 + Math.random() * 4) * 60 * 60 * 1000); // first: 4-8h after startup
+  console.log('[scheduler] brb/back scheduled');
+}
+
+// ── Status rotation — agents cycle their Discord custom status every 2-4h ─────
+function scheduleStatusRotation() {
+  const fireNext = () => {
+    setTimeout(() => {
+      const { rotateRandomStatuses } = require('./clients');
+      rotateRandomStatuses();
+      fireNext();
+    }, (2 + Math.random() * 2) * 60 * 60 * 1000); // 2-4h
+  };
+  setTimeout(() => {
+    const { rotateRandomStatuses } = require('./clients');
+    rotateRandomStatuses();
+    fireNext();
+  }, (1 + Math.random()) * 60 * 60 * 1000); // first: 1-2h after startup
+  console.log('[scheduler] Status rotation scheduled');
 }
 
 // ── Public: any agent can call this to alert the team ─────────────────────────

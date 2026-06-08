@@ -311,8 +311,14 @@ discord.on('messageCreate', async message => {
   const history   = getHistory(channelId);
   pushHistory(channelId, 'user', messageContent);
 
-  // Human-like pause before typing starts
-  await new Promise(r => setTimeout(r, 300 + Math.random() * 1500));
+  // Variable response latency — 80% fast, 15% "finishing something", 5% genuinely busy
+  const latencyRoll = Math.random();
+  const pauseMs = latencyRoll < 0.05
+    ? (180 + Math.random() * 120) * 1000   // 3-5 min
+    : latencyRoll < 0.20
+    ? (30  + Math.random() * 90)  * 1000   // 30-120 s
+    : 300  + Math.random() * 1500;          // 300-1800 ms
+  await new Promise(r => setTimeout(r, pauseMs));
   const typing = startTyping(message.channel);
 
   try {

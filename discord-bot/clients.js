@@ -21,6 +21,27 @@ const STATUSES = {
   'technical-writer': 'making it clear',
 };
 
+// Rotation pools — each agent cycles through realistic statuses over the day
+const STATUS_POOLS = {
+  'orchestrator':     ['keeping the room from spinning', 'in 1:1s', 'reading updates', 'thinking through it'],
+  'architect':        ['thinking in tradeoffs', 'whiteboarding', 'reviewing the design', 'reading the RFC'],
+  'senior-engineer':  ['in the code', 'reviewing PR', 'debugging', 'reading docs', 'pushing a fix'],
+  'ai-engineer':      ['watching model behavior', 'running evals', 'tweaking prompts', 'reading papers'],
+  'product':          ['reading user feedback', 'writing specs', 'in roadmap review', 'talking to users'],
+  'designer':         ['in Figma', 'reviewing designs', 'making assets', 'tweaking spacing'],
+  'devops':           ['watching uptime', 'deploying', 'checking logs', 'in the terminal'],
+  'security':         ['thinking like an attacker', 'reviewing auth flow', 'reading CVEs', 'running scans'],
+  'qa':               ['finding edge cases', 'running tests', 'writing test cases', 'checking prod'],
+  'growth':           ['watching the funnel', 'writing copy', 'reviewing metrics', 'planning launch'],
+  'data-analyst':     ['in the dashboards', 'running queries', 'building charts', 'analyzing cohorts'],
+  'mobile':           ['fighting iOS Safari', 'testing on device', 'reading app store guidelines'],
+  'finance':          ['running the numbers', 'reviewing burn', 'modeling scenarios', 'in a spreadsheet'],
+  'legal':            ['reading the fine print', 'reviewing ToS', 'checking compliance'],
+  'community':        ['talking to users', 'reading feedback', 'in the Discord', 'writing comms'],
+  'chief-of-staff':   ['keeping receipts', 'updating the log', 'chasing decisions', 'in the calendar'],
+  'technical-writer': ['making it clear', 'writing docs', 'editing', 'reviewing changelog'],
+};
+
 const agentClients = new Map(); // slug → logged-in Discord Client
 
 // ── Register the main listener client under an agent slug ─────────────────────
@@ -99,4 +120,21 @@ async function destroyAll(listenerToken = null) {
   agentClients.clear();
 }
 
-module.exports = { initAgentClients, registerMainClient, getAgentClient, getAgentUserId, getAgentUserIdMap, destroyAll };
+// Rotate 1-2 random agents to a new status from their pool
+function rotateRandomStatuses() {
+  const slugs = Object.keys(STATUS_POOLS);
+  const count  = 1 + Math.floor(Math.random() * 2);
+  const picks  = [...slugs].sort(() => Math.random() - 0.5).slice(0, count);
+  for (const slug of picks) {
+    const client = agentClients.get(slug);
+    if (!client?.user) continue;
+    const pool   = STATUS_POOLS[slug];
+    const status = pool[Math.floor(Math.random() * pool.length)];
+    client.user.setPresence({
+      activities: [{ name: status, type: ActivityType.Custom }],
+      status: 'online',
+    }).catch(() => {});
+  }
+}
+
+module.exports = { initAgentClients, registerMainClient, getAgentClient, getAgentUserId, getAgentUserIdMap, rotateRandomStatuses, destroyAll };

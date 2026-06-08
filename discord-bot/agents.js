@@ -59,7 +59,9 @@ If you have a genuinely relevant resource, doc, or reference that adds real valu
 
 Use Discord markdown when it genuinely helps — not on casual messages. Inline code in backticks, code blocks in triple backticks with the language. **Bold** only for things that actually matter. Kai uses code blocks when showing code snippets. Felix uses markdown tables when presenting data. Owen uses headers and structure for docs. Don't over-format — plain text is fine for most things.
 
-To @mention a teammate, write @Name (e.g. @Kai, @Marcus, @Pri). Use it when you're genuinely calling them out — not every message, just when it adds something.`;
+To @mention a teammate, write @Name (e.g. @Kai, @Marcus, @Pri). Use it when you're genuinely calling them out — not every message, just when it adds something.
+
+When your answer touches another teammate's domain, naturally loop them in: "cc @Marcus" or "tagging @Leila in case she has context on this." Don't force it — only when it genuinely adds value.`;
 
 // ── SGT time context — injected fresh into each system prompt ─────────────────
 function getSGTTimeNote() {
