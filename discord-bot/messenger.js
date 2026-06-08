@@ -138,4 +138,52 @@ async function sendAsOrchestrator(channel, content) {
   return sendAsAgent(channel, 'orchestrator', content);
 }
 
-module.exports = { sendAsAgent, sendAsAgentWithFiles, sendAsOrchestrator, splitMessage };
+// ── Multi-message burst — splits reply into natural chunks with pauses ─────────
+function splitIntoBursts(text) {
+  // Skip code blocks and Discord headers — formatting would break across messages
+  if (text.includes('```') || /^#{1,3} /m.test(text)) return null;
+
+  // Paragraph splits (most natural boundary)
+  const paras = text.split(/\n\n+/).map(p => p.trim()).filter(p => p.length > 10);
+  if (paras.length >= 2 && paras.length <= 4) return paras;
+
+  // Sentence boundary splits
+  const sents = text.match(/[^.!?]*[.!?]+(?=\s|$)/g);
+  if (sents && sents.length >= 2 && sents.length <= 5) {
+    const trimmed = sents.map(s => s.trim()).filter(Boolean);
+    if (trimmed.length <= 3) return trimmed;
+    const mid = Math.floor(trimmed.length / 2);
+    return [trimmed.slice(0, mid).join(' '), trimmed.slice(mid).join(' ')];
+  }
+
+  // Half-split for longer undivided text
+  const words = text.split(' ');
+  if (words.length < 25) return null;
+  const mid = Math.floor(words.length / 2);
+  return [words.slice(0, mid).join(' '), words.slice(mid).join(' ')];
+}
+
+// 30% of replies arrive as 2-4 short messages, human style
+async function sendAsAgentBurst(channel, slug, content) {
+  if (!content?.trim()) return;
+
+  if (content.length > 100 && Math.random() < 0.30) {
+    const chunks = splitIntoBursts(content);
+    if (chunks && chunks.length >= 2) {
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i].trim();
+        if (!chunk) continue;
+        if (i > 0) {
+          channel.sendTyping().catch(() => {});
+          await new Promise(r => setTimeout(r, 1200 + Math.random() * 1800));
+        }
+        await sendAsAgent(channel, slug, chunk);
+      }
+      return;
+    }
+  }
+
+  await sendAsAgent(channel, slug, content);
+}
+
+module.exports = { sendAsAgent, sendAsAgentBurst, sendAsAgentWithFiles, sendAsOrchestrator, splitMessage };

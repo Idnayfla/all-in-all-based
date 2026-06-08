@@ -1,6 +1,7 @@
 'use strict';
 const { STANDUP_HOUR_UTC, COUNCIL_CHANNEL } = require('./config');
 const { AGENTS, dispatchAgent } = require('./agents');
+const { getLastHusMessage } = require('./state');
 
 let discordClient   = null;
 let councilChannelId = null;
@@ -11,6 +12,7 @@ function init(discord) {
   scheduleStandup();
   scheduleProactiveCheckins();
   scheduleAgentConversations();
+  scheduleHusCheckin();
   console.log(`[scheduler] Standup set for ${STANDUP_HOUR_UTC}:00 UTC daily (9am SGT)`);
 }
 
@@ -221,6 +223,42 @@ function scheduleAgentConversations() {
     fireNext();
   }, firstMs);
   console.log('[scheduler] Agent conversations scheduled');
+}
+
+// ── Hus check-in — agents check on Hus after 2.5h of silence ─────────────────
+const CHECKIN_AGENTS = [
+  { slug: 'senior-engineer', message: "hey, you good? went quiet for a bit" },
+  { slug: 'chief-of-staff',  message: "everything alright on your end?" },
+  { slug: 'community',       message: "hey, still there? been quiet" },
+  { slug: 'growth',          message: "hey, you doing okay?" },
+  { slug: 'devops',          message: "still alive? nothing's crashed afaik" },
+];
+
+let lastCheckinSentAt = 0;
+const CHECKIN_QUIET_MS   = 2.5 * 60 * 60 * 1000; // 2.5h of Hus silence
+const CHECKIN_COOLDOWN_MS = 4  * 60 * 60 * 1000;  // max once per 4h
+
+function scheduleHusCheckin() {
+  setInterval(async () => {
+    if (!councilChannelId || !discordClient) return;
+    const now = Date.now();
+    if (now - getLastHusMessage() < CHECKIN_QUIET_MS) return;
+    if (now - lastCheckinSentAt  < CHECKIN_COOLDOWN_MS) return;
+
+    const item = CHECKIN_AGENTS[Math.floor(Math.random() * CHECKIN_AGENTS.length)];
+    lastCheckinSentAt = now;
+
+    try {
+      const channel = await discordClient.channels.fetch(councilChannelId);
+      if (!channel) return;
+      const { sendAsAgent } = require('./messenger');
+      await sendAsAgent(channel, item.slug, item.message);
+      console.log(`[scheduler] Hus check-in from ${item.slug}`);
+    } catch (err) {
+      console.error('[scheduler] Hus check-in failed:', err.message);
+    }
+  }, 20 * 60 * 1000);
+  console.log('[scheduler] Hus check-in watcher scheduled');
 }
 
 // ── Public: any agent can call this to alert the team ─────────────────────────

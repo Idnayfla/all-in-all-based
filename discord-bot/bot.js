@@ -44,12 +44,54 @@ process.on('exit', () => { try { fs.unlinkSync(pidFile); } catch {} });
 const { config, COUNCIL_CHANNEL, OLLAMA_BASE_URL, MODEL_OLLAMA } = require('./config');
 const { AGENTS, dispatchAgent, anthropic, groq }  = require('./agents');
 const { DEFINITIONS }                             = require('./tools');
-const { runCouncil }                              = require('./council');
-const { sendAsAgent, splitMessage }               = require('./messenger');
+const { runCouncil, quickReply }                  = require('./council');
+const { sendAsAgent, sendAsAgentBurst, splitMessage } = require('./messenger');
 const { initAgentClients, registerMainClient, destroyAll } = require('./clients');
 const scheduler                                   = require('./scheduler');
 const { getHistory, pushHistory, clearHistory, extractMemory } = require('./memory');
-const { reactToMessage } = require('./reactions');
+const { reactToMessage }                          = require('./reactions');
+const { updateLastHusMessage }                    = require('./state');
+
+// ── Urgency detection — only escalating agents @here ─────────────────────────
+const ESCALATING_AGENTS = new Set(['security', 'devops', 'senior-engineer']);
+const URGENCY_RE = /\b(prod(?:uction)?\s+(is\s+)?(down|outage|failing)|service\s+outage|security\s+breach|data\s+leak|compromised|critical\s+(outage|incident)|emergency\s+(deploy|patch|fix))\b/i;
+
+function isUrgent(slug, text) {
+  return ESCALATING_AGENTS.has(slug) && URGENCY_RE.test(text);
+}
+
+// ── Poll detection — create a Discord poll when a decision is in play ─────────
+const POLL_RE = /\b(should we (go with|use|pick|ship|choose)|option [ab]\b|a vs\.? b\b|which (one|option|approach|version)\b|vote on|i('m| am) torn between|can't decide between)\b/i;
+
+async function maybeSendPoll(channel, slug, reply) {
+  if (!POLL_RE.test(reply) || reply.length < 80) return;
+
+  const extractPrompt = `This message was sent in a team chat:\n\n"${reply.slice(0, 500)}"\n\nIf there is a clear binary or small-set decision implied (2-4 options), output JSON only with no other text: {"question": "short poll question max 50 chars", "options": ["Option A", "Option B"]}. Options max 20 chars each. If no clear decision, output: {"question": null}`;
+
+  let pollData;
+  try {
+    const raw = await quickReply(slug, extractPrompt);
+    const match = raw.match(/\{[\s\S]*?\}/);
+    if (!match) return;
+    pollData = JSON.parse(match[0]);
+    if (!pollData.question || !Array.isArray(pollData.options) || pollData.options.length < 2) return;
+  } catch { return; }
+
+  await new Promise(r => setTimeout(r, 2000 + Math.random() * 2000));
+
+  try {
+    await channel.send({
+      poll: {
+        question: { text: pollData.question.slice(0, 300) },
+        answers: pollData.options.slice(0, 4).map(o => ({ text: String(o).slice(0, 55) })),
+        duration: 24,
+        allowMultiselect: false,
+      },
+    });
+  } catch (err) {
+    console.warn('[poll] Create failed:', err.message?.slice(0, 80));
+  }
+}
 
 // ── Discord client ────────────────────────────────────────────────────────────
 const discord = new Client({
@@ -93,6 +135,9 @@ discord.on('messageCreate', async message => {
   const channelName = message.channel.name?.toLowerCase() ?? '';
   const content     = message.content.trim();
   if (!content) return;
+
+  // Track Hus's last active timestamp for check-in scheduler
+  updateLastHusMessage();
 
   // ── Commands ────────────────────────────────────────────────────────────────
   if (content === '!clear') {
@@ -257,8 +302,7 @@ discord.on('messageCreate', async message => {
     if (Math.random() < 0.12) {
       setTimeout(async () => {
         try {
-          const { quickReply: qr } = require('./council');
-          const correction = await qr(slug,
+          const correction = await quickReply(slug,
             `You just said: "${reply.slice(0, 200)}"\n\nIf you want to send a quick follow-up correction or add something you missed (start with "wait," or "actually,"), do it in one line. If you have nothing to correct or add, respond with exactly: [fine]`
           );
           if (correction && !correction.toLowerCase().includes('[fine]') && correction.length > 4) {
@@ -268,8 +312,14 @@ discord.on('messageCreate', async message => {
       }, 2000 + Math.random() * 3000);
     }
 
+    // @here prefix for genuine critical escalations
+    const finalReply = isUrgent(slug, reply) ? `@here — ${reply}` : reply;
+
     clearInterval(typing);
-    await sendAsAgent(message.channel, slug, reply);
+    await sendAsAgentBurst(message.channel, slug, finalReply);
+
+    // Create a poll if the reply implies a decision — non-blocking
+    maybeSendPoll(message.channel, slug, reply).catch(() => {});
 
   } catch (err) {
     clearInterval(typing);
