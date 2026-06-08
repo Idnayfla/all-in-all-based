@@ -95,12 +95,12 @@ discord.on('messageCreate', async message => {
     return;
   }
 
-  if (content.startsWith('!purge')) {
+  if (content.startsWith('!purge') || /^purge(\s+\d+)?$/i.test(content)) {
     const n = parseInt(content.split(' ')[1]) || 100;
     const limit = Math.min(n, 100);
     try {
       const fetched = await message.channel.messages.fetch({ limit: limit + 1 });
-      await message.channel.bulkDelete(fetched, true); // true = skip messages >14 days
+      await message.channel.bulkDelete(fetched, true);
     } catch (err) {
       await message.reply(`Could not delete: ${err.message.slice(0, 100)}`);
     }
