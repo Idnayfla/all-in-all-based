@@ -319,6 +319,30 @@ async function runCouncil(task, channel) {
   if (routing.executor) {
     await sleep(AGENT_GAP_MS);
     await runExecutor(routing.executor, task, responses, channel);
+    // 65% chance: 1-2 teammates react to the ship
+    runCelebration(task, channel).catch(() => {});
+  }
+}
+
+// ── Celebration — 1-2 random agents react when something ships ────────────────
+async function runCelebration(task, channel) {
+  const pool  = Object.keys(AGENTS).filter(s => s !== 'orchestrator');
+  const count = Math.random() < 0.25 ? 2 : Math.random() < 0.65 ? 1 : 0;
+  if (!count) return;
+
+  const picks = [...pool].sort(() => Math.random() - 0.5).slice(0, count);
+  for (const slug of picks) {
+    await sleep(2000 + Math.random() * 3000);
+    await humanDelay();
+    const t = startTyping(channel);
+    try {
+      const reply = await quickReply(slug,
+        `The team just shipped this: "${task.slice(0, 120)}". Give a brief, genuine reaction in your own voice — could be a "nice", a relevant observation, or just acknowledging it. One line.`
+      );
+      clearInterval(t);
+      const clean = sanitize(reply);
+      if (clean) await sendAsAgent(channel, slug, clean);
+    } catch { clearInterval(t); }
   }
 }
 

@@ -10,6 +10,7 @@ function init(discord) {
   discordClient = discord;
   scheduleStandup();
   scheduleProactiveCheckins();
+  scheduleAgentConversations();
   console.log(`[scheduler] Standup set for ${STANDUP_HOUR_UTC}:00 UTC daily (9am SGT)`);
 }
 
@@ -153,6 +154,73 @@ function scheduleProactiveCheckins() {
     fireNext();
   }, firstMs);
   console.log('[scheduler] Proactive check-ins scheduled');
+}
+
+// ── Agent-to-agent conversations — teammates talk among themselves ────────────
+const AGENT_PAIRS = [
+  { a: 'senior-engineer', b: 'architect',      topic: 'a technical decision or tradeoff in the Based codebase they have opinions on' },
+  { a: 'growth',          b: 'community',       topic: 'what users are saying and how to respond to it' },
+  { a: 'product',         b: 'chief-of-staff',  topic: 'roadmap priorities or something that needs a decision' },
+  { a: 'ai-engineer',     b: 'senior-engineer', topic: 'an AI or model behaviour thing they noticed' },
+  { a: 'data-analyst',    b: 'growth',          topic: 'a metric or trend worth discussing' },
+  { a: 'designer',        b: 'product',         topic: 'a UI/UX or design direction question' },
+  { a: 'devops',          b: 'architect',       topic: 'infra, cost, or deployment something' },
+  { a: 'security',        b: 'senior-engineer', topic: 'a security concern or risk they want to flag' },
+];
+
+async function runAgentConversation() {
+  if (!councilChannelId || !discordClient) return;
+  const pair = AGENT_PAIRS[Math.floor(Math.random() * AGENT_PAIRS.length)];
+  const { sendAsAgent } = require('./messenger');
+
+  try {
+    const channel = await discordClient.channels.fetch(councilChannelId);
+    if (!channel) return;
+
+    // Agent A starts
+    const promptA = `You're in your team Discord. Start a brief, natural conversation with ${pair.b} about ${pair.topic}. One or two sentences — like you'd actually message a colleague. Address them by name.`;
+    const replyA = await dispatchAgent(pair.a, [{ role: 'user', content: promptA }], {});
+    if (!replyA?.trim()) return;
+    await sendAsAgent(channel, pair.a, replyA.trim());
+    console.log(`[scheduler] Agent conversation: ${pair.a} → ${pair.b}`);
+
+    // Agent B responds
+    await new Promise(r => setTimeout(r, 3000 + Math.random() * 4000));
+    const promptB = `Your teammate ${pair.a} just said to you in Discord: "${replyA.trim()}"\n\nRespond naturally, in your own voice. Keep it conversational — 1-3 sentences max.`;
+    const replyB = await dispatchAgent(pair.b, [{ role: 'user', content: promptB }], {});
+    if (!replyB?.trim()) return;
+    await sendAsAgent(channel, pair.b, replyB.trim());
+
+    // 40% chance A responds once more
+    if (Math.random() < 0.4) {
+      await new Promise(r => setTimeout(r, 4000 + Math.random() * 4000));
+      const promptA2 = `You said: "${replyA.trim()}"\n${pair.b} replied: "${replyB.trim()}"\n\nRespond briefly if you have something genuine to add. Otherwise stay silent and respond with exactly: [done]`;
+      const replyA2 = await dispatchAgent(pair.a, [{ role: 'user', content: promptA2 }], {});
+      const clean = replyA2?.trim();
+      if (clean && !clean.toLowerCase().includes('[done]')) {
+        await sendAsAgent(channel, pair.a, clean);
+      }
+    }
+  } catch (err) {
+    console.error('[scheduler] Agent conversation failed:', err.message);
+  }
+}
+
+function scheduleAgentConversations() {
+  const fireNext = () => {
+    const ms = (5 + Math.random() * 7) * 60 * 60 * 1000; // every 5-12 hours
+    setTimeout(async () => {
+      await runAgentConversation();
+      fireNext();
+    }, ms);
+  };
+  // First one fires 1-3 hours after startup
+  const firstMs = (60 + Math.random() * 120) * 60 * 1000;
+  setTimeout(async () => {
+    await runAgentConversation();
+    fireNext();
+  }, firstMs);
+  console.log('[scheduler] Agent conversations scheduled');
 }
 
 // ── Public: any agent can call this to alert the team ─────────────────────────
