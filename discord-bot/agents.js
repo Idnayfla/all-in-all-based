@@ -3,7 +3,7 @@ const fs        = require('fs');
 const path      = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
 const Groq      = require('groq-sdk');
-const { config, AGENTS_DIR, PROVIDER, MODEL_OPUS, MODEL_SONNET, MODEL_GROQ } = require('./config');
+const { config, AGENTS_DIR, PROVIDER, MODEL_OPUS, MODEL_SONNET, MODEL_GROQ, MODEL_OLLAMA, OLLAMA_BASE_URL } = require('./config');
 const { DEFINITIONS, execute, describeUse } = require('./tools');
 
 // ── Agent registry ────────────────────────────────────────────────────────────
@@ -108,7 +108,7 @@ async function runAnthropicLoop(slug, messages, context = {}, depth = 0) {
   ], context, depth + 1);
 }
 
-// ── Groq loop — plain chat, no tools (Llama tool calling is unreliable) ───────
+// ── Groq loop — plain chat, no tools ─────────────────────────────────────────
 async function runGroqLoop(slug, messages) {
   const system = loadSystemPrompt(slug);
   const groqMessages = [
@@ -119,33 +119,64 @@ async function runGroqLoop(slug, messages) {
     })),
   ];
   const res = await groq.chat.completions.create({
-    model: MODEL_GROQ,
-    messages: groqMessages,
-    max_tokens: 4096,
+    model: MODEL_GROQ, messages: groqMessages, max_tokens: 4096,
   });
   return (res.choices[0].message.content || '').trim();
 }
 
-// ── Main dispatch — picks provider per agent ──────────────────────────────────
+// ── Ollama loop — local models via OpenAI-compatible API ──────────────────────
+async function runOllamaLoop(slug, messages) {
+  const system = loadSystemPrompt(slug);
+  const ollamaMessages = [
+    { role: 'system', content: system },
+    ...messages.map(m => ({
+      role: m.role,
+      content: typeof m.content === 'string' ? m.content : '',
+    })),
+  ];
+  const res = await fetch(`${OLLAMA_BASE_URL}/v1/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: MODEL_OLLAMA, messages: ollamaMessages, stream: false }),
+  });
+  if (!res.ok) throw new Error(`Ollama HTTP ${res.status}: ${await res.text().catch(() => '')}`);
+  const data = await res.json();
+  return (data.choices?.[0]?.message?.content || '').trim();
+}
+
+// ── Main dispatch — Anthropic (opus) → Ollama → Groq → Anthropic fallback ─────
 async function dispatchAgent(slug, messages, context = {}) {
   const agent = AGENTS[slug];
-  const useAnthropic =
-    PROVIDER === 'anthropic' ||
-    (PROVIDER === 'auto' && agent?.opus) ||
-    !groq;
 
-  if (useAnthropic) {
+  // Senior agents always use Anthropic Opus
+  if (PROVIDER === 'anthropic' || (PROVIDER !== 'groq' && PROVIDER !== 'ollama' && agent?.opus)) {
     if (!anthropic) throw new Error('Anthropic API key not configured.');
     return runAnthropicLoop(slug, messages, context);
   }
 
-  try {
-    return await runGroqLoop(slug, messages);
-  } catch (err) {
-    console.warn(`[${slug}] Groq failed (${err.message}) — falling back to Anthropic`);
-    if (!anthropic) throw new Error('Both Groq and Anthropic unavailable.');
-    return runAnthropicLoop(slug, messages, context);
+  // Force specific provider
+  if (PROVIDER === 'ollama') return runOllamaLoop(slug, messages);
+  if (PROVIDER === 'groq') {
+    if (!groq) throw new Error('Groq not configured.');
+    try { return await runGroqLoop(slug, messages); }
+    catch (err) {
+      console.warn(`[${slug}] Groq failed — Anthropic fallback`);
+      if (!anthropic) throw new Error('Both unavailable.');
+      return runAnthropicLoop(slug, messages, context);
+    }
   }
+
+  // Auto mode for non-opus agents: Ollama → Groq → Anthropic
+  try { return await runOllamaLoop(slug, messages); }
+  catch (err) { console.warn(`[${slug}] Ollama failed (${err.message}) — trying Groq`); }
+
+  if (groq) {
+    try { return await runGroqLoop(slug, messages); }
+    catch (err) { console.warn(`[${slug}] Groq failed (${err.message}) — Anthropic fallback`); }
+  }
+
+  if (!anthropic) throw new Error('All providers unavailable.');
+  return runAnthropicLoop(slug, messages, context);
 }
 
 module.exports = { AGENTS, dispatchAgent, loadSystemPrompt, anthropic, groq };

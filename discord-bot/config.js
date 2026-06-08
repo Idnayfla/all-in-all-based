@@ -17,7 +17,9 @@ module.exports = {
   PROVIDER:         config.provider       || 'auto',
   MODEL_OPUS:       config.model_opus     || 'claude-opus-4-8',
   MODEL_SONNET:     config.model_sonnet   || 'claude-sonnet-4-6',
-  MODEL_GROQ:       config.model_groq     || 'llama-3.3-70b-versatile',
+  MODEL_GROQ:       config.model_groq      || 'llama-3.3-70b-versatile',
+  MODEL_OLLAMA:     config.model_ollama    || 'llama3.1:8b',
+  OLLAMA_BASE_URL:  config.ollama_base_url || 'http://localhost:11434',
   COUNCIL_CHANNEL:  config.council_channel || 'council',
   STANDUP_HOUR_UTC: config.standup_hour_utc ?? 1, // 9am SGT = 1am UTC
 };

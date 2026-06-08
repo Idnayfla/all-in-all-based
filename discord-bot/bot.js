@@ -41,7 +41,7 @@ try {
 } catch {}
 fs.writeFileSync(pidFile, String(process.pid));
 process.on('exit', () => { try { fs.unlinkSync(pidFile); } catch {} });
-const { config, COUNCIL_CHANNEL }                 = require('./config');
+const { config, COUNCIL_CHANNEL, OLLAMA_BASE_URL, MODEL_OLLAMA } = require('./config');
 const { AGENTS, dispatchAgent, anthropic, groq }  = require('./agents');
 const { DEFINITIONS }                             = require('./tools');
 const { runCouncil }                              = require('./council');
@@ -221,6 +221,7 @@ discord.once('ready', () => {
 
   console.log(`\n◈ Based HQ  →  ${discord.user.tag}`);
   console.log(`  Provider : ${provider}`);
+  console.log(`  Ollama   : ${OLLAMA_BASE_URL} (${MODEL_OLLAMA})`);
   console.log(`  Groq     : ${groq       ? '✓ configured (free)' : '✗ not configured'}`);
   console.log(`  Anthropic: ${anthropic  ? '✓ configured'        : '✗ not configured'}`);
   console.log(`  Council  : #${COUNCIL_CHANNEL}`);
