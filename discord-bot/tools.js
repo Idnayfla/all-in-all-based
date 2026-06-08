@@ -489,12 +489,17 @@ async function webSearch({ query }) {
 
 async function consultAgent({ agent, question }, context) {
   const { AGENTS, dispatchAgent } = require('./agents');
+  const { sendAsAgentBurst }      = require('./messenger');
   if (!AGENTS[agent]) return `Unknown agent: ${agent}`;
   if (agent === context.currentAgent) return 'Cannot consult yourself.';
   if ((context.consultDepth || 0) >= 2) return 'Max consultation depth (2).';
   const reply = await dispatchAgent(agent, [{ role: 'user', content: question }], {
     ...context, consultDepth: (context.consultDepth || 0) + 1,
   });
+  // Post the consulted agent's reply visibly in Discord so the team can see the exchange
+  if (context.channel && reply) {
+    await sendAsAgentBurst(context.channel, agent, reply).catch(() => {});
+  }
   const a = AGENTS[agent];
   return `${a.icon} **${a.name}:**\n${reply}`;
 }
