@@ -165,13 +165,7 @@ async function sendSplit(channel, text) {
 
 // ── Message handler ───────────────────────────────────────────────────────────
 discord.on('messageCreate', async message => {
-  // Reactions from agent bots to each other's messages
-  if (message.author.bot) {
-    if (getAgentUserIdMap().has(message.author.id)) {
-      reactToAgentMessage(message).catch(() => {});
-    }
-    return;
-  }
+  if (message.author.bot) return;
   if (message.author.id !== config.authorized_user_id) return;
   if (processing.has(message.id)) return;
   processing.add(message.id);
@@ -303,8 +297,7 @@ discord.on('messageCreate', async message => {
 
   if (!slug || !messageContent) return;
 
-  // Fire reactions in background — non-blocking, agents react to Hus's message
-  reactToMessage(message).catch(() => {});
+  // Reactions disabled — too spammy
 
   // ── Direct mode: run agent with conversation history ──────────────────────────
   const channelId = message.channel.id;
