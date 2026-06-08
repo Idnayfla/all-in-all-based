@@ -491,17 +491,37 @@ export default function ChatPanel({
     const reader = new FileReader();
     reader.onload = ev => {
       const dataUrl = ev.target?.result as string;
-      const [meta, data] = dataUrl.split(',');
-      const mediaType = meta.match(/:(.*?);/)?.[1] as
-        | 'image/jpeg'
-        | 'image/png'
-        | 'image/webp'
-        | 'image/gif';
-      setPendingImage({ data, mediaType, previewUrl: dataUrl });
+      // GIFs can't be resized via canvas — send as-is
+      if (file.type === 'image/gif') {
+        const [, data] = dataUrl.split(',');
+        setPendingImage({ data, mediaType: 'image/gif', previewUrl: dataUrl });
+        return;
+      }
+      // Resize + compress to stay under API payload limits (max 1568px, JPEG 0.85)
+      const img = new window.Image();
+      img.onload = () => {
+        const MAX = 1568;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width > height) {
+            height = Math.round((height * MAX) / width);
+            width = MAX;
+          } else {
+            width = Math.round((width * MAX) / height);
+            height = MAX;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL('image/jpeg', 0.85);
+        const [, data] = compressed.split(',');
+        setPendingImage({ data, mediaType: 'image/jpeg', previewUrl: compressed });
+      };
+      img.src = dataUrl;
     };
-    reader.onerror = () => {
-      console.error('Failed to read image file');
-    };
+    reader.onerror = () => console.error('Failed to read image file');
     reader.readAsDataURL(file);
     e.target.value = '';
   };
