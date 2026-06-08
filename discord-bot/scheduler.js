@@ -109,14 +109,14 @@ Be direct. Max 300 words. Use Discord markdown.`;
   }
 }
 
-// ── Proactive agent check-ins — agents initiate without being asked ───────────
+// ── Proactive agent check-ins — Haiku/Groq only, never Opus ──────────────────
 const PROACTIVE = [
   { slug: 'growth',         prompt: 'You\'re Leila. Share one short observation about Based\'s growth, marketing, or user traction — something you noticed that\'s worth mentioning to the team. One or two sentences max, casual tone.' },
   { slug: 'devops',         prompt: 'You\'re Lars. Give a one-line infra or cost check-in. Something you\'d naturally mention to the team. Keep it short and dry.' },
   { slug: 'chief-of-staff', prompt: 'You\'re Priya. Post a brief status note — a decision that needs making, something that\'s drifting, or a quick reminder to the team. One or two sentences.' },
-  { slug: 'data-analyst',   prompt: 'You\'re Felix. Share one metric or data point worth the team knowing about. Could be good, bad, or just interesting. One sentence.' },
-  { slug: 'senior-engineer',prompt: 'You\'re Kai. Post a quick technical observation — something in the codebase, a pattern you noticed, or a heads-up. One line, direct.' },
   { slug: 'community',      prompt: 'You\'re Beatrix. Share something you heard from users recently — a piece of feedback, a sentiment, something the team should know. One or two sentences.' },
+  { slug: 'qa',             prompt: 'You\'re Samara. Share a quick quality or stability observation — something you noticed while checking the app, a potential edge case, or a reassurance that things look solid. One or two sentences.' },
+  { slug: 'product',        prompt: 'You\'re Jordan. Drop a quick product thought — something about the roadmap, user behaviour, or a feature direction worth flagging. One or two sentences.' },
 ];
 
 async function runProactiveCheckin() {
@@ -163,16 +163,18 @@ function scheduleProactiveCheckins() {
   console.log('[scheduler] Proactive check-ins scheduled');
 }
 
-// ── Agent-to-agent conversations — teammates talk among themselves ────────────
+// ── Agent-to-agent conversations — Haiku/Groq only, never Opus ───────────────
 const AGENT_PAIRS = [
-  { a: 'senior-engineer', b: 'architect',      topic: 'a technical decision or tradeoff in the Based codebase they have opinions on' },
   { a: 'growth',          b: 'community',       topic: 'what users are saying and how to respond to it' },
   { a: 'product',         b: 'chief-of-staff',  topic: 'roadmap priorities or something that needs a decision' },
-  { a: 'ai-engineer',     b: 'senior-engineer', topic: 'an AI or model behaviour thing they noticed' },
-  { a: 'data-analyst',    b: 'growth',          topic: 'a metric or trend worth discussing' },
   { a: 'designer',        b: 'product',         topic: 'a UI/UX or design direction question' },
-  { a: 'devops',          b: 'architect',       topic: 'infra, cost, or deployment something' },
-  { a: 'security',        b: 'senior-engineer', topic: 'a security concern or risk they want to flag' },
+  { a: 'devops',          b: 'security',        topic: 'infra security or deployment risk they want to flag' },
+  { a: 'qa',              b: 'devops',          topic: 'a stability or reliability concern they noticed' },
+  { a: 'qa',              b: 'product',         topic: 'a quality issue or user-facing bug worth discussing' },
+  { a: 'technical-writer',b: 'product',         topic: 'docs, changelog, or something users need to understand' },
+  { a: 'legal',           b: 'chief-of-staff',  topic: 'a compliance or policy thing worth flagging' },
+  { a: 'growth',          b: 'product',         topic: 'acquisition, onboarding, or something slowing growth' },
+  { a: 'community',       b: 'product',         topic: 'user feedback or a request they\'ve heard repeatedly' },
 ];
 
 async function runAgentConversation() {
@@ -231,12 +233,13 @@ function scheduleAgentConversations() {
 }
 
 // ── Hus check-in — agents check on Hus after 2.5h of silence ─────────────────
+// Haiku/Groq only — Kai (Opus) should not fire on a timer
 const CHECKIN_AGENTS = [
-  { slug: 'senior-engineer', message: "hey, you good? went quiet for a bit" },
-  { slug: 'chief-of-staff',  message: "everything alright on your end?" },
-  { slug: 'community',       message: "hey, still there? been quiet" },
-  { slug: 'growth',          message: "hey, you doing okay?" },
-  { slug: 'devops',          message: "still alive? nothing's crashed afaik" },
+  { slug: 'chief-of-staff', message: "everything alright on your end?" },
+  { slug: 'community',      message: "hey, still there? been quiet" },
+  { slug: 'growth',         message: "hey, you doing okay?" },
+  { slug: 'devops',         message: "still alive? nothing's crashed afaik" },
+  { slug: 'qa',             message: "hey, you good? went quiet" },
 ];
 
 let lastCheckinSentAt = 0;
@@ -267,7 +270,7 @@ function scheduleHusCheckin() {
 }
 
 // ── brb / back — agent steps away and comes back ─────────────────────────────
-const BRB_AGENTS   = ['community', 'growth', 'designer', 'qa', 'chief-of-staff', 'product', 'data-analyst'];
+const BRB_AGENTS   = ['community', 'growth', 'designer', 'qa', 'chief-of-staff', 'product', 'legal'];
 const BRB_PHRASES  = ['brb', 'brb one sec', 'brb real quick', 'stepping away for a bit'];
 const BACK_PHRASES = ['back', 'back.', 'k back', 'ok back', 'back now'];
 
