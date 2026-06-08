@@ -7,6 +7,9 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 const AGENT_GAP_MS = 4000;
 
+// Random human-like pause before responding (300–2000ms)
+const humanDelay = () => sleep(300 + Math.random() * 1700);
+
 // ── Strip XML tool-call artifacts that models sometimes output as plain text ──
 function sanitize(text) {
   if (!text) return '';
@@ -36,26 +39,40 @@ function isPureGreeting(text) {
   );
 }
 
-// ── Broadcast — every agent posts as themselves, staggered parallel ───────────
+// ── Broadcast — agents respond in waves, later ones reference earlier replies ──
 async function runBroadcast(originalMessage, channel) {
   const allSlugs = Object.keys(AGENTS).filter(s => s !== 'orchestrator');
+  const seen = []; // grows as agents respond — gives later agents context
 
   await sendAsOrchestrator(channel, 'on it.').catch(() => {});
 
-  const prompt = `${originalMessage}\n\nRespond in your own voice. One line.`;
-  await Promise.all(
-    allSlugs.map((slug, i) =>
-      sleep(i * 1200).then(async () => {
-        const t = startTyping(channel);
-        try {
-          const reply = await quickReply(slug, prompt);
-          clearInterval(t);
-          const clean = sanitize(reply);
-          if (clean) await sendAsAgent(channel, slug, clean);
-        } catch { clearInterval(t); }
-      })
-    )
-  );
+  const BATCH = 4;
+  for (let b = 0; b < allSlugs.length; b += BATCH) {
+    const batch = allSlugs.slice(b, b + BATCH);
+    const priorStr = seen.slice(-4).map(r => `${r.name}: ${r.reply}`).join('\n');
+    const prompt = priorStr
+      ? `${originalMessage}\n\nSome teammates already said:\n${priorStr}\n\nYour turn. One line, your own voice. React to what others said if natural.`
+      : `${originalMessage}\n\nRespond in your own voice. One line.`;
+
+    await Promise.all(
+      batch.map((slug, i) =>
+        sleep(i * 1000).then(async () => {
+          await humanDelay();
+          const t = startTyping(channel);
+          try {
+            const reply = await quickReply(slug, prompt);
+            clearInterval(t);
+            const clean = sanitize(reply);
+            if (clean) {
+              await sendAsAgent(channel, slug, clean);
+              seen.push({ name: AGENTS[slug]?.name || slug, reply: clean });
+            }
+          } catch { clearInterval(t); }
+        })
+      )
+    );
+    if (b + BATCH < allSlugs.length) await sleep(800);
+  }
 }
 
 // ── Orchestrator routing prompt ───────────────────────────────────────────────
@@ -230,14 +247,37 @@ async function runCouncil(task, channel) {
     return;
   }
 
-  // Casual conversation → Maya responds directly
+  // Casual conversation → Maya responds + occasionally 1-2 others chime in
   if (routing.casual) {
+    let mayaReply = '';
     const typing = startTyping(channel);
     try {
-      const reply = await quickReply('orchestrator', task);
+      mayaReply = await quickReply('orchestrator', task);
       clearInterval(typing);
-      await sendAsOrchestrator(channel, reply);
-    } catch (err) { clearInterval(typing); }
+      await sendAsOrchestrator(channel, mayaReply);
+    } catch (err) { clearInterval(typing); return; }
+
+    // ~40% chance one extra agent chimes in, ~15% chance two do
+    const chimeCount = Math.random() < 0.15 ? 2 : Math.random() < 0.40 ? 1 : 0;
+    if (chimeCount > 0) {
+      const pool = Object.keys(AGENTS).filter(s => s !== 'orchestrator');
+      const pickers = [...pool].sort(() => Math.random() - 0.5).slice(0, chimeCount);
+      for (const slug of pickers) {
+        await sleep(1200 + Math.random() * 2000);
+        await humanDelay();
+        const t = startTyping(channel);
+        try {
+          const chime = await quickReply(slug,
+            `In your team Discord, Hus said: "${task}"\nMaya replied: "${mayaReply}"\n\nIf you genuinely have something to add — a reaction, a take, a question — say it in one line. If you have nothing to add, respond with exactly: [pass]`
+          );
+          clearInterval(t);
+          const clean = sanitize(chime);
+          if (clean && !clean.toLowerCase().includes('[pass]') && clean.length > 3) {
+            await sendAsAgent(channel, slug, clean);
+          }
+        } catch { clearInterval(t); }
+      }
+    }
     return;
   }
 

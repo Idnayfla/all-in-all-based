@@ -217,6 +217,8 @@ discord.on('messageCreate', async message => {
   const history   = getHistory(channelId);
   pushHistory(channelId, 'user', messageContent);
 
+  // Human-like pause before typing starts
+  await new Promise(r => setTimeout(r, 300 + Math.random() * 1500));
   const typing = startTyping(message.channel);
 
   try {

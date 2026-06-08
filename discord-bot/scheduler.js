@@ -9,6 +9,7 @@ let councilChannelId = null;
 function init(discord) {
   discordClient = discord;
   scheduleStandup();
+  scheduleProactiveCheckins();
   console.log(`[scheduler] Standup set for ${STANDUP_HOUR_UTC}:00 UTC daily (9am SGT)`);
 }
 
@@ -98,6 +99,49 @@ Be direct. Max 300 words. Use Discord markdown.`;
   } catch (err) {
     console.error('[scheduler] Standup failed:', err.message);
   }
+}
+
+// ── Proactive agent check-ins — agents initiate without being asked ───────────
+const PROACTIVE = [
+  { slug: 'growth',         prompt: 'You\'re Leila. Share one short observation about Based\'s growth, marketing, or user traction — something you noticed that\'s worth mentioning to the team. One or two sentences max, casual tone.' },
+  { slug: 'devops',         prompt: 'You\'re Lars. Give a one-line infra or cost check-in. Something you\'d naturally mention to the team. Keep it short and dry.' },
+  { slug: 'chief-of-staff', prompt: 'You\'re Priya. Post a brief status note — a decision that needs making, something that\'s drifting, or a quick reminder to the team. One or two sentences.' },
+  { slug: 'data-analyst',   prompt: 'You\'re Felix. Share one metric or data point worth the team knowing about. Could be good, bad, or just interesting. One sentence.' },
+  { slug: 'senior-engineer',prompt: 'You\'re Kai. Post a quick technical observation — something in the codebase, a pattern you noticed, or a heads-up. One line, direct.' },
+  { slug: 'community',      prompt: 'You\'re Beatrix. Share something you heard from users recently — a piece of feedback, a sentiment, something the team should know. One or two sentences.' },
+];
+
+async function runProactiveCheckin() {
+  if (!councilChannelId || !discordClient) return;
+  const item = PROACTIVE[Math.floor(Math.random() * PROACTIVE.length)];
+  try {
+    const channel = await discordClient.channels.fetch(councilChannelId);
+    if (!channel) return;
+    const { sendAsAgent } = require('./messenger');
+    const reply = await dispatchAgent(item.slug, [{ role: 'user', content: item.prompt }], {});
+    if (reply?.trim()) await sendAsAgent(channel, item.slug, reply.trim());
+    console.log(`[scheduler] Proactive checkin from ${item.slug}`);
+  } catch (err) {
+    console.error('[scheduler] Proactive checkin failed:', err.message);
+  }
+}
+
+function scheduleProactiveCheckins() {
+  // Fire 2–4 times a day at random intervals (every 4–8 hours)
+  const fireNext = () => {
+    const ms = (4 + Math.random() * 4) * 60 * 60 * 1000; // 4-8 hours
+    setTimeout(async () => {
+      await runProactiveCheckin();
+      fireNext();
+    }, ms);
+  };
+  // First one fires 30-90 min after startup
+  const firstMs = (30 + Math.random() * 60) * 60 * 1000;
+  setTimeout(async () => {
+    await runProactiveCheckin();
+    fireNext();
+  }, firstMs);
+  console.log('[scheduler] Proactive check-ins scheduled');
 }
 
 // ── Public: any agent can call this to alert the team ─────────────────────────

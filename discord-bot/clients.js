@@ -1,15 +1,25 @@
 'use strict';
-/**
- * Manages individual Discord bot clients — one per agent.
- *
- * Two modes:
- *   Legacy:  discord_token = separate "Based HQ" listener bot (temporary)
- *   Proper:  discord_token = Orchestrator's token — no separate Based HQ needed.
- *            Call registerMainClient('orchestrator', discordClient) in ready handler.
- *            Duplicate tokens in agent_tokens are skipped automatically.
- */
+const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
 
-const { Client, GatewayIntentBits } = require('discord.js');
+const STATUSES = {
+  'orchestrator':     'keeping the room from spinning',
+  'architect':        'thinking in tradeoffs',
+  'senior-engineer':  'in the code',
+  'ai-engineer':      'watching model behavior',
+  'product':          'reading user feedback',
+  'designer':         'in Figma',
+  'devops':           'watching uptime',
+  'security':         'thinking like an attacker',
+  'qa':               'finding edge cases',
+  'growth':           'watching the funnel',
+  'data-analyst':     'in the dashboards',
+  'mobile':           'fighting iOS Safari',
+  'finance':          'running the numbers',
+  'legal':            'reading the fine print',
+  'community':        'talking to users',
+  'chief-of-staff':   'keeping receipts',
+  'technical-writer': 'making it clear',
+};
 
 const agentClients = new Map(); // slug → logged-in Discord Client
 
@@ -44,6 +54,13 @@ async function initAgentClients(agentTokens = {}, listenerToken = null) {
       await client.login(token);
       agentClients.set(slug, client);
       console.log(`[clients] ${slug.padEnd(20)} → ${client.user.tag}`);
+      const status = STATUSES[slug];
+      if (status) {
+        client.user.setPresence({
+          activities: [{ name: status, type: ActivityType.Custom }],
+          status: 'online',
+        });
+      }
     } catch (err) {
       console.warn(`[clients] ${slug} login failed: ${err.message.slice(0, 80)}`);
     }
