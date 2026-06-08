@@ -53,39 +53,32 @@ function isPureGreeting(text) {
   );
 }
 
-// ── Broadcast — agents respond in waves, later ones reference earlier replies ──
+// ── Broadcast — max 5 agents, staggered, one at a time to avoid rate limits ───
 async function runBroadcast(originalMessage, channel) {
-  const allSlugs = Object.keys(AGENTS).filter(s => s !== 'orchestrator');
-  const seen = []; // grows as agents respond — gives later agents context
+  // Pick 5 random non-orchestrator agents — not all 16
+  const pool = Object.keys(AGENTS).filter(s => s !== 'orchestrator');
+  const slugs = [...pool].sort(() => Math.random() - 0.5).slice(0, 5);
+  const seen = [];
 
   await sendAsOrchestrator(channel, 'on it.').catch(() => {});
 
-  const BATCH = 4;
-  for (let b = 0; b < allSlugs.length; b += BATCH) {
-    const batch = allSlugs.slice(b, b + BATCH);
-    const priorStr = seen.slice(-4).map(r => `${r.name}: ${r.reply}`).join('\n');
+  for (const slug of slugs) {
+    await sleep(1500 + Math.random() * 1500); // 1.5-3s between each — no rate limit hits
+    await humanDelay();
+    const t = startTyping(channel);
+    const priorStr = seen.slice(-3).map(r => `${r.name}: ${r.reply}`).join('\n');
     const prompt = priorStr
-      ? `${originalMessage}\n\nSome teammates already said:\n${priorStr}\n\nYour turn. One line, your own voice. React to what others said if natural.`
-      : `${originalMessage}\n\nRespond in your own voice. One line.`;
-
-    await Promise.all(
-      batch.map((slug, i) =>
-        sleep(i * 1000).then(async () => {
-          await humanDelay();
-          const t = startTyping(channel);
-          try {
-            const reply = await quickReply(slug, prompt);
-            clearInterval(t);
-            const clean = sanitize(reply);
-            if (clean) {
-              await sendAsAgent(channel, slug, clean);
-              seen.push({ name: AGENTS[slug]?.name || slug, reply: clean });
-            }
-          } catch { clearInterval(t); }
-        })
-      )
-    );
-    if (b + BATCH < allSlugs.length) await sleep(800);
+      ? `${originalMessage}\n\nTeammates already said:\n${priorStr}\n\nYour turn. One line, your own voice.`
+      : `${originalMessage}\n\nOne line response in your own voice.`;
+    try {
+      const reply = await quickReply(slug, prompt);
+      clearInterval(t);
+      const clean = sanitize(reply);
+      if (clean) {
+        await sendAsAgent(channel, slug, clean);
+        seen.push({ name: AGENTS[slug]?.name || slug, reply: clean });
+      }
+    } catch { clearInterval(t); }
   }
 }
 
@@ -103,14 +96,12 @@ A message was posted. Respond with ONLY a valid JSON object. No markdown, no exp
 }
 
 STEP 1 — Should ALL agents respond?
-broadcast: true when ANY of these apply:
-- Hus greets the whole group ("wassup everyone", "hey all", "henlo team", "yo all")
-- Hus asks where the others are ("where are the rest", "where is everyone", "why aren't they talking")
-- Hus wants the others to say/do something ("can they say hello", "tell them all to X", "have everyone Y")
-- Hus notices only one person responded and wants more ("only you?", "just you?", "where are the others")
-- ANY message that implies Hus wants to hear from multiple people, not just Maya
+broadcast: true ONLY for these explicit cases:
+- Hus directly greets the whole group with a short social message: "wassup everyone", "hey all", "morning team", "yo all", "henlo", "hi everyone"
+- Hus explicitly asks why others are silent: "where is everyone", "why isn't anyone talking", "where are the rest of you"
+- Hus explicitly asks everyone to do something simple: "everyone say hi", "can you all introduce yourselves"
 
-broadcast: false — task for specific agents, or genuine 1-on-1 chat with Maya
+broadcast: false for EVERYTHING else — including questions directed at the team, launch discussions, strategy questions, "what do you think", "any ideas", "what should we do". Those route to 2-3 specific agents, not everyone.
 
 If broadcast: true → set casual: true, agents: [], executor: null.
 
