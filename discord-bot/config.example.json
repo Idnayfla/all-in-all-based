@@ -1,0 +1,51 @@
+{
+  "_setup": [
+    "1. Copy this file to config.json",
+    "2. Fill in discord_token (main Based HQ listener bot)",
+    "3. For individual agent identities: create one Discord app per agent at discord.com/developers",
+    "   Each app: Bot tab → Reset Token → copy token → paste into agent_tokens below",
+    "   Then: OAuth2 → URL Generator → bot scope → Send Messages + Read Message History → invite to server",
+    "4. Agents without a token here will fall back to webhook (shows as 'Name APP')",
+    "5. You can add tokens one by one — each one you add immediately becomes a real Discord member"
+  ],
+
+  "discord_token": "token for your main Based HQ listener bot",
+  "authorized_user_id": "your Discord user ID (numbers only)",
+
+  "groq_api_key": "from console.groq.com (free)",
+  "anthropic_api_key": "sk-ant-your-key-here",
+
+  "provider": "auto",
+
+  "model_groq":   "llama-3.3-70b-versatile",
+  "model_opus":   "claude-opus-4-8",
+  "model_sonnet": "claude-sonnet-4-6",
+
+  "exa_api_key": "your exa key for web search",
+
+  "council_channel":   "council",
+  "standup_hour_utc":  1,
+
+  "project_root": "",
+  "agents_dir":   "",
+
+  "agent_tokens": {
+    "orchestrator":       "Bot token for Orchestrator",
+    "architect":          "Bot token for Architect",
+    "senior-engineer":    "Bot token for Senior Engineer",
+    "ai-engineer":        "Bot token for AI Engineer",
+    "product":            "Bot token for Product",
+    "designer":           "Bot token for Designer",
+    "devops":             "Bot token for DevOps",
+    "security":           "Bot token for Security",
+    "qa":                 "Bot token for QA",
+    "growth":             "Bot token for Growth",
+    "data-analyst":       "Bot token for Data Analyst",
+    "mobile":             "Bot token for Mobile",
+    "finance":            "Bot token for Finance",
+    "legal":              "Bot token for Legal",
+    "community":          "Bot token for Community",
+    "chief-of-staff":     "Bot token for Chief of Staff",
+    "technical-writer":   "Bot token for Technical Writer"
+  }
+}

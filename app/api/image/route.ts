@@ -22,7 +22,9 @@ export async function POST(req: NextRequest) {
 
   // Auto-detect infographic/poster/text-heavy requests → Ideogram handles text far better than Flux
   const isInfographic =
-    /\b(pyramid|triangle|infographic|tier list|tier chart|ranking chart|hierarchy|ranked list|leaderboard)\b/i.test(prompt) ||
+    /\b(pyramid|triangle|infographic|tier list|tier chart|ranking chart|hierarchy|ranked list|leaderboard)\b/i.test(
+      prompt
+    ) ||
     (/\b(rank|ranking|tier|tiers|category|categories)\b/i.test(prompt) &&
       /\b(hotel|restaurant|brand|product|company|logo)\b/i.test(prompt)) ||
     (/\b(triangle|pyramid)\b/i.test(prompt) &&
@@ -47,7 +49,8 @@ export async function POST(req: NextRequest) {
         prompt: enhancedPrompt,
         aspect_ratio: '2:3',
         style_type: 'design',
-        negative_prompt: 'blurry text, distorted text, low quality, watermark, cartoon, anime, 3D render, overexposed',
+        negative_prompt:
+          'blurry text, distorted text, low quality, watermark, cartoon, anime, 3D render, overexposed',
       };
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const result = await fal.subscribe('fal-ai/ideogram/v3', { input: ideogramInput as any });
