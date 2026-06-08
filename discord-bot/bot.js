@@ -331,14 +331,6 @@ discord.on('messageCreate', async message => {
   const typing = startTyping(message.channel);
 
   try {
-    // Orchestrator channel → council, so agents actually post as themselves
-    if (slug === 'orchestrator') {
-      clearInterval(typing);
-      pushHistory(channelId, 'assistant', '[council]');
-      await runCouncil(messageContent, message.channel);
-      return;
-    }
-
     const onProgress = async (text) => {
       try { await message.channel.send(text); } catch {}
     };

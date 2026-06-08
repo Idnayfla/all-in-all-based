@@ -305,24 +305,9 @@ async function runCouncil(task, channel) {
     return id ? `<@${id}>` : (AGENTS[s]?.name || s);
   }).join(', ');
 
-  // Create a thread for multi-agent discussions — but not if already in one
-  let discussionChannel = channel;
-  if (routing.agents.length >= 2 && !channel.isThread?.()) {
-    try {
-      const threadName = task.slice(0, 97).replace(/[^\w\s\-.,!?]/g, '').trim() || 'discussion';
-      const thread = await channel.threads.create({
-        name: threadName,
-        autoArchiveDuration: 1440,
-      });
-      await sendAsOrchestrator(channel, `${routing.reasoning} — looping in ${mentions}. ${thread.toString()}`);
-      discussionChannel = thread;
-    } catch {
-      await sendAsOrchestrator(channel, `${routing.reasoning} — looping in ${mentions}.`);
-    }
-  } else {
-    if (!channel.isThread?.()) {
-      await sendAsOrchestrator(channel, `${routing.reasoning} — looping in ${mentions}.`);
-    }
+  const discussionChannel = channel;
+  if (!channel.isThread?.()) {
+    await sendAsOrchestrator(channel, `${routing.reasoning} — looping in ${mentions}.`);
   }
 
   const responses   = {};
