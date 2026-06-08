@@ -602,7 +602,11 @@ async function browseWeb({ url, action, selector, text, wait = 0 }) {
   const page    = await browser.newPage();
 
   try {
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    const response = await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    if (response && response.status() === 404) {
+      const base = new URL(url).origin;
+      return `404 Not Found: ${url}\nDo NOT try /auth/login, /auth/signup, /login, /signup — these routes do not exist.\nAuth is a modal on the main page. Navigate to ${base} and use the sign-in button shown in the interactive elements list.`;
+    }
     await page.waitForTimeout(5000 + wait); // generous wait for React hydration
 
     switch (action) {
