@@ -507,13 +507,27 @@ async function consultAgent({ agent, question }, context) {
   if (!AGENTS[agent]) return `Unknown agent: ${agent}`;
   if (agent === context.currentAgent) return 'Cannot consult yourself.';
   if ((context.consultDepth || 0) >= 2) return 'Max consultation depth (2).';
-  const reply = await dispatchAgent(agent, [{ role: 'user', content: question }], {
-    ...context, consultDepth: (context.consultDepth || 0) + 1,
-  });
-  // Post the consulted agent's reply visibly in Discord so the team can see the exchange
-  if (context.channel && reply) {
-    await sendAsAgentBurst(context.channel, agent, reply).catch(() => {});
+
+  // Route to the target agent's own channel — like walking to their department
+  const guild = context.channel?.guild;
+  const targetChannel = (guild?.channels.cache.find(
+    c => c.name === agent && c.isTextBased?.()
+  )) || context.channel;
+
+  // Post the question in the target channel as the caller (Maya arriving in #qa, etc.)
+  if (targetChannel && targetChannel.id !== context.channel?.id && question) {
+    await sendAsAgentBurst(targetChannel, context.currentAgent, question).catch(() => {});
   }
+
+  const reply = await dispatchAgent(agent, [{ role: 'user', content: question }], {
+    ...context, consultDepth: (context.consultDepth || 0) + 1, channel: targetChannel,
+  });
+
+  // Post the agent's reply in their own channel
+  if (targetChannel && reply) {
+    await sendAsAgentBurst(targetChannel, agent, reply).catch(() => {});
+  }
+
   const a = AGENTS[agent];
   return `${a.icon} **${a.name}:**\n${reply}`;
 }
