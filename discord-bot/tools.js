@@ -242,6 +242,24 @@ const DEFINITIONS = [
       required: ['file'],
     },
   },
+  {
+    name: 'search_gif',
+    description: 'Search Tenor for a GIF to share in Discord. Use for celebrations, reactions, or when a GIF fits better than words. Returns a URL — pass it to send_file to post it.',
+    input_schema: {
+      type: 'object',
+      properties: { query: { type: 'string', description: 'What to search for, e.g. "celebrating", "mind blown", "good job", "facepalm"' } },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'dm_hus',
+    description: 'Send a private direct message to Hus. Use for sensitive info, a private heads-up, or anything not right for the main channel.',
+    input_schema: {
+      type: 'object',
+      properties: { message: { type: 'string', description: 'The private message to send.' } },
+      required: ['message'],
+    },
+  },
 ];
 
 // ── Human-readable progress descriptions ─────────────────────────────────────
@@ -265,6 +283,8 @@ function describeUse(name, input) {
     case 'manage_files':        return `${input.action} \`${input.source}\``;
     case 'get_system_info':     return `System ${input.type}`;
     case 'send_file':           return `Sending file: ${(input.file || '').slice(0, 60)}`;
+    case 'search_gif':          return `Searching GIF: "${(input.query || '').slice(0, 40)}"`;
+    case 'dm_hus':              return `DMing Hus`;
     default:                    return `Using \`${name}\``;
   }
 }
@@ -301,6 +321,8 @@ async function execute(name, input, context) {
       case 'manage_files':        return manageFiles(input);
       case 'get_system_info':     return getSystemInfo(input);
       case 'send_file':           return await sendFile(input, context);
+      case 'search_gif':          return await searchGif(input);
+      case 'dm_hus':              return await dmHus(input, context);
       default:                    return `Unknown tool: ${name}`;
     }
   } catch (e) {
@@ -699,4 +721,45 @@ async function sendFile({ file, caption = '' }, context) {
   return `File sent: ${path.basename(file)}${caption ? ` with caption "${caption.slice(0,60)}"` : ''}`;
 }
 
-module.exports = { DEFINITIONS, execute, describeUse };
+// ── search_gif — Tenor GIF search ────────────────────────────────────────────
+async function searchGif({ query }) {
+  const key = config.tenor_api_key;
+  if (!key) return 'Tenor not configured (add tenor_api_key to config.json)';
+  try {
+    const url = `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=${encodeURIComponent(key)}&limit=8`;
+    const res  = await fetch(url);
+    if (!res.ok) return `Tenor error: HTTP ${res.status}`;
+    const data    = await res.json();
+    const results = data.results || [];
+    if (!results.length) return 'No GIFs found.';
+    const pick   = results[Math.floor(Math.random() * results.length)];
+    const gifUrl = pick.media_formats?.gif?.url || pick.media_formats?.tinygif?.url;
+    return gifUrl || 'No URL in result.';
+  } catch (err) {
+    return `Tenor failed: ${err.message}`;
+  }
+}
+
+// Direct call variant — returns URL or null (for use in council.js without tool framework)
+async function searchGifUrl(query) {
+  const result = await searchGif({ query }).catch(() => null);
+  return (result && result.startsWith('http')) ? result : null;
+}
+
+// ── dm_hus — DM the founder directly ─────────────────────────────────────────
+async function dmHus({ message }, context) {
+  const discord = context?.discordClient;
+  if (!discord) return 'No Discord client in context.';
+  const userId = config.authorized_user_id;
+  if (!userId) return 'No authorized_user_id in config.';
+  try {
+    const user = await discord.users.fetch(userId);
+    const dm   = await user.createDM();
+    await dm.send(message);
+    return 'DM sent to Hus.';
+  } catch (err) {
+    return `DM failed: ${err.message}`;
+  }
+}
+
+module.exports = { DEFINITIONS, execute, describeUse, searchGifUrl };

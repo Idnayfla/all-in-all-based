@@ -1,8 +1,9 @@
 'use strict';
 const { AGENTS, dispatchAgent, anthropic } = require('./agents');
 const { MODEL_SONNET }                     = require('./config');
-const { sendAsAgent, sendAsOrchestrator }  = require('./messenger');
+const { sendAsAgent, sendAsOrchestrator, sendAsAgentWithFiles } = require('./messenger');
 const { getAgentClient }                   = require('./clients');
+const { searchGifUrl }                     = require('./tools');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -182,7 +183,16 @@ function startTyping(channel) {
 }
 
 // ── Run a single council agent ────────────────────────────────────────────────
+const ACKS = ['give me a sec', 'let me look at this', 'one sec', 'checking', 'on it'];
+
 async function runCouncilAgent(slug, task, channel, priorContext = '') {
+  // 30% chance for complex tasks: send a brief ack before diving in
+  if (task.length > 200 && Math.random() < 0.30) {
+    const ack = ACKS[Math.floor(Math.random() * ACKS.length)];
+    await sendAsAgent(channel, slug, ack);
+    await sleep(3000 + Math.random() * 5000);
+  }
+
   const typing = startTyping(channel);
   const prompt = priorContext
     ? `The team is discussing:\n\n${priorContext}\n\nWeigh in from your perspective on: ${task}`
@@ -190,7 +200,7 @@ async function runCouncilAgent(slug, task, channel, priorContext = '') {
 
   try {
     const reply = await dispatchAgent(slug, [{ role: 'user', content: prompt }], {
-      council: true, currentAgent: slug, channel,
+      council: true, currentAgent: slug, channel, discordClient: channel.client,
     });
     clearInterval(typing);
     const clean = sanitize(reply) || '...';
@@ -260,6 +270,9 @@ async function runCouncil(task, channel) {
     return;
   }
 
+  // Casual conversation — 15% chance Maya just reads it and moves on (intentional silence)
+  if (routing.casual && Math.random() < 0.15) return;
+
   // Casual conversation → Maya responds + occasionally 1-2 others chime in
   if (routing.casual) {
     const tone = detectTone(task);
@@ -301,14 +314,31 @@ async function runCouncil(task, channel) {
     const id = getAgentClient(s)?.user?.id;
     return id ? `<@${id}>` : (AGENTS[s]?.name || s);
   }).join(', ');
-  await sendAsOrchestrator(channel, `${routing.reasoning} — looping in ${mentions}.`);
+
+  // Create a thread for multi-agent discussions (2+ agents)
+  let discussionChannel = channel;
+  if (routing.agents.length >= 2) {
+    try {
+      const threadName = task.slice(0, 97).replace(/[^\w\s\-.,!?]/g, '').trim() || 'discussion';
+      const thread = await channel.threads.create({
+        name: threadName,
+        autoArchiveDuration: 1440,
+      });
+      await sendAsOrchestrator(channel, `${routing.reasoning} — looping in ${mentions}. ${thread.toString()}`);
+      discussionChannel = thread;
+    } catch {
+      await sendAsOrchestrator(channel, `${routing.reasoning} — looping in ${mentions}.`);
+    }
+  } else {
+    await sendAsOrchestrator(channel, `${routing.reasoning} — looping in ${mentions}.`);
+  }
 
   const responses   = {};
   let priorContext  = '';
 
   for (const slug of routing.agents) {
     await sleep(AGENT_GAP_MS);
-    responses[slug]  = await runCouncilAgent(slug, task, channel, priorContext);
+    responses[slug]  = await runCouncilAgent(slug, task, discussionChannel, priorContext);
     priorContext     += `\n**${AGENTS[slug]?.name}:** ${responses[slug].slice(0, 400)}\n`;
   }
 
@@ -318,21 +348,21 @@ async function runCouncil(task, channel) {
     const ctx     = Object.entries(responses)
       .map(([s, r]) => `**${AGENTS[s]?.name}:** ${r.slice(0, 600)}`)
       .join('\n\n');
-    const typing = startTyping(channel);
+    const typing = startTyping(discussionChannel);
     try {
       const synthesis = await dispatchAgent('orchestrator',
         [{ role: 'user', content: `Task: ${task}\n\nTeam input:\n\n${ctx}\n\nWrap up: decision, owner, next step. Brief.` }],
-        { council: true, currentAgent: 'orchestrator', channel }
+        { council: true, currentAgent: 'orchestrator', channel: discussionChannel, discordClient: channel.client }
       );
       clearInterval(typing);
-      await sendAsOrchestrator(channel, sanitize(synthesis));
+      await sendAsOrchestrator(discussionChannel, sanitize(synthesis));
 
       // Priya pins the decision via her own client
       const priya = getAgentClient('chief-of-staff');
       if (priya) {
         setTimeout(async () => {
           try {
-            const ch   = await priya.channels.fetch(channel.id).catch(() => null);
+            const ch   = await priya.channels.fetch(discussionChannel.id).catch(() => null);
             if (!ch) return;
             const msgs = await ch.messages.fetch({ limit: 1 });
             const last = msgs.first();
@@ -346,7 +376,7 @@ async function runCouncil(task, channel) {
   // Executor acts (only for code/file work tasks)
   if (routing.executor) {
     await sleep(AGENT_GAP_MS);
-    await runExecutor(routing.executor, task, responses, channel);
+    await runExecutor(routing.executor, task, responses, discussionChannel);
     // 65% chance: 1-2 teammates react to the ship
     runCelebration(task, channel).catch(() => {});
   }
@@ -371,6 +401,18 @@ async function runCelebration(task, channel) {
       const clean = sanitize(reply);
       if (clean) await sendAsAgent(channel, slug, clean);
     } catch { clearInterval(t); }
+  }
+
+  // 10% chance: drop a celebration GIF
+  const { config } = require('./config');
+  if (Math.random() < 0.10 && config.tenor_api_key) {
+    const queries = ['ship it', 'celebrating', 'lets go', 'great job', 'nice work'];
+    const query   = queries[Math.floor(Math.random() * queries.length)];
+    const gifUrl  = await searchGifUrl(query).catch(() => null);
+    if (gifUrl) {
+      const gifAgent = [...pool].sort(() => Math.random() - 0.5)[0];
+      await sendAsAgentWithFiles(channel, gifAgent, '', [gifUrl]).catch(() => {});
+    }
   }
 }
 

@@ -239,7 +239,7 @@ discord.on('messageCreate', async message => {
     };
 
     const reply = await dispatchAgent(slug, [...history], {
-      onProgress, currentAgent: slug, channel: message.channel,
+      onProgress, currentAgent: slug, channel: message.channel, discordClient: discord,
     });
 
     if (!reply) {
