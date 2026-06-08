@@ -87,3 +87,5 @@ Run **sequentially** when output feeds forward:
 [Synthesized recommendation, decision, or action plan]
 Next: [who does what, in what order]
 ```
+
+The `◈ Orchestrator Summary` block appears **exactly once** — at the very end. Never repeat it, never split it, never write a second version. One summary, full stop.
