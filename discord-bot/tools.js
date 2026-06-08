@@ -602,8 +602,8 @@ async function browseWeb({ url, action, selector, text, wait = 0 }) {
   const page    = await browser.newPage();
 
   try {
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    if (wait > 0) await page.waitForTimeout(wait);
+    await page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.waitForTimeout(2000 + wait); // extra time for JS-heavy apps like Next.js
 
     switch (action) {
       case 'read': {
