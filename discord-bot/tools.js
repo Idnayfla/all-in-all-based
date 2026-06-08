@@ -260,6 +260,61 @@ const DEFINITIONS = [
       required: ['message'],
     },
   },
+
+  // ── Work efficiency ────────────────────────────────────────────────────────
+  {
+    name: 'github_read',
+    description: 'Read GitHub issues, pull requests, PR diffs, and review status for this repo. Use to check what\'s open, review code, or see what needs attention.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        type:   { type: 'string', enum: ['issues', 'prs', 'issue', 'pr_diff', 'pr_reviews'], description: 'issues=open issue list, prs=open PR list, issue=single issue detail, pr_diff=diff of a PR, pr_reviews=review status of a PR.' },
+        number: { type: 'number', description: 'Issue or PR number (required for issue, pr_diff, pr_reviews).' },
+        state:  { type: 'string', enum: ['open', 'closed', 'merged', 'all'], description: 'Filter by state (default: open).' },
+      },
+      required: ['type'],
+    },
+  },
+  {
+    name: 'agent_notes',
+    description: 'Your personal persistent scratchpad. Save observations, todos, open questions, and decisions you want to remember across sessions. Separate from auto-extracted memory — this is what YOU deliberately choose to track.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['save', 'read', 'delete'], description: 'save=add/update a note, read=get all your notes, delete=remove a note.' },
+        key:    { type: 'string', description: 'Short note identifier, e.g. "open-question-auth" or "todo-perf-audit" (required for save and delete).' },
+        value:  { type: 'string', description: 'Content to save (required for save).' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'posthog_query',
+    description: 'Query PostHog analytics for Based — DAUs, top events, specific event counts. Requires posthog_api_key and posthog_project_id in config.json.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        type:  { type: 'string', enum: ['dau', 'events', 'custom'], description: 'dau=daily active users trend, events=top event counts, custom=specific event over time.' },
+        event: { type: 'string', description: 'Event name for custom query (e.g. "generation_started", "$pageview").' },
+        days:  { type: 'number', description: 'Days to look back (default 7).' },
+      },
+      required: ['type'],
+    },
+  },
+  {
+    name: 'create_discord_event',
+    description: 'Create a scheduled event in the Discord server — team meetings, reviews, syncs. Appears in the Events tab so everyone can see it.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name:             { type: 'string', description: 'Event name.' },
+        description:      { type: 'string', description: 'What the event is about.' },
+        start_time:       { type: 'string', description: 'ISO 8601 datetime, e.g. "2025-06-10T14:00:00+08:00" for 2pm SGT.' },
+        duration_minutes: { type: 'number', description: 'Duration in minutes (default 60).' },
+      },
+      required: ['name', 'start_time'],
+    },
+  },
 ];
 
 // ── Human-readable progress descriptions ─────────────────────────────────────
@@ -285,6 +340,10 @@ function describeUse(name, input) {
     case 'send_file':           return `Sending file: ${(input.file || '').slice(0, 60)}`;
     case 'search_gif':          return `Searching GIF: "${(input.query || '').slice(0, 40)}"`;
     case 'dm_hus':              return `DMing Hus`;
+    case 'github_read':         return `GitHub ${input.type}${input.number ? ` #${input.number}` : ''}`;
+    case 'agent_notes':         return `Notes: ${input.action}${input.key ? ` "${input.key}"` : ''}`;
+    case 'posthog_query':       return `PostHog ${input.type}${input.event ? ` (${input.event})` : ''} ${input.days||7}d`;
+    case 'create_discord_event':return `Creating event: "${(input.name||'').slice(0,40)}"`;
     default:                    return `Using \`${name}\``;
   }
 }
@@ -320,10 +379,14 @@ async function execute(name, input, context) {
       case 'create_github_pr':    return createGithubPr(input);
       case 'manage_files':        return manageFiles(input);
       case 'get_system_info':     return getSystemInfo(input);
-      case 'send_file':           return await sendFile(input, context);
-      case 'search_gif':          return await searchGif(input);
-      case 'dm_hus':              return await dmHus(input, context);
-      default:                    return `Unknown tool: ${name}`;
+      case 'send_file':              return await sendFile(input, context);
+      case 'search_gif':             return await searchGif(input);
+      case 'dm_hus':                 return await dmHus(input, context);
+      case 'github_read':            return githubRead(input);
+      case 'agent_notes':            return agentNotes(input, context);
+      case 'posthog_query':          return await posthogQuery(input);
+      case 'create_discord_event':   return await createDiscordEvent(input, context);
+      default:                       return `Unknown tool: ${name}`;
     }
   } catch (e) {
     return `Tool error (${name}): ${e.message}`;
@@ -758,6 +821,161 @@ async function dmHus({ message }, context) {
     return 'DM sent to Hus.';
   } catch (err) {
     return `DM failed: ${err.message}`;
+  }
+}
+
+// ── github_read — read issues, PRs, diffs via gh CLI ─────────────────────────
+function githubRead({ type, number, state = 'open' }) {
+  try {
+    switch (type) {
+      case 'issues':
+        return execSync(
+          `gh issue list --state ${state} --limit 20 --json number,title,labels,state,createdAt,assignees`,
+          { cwd: PROJECT_ROOT, encoding: 'utf-8', timeout: 20000 }
+        ).trim();
+      case 'prs':
+        return execSync(
+          `gh pr list --state ${state} --limit 15 --json number,title,author,reviewDecision,isDraft,createdAt,headRefName`,
+          { cwd: PROJECT_ROOT, encoding: 'utf-8', timeout: 20000 }
+        ).trim();
+      case 'issue':
+        if (!number) return 'number required for issue';
+        return execSync(
+          `gh issue view ${number} --json title,body,state,labels,assignees,comments`,
+          { cwd: PROJECT_ROOT, encoding: 'utf-8', timeout: 20000 }
+        ).trim().slice(0, 6000);
+      case 'pr_diff':
+        if (!number) return 'number required for pr_diff';
+        return execSync(`gh pr diff ${number}`,
+          { cwd: PROJECT_ROOT, encoding: 'utf-8', timeout: 20000 }
+        ).trim().slice(0, 6000);
+      case 'pr_reviews':
+        if (!number) return 'number required for pr_reviews';
+        return execSync(
+          `gh pr view ${number} --json title,state,reviews,comments,reviewRequests,statusCheckRollup`,
+          { cwd: PROJECT_ROOT, encoding: 'utf-8', timeout: 20000 }
+        ).trim();
+      default:
+        return 'Unknown type. Use: issues, prs, issue, pr_diff, pr_reviews';
+    }
+  } catch (e) {
+    return `GitHub read failed: ${(e.stderr || e.message || '').slice(0, 400)}`;
+  }
+}
+
+// ── agent_notes — persistent scratchpad per agent ────────────────────────────
+function agentNotes({ action, key, value }, context) {
+  const slug = context?.currentAgent || 'shared';
+  const dir  = path.join(__dirname, 'notes');
+  const file = path.join(dir, `${slug}.json`);
+  fs.mkdirSync(dir, { recursive: true });
+  let notes = {};
+  try { notes = JSON.parse(fs.readFileSync(file, 'utf-8')); } catch {}
+
+  switch (action) {
+    case 'save': {
+      if (!key)   return 'key required for save';
+      if (!value) return 'value required for save';
+      notes[key] = { value, at: new Date().toISOString().slice(0, 10) };
+      fs.writeFileSync(file, JSON.stringify(notes, null, 2));
+      return `Note saved: "${key}"`;
+    }
+    case 'read': {
+      const entries = Object.entries(notes);
+      if (!entries.length) return 'No notes yet.';
+      return entries.map(([k, v]) => `**${k}** (${v.at}): ${v.value}`).join('\n');
+    }
+    case 'delete': {
+      if (!key) return 'key required for delete';
+      if (!notes[key]) return `Note "${key}" not found.`;
+      delete notes[key];
+      fs.writeFileSync(file, JSON.stringify(notes, null, 2));
+      return `Deleted: "${key}"`;
+    }
+    default:
+      return 'Unknown action. Use: save, read, delete';
+  }
+}
+
+// ── posthog_query — pull real analytics from PostHog ─────────────────────────
+async function posthogQuery({ type, event, days = 7 }) {
+  const key       = config.posthog_api_key;
+  const projectId = config.posthog_project_id;
+  if (!key)       return 'PostHog not configured. Add posthog_api_key to config.json (get from posthog.com → Settings → Personal API keys).';
+  if (!projectId) return 'PostHog not configured. Add posthog_project_id to config.json (visible in your PostHog project URL).';
+  const base    = (config.posthog_host || 'https://app.posthog.com').replace(/\/$/, '');
+  const headers = { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' };
+
+  try {
+    switch (type) {
+      case 'dau': {
+        const url = `${base}/api/projects/${projectId}/insights/trend/?date_from=-${days}d&interval=day&events=[{"id":"$pageview","type":"events"}]`;
+        const res  = await fetch(url, { headers });
+        if (!res.ok) return `PostHog error: HTTP ${res.status}`;
+        const data   = await res.json();
+        const series = data.result?.[0];
+        if (!series) return 'No DAU data returned.';
+        const rows = (series.data || []).map((v, i) => `  ${series.labels?.[i] || i}: ${v}`).join('\n');
+        const peak = Math.max(...(series.data || [0]));
+        return `DAU last ${days}d (pageviews):\n${rows}\n\nPeak: ${peak}`;
+      }
+      case 'events': {
+        const url = `${base}/api/projects/${projectId}/events/?limit=200&after=${new Date(Date.now() - days * 86400000).toISOString()}`;
+        const res  = await fetch(url, { headers });
+        if (!res.ok) return `PostHog error: HTTP ${res.status}`;
+        const data   = await res.json();
+        const counts = {};
+        for (const ev of (data.results || [])) counts[ev.event] = (counts[ev.event] || 0) + 1;
+        const sorted = Object.entries(counts).sort(([, a], [, b]) => b - a).slice(0, 20);
+        return `Top events last ${days}d:\n${sorted.map(([k, v]) => `  ${v}x  ${k}`).join('\n')}`;
+      }
+      case 'custom': {
+        if (!event) return 'event name required for custom query';
+        const evEncoded = encodeURIComponent(JSON.stringify([{ id: event, type: 'events' }]));
+        const url = `${base}/api/projects/${projectId}/insights/trend/?date_from=-${days}d&interval=day&events=${evEncoded}`;
+        const res  = await fetch(url, { headers });
+        if (!res.ok) return `PostHog error: HTTP ${res.status}`;
+        const data   = await res.json();
+        const series = data.result?.[0];
+        if (!series) return `No data for "${event}".`;
+        const total = (series.data || []).reduce((a, b) => a + b, 0);
+        const rows  = (series.data || []).map((v, i) => `  ${series.labels?.[i] || i}: ${v}`).join('\n');
+        return `"${event}" last ${days}d — Total: ${total}\n${rows}`;
+      }
+      default:
+        return 'Unknown type. Use: dau, events, custom';
+    }
+  } catch (err) {
+    return `PostHog query failed: ${err.message}`;
+  }
+}
+
+// ── create_discord_event — schedule a meeting in the server's Events tab ─────
+async function createDiscordEvent({ name, description = '', start_time, duration_minutes = 60 }, context) {
+  const discord = context?.discordClient;
+  if (!discord) return 'No Discord client in context — works only during live conversations.';
+  const guild = discord.guilds.cache.first();
+  if (!guild)   return 'No guild found.';
+
+  try {
+    const start = new Date(start_time);
+    if (isNaN(start.getTime())) return `Invalid start_time: "${start_time}". Use ISO 8601 format, e.g. "2025-06-15T14:00:00+08:00".`;
+    const end = new Date(start.getTime() + duration_minutes * 60000);
+
+    const ev = await guild.scheduledEvents.create({
+      name:                name.slice(0, 100),
+      description:         description.slice(0, 1000),
+      scheduledStartTime:  start,
+      scheduledEndTime:    end,
+      privacyLevel:        2,  // GuildOnly
+      entityType:          3,  // External
+      entityMetadata:      { location: 'Based HQ' },
+    });
+
+    const sgt = start.toLocaleString('en-SG', { timeZone: 'Asia/Singapore', dateStyle: 'medium', timeStyle: 'short' });
+    return `Event created: "${name}" — ${sgt} SGT (${duration_minutes}min) · ID: ${ev.id}`;
+  } catch (err) {
+    return `Failed to create event: ${err.message}`;
   }
 }
 
