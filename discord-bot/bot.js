@@ -95,6 +95,18 @@ discord.on('messageCreate', async message => {
     return;
   }
 
+  if (content.startsWith('!purge')) {
+    const n = parseInt(content.split(' ')[1]) || 100;
+    const limit = Math.min(n, 100);
+    try {
+      const fetched = await message.channel.messages.fetch({ limit: limit + 1 });
+      await message.channel.bulkDelete(fetched, true); // true = skip messages >14 days
+    } catch (err) {
+      await message.reply(`Could not delete: ${err.message.slice(0, 100)}`);
+    }
+    return;
+  }
+
   if (content === '!status') {
     const up = Math.floor(process.uptime());
     const provider =
