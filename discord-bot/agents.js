@@ -16,19 +16,19 @@ const AGENTS = {
   architect:          { name: 'Marcus',  icon: '⬡', opus: true,  avatarURL: AVATAR('marcus')  },
   'senior-engineer':  { name: 'Kai',     icon: '◈', opus: true,  avatarURL: AVATAR('kai')     },
   'ai-engineer':      { name: 'Zoe',     icon: '⊙', opus: true,  avatarURL: AVATAR('zoe')     },
-  product:            { name: 'Jordan',  icon: '◈', opus: false, avatarURL: AVATAR('jordan')  },
-  designer:           { name: 'Ren',     icon: '◉', opus: false, avatarURL: AVATAR('ren')     },
-  devops:             { name: 'Lars',    icon: '⬡', opus: false, avatarURL: AVATAR('lars')    },
-  security:           { name: 'Dani',    icon: '◈', opus: false, avatarURL: AVATAR('dani')    },
-  qa:                 { name: 'Samara',  icon: '⊙', opus: false, avatarURL: AVATAR('samara')  },
-  growth:             { name: 'Leila',   icon: '◉', opus: false, avatarURL: AVATAR('leila')   },
-  'data-analyst':     { name: 'Felix',   icon: '⬡', opus: false, avatarURL: AVATAR('felix')   },
-  mobile:             { name: 'Tomás',   icon: '◈', opus: false, avatarURL: AVATAR('tomas')   },
-  finance:            { name: 'Yuki',    icon: '◉', opus: false, avatarURL: AVATAR('yuki')    },
-  legal:              { name: 'Asha',    icon: '⊙', opus: false, avatarURL: AVATAR('asha')    },
-  community:          { name: 'Beatrix', icon: '⬡', opus: false, avatarURL: AVATAR('beatrix') },
-  'chief-of-staff':   { name: 'Priya',   icon: '◈', opus: false, avatarURL: AVATAR('priya')   },
-  'technical-writer': { name: 'Owen',    icon: '◉', opus: false, avatarURL: AVATAR('owen')    },
+  product:            { name: 'Jordan',  icon: '◈', opus: true,  avatarURL: AVATAR('jordan')  }, // needs github_read, update_github_issue
+  designer:           { name: 'Ren',     icon: '◉', opus: false, avatarURL: AVATAR('ren')     }, // chat-only, groq fine
+  devops:             { name: 'Lars',    icon: '⬡', opus: true,  avatarURL: AVATAR('lars')    }, // needs run_command, get_system_info
+  security:           { name: 'Dani',    icon: '◈', opus: true,  avatarURL: AVATAR('dani')    }, // needs read_file, search_codebase
+  qa:                 { name: 'Samara',  icon: '⊙', opus: true,  avatarURL: AVATAR('samara')  }, // needs github_read, run_command
+  growth:             { name: 'Leila',   icon: '◉', opus: false, avatarURL: AVATAR('leila')   }, // chat-only, groq fine
+  'data-analyst':     { name: 'Felix',   icon: '⬡', opus: true,  avatarURL: AVATAR('felix')   }, // needs posthog_query — was hallucinating
+  mobile:             { name: 'Tomás',   icon: '◈', opus: false, avatarURL: AVATAR('tomas')   }, // chat-only, groq fine
+  finance:            { name: 'Yuki',    icon: '◉', opus: true,  avatarURL: AVATAR('yuki')    }, // needs stripe_query — was hallucinating
+  legal:              { name: 'Asha',    icon: '⊙', opus: false, avatarURL: AVATAR('asha')    }, // chat-only, groq fine
+  community:          { name: 'Beatrix', icon: '⬡', opus: false, avatarURL: AVATAR('beatrix') }, // chat-only, groq fine
+  'chief-of-staff':   { name: 'Priya',   icon: '◈', opus: true,  avatarURL: AVATAR('priya')   }, // needs get_git_info, update_github_issue
+  'technical-writer': { name: 'Owen',    icon: '◉', opus: true,  avatarURL: AVATAR('owen')    }, // needs read_file, write_file
 };
 
 const DISCORD_ADDENDUM = `
