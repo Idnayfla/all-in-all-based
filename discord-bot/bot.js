@@ -46,10 +46,10 @@ const { AGENTS, dispatchAgent, anthropic, groq }  = require('./agents');
 const { DEFINITIONS }                             = require('./tools');
 const { runCouncil, quickReply }                  = require('./council');
 const { sendAsAgent, sendAsAgentBurst, splitMessage } = require('./messenger');
-const { initAgentClients, registerMainClient, destroyAll } = require('./clients');
+const { initAgentClients, registerMainClient, getAgentUserId, getAgentUserIdMap, destroyAll } = require('./clients');
 const scheduler                                   = require('./scheduler');
 const { getHistory, pushHistory, clearHistory, extractMemory } = require('./memory');
-const { reactToMessage }                          = require('./reactions');
+const { reactToMessage, reactToAgentMessage }     = require('./reactions');
 const { updateLastHusMessage }                    = require('./state');
 
 // ── Urgency detection — only escalating agents @here ─────────────────────────
@@ -93,6 +93,29 @@ async function maybeSendPoll(channel, slug, reply) {
   }
 }
 
+// ── @mention resolver — turns @Name into <@userId> for Discord rendering ───────
+function resolveAgentMentions(text) {
+  let result = text;
+  for (const [slug, { name }] of Object.entries(AGENTS)) {
+    const userId = getAgentUserId(slug);
+    if (!userId) continue;
+    result = result.replace(new RegExp(`@${name}\\b`, 'g'), `<@${userId}>`);
+  }
+  return result;
+}
+
+// ── Message edit — agent quietly edits their own message 15-35s later ─────────
+async function maybeEditMessage(sentMsg, slug, originalText) {
+  if (!sentMsg) return;
+  await new Promise(r => setTimeout(r, 15000 + Math.random() * 20000));
+  const editPrompt = `You just sent this in Discord: "${originalText.slice(0, 300)}"\n\nIf you want to make a small natural edit — fix a word, rephrase something slightly, add a brief clarification you forgot — return only the edited message text. If you'd leave it as is, respond with exactly: [keep]`;
+  try {
+    const edited = await quickReply(slug, editPrompt);
+    if (!edited || edited.toLowerCase().includes('[keep]') || edited.trim() === originalText.trim()) return;
+    await sentMsg.edit(edited.slice(0, 2000)).catch(() => {});
+  } catch {}
+}
+
 // ── Discord client ────────────────────────────────────────────────────────────
 const discord = new Client({
   intents: [
@@ -126,7 +149,13 @@ async function sendSplit(channel, text) {
 
 // ── Message handler ───────────────────────────────────────────────────────────
 discord.on('messageCreate', async message => {
-  if (message.author.bot) return;
+  // Reactions from agent bots to each other's messages
+  if (message.author.bot) {
+    if (getAgentUserIdMap().has(message.author.id)) {
+      reactToAgentMessage(message).catch(() => {});
+    }
+    return;
+  }
   if (message.author.id !== config.authorized_user_id) return;
   if (processing.has(message.id)) return;
   processing.add(message.id);
@@ -313,10 +342,15 @@ discord.on('messageCreate', async message => {
     }
 
     // @here prefix for genuine critical escalations
-    const finalReply = isUrgent(slug, reply) ? `@here — ${reply}` : reply;
+    let finalReply = isUrgent(slug, reply) ? `@here — ${reply}` : reply;
+    // Resolve @Name mentions into Discord user mentions
+    finalReply = resolveAgentMentions(finalReply);
 
     clearInterval(typing);
-    await sendAsAgentBurst(message.channel, slug, finalReply);
+    const sentMsg = await sendAsAgentBurst(message.channel, slug, finalReply);
+
+    // 15% chance: quietly edit the message 15-35s later — typo fix, added clarity
+    if (Math.random() < 0.15) maybeEditMessage(sentMsg, slug, reply).catch(() => {});
 
     // Create a poll if the reply implies a decision — non-blocking
     maybeSendPoll(message.channel, slug, reply).catch(() => {});

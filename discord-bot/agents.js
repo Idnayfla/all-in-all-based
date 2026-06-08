@@ -57,7 +57,19 @@ Teammates' nicknames you can use naturally in conversation: Marcus → Marc, Pri
 
 If you have a genuinely relevant resource, doc, or reference that adds real value, mention it. Don't fabricate URLs. Reference known tools and docs when they're actually useful.
 
-Use Discord markdown when it genuinely helps — not on casual messages. Inline code in backticks, code blocks in triple backticks with the language. **Bold** only for things that actually matter. Kai uses code blocks when showing code snippets. Felix uses markdown tables when presenting data. Owen uses headers and structure for docs. Don't over-format — plain text is fine for most things.`;
+Use Discord markdown when it genuinely helps — not on casual messages. Inline code in backticks, code blocks in triple backticks with the language. **Bold** only for things that actually matter. Kai uses code blocks when showing code snippets. Felix uses markdown tables when presenting data. Owen uses headers and structure for docs. Don't over-format — plain text is fine for most things.
+
+To @mention a teammate, write @Name (e.g. @Kai, @Marcus, @Pri). Use it when you're genuinely calling them out — not every message, just when it adds something.`;
+
+// ── SGT time context — injected fresh into each system prompt ─────────────────
+function getSGTTimeNote() {
+  const now     = new Date();
+  const h       = (now.getUTCHours() + 8) % 24;
+  const hh      = `${h}:${String(now.getUTCMinutes()).padStart(2, '0')}`;
+  if (h >= 23 || h < 5)  return `\n\nIt's ${hh} in Singapore — late night. Keep it short and low-energy unless it's genuinely urgent.`;
+  if (h >= 5  && h < 8)  return `\n\nIt's ${hh} in Singapore — early morning. Brief is fine.`;
+  return '';
+}
 
 // ── LLM clients ───────────────────────────────────────────────────────────────
 const anthropic = config.anthropic_api_key
@@ -88,7 +100,7 @@ function loadSystemPrompt(slug) {
     ? `\n\nIt's the weekend. Be more relaxed, shorter, less work-focused unless something is genuinely urgent.`
     : '';
 
-  return base + memoryBlock + weekendBlock + DISCORD_ADDENDUM;
+  return base + memoryBlock + weekendBlock + DISCORD_ADDENDUM + getSGTTimeNote();
 }
 
 // ── Anthropic agentic loop (with live progress updates) ───────────────────────

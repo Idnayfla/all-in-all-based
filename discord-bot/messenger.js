@@ -75,16 +75,17 @@ async function sendViaClient(agentClient, channel, content, files = []) {
   if (!ch) throw new Error(`Agent client cannot access channel ${channel.id}`);
 
   const attachments = buildAttachments(files);
+  let lastMsg = null;
 
   if (attachments.length) {
-    // Send text + files in one message (first chunk), rest as text only
     const parts = splitMessage(content);
-    await ch.send({ content: parts[0] || undefined, files: attachments });
-    for (const p of parts.slice(1)) await ch.send(p);
+    lastMsg = await ch.send({ content: parts[0] || undefined, files: attachments });
+    for (const p of parts.slice(1)) lastMsg = await ch.send(p);
   } else {
     const parts = splitMessage(content);
-    for (const p of parts) await ch.send(p);
+    for (const p of parts) lastMsg = await ch.send(p);
   }
+  return lastMsg;
 }
 
 // ── Send via webhook ──────────────────────────────────────────────────────────
@@ -111,15 +112,16 @@ async function sendViaWebhook(channel, slug, content, files = []) {
   }
 }
 
-// ── Main send — text ──────────────────────────────────────────────────────────
+// ── Main send — text (returns Message if sent via own client, null via webhook) ─
 async function sendAsAgent(channel, slug, content) {
-  if (!content?.trim()) return;
+  if (!content?.trim()) return null;
   const client = getAgentClient(slug);
   if (client) {
-    try { await sendViaClient(client, channel, content); return; }
+    try { return await sendViaClient(client, channel, content); }
     catch (err) { console.warn(`[messenger] ${slug} client failed (${err.message}) — webhook fallback`); }
   }
   await sendViaWebhook(channel, slug, content);
+  return null;
 }
 
 // ── Main send — with file attachments ────────────────────────────────────────
@@ -164,12 +166,14 @@ function splitIntoBursts(text) {
 }
 
 // 30% of replies arrive as 2-4 short messages, human style
+// Returns the last sent Message (or null if webhook)
 async function sendAsAgentBurst(channel, slug, content) {
-  if (!content?.trim()) return;
+  if (!content?.trim()) return null;
 
   if (content.length > 100 && Math.random() < 0.30) {
     const chunks = splitIntoBursts(content);
     if (chunks && chunks.length >= 2) {
+      let lastMsg = null;
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i].trim();
         if (!chunk) continue;
@@ -177,13 +181,28 @@ async function sendAsAgentBurst(channel, slug, content) {
           channel.sendTyping().catch(() => {});
           await new Promise(r => setTimeout(r, 1200 + Math.random() * 1800));
         }
-        await sendAsAgent(channel, slug, chunk);
+        lastMsg = await sendAsAgent(channel, slug, chunk);
       }
-      return;
+      // Typing ghost — 5%: agent starts to follow up, then goes quiet
+      if (Math.random() < 0.05) {
+        setTimeout(() => {
+          channel.sendTyping().catch(() => {});
+        }, 2000 + Math.random() * 3000);
+      }
+      return lastMsg;
     }
   }
 
-  await sendAsAgent(channel, slug, content);
+  const msg = await sendAsAgent(channel, slug, content);
+
+  // Typing ghost — 5%: agent starts to follow up, then goes quiet
+  if (Math.random() < 0.05) {
+    setTimeout(() => {
+      channel.sendTyping().catch(() => {});
+    }, 2000 + Math.random() * 3000);
+  }
+
+  return msg;
 }
 
 module.exports = { sendAsAgent, sendAsAgentBurst, sendAsAgentWithFiles, sendAsOrchestrator, splitMessage };

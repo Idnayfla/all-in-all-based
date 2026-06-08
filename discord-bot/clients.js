@@ -75,6 +75,20 @@ function getAgentClient(slug) {
   return agentClients.get(slug) || null;
 }
 
+// ── User ID helpers for @mention resolution ───────────────────────────────────
+function getAgentUserId(slug) {
+  return agentClients.get(slug)?.user?.id || null;
+}
+
+// Returns Map<userId, slug> for all connected agent bots
+function getAgentUserIdMap() {
+  const map = new Map();
+  for (const [slug, client] of agentClients) {
+    if (client?.user?.id) map.set(client.user.id, slug);
+  }
+  return map;
+}
+
 // ── Destroy all agent clients except the main listener ────────────────────────
 async function destroyAll(listenerToken = null) {
   for (const [slug, client] of agentClients) {
@@ -85,4 +99,4 @@ async function destroyAll(listenerToken = null) {
   agentClients.clear();
 }
 
-module.exports = { initAgentClients, registerMainClient, getAgentClient, destroyAll };
+module.exports = { initAgentClients, registerMainClient, getAgentClient, getAgentUserId, getAgentUserIdMap, destroyAll };
