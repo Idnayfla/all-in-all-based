@@ -300,6 +300,33 @@ const DEFINITIONS = [
     },
   },
 
+  {
+    name: 'github_comment',
+    description: 'Leave a comment on a GitHub issue or pull request. Use for code review feedback, status updates, or responding to discussions.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        type:   { type: 'string', enum: ['issue', 'pr'], description: 'Whether to comment on an issue or PR.' },
+        number: { type: 'number', description: 'Issue or PR number.' },
+        body:   { type: 'string', description: 'The comment text. Supports GitHub markdown.' },
+      },
+      required: ['type', 'number', 'body'],
+    },
+  },
+  {
+    name: 'update_github_issue',
+    description: 'Update a GitHub issue — close it, reopen it, change the title, add/remove labels, or assign it. Core triage and project management tool.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        number: { type: 'number', description: 'Issue number.' },
+        action: { type: 'string', enum: ['close', 'reopen', 'label', 'unlabel', 'assign', 'unassign', 'title', 'body'], description: 'What to do.' },
+        value:  { type: 'string', description: 'The value for the action — label name, assignee username, new title, or new body.' },
+      },
+      required: ['number', 'action'],
+    },
+  },
+
   // ── Previously added ───────────────────────────────────────────────────────
   {
     name: 'github_read',
@@ -379,6 +406,8 @@ function describeUse(name, input) {
     case 'send_file':           return `Sending file: ${(input.file || '').slice(0, 60)}`;
     case 'search_gif':          return `Searching GIF: "${(input.query || '').slice(0, 40)}"`;
     case 'dm_hus':              return `DMing Hus`;
+    case 'github_comment':      return `GitHub comment on ${input.type} #${input.number}`;
+    case 'update_github_issue': return `GitHub issue #${input.number}: ${input.action}${input.value ? ` → ${input.value}` : ''}`;
     case 'stripe_query':        return `Stripe ${input.type}`;
     case 'schedule_message':    return `Scheduling message for ${(input.send_at||'').slice(0,16)}`;
     case 'read_discord_history':return `Reading #${input.channel_name} history (${input.limit||20} msgs)`;
@@ -424,6 +453,8 @@ async function execute(name, input, context) {
       case 'send_file':              return await sendFile(input, context);
       case 'search_gif':             return await searchGif(input);
       case 'dm_hus':                 return await dmHus(input, context);
+      case 'github_comment':         return githubComment(input);
+      case 'update_github_issue':    return updateGithubIssue(input);
       case 'stripe_query':           return await stripeQuery(input);
       case 'schedule_message':       return await scheduleMessage(input, context);
       case 'read_discord_history':   return await readDiscordHistory(input, context);
@@ -866,6 +897,64 @@ async function dmHus({ message }, context) {
     return 'DM sent to Hus.';
   } catch (err) {
     return `DM failed: ${err.message}`;
+  }
+}
+
+// ── github_comment — leave a comment on an issue or PR ───────────────────────
+function githubComment({ type, number, body }) {
+  const cmd = type === 'pr'
+    ? `gh pr comment ${number} --body "${body.replace(/"/g, '\\"')}"`
+    : `gh issue comment ${number} --body "${body.replace(/"/g, '\\"')}"`;
+  try {
+    const out = execSync(cmd, { cwd: PROJECT_ROOT, encoding: 'utf-8', timeout: 20000 });
+    return `Comment posted on ${type} #${number}: ${out.trim().slice(0, 200)}`;
+  } catch (e) {
+    return `Comment failed: ${(e.stderr || e.message || '').slice(0, 400)}`;
+  }
+}
+
+// ── update_github_issue — close, label, assign, edit ─────────────────────────
+function updateGithubIssue({ number, action, value }) {
+  try {
+    let cmd;
+    switch (action) {
+      case 'close':
+        cmd = `gh issue close ${number}`;
+        break;
+      case 'reopen':
+        cmd = `gh issue reopen ${number}`;
+        break;
+      case 'label':
+        if (!value) return 'value required for label action (label name)';
+        cmd = `gh issue edit ${number} --add-label "${value.replace(/"/g, '\\"')}"`;
+        break;
+      case 'unlabel':
+        if (!value) return 'value required for unlabel action (label name)';
+        cmd = `gh issue edit ${number} --remove-label "${value.replace(/"/g, '\\"')}"`;
+        break;
+      case 'assign':
+        if (!value) return 'value required for assign action (GitHub username)';
+        cmd = `gh issue edit ${number} --add-assignee "${value.replace(/"/g, '\\"')}"`;
+        break;
+      case 'unassign':
+        if (!value) return 'value required for unassign action (GitHub username)';
+        cmd = `gh issue edit ${number} --remove-assignee "${value.replace(/"/g, '\\"')}"`;
+        break;
+      case 'title':
+        if (!value) return 'value required for title action';
+        cmd = `gh issue edit ${number} --title "${value.replace(/"/g, '\\"')}"`;
+        break;
+      case 'body':
+        if (!value) return 'value required for body action';
+        cmd = `gh issue edit ${number} --body "${value.replace(/"/g, '\\"')}"`;
+        break;
+      default:
+        return 'Unknown action. Use: close, reopen, label, unlabel, assign, unassign, title, body';
+    }
+    execSync(cmd, { cwd: PROJECT_ROOT, encoding: 'utf-8', timeout: 20000 });
+    return `Issue #${number} ${action}${value ? `: ${value}` : ''} — done.`;
+  } catch (e) {
+    return `Update failed: ${(e.stderr || e.message || '').slice(0, 400)}`;
   }
 }
 
