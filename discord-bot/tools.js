@@ -129,17 +129,31 @@ const DEFINITIONS = [
   },
   {
     name: 'browse_web',
-    description: 'Open a real browser (Playwright/Chromium) and interact with a website. IMPORTANT WORKFLOW: always use action=read first — it returns the page text PLUS an "--- Interactive elements ---" section listing every button/link/input with its real CSS selector. Use those selectors for subsequent click/fill actions. Never guess URLs or selectors. If auth is needed, look for the sign-in button on the current page (do not navigate to /login or /signup — these routes may not exist).',
+    description: 'Open a real browser and interact with a website. Each call opens a FRESH browser with NO saved session — so multi-step flows (login, click around, read result) MUST use the "steps" array to run in one session. Single-action shorthand (action+selector+text) also works for simple reads/screenshots. Never guess selectors — use action=read first to get the "--- Interactive elements ---" list. Never navigate to /login or /signup — auth on getbased.dev is a modal on /.',
     input_schema: {
       type: 'object',
       properties: {
-        url:      { type: 'string', description: 'URL to navigate to.' },
-        action:   { type: 'string', enum: ['read','screenshot','click','fill','extract'], description: 'read=get page text + interactive elements list, screenshot=save image, click=click selector, fill=type into selector, extract=get text from selector.' },
-        selector: { type: 'string', description: 'CSS selector for click/fill/extract. Get this from the interactive elements list returned by action=read — do not guess.' },
-        text:     { type: 'string', description: 'Text to type (for fill action).' },
-        wait:     { type: 'number', description: 'Extra ms to wait for page load (default 0).' },
+        url:      { type: 'string', description: 'URL to navigate to on page load.' },
+        action:   { type: 'string', enum: ['read','screenshot','click','fill','extract'], description: 'Single action shorthand. Ignored if steps is provided.' },
+        selector: { type: 'string', description: 'CSS selector for single-action click/fill/extract.' },
+        text:     { type: 'string', description: 'Text to type (single-action fill).' },
+        wait:     { type: 'number', description: 'Extra ms to wait after page load.' },
+        steps:    {
+          type: 'array',
+          description: 'Run multiple actions in ONE browser session. Each step: {action, selector?, text?, wait?}. Use this for any multi-step flow (login, navigate, fill form, read result).',
+          items: {
+            type: 'object',
+            properties: {
+              action:   { type: 'string', enum: ['read','screenshot','click','fill','extract','wait'] },
+              selector: { type: 'string' },
+              text:     { type: 'string' },
+              wait:     { type: 'number', description: 'ms to wait (for wait action or extra delay)' },
+            },
+            required: ['action'],
+          },
+        },
       },
-      required: ['url', 'action'],
+      required: ['url'],
     },
   },
   {
@@ -594,7 +608,7 @@ async function fetchUrl({ url, method = 'GET', headers = {}, body }) {
 }
 
 // ── browse_web — Full browser automation ─────────────────────────────────────
-async function browseWeb({ url, action, selector, text, wait = 0 }) {
+async function browseWeb({ url, action, selector, text, wait = 0, steps }) {
   if (!playwright) {
     return [
       'Playwright is not installed. To enable browser tools, run:',
@@ -613,6 +627,57 @@ async function browseWeb({ url, action, selector, text, wait = 0 }) {
       return `404 Not Found: ${url}\nDo NOT try /auth/login, /auth/signup, /login, /signup — these routes do not exist.\nAuth is a modal on the main page. Navigate to ${base} and use the sign-in button shown in the interactive elements list.`;
     }
     await page.waitForTimeout(5000 + wait); // generous wait for React hydration
+
+    // ── Multi-step mode — run all steps in one session ──────────────────────
+    if (steps && steps.length) {
+      const results = [];
+      for (const step of steps) {
+        const { action: sa, selector: ss, text: st, wait: sw = 0 } = step;
+        try {
+          if (sa === 'wait') {
+            await page.waitForTimeout(sw || 1000);
+            results.push(`Waited ${sw || 1000}ms`);
+          } else if (sa === 'read') {
+            const { text: pt, interactive } = await page.evaluate(() => {
+              const text = document.body?.innerText || '';
+              const els = [...document.querySelectorAll('a, button, input, textarea, [role="button"]')];
+              const interactive = els.map(el => {
+                const tag = el.tagName.toLowerCase();
+                const label = (el.innerText || el.value || el.placeholder || el.getAttribute('aria-label') || '').trim().slice(0, 60);
+                const id = el.id ? `#${el.id}` : null;
+                const cls = el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : null;
+                return `${id || (tag + (cls || ''))}${label ? ` — "${label}"` : ''}`;
+              }).filter(Boolean).slice(0, 30);
+              return { text, interactive };
+            });
+            results.push(`READ:\n${pt.trim().slice(0, 2000)}\n\n--- Interactive ---\n${interactive.join('\n')}`);
+          } else if (sa === 'screenshot') {
+            const file = path.join(os.tmpdir(), `screenshot-${Date.now()}.png`);
+            await page.screenshot({ path: file, fullPage: false });
+            results.push(`Screenshot: ${file}`);
+          } else if (sa === 'click') {
+            if (!ss) { results.push('click: selector required'); continue; }
+            await page.waitForSelector(ss, { timeout: 10000 });
+            try { await page.locator(ss).first().click({ force: true, timeout: 8000 }); }
+            catch { await page.evaluate(s => document.querySelector(s)?.click(), ss); }
+            await page.waitForTimeout(1500 + sw);
+            results.push(`Clicked "${ss}"`);
+          } else if (sa === 'fill') {
+            if (!ss) { results.push('fill: selector required'); continue; }
+            await page.waitForSelector(ss, { timeout: 10000 });
+            await page.fill(ss, st || '');
+            results.push(`Filled "${ss}" with "${(st || '').slice(0, 60)}"`);
+          } else if (sa === 'extract') {
+            if (!ss) { results.push('extract: selector required'); continue; }
+            const extracted = await page.$$eval(ss, els => els.map(e => e.innerText).join('\n')).catch(() => '');
+            results.push(`Extracted "${ss}":\n${extracted.slice(0, 1000)}`);
+          }
+        } catch (err) {
+          results.push(`Step ${sa} failed: ${err.message}`);
+        }
+      }
+      return results.join('\n\n---\n\n');
+    }
 
     switch (action) {
       case 'read': {
