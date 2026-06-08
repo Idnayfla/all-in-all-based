@@ -24,8 +24,14 @@ const AGENT_REACTIONS = {
 
 // Each agent independently decides whether to react (~30% chance each)
 // Runs in background — caller should not await
+// Max 2 reactors per message, 8% chance each — realistic not spammy
 async function reactToMessage(message) {
-  const slugs = Object.keys(AGENTS).filter(() => Math.random() < 0.30);
+  const all = Object.keys(AGENTS).sort(() => Math.random() - 0.5);
+  const slugs = [];
+  for (const slug of all) {
+    if (slugs.length >= 2) break;
+    if (Math.random() < 0.08) slugs.push(slug);
+  }
   if (!slugs.length) return;
 
   for (const slug of slugs) {
@@ -35,8 +41,7 @@ async function reactToMessage(message) {
     const pool  = AGENT_REACTIONS[slug] || ['👍'];
     const emoji = pool[Math.floor(Math.random() * pool.length)];
 
-    // Staggered so reactions trickle in, not all at once
-    await new Promise(r => setTimeout(r, 600 + Math.random() * 2400));
+    await new Promise(r => setTimeout(r, 800 + Math.random() * 3000));
     try {
       const ch  = await client.channels.fetch(message.channel.id).catch(() => null);
       if (!ch) continue;
@@ -47,13 +52,17 @@ async function reactToMessage(message) {
   }
 }
 
-// Agents react to each other's bot messages — 15% probability, can't self-react
+// Agents react to each other's bot messages — max 1, 6% chance, can't self-react
 async function reactToAgentMessage(message) {
   const agentIds  = getAgentUserIdMap();
   const senderSlug = agentIds.get(message.author.id);
   if (!senderSlug) return;
 
-  const candidates = Object.keys(AGENTS).filter(s => s !== senderSlug && Math.random() < 0.15);
+  const candidates = Object.keys(AGENTS)
+    .filter(s => s !== senderSlug)
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 1)
+    .filter(() => Math.random() < 0.06);
   if (!candidates.length) return;
 
   for (const slug of candidates) {
