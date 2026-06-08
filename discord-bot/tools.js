@@ -501,17 +501,41 @@ async function webSearch({ query }) {
   return data.results.map(r => `**${r.title}**\n${r.url}\n${r.text?.slice(0, 300) || ''}`).join('\n\n---\n\n');
 }
 
+// Human name → agent slug (models often pass names instead of slugs)
+const NAME_TO_SLUG = {
+  maya: 'orchestrator',
+  marcus: 'architect', marc: 'architect',
+  kai: 'senior-engineer',
+  zoe: 'ai-engineer',
+  felix: 'data-analyst',
+  yuki: 'finance',
+  jordan: 'product', jord: 'product',
+  lars: 'devops',
+  dani: 'security',
+  samara: 'qa', sam: 'qa',
+  priya: 'chief-of-staff', pri: 'chief-of-staff',
+  owen: 'technical-writer',
+  ren: 'designer',
+  leila: 'growth',
+  tomas: 'mobile', tomás: 'mobile',
+  asha: 'legal',
+  beatrix: 'community', bea: 'community',
+};
+
 async function consultAgent({ agent, question }, context) {
   const { AGENTS, dispatchAgent } = require('./agents');
   const { sendAsAgentBurst }      = require('./messenger');
-  if (!AGENTS[agent]) return `Unknown agent: ${agent}`;
-  if (agent === context.currentAgent) return 'Cannot consult yourself.';
+  // Accept human names (samara, kai, etc.) as well as slugs (qa, senior-engineer, etc.)
+  const slug = NAME_TO_SLUG[agent.toLowerCase()] || agent;
+  if (!AGENTS[slug]) return `Unknown agent: ${agent}. Valid slugs: ${Object.keys(AGENTS).join(', ')}`;
+  const agent_slug = slug;
+  if (agent_slug === context.currentAgent) return 'Cannot consult yourself.';
   if ((context.consultDepth || 0) >= 2) return 'Max consultation depth (2).';
 
   // Route to the target agent's own channel — like walking to their department
   const guild = context.channel?.guild;
   const targetChannel = (guild?.channels.cache.find(
-    c => c.name === agent && c.isTextBased?.()
+    c => c.name === agent_slug && c.isTextBased?.()
   )) || context.channel;
 
   // Post the question in the target channel as the caller (Maya arriving in #qa, etc.)
@@ -519,16 +543,16 @@ async function consultAgent({ agent, question }, context) {
     await sendAsAgentBurst(targetChannel, context.currentAgent, question).catch(() => {});
   }
 
-  const reply = await dispatchAgent(agent, [{ role: 'user', content: question }], {
+  const reply = await dispatchAgent(agent_slug, [{ role: 'user', content: question }], {
     ...context, consultDepth: (context.consultDepth || 0) + 1, channel: targetChannel,
   });
 
   // Post the agent's reply in their own channel
   if (targetChannel && reply) {
-    await sendAsAgentBurst(targetChannel, agent, reply).catch(() => {});
+    await sendAsAgentBurst(targetChannel, agent_slug, reply).catch(() => {});
   }
 
-  const a = AGENTS[agent];
+  const a = AGENTS[agent_slug];
   return `${a.icon} **${a.name}:**\n${reply}`;
 }
 
