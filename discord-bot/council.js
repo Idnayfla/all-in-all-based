@@ -36,46 +36,13 @@ function isPureGreeting(text) {
   );
 }
 
-// ── Detect any message addressed to the whole group ──────────────────────────
-function isBroadcastRequest(text) {
-  const lower = text.toLowerCase().trim();
-  const hasGroupWord = /\b(everyone|all|team|folks|guys|yall|y'all|the\s+rest)\b/.test(lower);
-  if (!hasGroupWord) return false;
-
-  // Greeting to the group ("wassup everyone", "hey all", "henlo everyone")
-  if (/^(hey|hi|hello|sup|yo+|wassup|watsup|what'?s?\s*up|morning|howdy|henlo+|helo+|heyy+|oi)\b/.test(lower)) return true;
-
-  // Directive to the group ("tell them all to X", "have everyone Y")
-  if (/^(tell|ask|have|make|get)\s+(them|everyone|all|the\s+team)\s+/.test(lower)) return true;
-  if (/^everyone\s+(say|do|introduce|reply|respond|jump|go)\b/.test(lower)) return true;
-  if (/\bi\s+(need|want)\s+everyone\s+to\s+/.test(lower)) return true;
-
-  // "where are the rest / everyone", "anyone home / there"
-  if (/\b(where|who)\s+(are|is)\s+(the\s+)?(rest|everyone|others|all)\b/.test(lower)) return true;
-  if (/\b(anyone|anybody)\s+(home|there|here|around|online)\b/.test(lower)) return true;
-
-  return false;
-}
-
-function extractBroadcastAction(text) {
-  const lower = text.toLowerCase().trim();
-  return lower
-    .replace(/^(tell|ask|have|make)\s+(them|everyone|all\s+of\s+(you|them)|the\s+team)\s+(all\s+)?(to\s+)?/, '')
-    .replace(/^everyone\s+/, '')
-    .replace(/^i\s+(need|want)\s+everyone\s+to\s+/, '')
-    .trim() || text;
-}
-
 // ── Broadcast — every agent posts as themselves, staggered parallel ───────────
 async function runBroadcast(originalMessage, channel) {
-  const action   = extractBroadcastAction(originalMessage);
   const allSlugs = Object.keys(AGENTS).filter(s => s !== 'orchestrator');
 
-  // Maya sends a hardcoded one-liner — no LLM, no risk of her generating everyone's responses
   await sendAsOrchestrator(channel, 'on it.').catch(() => {});
 
-  // Every other agent responds as themselves — prompt is just the action, nothing more
-  const prompt = `${action}. One line, your own voice.`;
+  const prompt = `${originalMessage}\n\nRespond in your own voice. One line.`;
   await Promise.all(
     allSlugs.map((slug, i) =>
       sleep(i * 1200).then(async () => {
@@ -91,40 +58,30 @@ async function runBroadcast(originalMessage, channel) {
   );
 }
 
-// ── Detect explicit group address ("hey everyone", "morning team") ────────────
-function isGroupGreeting(text) {
-  const lower = text.toLowerCase().trim();
-  // Must start with a greeting word AND contain a group word — prevents false positives
-  const startsWithGreeting = /^(hey|hi|hello|yo|sup|morning|good morning|good afternoon|good evening|heyy+)\b/.test(lower);
-  const hasGroupWord = /\b(everyone|team|folks|guys|all)\b/.test(lower);
-  return startsWithGreeting && hasGroupWord;
-}
-
 // ── Orchestrator routing prompt ───────────────────────────────────────────────
-const ROUTING_SYSTEM = `You are the Orchestrator for Based HQ — a private dev team Discord server. Hus is the CEO.
+const ROUTING_SYSTEM = `You are the Orchestrator for Based HQ — a private dev team Discord server. Hus is the CEO and founder.
 
 A message was posted. Respond with ONLY a valid JSON object. No markdown, no explanation. Raw JSON only.
 
 {
+  "broadcast": false,
   "casual": false,
   "reasoning": "one sentence",
   "agents": ["slug1", "slug2"],
   "executor": "slug"
 }
 
-DECIDE: is this casual talk OR a real task?
+STEP 1 — Is this addressed to the whole group?
+broadcast: true — Hus is greeting everyone, asking where everyone is, or wants all agents to respond.
+  Examples: "wassup everyone", "hey all", "where are the rest", "anyone home", "tell them all to say hi",
+            "morning team", "what's good everyone", "yo all", "henlo everyone", "where is everybody"
+broadcast: false — everything else (tasks, questions to one agent, casual chat with Maya)
 
-casual: true  — direct chitchat: "what about the rest", "are you all here", "who's online", jokes, venting, opinions not needing code work
-casual: false — ANYTHING touching the codebase, product, bugs, features, status, decisions, performance, code review, deployments
+If broadcast: true → set casual: true, agents: [], executor: null. Stop here.
 
-IMPORTANT EXAMPLES:
-- "what is the current state of X"     → casual: false (needs file reads)
-- "how is the discord bot going"       → casual: false (needs git/file check)
-- "what happened with X"               → casual: false (needs git log)
-- "what about the rest"                → casual: true  (vague, no task)
-- "are you guys working on anything"   → casual: true  (conversation)
-- "fix the drum bug in Studio"         → casual: false
-- "what should we prioritise next"     → casual: false (product decision)
+STEP 2 — If broadcast: false, is this casual or a real task?
+casual: true  — chitchat, venting, opinions, questions not requiring code or file access
+casual: false — anything touching codebase, product, bugs, features, status, decisions, deployments
 
 When casual: true  → agents: [], executor: null
 When casual: false → pick 2–4 agents from routing guide below
@@ -158,7 +115,9 @@ async function getRouting(task) {
   if (!match) throw new Error(`Non-JSON routing response: ${text.slice(0, 200)}`);
 
   const routing = JSON.parse(match[0]);
-  console.log(`[routing] casual=${routing.casual} agents=[${(routing.agents || []).join(',')}] executor=${routing.executor || 'none'}`);
+  console.log(`[routing] broadcast=${routing.broadcast} casual=${routing.casual} agents=[${(routing.agents || []).join(',')}] executor=${routing.executor || 'none'}`);
+
+  if (routing.broadcast) return routing;
 
   const valid    = Object.keys(AGENTS).filter(s => s !== 'orchestrator');
   routing.agents = (routing.agents || []).filter(s => valid.includes(s)).slice(0, 4);
@@ -186,17 +145,6 @@ async function quickReply(slug, message) {
 function startTyping(channel) {
   channel.sendTyping().catch(() => {});
   return setInterval(() => channel.sendTyping().catch(() => {}), 8000);
-}
-
-// ── Pick a few random agents for a group greeting ─────────────────────────────
-function pickGreetingAgents(count = 2) {
-  const pool = ['senior-engineer', 'product', 'devops', 'qa', 'designer', 'growth', 'architect', 'chief-of-staff'];
-  // Fisher-Yates shuffle
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-  return pool.slice(0, count);
 }
 
 // ── Run a single council agent ────────────────────────────────────────────────
@@ -248,36 +196,7 @@ async function runExecutor(slug, task, responses, channel) {
 // ── Main council entrypoint ───────────────────────────────────────────────────
 async function runCouncil(task, channel) {
 
-  // Broadcast directive ("tell them all to say hi") → every agent posts as themselves
-  if (isBroadcastRequest(task)) {
-    await runBroadcast(task, channel);
-    return;
-  }
-
-  // Group greeting ("hey everyone", "morning team") → Orchestrator + 2 others say hi
-  if (isPureGreeting(task) && isGroupGreeting(task)) {
-    const typing = startTyping(channel);
-    try {
-      const reply = await quickReply('orchestrator', task);
-      clearInterval(typing);
-      await sendAsOrchestrator(channel, reply);
-    } catch (err) {
-      clearInterval(typing);
-      await sendAsOrchestrator(channel, 'hey');
-    }
-    for (const slug of pickGreetingAgents(2)) {
-      await sleep(AGENT_GAP_MS);
-      const t2 = startTyping(channel);
-      try {
-        const hi = await quickReply(slug, task);
-        clearInterval(t2);
-        await sendAsAgent(channel, slug, hi);
-      } catch { clearInterval(t2); }
-    }
-    return;
-  }
-
-  // Pure greeting without "everyone" → just Orchestrator
+  // Simple solo greeting ("hey", "lol") → just Maya, skip routing cost
   if (isPureGreeting(task)) {
     const typing = startTyping(channel);
     try {
@@ -291,17 +210,23 @@ async function runCouncil(task, channel) {
     return;
   }
 
-  // Everything else → Orchestrator decides casual vs task
+  // Everything else → LLM decides broadcast / casual / task
   let routing;
   try {
     routing = await getRouting(task);
   } catch (err) {
     console.error('[routing error]', err.message);
     await sendAsOrchestrator(channel, 'Routing failed, falling back to Senior Engineer.');
-    routing = { casual: false, reasoning: 'Fallback', agents: ['senior-engineer'], executor: 'senior-engineer' };
+    routing = { broadcast: false, casual: false, reasoning: 'Fallback', agents: ['senior-engineer'], executor: 'senior-engineer' };
   }
 
-  // Casual conversation → Orchestrator responds directly
+  // Broadcast → all agents respond as themselves
+  if (routing.broadcast) {
+    await runBroadcast(task, channel);
+    return;
+  }
+
+  // Casual conversation → Maya responds directly
   if (routing.casual) {
     const typing = startTyping(channel);
     try {
@@ -350,4 +275,4 @@ async function runCouncil(task, channel) {
 }
 
 // Exported for testing
-module.exports = { runCouncil, sanitize, isPureGreeting, isGroupGreeting, isBroadcastRequest };
+module.exports = { runCouncil, sanitize, isPureGreeting };
