@@ -1,4 +1,6 @@
 'use strict';
+const fs   = require('fs');
+const path = require('path');
 const { STANDUP_HOUR_UTC, COUNCIL_CHANNEL } = require('./config');
 const { AGENTS, dispatchAgent } = require('./agents');
 const { getLastHusMessage } = require('./state');
@@ -15,6 +17,7 @@ function init(discord) {
   scheduleHusCheckin();
   scheduleBrbBack();
   scheduleStatusRotation();
+  scheduleMessagePoller();
   console.log(`[scheduler] Standup set for ${STANDUP_HOUR_UTC}:00 UTC daily (9am SGT)`);
 }
 
@@ -310,6 +313,51 @@ function scheduleStatusRotation() {
     fireNext();
   }, (1 + Math.random()) * 60 * 60 * 1000); // first: 1-2h after startup
   console.log('[scheduler] Status rotation scheduled');
+}
+
+// ── Scheduled messages — agents fire one-off messages at a specific time ──────
+const SCHEDULED_FILE = path.join(__dirname, 'scheduled-messages.json');
+
+async function fireScheduledMessages() {
+  if (!discordClient) return;
+  let scheduled = [];
+  try { scheduled = JSON.parse(fs.readFileSync(SCHEDULED_FILE, 'utf-8')); } catch { return; }
+
+  const now = Date.now();
+  const pending  = scheduled.filter(m => new Date(m.fireAt).getTime() <= now);
+  const remaining = scheduled.filter(m => new Date(m.fireAt).getTime() > now);
+
+  if (!pending.length) return;
+
+  for (const entry of pending) {
+    try {
+      const guild = discordClient.guilds.cache.first();
+      if (!guild) continue;
+
+      // Resolve channel by ID first, then by name
+      let channel = entry.channelId ? await discordClient.channels.fetch(entry.channelId).catch(() => null) : null;
+      if (!channel && entry.channelName) {
+        channel = guild.channels.cache.find(c => c.name === entry.channelName && c.isTextBased?.());
+      }
+      if (!channel && councilChannelId) {
+        channel = await discordClient.channels.fetch(councilChannelId).catch(() => null);
+      }
+      if (!channel) continue;
+
+      const { sendAsAgent } = require('./messenger');
+      await sendAsAgent(channel, entry.slug, entry.message);
+      console.log(`[scheduler] Fired scheduled message from ${entry.slug}: "${entry.message.slice(0, 60)}"`);
+    } catch (err) {
+      console.error('[scheduler] Scheduled message failed:', err.message);
+    }
+  }
+
+  fs.writeFileSync(SCHEDULED_FILE, JSON.stringify(remaining, null, 2));
+}
+
+function scheduleMessagePoller() {
+  setInterval(fireScheduledMessages, 60 * 1000); // check every minute
+  console.log('[scheduler] Scheduled message poller active');
 }
 
 // ── Public: any agent can call this to alert the team ─────────────────────────

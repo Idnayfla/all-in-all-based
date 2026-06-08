@@ -263,6 +263,45 @@ const DEFINITIONS = [
 
   // ── Work efficiency ────────────────────────────────────────────────────────
   {
+    name: 'stripe_query',
+    description: 'Query Stripe for real revenue data — MRR, active subscriptions, recent charges, failed payments. Requires stripe_secret_key in config.json.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', enum: ['mrr', 'subscriptions', 'charges', 'failed', 'summary'], description: 'mrr=monthly recurring revenue, subscriptions=active sub list, charges=recent payments, failed=failed charges, summary=MRR+sub count+recent.' },
+        limit: { type: 'number', description: 'Number of records to return (default 10, max 100).' },
+      },
+      required: ['type'],
+    },
+  },
+  {
+    name: 'schedule_message',
+    description: 'Schedule a Discord message to be sent at a specific future time. Use to set reminders, follow-ups, or time-based announcements. The message will appear in the current channel from you.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        message:    { type: 'string', description: 'The message to send.' },
+        send_at:    { type: 'string', description: 'ISO 8601 datetime when to send, e.g. "2025-06-10T09:00:00+08:00" for 9am SGT.' },
+        channel:    { type: 'string', description: 'Channel name to post in (default: current channel).' },
+      },
+      required: ['message', 'send_at'],
+    },
+  },
+  {
+    name: 'read_discord_history',
+    description: 'Read recent message history from any channel — catch up on what was discussed, get context, review decisions made while you were away.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        channel_name: { type: 'string', description: 'Channel name to read from (e.g. "council", "senior-engineer").' },
+        limit:        { type: 'number', description: 'Number of recent messages to fetch (default 20, max 50).' },
+      },
+      required: ['channel_name'],
+    },
+  },
+
+  // ── Previously added ───────────────────────────────────────────────────────
+  {
     name: 'github_read',
     description: 'Read GitHub issues, pull requests, PR diffs, and review status for this repo. Use to check what\'s open, review code, or see what needs attention.',
     input_schema: {
@@ -340,6 +379,9 @@ function describeUse(name, input) {
     case 'send_file':           return `Sending file: ${(input.file || '').slice(0, 60)}`;
     case 'search_gif':          return `Searching GIF: "${(input.query || '').slice(0, 40)}"`;
     case 'dm_hus':              return `DMing Hus`;
+    case 'stripe_query':        return `Stripe ${input.type}`;
+    case 'schedule_message':    return `Scheduling message for ${(input.send_at||'').slice(0,16)}`;
+    case 'read_discord_history':return `Reading #${input.channel_name} history (${input.limit||20} msgs)`;
     case 'github_read':         return `GitHub ${input.type}${input.number ? ` #${input.number}` : ''}`;
     case 'agent_notes':         return `Notes: ${input.action}${input.key ? ` "${input.key}"` : ''}`;
     case 'posthog_query':       return `PostHog ${input.type}${input.event ? ` (${input.event})` : ''} ${input.days||7}d`;
@@ -382,6 +424,9 @@ async function execute(name, input, context) {
       case 'send_file':              return await sendFile(input, context);
       case 'search_gif':             return await searchGif(input);
       case 'dm_hus':                 return await dmHus(input, context);
+      case 'stripe_query':           return await stripeQuery(input);
+      case 'schedule_message':       return await scheduleMessage(input, context);
+      case 'read_discord_history':   return await readDiscordHistory(input, context);
       case 'github_read':            return githubRead(input);
       case 'agent_notes':            return agentNotes(input, context);
       case 'posthog_query':          return await posthogQuery(input);
@@ -821,6 +866,143 @@ async function dmHus({ message }, context) {
     return 'DM sent to Hus.';
   } catch (err) {
     return `DM failed: ${err.message}`;
+  }
+}
+
+// ── stripe_query — pull real revenue data from Stripe API ────────────────────
+async function stripeQuery({ type, limit = 10 }) {
+  const key = config.stripe_secret_key;
+  if (!key) return 'Stripe not configured. Add stripe_secret_key to config.json (get from dashboard.stripe.com → Developers → API keys).';
+  const cap = Math.min(limit, 100);
+  const headers = { Authorization: `Bearer ${key}`, 'Content-Type': 'application/x-www-form-urlencoded' };
+  const get = async (path) => {
+    const res = await fetch(`https://api.stripe.com/v1${path}`, { headers });
+    if (!res.ok) throw new Error(`Stripe HTTP ${res.status}: ${await res.text().catch(() => '')}`);
+    return res.json();
+  };
+
+  try {
+    switch (type) {
+      case 'mrr': {
+        const subs = await get(`/subscriptions?status=active&limit=100`);
+        const mrr  = (subs.data || []).reduce((sum, s) => {
+          const item = s.items?.data?.[0];
+          if (!item) return sum;
+          const amt = item.price?.unit_amount || 0;
+          const int = item.price?.recurring?.interval;
+          const monthly = int === 'year' ? amt / 12 : int === 'week' ? amt * 4 : amt;
+          return sum + monthly / 100;
+        }, 0);
+        return `MRR: $${mrr.toFixed(2)} USD\nActive subscriptions: ${subs.data?.length || 0}${subs.has_more ? '+' : ''}`;
+      }
+      case 'subscriptions': {
+        const subs = await get(`/subscriptions?status=active&limit=${cap}&expand[]=data.customer`);
+        const rows = (subs.data || []).map(s => {
+          const email = s.customer?.email || s.customer || 'unknown';
+          const plan  = s.items?.data?.[0]?.price?.nickname || s.items?.data?.[0]?.price?.id || 'plan';
+          const amt   = ((s.items?.data?.[0]?.price?.unit_amount || 0) / 100).toFixed(2);
+          return `  ${email} — $${amt}/${s.items?.data?.[0]?.price?.recurring?.interval || '?'} (${plan})`;
+        });
+        return `Active subscriptions (${rows.length}):\n${rows.join('\n')}`;
+      }
+      case 'charges': {
+        const charges = await get(`/charges?limit=${cap}`);
+        const rows    = (charges.data || []).map(c => {
+          const date = new Date(c.created * 1000).toISOString().slice(0, 10);
+          const amt  = (c.amount / 100).toFixed(2);
+          return `  ${date}  $${amt} ${c.currency.toUpperCase()}  ${c.billing_details?.email || c.customer || ''}  ${c.status}`;
+        });
+        return `Recent charges (${rows.length}):\n${rows.join('\n')}`;
+      }
+      case 'failed': {
+        const charges = await get(`/charges?limit=${cap}&status=failed`);
+        const rows    = (charges.data || []).map(c => {
+          const date = new Date(c.created * 1000).toISOString().slice(0, 10);
+          const amt  = (c.amount / 100).toFixed(2);
+          return `  ${date}  $${amt}  ${c.billing_details?.email || ''}  reason: ${c.failure_message || c.failure_code || 'unknown'}`;
+        });
+        return rows.length ? `Failed charges (${rows.length}):\n${rows.join('\n')}` : 'No failed charges found.';
+      }
+      case 'summary': {
+        const [subs, charges, bal] = await Promise.all([
+          get('/subscriptions?status=active&limit=100'),
+          get('/charges?limit=10'),
+          get('/balance'),
+        ]);
+        const mrr = (subs.data || []).reduce((sum, s) => {
+          const item = s.items?.data?.[0];
+          if (!item) return sum;
+          const amt = item.price?.unit_amount || 0;
+          const int = item.price?.recurring?.interval;
+          return sum + (int === 'year' ? amt / 12 : int === 'week' ? amt * 4 : amt) / 100;
+        }, 0);
+        const avail = ((bal.available?.[0]?.amount || 0) / 100).toFixed(2);
+        const recent = (charges.data || []).slice(0, 5).map(c =>
+          `  ${new Date(c.created*1000).toISOString().slice(0,10)}  $${(c.amount/100).toFixed(2)}  ${c.status}`
+        ).join('\n');
+        return `**Stripe Summary**\nMRR: $${mrr.toFixed(2)}\nActive subs: ${subs.data?.length || 0}\nBalance available: $${avail}\n\nLast 5 charges:\n${recent}`;
+      }
+      default:
+        return 'Unknown type. Use: mrr, subscriptions, charges, failed, summary';
+    }
+  } catch (err) {
+    return `Stripe query failed: ${err.message}`;
+  }
+}
+
+// ── schedule_message — fire a Discord message at a future datetime ────────────
+const SCHEDULED_FILE = path.join(__dirname, 'scheduled-messages.json');
+
+async function scheduleMessage({ message, send_at, channel: channelName }, context) {
+  const fireAt = new Date(send_at);
+  if (isNaN(fireAt.getTime())) return `Invalid send_at: "${send_at}". Use ISO 8601 format.`;
+  if (fireAt <= new Date()) return 'send_at must be in the future.';
+
+  let scheduled = [];
+  try { scheduled = JSON.parse(fs.readFileSync(SCHEDULED_FILE, 'utf-8')); } catch {}
+
+  const entry = {
+    id:          `${Date.now()}-${Math.random().toString(36).slice(2,6)}`,
+    slug:        context?.currentAgent || 'orchestrator',
+    channelId:   channelName ? null : context?.channel?.id,
+    channelName: channelName || context?.channel?.name || null,
+    message,
+    fireAt:      fireAt.toISOString(),
+    created:     new Date().toISOString(),
+  };
+
+  scheduled.push(entry);
+  fs.writeFileSync(SCHEDULED_FILE, JSON.stringify(scheduled, null, 2));
+
+  const sgt = fireAt.toLocaleString('en-SG', { timeZone: 'Asia/Singapore', dateStyle: 'medium', timeStyle: 'short' });
+  return `Scheduled: "${message.slice(0, 60)}${message.length > 60 ? '…' : ''}" → ${sgt} SGT`;
+}
+
+// ── read_discord_history — fetch recent messages from any channel ─────────────
+async function readDiscordHistory({ channel_name, limit = 20 }, context) {
+  const discord = context?.discordClient;
+  if (!discord) return 'No Discord client in context — works only during live conversations.';
+  const guild = discord.guilds.cache.first();
+  if (!guild)   return 'No guild found.';
+
+  const ch = guild.channels.cache.find(c =>
+    c.name?.toLowerCase() === channel_name.toLowerCase() && c.isTextBased?.()
+  );
+  if (!ch) return `Channel #${channel_name} not found. Available: ${guild.channels.cache.filter(c => c.isTextBased?.()).map(c => c.name).join(', ')}`;
+
+  try {
+    const msgs   = await ch.messages.fetch({ limit: Math.min(limit, 50) });
+    const sorted = [...msgs.values()].sort((a, b) => a.createdTimestamp - b.createdTimestamp);
+    if (!sorted.length) return `#${channel_name} has no recent messages.`;
+
+    return sorted.map(m => {
+      const time = m.createdAt.toLocaleTimeString('en-SG', { timeZone: 'Asia/Singapore', hour: '2-digit', minute: '2-digit' });
+      const name = m.author.username || m.author.tag;
+      const text = m.content?.slice(0, 300) || (m.attachments.size ? '[attachment]' : '[embed]');
+      return `[${time}] ${name}: ${text}`;
+    }).join('\n');
+  } catch (err) {
+    return `Failed to read history: ${err.message}`;
   }
 }
 
