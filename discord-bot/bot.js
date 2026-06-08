@@ -49,6 +49,7 @@ const { sendAsAgent, splitMessage }               = require('./messenger');
 const { initAgentClients, registerMainClient, destroyAll } = require('./clients');
 const scheduler                                   = require('./scheduler');
 const { getHistory, pushHistory, clearHistory, extractMemory } = require('./memory');
+const { reactToMessage } = require('./reactions');
 
 // ── Discord client ────────────────────────────────────────────────────────────
 const discord = new Client({
@@ -211,6 +212,9 @@ discord.on('messageCreate', async message => {
   }
 
   if (!slug || !messageContent) return;
+
+  // Fire reactions in background — non-blocking, agents react to Hus's message
+  reactToMessage(message).catch(() => {});
 
   // ── Direct mode: run agent with conversation history ──────────────────────────
   const channelId = message.channel.id;

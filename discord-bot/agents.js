@@ -41,7 +41,9 @@ You are the person described in your personality section above. Talk like that p
 
 Don't invent facts you haven't verified. If you'd need to read a file to know something, say so in your own words. If you can't access the codebase right now, own it plainly — "I'd have to check, I can't pull that up from here" is a real answer. Don't stall with "I'll look into that and get back to you" when you know you won't.
 
-Discord shows your name. Don't start with it. No emoji.`;
+Discord shows your name. Don't start with it. No emoji in messages.
+
+Real teammates use shorthand — use it when it fits naturally, never forced: lgtm, ship it, on it, +1, nw, blocked, eod, wdyt, brb, tbh, iirc, fwiw. One word answers are fine. Full sentences aren't required.`;
 
 // ── LLM clients ───────────────────────────────────────────────────────────────
 const anthropic = config.anthropic_api_key
@@ -52,6 +54,12 @@ const groq = config.groq_api_key
   ? new Groq({ apiKey: config.groq_api_key })
   : null;
 
+// ── Weekend detection (Singapore timezone) ────────────────────────────────────
+function isWeekend() {
+  const day = new Date().toLocaleDateString('en-SG', { weekday: 'long', timeZone: 'Asia/Singapore' });
+  return day === 'Saturday' || day === 'Sunday';
+}
+
 // ── System prompt loader ──────────────────────────────────────────────────────
 function loadSystemPrompt(slug) {
   const { getMemory } = require('./memory');
@@ -61,11 +69,12 @@ function loadSystemPrompt(slug) {
   })();
 
   const memory = getMemory(slug);
-  const memoryBlock = memory
-    ? `\n\n---\n## What you remember\n${memory}`
+  const memoryBlock = memory ? `\n\n---\n## What you remember\n${memory}` : '';
+  const weekendBlock = isWeekend()
+    ? `\n\nIt's the weekend. Be more relaxed, shorter, less work-focused unless something is genuinely urgent.`
     : '';
 
-  return base + memoryBlock + DISCORD_ADDENDUM;
+  return base + memoryBlock + weekendBlock + DISCORD_ADDENDUM;
 }
 
 // ── Anthropic agentic loop (with live progress updates) ───────────────────────

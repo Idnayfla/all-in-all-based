@@ -114,11 +114,22 @@ const PROACTIVE = [
 async function runProactiveCheckin() {
   if (!councilChannelId || !discordClient) return;
   const item = PROACTIVE[Math.floor(Math.random() * PROACTIVE.length)];
+
+  // 25% chance: reference memory for a genuine follow-through
+  let prompt = item.prompt;
+  if (Math.random() < 0.25) {
+    const { getMemory } = require('./memory');
+    const memory = getMemory(item.slug);
+    if (memory) {
+      prompt += `\n\nYour memory from recent conversations:\n${memory}\n\nIf something in your memory is worth following up on, mention it naturally — "by the way, re: that thing earlier..." — instead of a generic check-in.`;
+    }
+  }
+
   try {
     const channel = await discordClient.channels.fetch(councilChannelId);
     if (!channel) return;
     const { sendAsAgent } = require('./messenger');
-    const reply = await dispatchAgent(item.slug, [{ role: 'user', content: item.prompt }], {});
+    const reply = await dispatchAgent(item.slug, [{ role: 'user', content: prompt }], {});
     if (reply?.trim()) await sendAsAgent(channel, item.slug, reply.trim());
     console.log(`[scheduler] Proactive checkin from ${item.slug}`);
   } catch (err) {

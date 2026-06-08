@@ -2,6 +2,7 @@
 const { AGENTS, dispatchAgent, anthropic } = require('./agents');
 const { MODEL_SONNET }                     = require('./config');
 const { sendAsAgent, sendAsOrchestrator }  = require('./messenger');
+const { getAgentClient }                   = require('./clients');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -282,8 +283,11 @@ async function runCouncil(task, channel) {
   }
 
   // Real task → bring in the team
-  const agentNames = routing.agents.map(s => AGENTS[s]?.name).join(', ');
-  await sendAsOrchestrator(channel, `${routing.reasoning} — looping in ${agentNames}.`);
+  const mentions = routing.agents.map(s => {
+    const id = getAgentClient(s)?.user?.id;
+    return id ? `<@${id}>` : (AGENTS[s]?.name || s);
+  }).join(', ');
+  await sendAsOrchestrator(channel, `${routing.reasoning} — looping in ${mentions}.`);
 
   const responses   = {};
   let priorContext  = '';
