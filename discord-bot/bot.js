@@ -64,6 +64,13 @@ const histories = new Map();
 // Deduplication — ignore messages already being processed
 const processing = new Set();
 
+// ── Log channel — posts bot events to #bot-logs ───────────────────────────────
+let logChannel = null;
+function log(msg) {
+  console.log('[log]', msg);
+  if (logChannel) logChannel.send(`\`${new Date().toISOString().slice(11,19)}\` ${msg}`).catch(() => {});
+}
+
 // ── Utilities ─────────────────────────────────────────────────────────────────
 function startTyping(channel) {
   channel.sendTyping().catch(() => {});
@@ -96,25 +103,27 @@ discord.on('messageCreate', async message => {
   }
 
   if (/^(!?purge[d]?|clear\s+chat|wipe\s+chat|delete\s+messages?)\b/i.test(content)) {
-    console.log('[purge] triggered by:', content);
     const numMatch = content.match(/\d+/);
     const limit = Math.min(numMatch ? parseInt(numMatch[0]) : 100, 100);
+    log(`purge triggered in #${channelName} — fetching ${limit} messages`);
+    const status = await message.channel.send(`purging...`).catch(() => null);
     try {
       const fetched = await message.channel.messages.fetch({ limit });
-      console.log('[purge] fetched', fetched.size, 'messages');
+      log(`purge: fetched ${fetched.size} messages, deleting...`);
       let count = 0;
       for (const [, msg] of fetched) {
-        await msg.delete().then(() => count++).catch(() => {});
+        await msg.delete().catch(() => {});
+        count++;
       }
-      console.log('[purge] deleted', count);
-      const confirm = await message.channel.send(`Deleted ${count} messages.`).catch(() => null);
-      if (confirm) setTimeout(() => confirm.delete().catch(() => {}), 4000);
+      log(`purge: done — deleted ${count} messages`);
+      if (status) await status.edit(`Deleted ${count} messages.`).catch(() => {});
+      setTimeout(() => status?.delete().catch(() => {}), 4000);
     } catch (err) {
-      console.error('[purge] error:', err.message);
       const hint = err.message.includes('Missing Permissions')
-        ? 'Bot needs Manage Messages permission in this channel.'
-        : err.message.slice(0, 150);
-      await message.channel.send(`Purge failed: ${hint}`).catch(() => {});
+        ? 'Bot needs **Manage Messages** permission in this channel.'
+        : err.message.slice(0, 200);
+      log(`purge error: ${hint}`);
+      if (status) await status.edit(`Purge failed: ${hint}`).catch(() => {});
     }
     return;
   }
@@ -245,7 +254,7 @@ discord.on('messageCreate', async message => {
 
   } catch (err) {
     clearInterval(typing);
-    console.error(`[${slug}]`, err);
+    log(`[${slug}] error: ${err.message?.slice(0, 200)}`);
     await message.reply(`◈ Error: ${(err.message || 'Something went wrong').slice(0, 200)}`);
   }
 });
@@ -267,6 +276,13 @@ discord.once('ready', () => {
 
   discord.user.setActivity('Based HQ', { type: ActivityType.Watching });
   scheduler.init(discord);
+
+  // Find log channel
+  const logChannelName = config.log_channel || 'bot-logs';
+  logChannel = discord.guilds.cache
+    .flatMap(g => g.channels.cache)
+    .find(c => c.name === logChannelName && c.isTextBased?.()) || null;
+  log(`Bot started. Provider: ${provider}. Log channel: ${logChannel ? '#' + logChannelName : 'none (create #bot-logs to enable)'}`);
 
   // Register main client under the listener agent slug (default: orchestrator)
   const listenerSlug = config.listener_agent || 'orchestrator';
