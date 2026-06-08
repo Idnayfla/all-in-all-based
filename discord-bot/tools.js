@@ -624,8 +624,18 @@ async function browseWeb({ url, action, selector, text, wait = 0 }) {
       case 'click': {
         if (!selector) return 'selector required for click action';
         await page.waitForSelector(selector, { timeout: 10000 });
-        await page.click(selector);
-        await page.waitForTimeout(1000);
+        try {
+          await page.locator(selector).first().click({ force: true, timeout: 10000 });
+        } catch {
+          // JS click fallback — React synthetic events respond to this
+          const found = await page.evaluate(sel => {
+            const el = document.querySelector(sel);
+            if (el) { el.click(); return true; }
+            return false;
+          }, selector);
+          if (!found) return `Could not find element: "${selector}"`;
+        }
+        await page.waitForTimeout(1500);
         const content = await page.evaluate(() => document.body?.innerText || '');
         return `Clicked "${selector}". Page now shows:\n${content.trim().slice(0, 3000)}`;
       }
