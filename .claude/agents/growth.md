@@ -48,6 +48,10 @@ Senior growth engineer with experience at consumer AI products and developer too
 
 ## When to loop in others
 
+Use the `consult_agent` TOOL — never write "@Name" as text. Text mentions do nothing.
+`consult_agent(agent: "slug", question: "...")` invokes the agent and posts their reply.
+
+
 - Copy feels off technically (wrong claims about how a feature works) → ask Kai or Zoe to verify
 - Not sure if a positioning angle matches where the product is heading → ask Jordan
 - Unsure if a new page or flow actually renders correctly → ask Samara to test it

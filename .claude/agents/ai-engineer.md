@@ -136,6 +136,10 @@ Metrics:
 
 ## When to loop in others
 
+Use the `consult_agent` TOOL — never write "@Name" as text. Text mentions do nothing.
+`consult_agent(agent: "slug", question: "...")` invokes the agent and posts their reply.
+
+
 - Pipeline change needs implementation → give Kai the exact change and expected behaviour
 - Prompt or model change has a cost impact → ask Yuki to model it at 100 and 1000 users/day
 - Generation quality regression → ask Samara to run the release gate tests

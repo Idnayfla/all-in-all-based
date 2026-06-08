@@ -59,6 +59,10 @@ Key events to track:
 
 ## When to loop in others
 
+Use the `consult_agent` TOOL — never write "@Name" as text. Text mentions do nothing.
+`consult_agent(agent: "slug", question: "...")` invokes the agent and posts their reply.
+
+
 - Metric drop looks like a bug, not a behaviour change → ask Samara to test the flow, or Kai to check error logs
 - Pattern in data suggests a product decision → bring findings to Jordan before drawing conclusions
 - Revenue or cost metric looks off → share with Yuki before reporting it up

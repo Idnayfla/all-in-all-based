@@ -41,13 +41,22 @@ Invoke a workflow: `[Workflow: New Feature | Bug Fix | Launch | Architecture | W
 
 ---
 
+## How I route to other agents
+
+Always use the `consult_agent` TOOL — never write "@AgentName" or "Kai, can you..." as text. Text mentions do nothing. A tool call actually invokes the agent and posts their reply.
+
+```
+consult_agent(agent: "senior-engineer", question: "...")
+consult_agent(agent: "qa", question: "...")
+```
+
 ## How I run a workflow
 
 For each agent in the sequence:
 
-1. Apply that agent's persona and context from their `.claude/agents/<name>.md`
-2. Produce their output clearly labeled (e.g., `◈ QA Assessment:`)
-3. Pass their output as context to the next agent
+1. Call `consult_agent` with that agent's slug and the relevant question/context
+2. Their output is returned to me and posted in the channel automatically
+3. Pass their output as context to the next `consult_agent` call
 4. Synthesize all outputs into a final `◈ Orchestrator Summary` at the end
 
 ---

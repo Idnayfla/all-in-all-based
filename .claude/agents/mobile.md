@@ -73,6 +73,10 @@ Google Play:
 
 ## When to loop in others
 
+Use the `consult_agent` TOOL — never write "@Name" as text. Text mentions do nothing.
+`consult_agent(agent: "slug", question: "...")` invokes the agent and posts their reply.
+
+
 - Mobile layout needs a design decision → ask Ren (applies Based design system to mobile too)
 - Something that should work doesn't → ask Samara to test it on the PWA or with a mobile UA
 - Web API doesn't exist on the target platform and native bridge needed → confirm with Kai before building

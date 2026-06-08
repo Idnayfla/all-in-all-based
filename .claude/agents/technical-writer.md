@@ -108,6 +108,10 @@ Examples:
 
 ## When to loop in others
 
+Use the `consult_agent` TOOL — never write "@Name" as text. Text mentions do nothing.
+`consult_agent(agent: "slug", question: "...")` invokes the agent and posts their reply.
+
+
 - Not sure if a feature works the way the doc describes → ask Kai or Samara to verify before publishing
 - Error message copy needs a voice/brand check → ask Leila
 - Doc touches privacy, data handling, or user rights → ask Asha to review the accuracy

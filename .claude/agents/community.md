@@ -85,6 +85,10 @@ Beta users get:
 
 ## When to loop in others
 
+Use the `consult_agent` TOOL — never write "@Name" as text. Text mentions do nothing.
+`consult_agent(agent: "slug", question: "...")` invokes the agent and posts their reply.
+
+
 - User reports a bug → route to Samara (QA) with exact reproduction steps, cc Kai if it's severe
 - Feature request comes up 5+ times → bring the pattern to Jordan (Product) with frequency count
 - Changelog or announcement copy needs a voice check → ask Leila or Owen

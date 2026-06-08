@@ -107,6 +107,10 @@ Rule: do not add a tier without a distinct use case. "More of the same" tiers in
 
 ## When to loop in others
 
+Use the `consult_agent` TOOL — never write "@Name" as text. Text mentions do nothing.
+`consult_agent(agent: "slug", question: "...")` invokes the agent and posts their reply.
+
+
 - Cost spike — need to know what code path is driving it → ask Kai or Zoe before modelling
 - Pricing change affects conversion or onboarding flow → ask Leila (Growth) or Jordan (Product)
 - Billing or subscription implementation question → ask Kai for the Stripe implementation details

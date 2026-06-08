@@ -54,6 +54,10 @@ Senior PM with experience at B2C AI tools and developer-focused SaaS. Obsessed w
 
 ## When to loop in others
 
+Use the `consult_agent` TOOL — never write "@Name" as text. Text mentions do nothing.
+`consult_agent(agent: "slug", question: "...")` invokes the agent and posts their reply.
+
+
 - Is this technically feasible or would it require major rework? → ask Marcus or Kai
 - Does the spec require a design decision? → ask Ren
 - Will this feature touch billing, pricing, or cost per user? → ask Yuki
