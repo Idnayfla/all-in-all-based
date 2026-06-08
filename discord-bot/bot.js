@@ -93,6 +93,22 @@ async function maybeSendPoll(channel, slug, reply) {
   }
 }
 
+// ── Typo generator — swaps two adjacent letters in one content word ───────────
+function introduceTypo(text) {
+  if (text.includes('```') || text.length < 60) return null;
+  const words = text.split(' ');
+  const candidates = words
+    .map((w, i) => ({ clean: w.replace(/[^a-zA-Z]/g, ''), raw: w, i }))
+    .filter(({ clean }) => clean.length >= 5 && /^[a-zA-Z]+$/.test(clean));
+  if (!candidates.length) return null;
+  const { clean, raw, i } = candidates[Math.floor(Math.random() * candidates.length)];
+  const pos  = 1 + Math.floor(Math.random() * (clean.length - 2));
+  const typo = clean.slice(0, pos) + clean[pos + 1] + clean[pos] + clean.slice(pos + 2);
+  const typoWords = [...words];
+  typoWords[i] = raw.replace(clean, typo);
+  return { typoText: typoWords.join(' '), correction: `*${clean}` };
+}
+
 // ── @mention resolver — turns @Name into <@userId> for Discord rendering ───────
 function resolveAgentMentions(text) {
   let result = text;
@@ -346,11 +362,24 @@ discord.on('messageCreate', async message => {
     // Resolve @Name mentions into Discord user mentions
     finalReply = resolveAgentMentions(finalReply);
 
-    clearInterval(typing);
-    const sentMsg = await sendAsAgentBurst(message.channel, slug, finalReply);
+    // 40% chance: use Discord's reply-to UI (shows the quoted message header)
+    const replyToId = Math.random() < 0.40 ? message.id : null;
 
-    // 15% chance: quietly edit the message 15-35s later — typo fix, added clarity
-    if (Math.random() < 0.15) maybeEditMessage(sentMsg, slug, reply).catch(() => {});
+    // 8% chance: introduce a typo, then self-correct a few seconds later
+    const typoResult = Math.random() < 0.08 ? introduceTypo(finalReply) : null;
+
+    clearInterval(typing);
+
+    if (typoResult) {
+      const sentMsg = await sendAsAgentBurst(message.channel, slug, typoResult.typoText, replyToId);
+      if (Math.random() < 0.15) maybeEditMessage(sentMsg, slug, reply).catch(() => {});
+      setTimeout(async () => {
+        try { await sendAsAgent(message.channel, slug, typoResult.correction); } catch {}
+      }, 2000 + Math.random() * 3000);
+    } else {
+      const sentMsg = await sendAsAgentBurst(message.channel, slug, finalReply, replyToId);
+      if (Math.random() < 0.15) maybeEditMessage(sentMsg, slug, reply).catch(() => {});
+    }
 
     // Create a poll if the reply implies a decision — non-blocking
     maybeSendPoll(message.channel, slug, reply).catch(() => {});

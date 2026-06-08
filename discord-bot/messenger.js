@@ -70,20 +70,23 @@ function buildAttachments(files = []) {
 }
 
 // ── Send via agent's own client ───────────────────────────────────────────────
-async function sendViaClient(agentClient, channel, content, files = []) {
+async function sendViaClient(agentClient, channel, content, files = [], replyToId = null) {
   const ch = await agentClient.channels.fetch(channel.id).catch(() => null);
   if (!ch) throw new Error(`Agent client cannot access channel ${channel.id}`);
 
   const attachments = buildAttachments(files);
+  const replyOpt = replyToId ? { reply: { messageReference: replyToId, failIfNotExists: false } } : {};
   let lastMsg = null;
 
   if (attachments.length) {
     const parts = splitMessage(content);
-    lastMsg = await ch.send({ content: parts[0] || undefined, files: attachments });
+    lastMsg = await ch.send({ content: parts[0] || undefined, files: attachments, ...replyOpt });
     for (const p of parts.slice(1)) lastMsg = await ch.send(p);
   } else {
     const parts = splitMessage(content);
-    for (const p of parts) lastMsg = await ch.send(p);
+    for (let i = 0; i < parts.length; i++) {
+      lastMsg = await ch.send(i === 0 && replyToId ? { content: parts[i], ...replyOpt } : parts[i]);
+    }
   }
   return lastMsg;
 }
@@ -113,11 +116,11 @@ async function sendViaWebhook(channel, slug, content, files = []) {
 }
 
 // ── Main send — text (returns Message if sent via own client, null via webhook) ─
-async function sendAsAgent(channel, slug, content) {
+async function sendAsAgent(channel, slug, content, replyToId = null) {
   if (!content?.trim()) return null;
   const client = getAgentClient(slug);
   if (client) {
-    try { return await sendViaClient(client, channel, content); }
+    try { return await sendViaClient(client, channel, content, [], replyToId); }
     catch (err) { console.warn(`[messenger] ${slug} client failed (${err.message}) — webhook fallback`); }
   }
   await sendViaWebhook(channel, slug, content);
@@ -166,8 +169,9 @@ function splitIntoBursts(text) {
 }
 
 // 30% of replies arrive as 2-4 short messages, human style
+// replyToId: Discord message ID to quote (only applied to the first chunk)
 // Returns the last sent Message (or null if webhook)
-async function sendAsAgentBurst(channel, slug, content) {
+async function sendAsAgentBurst(channel, slug, content, replyToId = null) {
   if (!content?.trim()) return null;
 
   if (content.length > 100 && Math.random() < 0.30) {
@@ -181,25 +185,19 @@ async function sendAsAgentBurst(channel, slug, content) {
           channel.sendTyping().catch(() => {});
           await new Promise(r => setTimeout(r, 1200 + Math.random() * 1800));
         }
-        lastMsg = await sendAsAgent(channel, slug, chunk);
+        lastMsg = await sendAsAgent(channel, slug, chunk, i === 0 ? replyToId : null);
       }
-      // Typing ghost — 5%: agent starts to follow up, then goes quiet
       if (Math.random() < 0.05) {
-        setTimeout(() => {
-          channel.sendTyping().catch(() => {});
-        }, 2000 + Math.random() * 3000);
+        setTimeout(() => { channel.sendTyping().catch(() => {}); }, 2000 + Math.random() * 3000);
       }
       return lastMsg;
     }
   }
 
-  const msg = await sendAsAgent(channel, slug, content);
+  const msg = await sendAsAgent(channel, slug, content, replyToId);
 
-  // Typing ghost — 5%: agent starts to follow up, then goes quiet
   if (Math.random() < 0.05) {
-    setTimeout(() => {
-      channel.sendTyping().catch(() => {});
-    }, 2000 + Math.random() * 3000);
+    setTimeout(() => { channel.sendTyping().catch(() => {}); }, 2000 + Math.random() * 3000);
   }
 
   return msg;
