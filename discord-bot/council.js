@@ -71,17 +71,21 @@ A message was posted. Respond with ONLY a valid JSON object. No markdown, no exp
   "executor": "slug"
 }
 
-STEP 1 — Is this addressed to the whole group?
-broadcast: true — Hus is greeting everyone, asking where everyone is, or wants all agents to respond.
-  Examples: "wassup everyone", "hey all", "where are the rest", "anyone home", "tell them all to say hi",
-            "morning team", "what's good everyone", "yo all", "henlo everyone", "where is everybody"
-broadcast: false — everything else (tasks, questions to one agent, casual chat with Maya)
+STEP 1 — Should ALL agents respond?
+broadcast: true when ANY of these apply:
+- Hus greets the whole group ("wassup everyone", "hey all", "henlo team", "yo all")
+- Hus asks where the others are ("where are the rest", "where is everyone", "why aren't they talking")
+- Hus wants the others to say/do something ("can they say hello", "tell them all to X", "have everyone Y")
+- Hus notices only one person responded and wants more ("only you?", "just you?", "where are the others")
+- ANY message that implies Hus wants to hear from multiple people, not just Maya
 
-If broadcast: true → set casual: true, agents: [], executor: null. Stop here.
+broadcast: false — task for specific agents, or genuine 1-on-1 chat with Maya
 
-STEP 2 — If broadcast: false, is this casual or a real task?
-casual: true  — chitchat, venting, opinions, questions not requiring code or file access
-casual: false — anything touching codebase, product, bugs, features, status, decisions, deployments
+If broadcast: true → set casual: true, agents: [], executor: null.
+
+STEP 2 — If broadcast: false, casual or real task?
+casual: true  — chitchat, opinions, questions not needing code/file access
+casual: false — codebase, bugs, features, status, deployments, decisions
 
 When casual: true  → agents: [], executor: null
 When casual: false → pick 2–4 agents from routing guide below

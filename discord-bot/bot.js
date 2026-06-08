@@ -151,26 +151,31 @@ discord.on('messageCreate', async message => {
   // ── Direct mode: resolve agent slug ──────────────────────────────────────────
   let slug, messageContent;
 
-  // By channel name
-  const byChannel = Object.keys(AGENTS).find(s => channelName === s);
-  if (byChannel) {
-    slug = byChannel;
-    messageContent = content;
-  } else {
-    // By prefix: "architect: ..." or "Senior Engineer: ..."
-    const lower = content.toLowerCase();
+  // Try to resolve a specific agent from a name/slug prefix — works from any channel
+  // Supports: "Kai: message"  "Kai, message"  "senior-engineer: message"
+  function resolvePrefix(text) {
+    const lower = text.toLowerCase();
     for (const [s, { name }] of Object.entries(AGENTS)) {
-      if (lower.startsWith(s + ':')) {
-        slug = s;
-        messageContent = content.slice(s.length + 1).trim();
-        break;
+      for (const prefix of [name.toLowerCase(), s]) {
+        if (lower.startsWith(prefix + ':') || lower.startsWith(prefix + ',')) {
+          return { slug: s, body: text.slice(prefix.length + 1).trim() };
+        }
       }
-      const lname = name.toLowerCase();
-      if (lower.startsWith(lname + ':')) {
-        slug = s;
-        messageContent = content.slice(lname.length + 1).trim();
-        break;
-      }
+    }
+    return null;
+  }
+
+  const prefixMatch = resolvePrefix(content);
+  if (prefixMatch && prefixMatch.body) {
+    // Explicit name prefix — always routes directly to that agent
+    slug = prefixMatch.slug;
+    messageContent = prefixMatch.body;
+  } else {
+    // By channel name
+    const byChannel = Object.keys(AGENTS).find(s => channelName === s);
+    if (byChannel) {
+      slug = byChannel;
+      messageContent = content;
     }
   }
 
