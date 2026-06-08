@@ -60,19 +60,11 @@ async function runBroadcast(originalMessage, channel) {
   const action   = extractBroadcastAction(originalMessage);
   const allSlugs = Object.keys(AGENTS).filter(s => s !== 'orchestrator');
 
-  // Orchestrator acknowledges and goes first
-  const mayaTyping = startTyping(channel);
-  try {
-    const kickoff = await quickReply('orchestrator', `Hus said: "${originalMessage}". Acknowledge briefly, then respond yourself.`);
-    clearInterval(mayaTyping);
-    await sendAsOrchestrator(channel, sanitize(kickoff) || 'alright, everyone.');
-  } catch {
-    clearInterval(mayaTyping);
-    await sendAsOrchestrator(channel, 'alright, everyone.').catch(() => {});
-  }
+  // Maya sends a hardcoded one-liner — no LLM, no risk of her generating everyone's responses
+  await sendAsOrchestrator(channel, 'on it.').catch(() => {});
 
-  // All other agents — staggered starts, run in parallel so they trickle in naturally
-  const prompt = `Hus is asking everyone: ${action}. Respond briefly in your own voice.`;
+  // Every other agent responds as themselves — prompt is just the action, nothing more
+  const prompt = `${action}. One line, your own voice.`;
   await Promise.all(
     allSlugs.map((slug, i) =>
       sleep(i * 1200).then(async () => {
