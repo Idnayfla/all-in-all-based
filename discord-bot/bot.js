@@ -49,7 +49,6 @@ const { sendAsAgent, sendAsAgentBurst, splitMessage } = require('./messenger');
 const { initAgentClients, registerMainClient, getAgentUserId, getAgentUserIdMap, destroyAll } = require('./clients');
 const scheduler                                   = require('./scheduler');
 const { getHistory, pushHistory, clearHistory, extractMemory } = require('./memory');
-const { reactToMessage, reactToAgentMessage }     = require('./reactions');
 const { updateLastHusMessage }                    = require('./state');
 
 // ── Urgency detection — only escalating agents @here ─────────────────────────
@@ -298,7 +297,6 @@ discord.on('messageCreate', async message => {
 
   if (!slug || !messageContent) return;
 
-  // Reactions disabled — too spammy
 
   // ── Direct mode: run agent with conversation history ──────────────────────────
   const channelId = message.channel.id;
