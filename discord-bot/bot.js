@@ -279,10 +279,11 @@ discord.once('ready', () => {
 
   // Find log channel
   const logChannelName = config.log_channel || 'bot-logs';
-  logChannel = discord.guilds.cache
-    .flatMap(g => g.channels.cache)
-    .find(c => c.name === logChannelName && c.isTextBased?.()) || null;
-  log(`Bot started. Provider: ${provider}. Log channel: ${logChannel ? '#' + logChannelName : 'none (create #bot-logs to enable)'}`);
+  for (const guild of discord.guilds.cache.values()) {
+    const ch = guild.channels.cache.find(c => c.name === logChannelName && c.isTextBased?.());
+    if (ch) { logChannel = ch; break; }
+  }
+  log(`Bot started. Provider: ${provider}. Log channel: ${logChannel ? '#' + logChannelName : 'none'}`);
 
   // Register main client under the listener agent slug (default: orchestrator)
   const listenerSlug = config.listener_agent || 'orchestrator';
