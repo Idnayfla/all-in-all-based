@@ -178,14 +178,18 @@ discord.on('messageCreate', async message => {
   updateLastHusMessage();
 
   // ── Thread continuation — Hus replying inside a council thread ───────────────
+  // Maya handles it directly — no re-routing, no new agents piling in
   if (message.channel.isThread?.()) {
     const typing = startTyping(message.channel);
     try {
-      await runCouncil(content, message.channel);
-    } catch (err) {
-      log(`[thread] follow-up failed: ${err.message?.slice(0, 100)}`);
-    } finally {
+      const reply = await quickReply('orchestrator',
+        `You're in a team discussion thread. Hus just said: "${content}"\n\nRespond directly. If he's asking for a summary or conclusion, give one clearly. If he's asking a question, answer it. Stay in the context of what the thread was discussing.`
+      );
       clearInterval(typing);
+      if (reply?.trim()) await sendAsOrchestrator(message.channel, reply.trim());
+    } catch (err) {
+      clearInterval(typing);
+      log(`[thread] follow-up failed: ${err.message?.slice(0, 100)}`);
     }
     return;
   }

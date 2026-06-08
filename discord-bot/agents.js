@@ -94,10 +94,23 @@ function isWeekend() {
 }
 
 // ── System prompt loader ──────────────────────────────────────────────────────
+// Claude Code agent files contain scaffolding (routing tables, workflow steps,
+// output formats) that confuses agents when read in Discord chat context.
+// Strip everything from the first ## heading after the personality block.
+function extractPersonality(raw) {
+  // Keep the personality section — stop at the first ## that isn't personality-related
+  const stopMarkers = /^## (Identity|When I activate|Routing|How I run|Parallel|Shared context|Output format|Behaviour|Capabilities|Tools|Commands|Workflow)/m;
+  const match = raw.search(stopMarkers);
+  return match > 0 ? raw.slice(0, match).trim() : raw;
+}
+
 function loadSystemPrompt(slug) {
   const { getMemory } = require('./memory');
   const base = (() => {
-    try { return fs.readFileSync(path.join(AGENTS_DIR, `${slug}.md`), 'utf-8'); }
+    try {
+      const raw = fs.readFileSync(path.join(AGENTS_DIR, `${slug}.md`), 'utf-8');
+      return extractPersonality(raw);
+    }
     catch { return `You are the ${AGENTS[slug]?.name || slug} specialist for Based AI studio.`; }
   })();
 
