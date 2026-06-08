@@ -771,6 +771,30 @@ export default function ChatPanel({
 
       track('generation_started');
 
+      // Strip base64 image data from all but the most recent image-bearing message.
+      // The server only uses the last image anyway — keeping old ones re-sends MBs each turn.
+      const msgsForApi = (() => {
+        let kept = false;
+        return [...newMessages]
+          .reverse()
+          .map(msg => {
+            if (!Array.isArray(msg.content)) return msg;
+            const hasImg = (msg.content as Array<{ type: string }>).some(b => b.type === 'image');
+            if (!hasImg) return msg;
+            if (!kept) {
+              kept = true;
+              return msg;
+            } // keep most recent image intact
+            return {
+              ...msg,
+              content: (msg.content as Array<{ type: string; text?: string }>).map(b =>
+                b.type === 'image' ? { type: 'text' as const, text: '[reference image]' } : b
+              ),
+            };
+          })
+          .reverse();
+      })();
+
       const res = await fetch('/api/generate', {
         method: 'POST',
         signal: abort.signal,
@@ -779,7 +803,7 @@ export default function ChatPanel({
           ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
         body: JSON.stringify({
-          messages: newMessages,
+          messages: msgsForApi,
           existingFiles: files,
           personality,
           memory,
