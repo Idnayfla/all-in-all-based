@@ -602,8 +602,8 @@ async function browseWeb({ url, action, selector, text, wait = 0 }) {
   const page    = await browser.newPage();
 
   try {
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForTimeout(3000 + wait); // extra time for React hydration (networkidle hangs on Next.js)
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForTimeout(5000 + wait); // generous wait for React hydration
 
     switch (action) {
       case 'read': {
