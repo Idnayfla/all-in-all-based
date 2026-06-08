@@ -11,24 +11,27 @@ const { DEFINITIONS, execute, describeUse } = require('./tools');
 const AVATAR = slug =>
   `https://api.dicebear.com/9.x/bottts-neutral/png?seed=${encodeURIComponent(slug)}&size=128`;
 
+// tier: 'opus' = Anthropic Opus (complex reasoning, critical data)
+//        'groq' = Groq llama (free, fast, now with full tool support)
+// Mac Mini arrival → add 'local' tier here, no other changes needed
 const AGENTS = {
-  orchestrator:       { name: 'Maya',    icon: '◉', opus: true,  avatarURL: AVATAR('maya')    },
-  architect:          { name: 'Marcus',  icon: '⬡', opus: true,  avatarURL: AVATAR('marcus')  },
-  'senior-engineer':  { name: 'Kai',     icon: '◈', opus: true,  avatarURL: AVATAR('kai')     },
-  'ai-engineer':      { name: 'Zoe',     icon: '⊙', opus: true,  avatarURL: AVATAR('zoe')     },
-  product:            { name: 'Jordan',  icon: '◈', opus: true,  avatarURL: AVATAR('jordan')  }, // needs github_read, update_github_issue
-  designer:           { name: 'Ren',     icon: '◉', opus: false, avatarURL: AVATAR('ren')     }, // chat-only, groq fine
-  devops:             { name: 'Lars',    icon: '⬡', opus: true,  avatarURL: AVATAR('lars')    }, // needs run_command, get_system_info
-  security:           { name: 'Dani',    icon: '◈', opus: true,  avatarURL: AVATAR('dani')    }, // needs read_file, search_codebase
-  qa:                 { name: 'Samara',  icon: '⊙', opus: true,  avatarURL: AVATAR('samara')  }, // needs github_read, run_command
-  growth:             { name: 'Leila',   icon: '◉', opus: false, avatarURL: AVATAR('leila')   }, // chat-only, groq fine
-  'data-analyst':     { name: 'Felix',   icon: '⬡', opus: true,  avatarURL: AVATAR('felix')   }, // needs posthog_query — was hallucinating
-  mobile:             { name: 'Tomás',   icon: '◈', opus: false, avatarURL: AVATAR('tomas')   }, // chat-only, groq fine
-  finance:            { name: 'Yuki',    icon: '◉', opus: true,  avatarURL: AVATAR('yuki')    }, // needs stripe_query — was hallucinating
-  legal:              { name: 'Asha',    icon: '⊙', opus: false, avatarURL: AVATAR('asha')    }, // chat-only, groq fine
-  community:          { name: 'Beatrix', icon: '⬡', opus: false, avatarURL: AVATAR('beatrix') }, // chat-only, groq fine
-  'chief-of-staff':   { name: 'Priya',   icon: '◈', opus: true,  avatarURL: AVATAR('priya')   }, // needs get_git_info, update_github_issue
-  'technical-writer': { name: 'Owen',    icon: '◉', opus: true,  avatarURL: AVATAR('owen')    }, // needs read_file, write_file
+  orchestrator:       { name: 'Maya',    tier: 'opus', icon: '◉', avatarURL: AVATAR('maya')    },
+  architect:          { name: 'Marcus',  tier: 'opus', icon: '⬡', avatarURL: AVATAR('marcus')  },
+  'senior-engineer':  { name: 'Kai',     tier: 'opus', icon: '◈', avatarURL: AVATAR('kai')     },
+  'ai-engineer':      { name: 'Zoe',     tier: 'opus', icon: '⊙', avatarURL: AVATAR('zoe')     },
+  'data-analyst':     { name: 'Felix',   tier: 'opus', icon: '⬡', avatarURL: AVATAR('felix')   },
+  finance:            { name: 'Yuki',    tier: 'opus', icon: '◉', avatarURL: AVATAR('yuki')    },
+  product:            { name: 'Jordan',  tier: 'groq', icon: '◈', avatarURL: AVATAR('jordan')  },
+  designer:           { name: 'Ren',     tier: 'groq', icon: '◉', avatarURL: AVATAR('ren')     },
+  devops:             { name: 'Lars',    tier: 'groq', icon: '⬡', avatarURL: AVATAR('lars')    },
+  security:           { name: 'Dani',    tier: 'groq', icon: '◈', avatarURL: AVATAR('dani')    },
+  qa:                 { name: 'Samara',  tier: 'groq', icon: '⊙', avatarURL: AVATAR('samara')  },
+  growth:             { name: 'Leila',   tier: 'groq', icon: '◉', avatarURL: AVATAR('leila')   },
+  mobile:             { name: 'Tomás',   tier: 'groq', icon: '◈', avatarURL: AVATAR('tomas')   },
+  legal:              { name: 'Asha',    tier: 'groq', icon: '⊙', avatarURL: AVATAR('asha')    },
+  community:          { name: 'Beatrix', tier: 'groq', icon: '⬡', avatarURL: AVATAR('beatrix') },
+  'chief-of-staff':   { name: 'Priya',   tier: 'groq', icon: '◈', avatarURL: AVATAR('priya')   },
+  'technical-writer': { name: 'Owen',    tier: 'groq', icon: '◉', avatarURL: AVATAR('owen')    },
 };
 
 const DISCORD_ADDENDUM = `
@@ -143,20 +146,56 @@ async function runAnthropicLoop(slug, messages, context = {}, depth = 0) {
   ], context, depth + 1);
 }
 
-// ── Groq loop — plain chat, no tools ─────────────────────────────────────────
-async function runGroqLoop(slug, messages) {
+// ── Groq agentic loop — full tool support via OpenAI-compatible function calling
+async function runGroqLoop(slug, messages, context = {}) {
   const system = loadSystemPrompt(slug);
-  const groqMessages = [
+  const groqMsgs = [
     { role: 'system', content: system },
     ...messages.map(m => ({
       role: m.role,
-      content: typeof m.content === 'string' ? m.content : '',
-    })),
+      content: typeof m.content === 'string' ? m.content
+             : Array.isArray(m.content) ? m.content.filter(b => b.type === 'text').map(b => b.text || '').join('') : '',
+    })).filter(m => m.content !== ''),
   ];
+  return _groqAgentic(slug, groqMsgs, context, 0);
+}
+
+async function _groqAgentic(slug, groqMsgs, context, depth) {
+  if (depth > 8) return '[Max depth reached]';
+
+  const tools = DEFINITIONS.map(d => ({
+    type: 'function',
+    function: { name: d.name, description: d.description, parameters: d.input_schema },
+  }));
+
   const res = await groq.chat.completions.create({
-    model: MODEL_GROQ, messages: groqMessages, max_tokens: 4096,
+    model: MODEL_GROQ, messages: groqMsgs, tools, tool_choice: 'auto', max_tokens: 4096,
   });
-  return (res.choices[0].message.content || '').trim();
+
+  const msg = res.choices[0].message;
+  if (!msg.tool_calls?.length) return (msg.content || '').trim();
+
+  const agent = AGENTS[slug];
+  if (context.onProgress) {
+    const summary = msg.tool_calls.map(tc => {
+      try { return describeUse(tc.function.name, JSON.parse(tc.function.arguments || '{}')); }
+      catch { return tc.function.name; }
+    }).join(' · ');
+    await context.onProgress(`${agent?.icon} **${agent?.name}:** ${summary}...`).catch(() => {});
+  }
+
+  const toolResults = await Promise.all(msg.tool_calls.map(async tc => {
+    let input = {};
+    try { input = JSON.parse(tc.function.arguments || '{}'); } catch {}
+    const result = String(await execute(tc.function.name, input, { ...context, currentAgent: slug }));
+    return { role: 'tool', tool_call_id: tc.id, content: result };
+  }));
+
+  return _groqAgentic(slug, [
+    ...groqMsgs,
+    { role: 'assistant', content: msg.content || null, tool_calls: msg.tool_calls },
+    ...toolResults,
+  ], context, depth + 1);
 }
 
 // ── Ollama loop — local models via OpenAI-compatible API ──────────────────────
@@ -179,35 +218,45 @@ async function runOllamaLoop(slug, messages) {
   return (data.choices?.[0]?.message?.content || '').trim();
 }
 
-// ── Main dispatch — Anthropic (opus) → Ollama → Groq → Anthropic fallback ─────
+// ── Main dispatch — tier-based routing ───────────────────────────────────────
+// tier 'opus' → Anthropic Opus (with tools)
+// tier 'groq' → Groq llama (with tools, free) → Anthropic fallback
+// PROVIDER override in config forces all agents to one provider
 async function dispatchAgent(slug, messages, context = {}) {
   const agent = AGENTS[slug];
+  const tier  = agent?.tier || 'groq';
 
-  // Senior agents always use Anthropic Opus
-  if (PROVIDER === 'anthropic' || (PROVIDER !== 'groq' && PROVIDER !== 'ollama' && agent?.opus)) {
+  // Hard provider overrides
+  if (PROVIDER === 'anthropic') {
     if (!anthropic) throw new Error('Anthropic API key not configured.');
     return runAnthropicLoop(slug, messages, context);
   }
-
-  // Force specific provider
   if (PROVIDER === 'ollama') return runOllamaLoop(slug, messages);
   if (PROVIDER === 'groq') {
     if (!groq) throw new Error('Groq not configured.');
-    try { return await runGroqLoop(slug, messages); }
+    try { return await runGroqLoop(slug, messages, context); }
     catch (err) {
       console.warn(`[${slug}] Groq failed — Anthropic fallback`);
-      if (!anthropic) throw new Error('Both unavailable.');
+      if (!anthropic) throw err;
       return runAnthropicLoop(slug, messages, context);
     }
   }
 
-  // Auto mode for non-opus agents: Ollama → Groq → Anthropic
+  // Auto mode — route by tier
+  if (tier === 'opus') {
+    if (anthropic) return runAnthropicLoop(slug, messages, context);
+    console.warn(`[${slug}] Anthropic unavailable — Groq fallback`);
+    if (groq) return runGroqLoop(slug, messages, context);
+    throw new Error('No provider available.');
+  }
+
+  // groq tier: Ollama → Groq (with tools) → Anthropic fallback
   try { return await runOllamaLoop(slug, messages); }
-  catch (err) { console.warn(`[${slug}] Ollama failed (${err.message}) — trying Groq`); }
+  catch { /* Ollama not running, continue */ }
 
   if (groq) {
-    try { return await runGroqLoop(slug, messages); }
-    catch (err) { console.warn(`[${slug}] Groq failed (${err.message}) — Anthropic fallback`); }
+    try { return await runGroqLoop(slug, messages, context); }
+    catch (err) { console.warn(`[${slug}] Groq failed — Anthropic fallback`); }
   }
 
   if (!anthropic) throw new Error('All providers unavailable.');

@@ -236,8 +236,8 @@ discord.on('messageCreate', async message => {
 
   if (content === '!help') {
     const list = Object.entries(AGENTS)
-      .map(([s, { name, icon, opus }]) =>
-        `${icon} **#${s}** — ${name}${opus ? ' *(Anthropic)*' : ' *(Groq)*'}`
+      .map(([s, { name, icon, tier }]) =>
+        `${icon} **#${s}** — ${name} *(${tier === 'opus' ? 'Opus' : 'Groq+tools'})*`
       )
       .join('\n');
     const tools = DEFINITIONS.map(t => `\`${t.name}\``).join(' · ');
