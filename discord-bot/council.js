@@ -36,14 +36,25 @@ function isPureGreeting(text) {
   );
 }
 
-// ── Detect broadcast directive ("tell them all to X", "have everyone Y") ────────
+// ── Detect any message addressed to the whole group ──────────────────────────
 function isBroadcastRequest(text) {
   const lower = text.toLowerCase().trim();
-  return (
-    /^(tell|ask|have|make)\s+(them|everyone|all\s+of\s+(you|them)|the\s+team)\s+(all\s+)?(to\s+)?\S/.test(lower) ||
-    /^everyone\s+(say|do|introduce|reply|respond|jump\s+in|go\s+ahead)\b/.test(lower) ||
-    /\bi\s+(need|want)\s+everyone\s+to\s+\S/.test(lower)
-  );
+  const hasGroupWord = /\b(everyone|all|team|folks|guys|yall|y'all|the\s+rest)\b/.test(lower);
+  if (!hasGroupWord) return false;
+
+  // Greeting to the group ("wassup everyone", "hey all", "henlo everyone")
+  if (/^(hey|hi|hello|sup|yo+|wassup|watsup|what'?s?\s*up|morning|howdy|henlo+|helo+|heyy+|oi)\b/.test(lower)) return true;
+
+  // Directive to the group ("tell them all to X", "have everyone Y")
+  if (/^(tell|ask|have|make|get)\s+(them|everyone|all|the\s+team)\s+/.test(lower)) return true;
+  if (/^everyone\s+(say|do|introduce|reply|respond|jump|go)\b/.test(lower)) return true;
+  if (/\bi\s+(need|want)\s+everyone\s+to\s+/.test(lower)) return true;
+
+  // "where are the rest / everyone", "anyone home / there"
+  if (/\b(where|who)\s+(are|is)\s+(the\s+)?(rest|everyone|others|all)\b/.test(lower)) return true;
+  if (/\b(anyone|anybody)\s+(home|there|here|around|online)\b/.test(lower)) return true;
+
+  return false;
 }
 
 function extractBroadcastAction(text) {
