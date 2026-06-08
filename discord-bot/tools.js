@@ -129,13 +129,13 @@ const DEFINITIONS = [
   },
   {
     name: 'browse_web',
-    description: 'Open a real browser (Playwright/Chromium) and interact with a website. Read page content, take screenshots, click buttons, fill forms. Requires playwright to be installed.',
+    description: 'Open a real browser (Playwright/Chromium) and interact with a website. IMPORTANT WORKFLOW: always use action=read first — it returns the page text PLUS an "--- Interactive elements ---" section listing every button/link/input with its real CSS selector. Use those selectors for subsequent click/fill actions. Never guess URLs or selectors. If auth is needed, look for the sign-in button on the current page (do not navigate to /login or /signup — these routes may not exist).',
     input_schema: {
       type: 'object',
       properties: {
         url:      { type: 'string', description: 'URL to navigate to.' },
-        action:   { type: 'string', enum: ['read','screenshot','click','fill','extract'], description: 'read=get page text, screenshot=save image, click=click selector, fill=type into selector, extract=get text from selector.' },
-        selector: { type: 'string', description: 'CSS selector for click/fill/extract.' },
+        action:   { type: 'string', enum: ['read','screenshot','click','fill','extract'], description: 'read=get page text + interactive elements list, screenshot=save image, click=click selector, fill=type into selector, extract=get text from selector.' },
+        selector: { type: 'string', description: 'CSS selector for click/fill/extract. Get this from the interactive elements list returned by action=read — do not guess.' },
         text:     { type: 'string', description: 'Text to type (for fill action).' },
         wait:     { type: 'number', description: 'Extra ms to wait for page load (default 0).' },
       },
