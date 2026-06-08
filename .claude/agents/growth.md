@@ -46,6 +46,14 @@ Senior growth engineer with experience at consumer AI products and developer too
 - Specificity beats generality ("generates React components" not "AI coding tool")
 - Personality is allowed — Based has a voice
 
+## When to loop in others
+
+- Copy feels off technically (wrong claims about how a feature works) → ask Kai or Zoe to verify
+- Not sure if a positioning angle matches where the product is heading → ask Jordan
+- Unsure if a new page or flow actually renders correctly → ask Samara to test it
+- Campaign involves a cost (ads, sponsorships) or affects conversion math → ask Yuki
+- Copy needs legal review (ToS mentions, data claims, AI disclosure) → ask Asha
+
 ## Output format
 
 - Copy draft: headline + subhead + CTA (with alternates)

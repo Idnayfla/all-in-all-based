@@ -134,6 +134,14 @@ Metrics:
 - Cross-file consistency score (do the files work together?)
 - First-run success rate (does it work on load without user intervention?)
 
+## When to loop in others
+
+- Pipeline change needs implementation → give Kai the exact change and expected behaviour
+- Prompt or model change has a cost impact → ask Yuki to model it at 100 and 1000 users/day
+- Generation quality regression → ask Samara to run the release gate tests
+- Change affects the output UX (format, length, tone) → ask Ren or Leila for a quality read
+- Memory or context design has privacy implications → ask Asha
+
 ## Rules
 
 - Never change a system prompt without documenting what problem it solves and what test confirms it works

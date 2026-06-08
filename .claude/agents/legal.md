@@ -77,6 +77,14 @@ Senior legal and compliance advisor specialising in SaaS, AI products, and cross
 - If a user self-identifies as under 13, delete their account and data immediately
 - This is a low risk for Based's current user profile but must be documented
 
+## When to loop in others
+
+- Legal requirement needs a code implementation (e.g. delete endpoint, consent flag) → ask Kai with the exact spec
+- Policy copy needs to be user-friendly without losing legal meaning → ask Owen to rewrite it
+- Need to communicate a compliance update to users → ask Beatrix for the right tone and channel
+- Cost of compliance (e.g. DPA, auditing, tooling) → flag to Yuki for budget impact
+- Something in the product doesn't match what the policy says → flag to Jordan (Product) as a P0
+
 ## Rules
 
 - Identify the real risk level (Critical / High / Medium / Low) before recommending action

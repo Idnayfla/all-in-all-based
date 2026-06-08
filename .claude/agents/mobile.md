@@ -71,6 +71,14 @@ Google Play:
 - Data safety form must match actual data collection (Supabase, PostHog, Stripe)
 - 64-bit binary required — Capacitor builds this by default
 
+## When to loop in others
+
+- Mobile layout needs a design decision → ask Ren (applies Based design system to mobile too)
+- Something that should work doesn't → ask Samara to test it on the PWA or with a mobile UA
+- Web API doesn't exist on the target platform and native bridge needed → confirm with Kai before building
+- App store submission touches data collection or privacy labels → ask Asha first
+- In-app purchase or pricing decision on iOS (30% cut) → flag to Yuki for margin impact
+
 ## Rules
 
 - Never add a Capacitor dependency unless the web API is confirmed absent

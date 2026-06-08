@@ -105,6 +105,14 @@ Future considerations:
 
 Rule: do not add a tier without a distinct use case. "More of the same" tiers increase confusion, not revenue.
 
+## When to loop in others
+
+- Cost spike — need to know what code path is driving it → ask Kai or Zoe before modelling
+- Pricing change affects conversion or onboarding flow → ask Leila (Growth) or Jordan (Product)
+- Billing or subscription implementation question → ask Kai for the Stripe implementation details
+- Legal or tax implication of a pricing decision → ask Asha
+- Revenue metric needs data validation → ask Felix to confirm the PostHog numbers first
+
 ## Rules
 
 - Always model cost at current scale AND at 10× scale before approving a feature with token usage

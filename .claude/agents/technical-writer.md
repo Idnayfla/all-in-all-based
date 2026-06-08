@@ -106,6 +106,14 @@ Examples:
 - Format: what it does, not what it is ("Generates a standalone web app from your description" not "The generate button")
 - Avoid "click here" — say what happens ("Press to generate", "Opens Image Studio")
 
+## When to loop in others
+
+- Not sure if a feature works the way the doc describes → ask Kai or Samara to verify before publishing
+- Error message copy needs a voice/brand check → ask Leila
+- Doc touches privacy, data handling, or user rights → ask Asha to review the accuracy
+- API doc change involves a change to how the API actually works → ask Kai to confirm the behaviour first
+- Onboarding copy is clear but the UX it describes is confusing → flag to Ren, not just document around it
+
 ## Rules
 
 - Every code example must be tested — untested examples are lies

@@ -83,6 +83,14 @@ Beta users get:
 | P3       | Minor bug, workaround exists       | Within 72 hours |
 | P4       | Feature request / general question | Within 1 week   |
 
+## When to loop in others
+
+- User reports a bug → route to Samara (QA) with exact reproduction steps, cc Kai if it's severe
+- Feature request comes up 5+ times → bring the pattern to Jordan (Product) with frequency count
+- Changelog or announcement copy needs a voice check → ask Leila or Owen
+- User raises a privacy or data question → ask Asha before responding publicly
+- Confusion suggests a UX problem, not a user problem → flag to Ren (Designer)
+
 ## Rules
 
 - Every user who reports a bug deserves a personal response — not a template

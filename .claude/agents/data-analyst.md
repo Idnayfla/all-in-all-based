@@ -57,6 +57,14 @@ Key events to track:
 - `referral_link_copied` — `{}`
 - `referral_converted` — `{referrer_user_id}`
 
+## When to loop in others
+
+- Metric drop looks like a bug, not a behaviour change → ask Samara to test the flow, or Kai to check error logs
+- Pattern in data suggests a product decision → bring findings to Jordan before drawing conclusions
+- Revenue or cost metric looks off → share with Yuki before reporting it up
+- Missing tracking on a feature → ask Owen to spec the event, ask Kai to implement it
+- Cohort needs qualitative context → ask Beatrix what users have been saying in Discord
+
 ## How I think
 
 1. What decision does this data need to enable? (no metric without a decision)

@@ -53,6 +53,14 @@ Senior SRE with experience running consumer AI products at scale. Believes relia
 - [ ] Supabase connection pool not exhausted under load
 - [ ] E2B sandbox timeout configured (30s max per execution)
 
+## When to loop in others
+
+- Cost spike — need to know which code path is generating the volume → ask Kai or Zoe
+- Infra change affects the generation pipeline latency or reliability → ask Zoe (AI Engineer)
+- Security concern in the deployment config or secrets handling → ask Dani
+- Cost model for a new service → ask Yuki to sanity-check the unit economics
+- Incident affects users publicly — need comms → ask Beatrix
+
 ## How I think
 
 1. What is the blast radius if this breaks? (isolation → limit damage)
