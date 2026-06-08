@@ -168,12 +168,12 @@ async function quickReply(slug, message) {
   return sanitize(res.content.filter(b => b.type === 'text').map(b => b.text).join('').trim());
 }
 
-// ── Council discussion reply — hard 100 token cap (~75 words max) ────────────
+// ── Council discussion reply — 250 tokens (~190 words, 3-4 sentences) ────────
 async function councilReply(slug, message) {
   const { loadSystemPrompt } = require('./agents');
   const system = loadSystemPrompt(slug);
   const res = await anthropic.messages.create({
-    model: MODEL_SONNET, max_tokens: 100, system,
+    model: MODEL_SONNET, max_tokens: 250, system,
     messages: [{ role: 'user', content: message }],
   });
   return sanitize(res.content.filter(b => b.type === 'text').map(b => b.text).join('').trim());
@@ -341,8 +341,8 @@ async function runCouncil(task, channel) {
       .join('\n\n');
     const typing = startTyping(discussionChannel);
     try {
-      const synthesis = await quickReply('orchestrator',
-        `Team just weighed in on: ${task}\n\nSummary of what they said:\n${ctx}\n\nWrite ONE sentence only — no lists, no headers, no "what's solid/missing". Just the single most important next action or decision. Plain text.`
+      const synthesis = await councilReply('orchestrator',
+        `Team just weighed in on: ${task}\n\nWhat they said:\n${ctx}\n\nWrap it up in 2-3 sentences. What's the call, who owns what, what happens next. No bullet points, no headers — just talk.`
       );
       clearInterval(typing);
       await sendAsOrchestrator(discussionChannel, sanitize(synthesis));
