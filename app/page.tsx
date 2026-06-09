@@ -1244,11 +1244,7 @@ export default function Home() {
           }}
         />
       )}
-      {showSplash && (
-        <SplashScreen
-          onDone={() => setShowSplash(false)}
-        />
-      )}
+      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
       {subscription.tier === 'pro' && <div className="pro-crown-strip" />}
       <header className="app-header">
         <div
