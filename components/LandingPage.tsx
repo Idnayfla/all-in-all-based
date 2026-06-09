@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
+import Link from 'next/link';
 
 interface Props {
   onSignIn: (tab?: 'signin' | 'signup') => void;
@@ -125,7 +126,7 @@ function LandingGalleryCard({ item }: { item: GalleryItem }) {
   }, []);
 
   return (
-    <a href="/gallery" className="landing-gal-card">
+    <Link href="/gallery" className="landing-gal-card">
       <div className="landing-gal-preview" ref={wrapRef}>
         {visible ? (
           <iframe
@@ -146,7 +147,7 @@ function LandingGalleryCard({ item }: { item: GalleryItem }) {
           by {item.author_name ?? 'Anonymous'} · ↻ {item.remix_count}
         </span>
       </div>
-    </a>
+    </Link>
   );
 }
 
@@ -180,18 +181,18 @@ export default function LandingPage({ onSignIn }: Props) {
       <header className="landing-header">
         <div className="landing-logo">B&gt;</div>
         <nav className="landing-header-nav">
-          <a href="/gallery" className="landing-nav-link">
+          <Link href="/gallery" className="landing-nav-link">
             Gallery
-          </a>
-          <a href="/changelog" className="landing-nav-link">
+          </Link>
+          <Link href="/changelog" className="landing-nav-link">
             What&apos;s New
-          </a>
-          <a href="/vote" className="landing-nav-link">
+          </Link>
+          <Link href="/vote" className="landing-nav-link">
             Vote
-          </a>
-          <a href="/roadmap" className="landing-nav-link">
+          </Link>
+          <Link href="/roadmap" className="landing-nav-link">
             Roadmap
-          </a>
+          </Link>
           <button
             className="landing-signin-btn"
             onClick={e => {
@@ -207,9 +208,7 @@ export default function LandingPage({ onSignIn }: Props) {
       {/* ── Hero ── */}
       <section className="landing-hero">
         <div className="landing-hero-glow" />
-        <div className="landing-hero-badge">
-          ◈ Personal Assistant AI
-        </div>
+        <div className="landing-hero-badge">◈ Personal Assistant AI</div>
         <h1 className="landing-headline">
           <span style={{ whiteSpace: 'nowrap' }}>Never leaves</span>
           <br />
@@ -321,9 +320,9 @@ export default function LandingPage({ onSignIn }: Props) {
                 Real projects, built by real people. Browse and remix anything.
               </p>
             </div>
-            <a href="/gallery" className="landing-gallery-browse-btn">
+            <Link href="/gallery" className="landing-gallery-browse-btn">
               Browse all →
-            </a>
+            </Link>
           </div>
           <div className="landing-gal-grid">
             {galleryItems.map(item => (
@@ -331,9 +330,9 @@ export default function LandingPage({ onSignIn }: Props) {
             ))}
           </div>
           <div className="landing-gallery-cta-row">
-            <a href="/gallery" className="landing-gallery-cta-link">
+            <Link href="/gallery" className="landing-gallery-cta-link">
               See everything in the gallery →
-            </a>
+            </Link>
           </div>
         </section>
       )}
@@ -349,9 +348,9 @@ export default function LandingPage({ onSignIn }: Props) {
               coming.
             </p>
           </div>
-          <a href="/roadmap" className="landing-roadmap-btn">
+          <Link href="/roadmap" className="landing-roadmap-btn">
             Full roadmap →
-          </a>
+          </Link>
         </div>
         <div className="landing-roadmap-grid">
           <div className="landing-roadmap-col">
@@ -377,9 +376,9 @@ export default function LandingPage({ onSignIn }: Props) {
                 </div>
               </div>
             ))}
-            <a href="/roadmap" className="landing-roadmap-see-all">
+            <Link href="/roadmap" className="landing-roadmap-see-all">
               See full roadmap →
-            </a>
+            </Link>
           </div>
         </div>
       </section>
@@ -462,13 +461,13 @@ export default function LandingPage({ onSignIn }: Props) {
       </section>
 
       <footer className="landing-footer">
-        <a href="/roadmap" className="landing-footer-link">
+        <Link href="/roadmap" className="landing-footer-link">
           Roadmap
-        </a>
+        </Link>
         <span className="landing-footer-sep">·</span>
-        <a href="/gallery" className="landing-footer-link">
+        <Link href="/gallery" className="landing-footer-link">
           Gallery
-        </a>
+        </Link>
         <span className="landing-footer-sep">·</span>
         <a
           href="https://ko-fi.com/basedfund"
@@ -479,17 +478,17 @@ export default function LandingPage({ onSignIn }: Props) {
           ◈ Support
         </a>
         <span className="landing-footer-sep">·</span>
-        <a href="/terms" className="landing-footer-link">
+        <Link href="/terms" className="landing-footer-link">
           Terms
-        </a>
+        </Link>
         <span className="landing-footer-sep">·</span>
-        <a href="/privacy" className="landing-footer-link">
+        <Link href="/privacy" className="landing-footer-link">
           Privacy
-        </a>
+        </Link>
         <span className="landing-footer-sep">·</span>
-        <a href="/refund" className="landing-footer-link">
+        <Link href="/refund" className="landing-footer-link">
           Refund
-        </a>
+        </Link>
       </footer>
     </div>
   );
