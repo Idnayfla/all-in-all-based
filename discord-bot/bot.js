@@ -34,33 +34,47 @@ try {
   if (fs.existsSync(pidFile)) {
     const oldPid = parseInt(fs.readFileSync(pidFile, 'utf-8').trim(), 10);
     if (oldPid && oldPid !== process.pid) {
-      try { process.kill(oldPid); console.log(`[boot] Killed previous instance (PID ${oldPid})`); }
-      catch {}
+      try {
+        process.kill(oldPid);
+        console.log(`[boot] Killed previous instance (PID ${oldPid})`);
+      } catch {}
     }
   }
 } catch {}
 fs.writeFileSync(pidFile, String(process.pid));
-process.on('exit', () => { try { fs.unlinkSync(pidFile); } catch {} });
+process.on('exit', () => {
+  try {
+    fs.unlinkSync(pidFile);
+  } catch {}
+});
 const { config, COUNCIL_CHANNEL, OLLAMA_BASE_URL, MODEL_OLLAMA } = require('./config');
-const { AGENTS, dispatchAgent, anthropic, groq }  = require('./agents');
-const { DEFINITIONS }                             = require('./tools');
-const { runCouncil, quickReply }                  = require('./council');
+const { AGENTS, dispatchAgent, anthropic, groq } = require('./agents');
+const { DEFINITIONS } = require('./tools');
+const { runCouncil, quickReply } = require('./council');
 const { sendAsAgent, sendAsAgentBurst, splitMessage } = require('./messenger');
-const { initAgentClients, registerMainClient, getAgentUserId, getAgentUserIdMap, destroyAll } = require('./clients');
-const scheduler                                   = require('./scheduler');
+const {
+  initAgentClients,
+  registerMainClient,
+  getAgentUserId,
+  getAgentUserIdMap,
+  destroyAll,
+} = require('./clients');
+const scheduler = require('./scheduler');
 const { getHistory, pushHistory, clearHistory, extractMemory } = require('./memory');
-const { updateLastHusMessage }                    = require('./state');
+const { updateLastHusMessage } = require('./state');
 
 // ── Urgency detection — only escalating agents @here ─────────────────────────
 const ESCALATING_AGENTS = new Set(['security', 'devops', 'senior-engineer']);
-const URGENCY_RE = /\b(prod(?:uction)?\s+(is\s+)?(down|outage|failing)|service\s+outage|security\s+breach|data\s+leak|compromised|critical\s+(outage|incident)|emergency\s+(deploy|patch|fix))\b/i;
+const URGENCY_RE =
+  /\b(prod(?:uction)?\s+(is\s+)?(down|outage|failing)|service\s+outage|security\s+breach|data\s+leak|compromised|critical\s+(outage|incident)|emergency\s+(deploy|patch|fix))\b/i;
 
 function isUrgent(slug, text) {
   return ESCALATING_AGENTS.has(slug) && URGENCY_RE.test(text);
 }
 
 // ── Poll detection — create a Discord poll when a decision is in play ─────────
-const POLL_RE = /\b(should we (go with|use|pick|ship|choose)|option [ab]\b|a vs\.? b\b|which (one|option|approach|version)\b|vote on|i('m| am) torn between|can't decide between)\b/i;
+const POLL_RE =
+  /\b(should we (go with|use|pick|ship|choose)|option [ab]\b|a vs\.? b\b|which (one|option|approach|version)\b|vote on|i('m| am) torn between|can't decide between)\b/i;
 
 async function maybeSendPoll(channel, slug, reply) {
   if (!POLL_RE.test(reply) || reply.length < 80) return;
@@ -73,8 +87,11 @@ async function maybeSendPoll(channel, slug, reply) {
     const match = raw.match(/\{[\s\S]*?\}/);
     if (!match) return;
     pollData = JSON.parse(match[0]);
-    if (!pollData.question || !Array.isArray(pollData.options) || pollData.options.length < 2) return;
-  } catch { return; }
+    if (!pollData.question || !Array.isArray(pollData.options) || pollData.options.length < 2)
+      return;
+  } catch {
+    return;
+  }
 
   await new Promise(r => setTimeout(r, 2000 + Math.random() * 2000));
 
@@ -101,7 +118,7 @@ function introduceTypo(text) {
     .filter(({ clean }) => clean.length >= 5 && /^[a-zA-Z]+$/.test(clean));
   if (!candidates.length) return null;
   const { clean, raw, i } = candidates[Math.floor(Math.random() * candidates.length)];
-  const pos  = 1 + Math.floor(Math.random() * (clean.length - 2));
+  const pos = 1 + Math.floor(Math.random() * (clean.length - 2));
   const typo = clean.slice(0, pos) + clean[pos + 1] + clean[pos] + clean.slice(pos + 2);
   const typoWords = [...words];
   typoWords[i] = raw.replace(clean, typo);
@@ -126,7 +143,8 @@ async function maybeEditMessage(sentMsg, slug, originalText) {
   const editPrompt = `You just sent this in Discord: "${originalText.slice(0, 300)}"\n\nIf you want to make a small natural edit — fix a word, rephrase something slightly, add a brief clarification you forgot — return only the edited message text. If you'd leave it as is, respond with exactly: [keep]`;
   try {
     const edited = await quickReply(slug, editPrompt);
-    if (!edited || edited.toLowerCase().includes('[keep]') || edited.trim() === originalText.trim()) return;
+    if (!edited || edited.toLowerCase().includes('[keep]') || edited.trim() === originalText.trim())
+      return;
     await sentMsg.edit(edited.slice(0, 2000)).catch(() => {});
   } catch {}
 }
@@ -147,7 +165,8 @@ const processing = new Set();
 let logChannel = null;
 function log(msg) {
   console.log('[log]', msg);
-  if (logChannel) logChannel.send(`\`${new Date().toISOString().slice(11,19)}\` ${msg}`).catch(() => {});
+  if (logChannel)
+    logChannel.send(`\`${new Date().toISOString().slice(11, 19)}\` ${msg}`).catch(() => {});
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
@@ -171,7 +190,7 @@ discord.on('messageCreate', async message => {
   setTimeout(() => processing.delete(message.id), 60000);
 
   const channelName = message.channel.name?.toLowerCase() ?? '';
-  const content     = message.content.trim();
+  const content = message.content.trim();
   if (!content) return;
 
   // Track Hus's last active timestamp for check-in scheduler
@@ -182,7 +201,8 @@ discord.on('messageCreate', async message => {
   if (message.channel.isThread?.()) {
     const typing = startTyping(message.channel);
     try {
-      const reply = await quickReply('orchestrator',
+      const reply = await quickReply(
+        'orchestrator',
         `You're in a team discussion thread. Hus just said: "${content}"\n\nRespond directly. If he's asking for a summary or conclusion, give one clearly. If he's asking a question, answer it. Stay in the context of what the thread was discussing.`
       );
       clearInterval(typing);
@@ -230,16 +250,18 @@ discord.on('messageCreate', async message => {
   if (content === '!status') {
     const up = Math.floor(process.uptime());
     const provider =
-      config.provider === 'auto'      ? 'auto — Groq (free) for 13 · Anthropic Opus for senior 4' :
-      config.provider === 'groq'      ? `groq — ${config.model_groq}` :
-      /* anthropic */                   `anthropic — ${config.model_opus}`;
+      config.provider === 'auto'
+        ? 'auto — Groq (free) for 13 · Anthropic Opus for senior 4'
+        : config.provider === 'groq'
+          ? `groq — ${config.model_groq}`
+          : /* anthropic */ `anthropic — ${config.model_opus}`;
     await message.reply(
       `**◈ Based HQ**\n` +
-      `Uptime: ${Math.floor(up / 3600)}h ${Math.floor((up % 3600) / 60)}m\n` +
-      `Provider: ${provider}\n` +
-      `Groq: ${groq ? '✓' : '✗'}  ·  Anthropic: ${anthropic ? '✓' : '✗'}\n` +
-      `Active histories: persisted to disk\n` +
-      `Council: #${COUNCIL_CHANNEL}`
+        `Uptime: ${Math.floor(up / 3600)}h ${Math.floor((up % 3600) / 60)}m\n` +
+        `Provider: ${provider}\n` +
+        `Groq: ${groq ? '✓' : '✗'}  ·  Anthropic: ${anthropic ? '✓' : '✗'}\n` +
+        `Active histories: persisted to disk\n` +
+        `Council: #${COUNCIL_CHANNEL}`
     );
     return;
   }
@@ -254,11 +276,11 @@ discord.on('messageCreate', async message => {
     const tools = DEFINITIONS.map(t => `\`${t.name}\``).join(' · ');
     await message.reply(
       `**◈ Based HQ — Agent Directory**\n\n` +
-      `${list}\n\n` +
-      `**Tools:** ${tools}\n\n` +
-      `**Council mode:** Post in **#${COUNCIL_CHANNEL}** or use \`!council <task>\`\n` +
-      `**Direct mode:** Post in an agent channel or prefix: \`architect: question\`\n` +
-      `**Commands:** \`!clear\` · \`!help\` · \`!status\` · \`!council <task>\``
+        `${list}\n\n` +
+        `**Tools:** ${tools}\n\n` +
+        `**Council mode:** Post in **#${COUNCIL_CHANNEL}** or use \`!council <task>\`\n` +
+        `**Direct mode:** Post in an agent channel or prefix: \`architect: question\`\n` +
+        `**Commands:** \`!clear\` · \`!help\` · \`!status\` · \`!council <task>\``
     );
     return;
   }
@@ -314,29 +336,34 @@ discord.on('messageCreate', async message => {
 
   if (!slug || !messageContent) return;
 
-
   // ── Direct mode: run agent with conversation history ──────────────────────────
   const channelId = message.channel.id;
-  const history   = getHistory(channelId);
+  const history = getHistory(channelId);
   pushHistory(channelId, 'user', messageContent);
 
   // Variable response latency — 80% fast, 15% "finishing something", 5% genuinely busy
   const latencyRoll = Math.random();
-  const pauseMs = latencyRoll < 0.05
-    ? (180 + Math.random() * 120) * 1000   // 3-5 min
-    : latencyRoll < 0.20
-    ? (30  + Math.random() * 90)  * 1000   // 30-120 s
-    : 300  + Math.random() * 1500;          // 300-1800 ms
+  const pauseMs =
+    latencyRoll < 0.05
+      ? (180 + Math.random() * 120) * 1000 // 3-5 min
+      : latencyRoll < 0.2
+        ? (30 + Math.random() * 90) * 1000 // 30-120 s
+        : 300 + Math.random() * 1500; // 300-1800 ms
   await new Promise(r => setTimeout(r, pauseMs));
   const typing = startTyping(message.channel);
 
   try {
-    const onProgress = async (text) => {
-      try { await message.channel.send(text); } catch {}
+    const onProgress = async text => {
+      try {
+        await message.channel.send(text);
+      } catch {}
     };
 
     const reply = await dispatchAgent(slug, [...history], {
-      onProgress, currentAgent: slug, channel: message.channel, discordClient: discord,
+      onProgress,
+      currentAgent: slug,
+      channel: message.channel,
+      discordClient: discord,
     });
 
     if (!reply) {
@@ -348,20 +375,33 @@ discord.on('messageCreate', async message => {
     pushHistory(channelId, 'assistant', reply);
 
     // Extract memory in background — non-blocking
-    extractMemory(slug, getHistory(channelId), anthropic, config.model_sonnet || 'claude-sonnet-4-6').catch(() => {});
+    extractMemory(
+      slug,
+      getHistory(channelId),
+      anthropic,
+      config.model_sonnet || 'claude-sonnet-4-6'
+    ).catch(() => {});
 
     // 12% chance: agent sends a quick self-correction
     if (Math.random() < 0.12) {
-      setTimeout(async () => {
-        try {
-          const correction = await quickReply(slug,
-            `You just said: "${reply.slice(0, 200)}"\n\nIf you want to send a quick follow-up correction or add something you missed (start with "wait," or "actually,"), do it in one line. If you have nothing to correct or add, respond with exactly: [fine]`
-          );
-          if (correction && !correction.toLowerCase().includes('[fine]') && correction.length > 4) {
-            await sendAsAgent(message.channel, slug, correction);
-          }
-        } catch {}
-      }, 2000 + Math.random() * 3000);
+      setTimeout(
+        async () => {
+          try {
+            const correction = await quickReply(
+              slug,
+              `You just said: "${reply.slice(0, 200)}"\n\nIf you want to send a quick follow-up correction or add something you missed (start with "wait," or "actually,"), do it in one line. If you have nothing to correct or add, respond with exactly: [fine]`
+            );
+            if (
+              correction &&
+              !correction.toLowerCase().includes('[fine]') &&
+              correction.length > 4
+            ) {
+              await sendAsAgent(message.channel, slug, correction);
+            }
+          } catch {}
+        },
+        2000 + Math.random() * 3000
+      );
     }
 
     // @here prefix for genuine critical escalations
@@ -370,7 +410,7 @@ discord.on('messageCreate', async message => {
     finalReply = resolveAgentMentions(finalReply);
 
     // 40% chance: use Discord's reply-to UI (shows the quoted message header)
-    const replyToId = Math.random() < 0.40 ? message.id : null;
+    const replyToId = Math.random() < 0.4 ? message.id : null;
 
     // 8% chance: introduce a typo, then self-correct a few seconds later
     const typoResult = Math.random() < 0.08 ? introduceTypo(finalReply) : null;
@@ -380,9 +420,14 @@ discord.on('messageCreate', async message => {
     if (typoResult) {
       const sentMsg = await sendAsAgentBurst(message.channel, slug, typoResult.typoText, replyToId);
       if (Math.random() < 0.15) maybeEditMessage(sentMsg, slug, reply).catch(() => {});
-      setTimeout(async () => {
-        try { await sendAsAgent(message.channel, slug, typoResult.correction); } catch {}
-      }, 2000 + Math.random() * 3000);
+      setTimeout(
+        async () => {
+          try {
+            await sendAsAgent(message.channel, slug, typoResult.correction);
+          } catch {}
+        },
+        2000 + Math.random() * 3000
+      );
     } else {
       const sentMsg = await sendAsAgentBurst(message.channel, slug, finalReply, replyToId);
       if (Math.random() < 0.15) maybeEditMessage(sentMsg, slug, reply).catch(() => {});
@@ -390,7 +435,6 @@ discord.on('messageCreate', async message => {
 
     // Create a poll if the reply implies a decision — non-blocking
     maybeSendPoll(message.channel, slug, reply).catch(() => {});
-
   } catch (err) {
     clearInterval(typing);
     log(`[${slug}] error: ${err.message?.slice(0, 200)}`);
@@ -401,15 +445,17 @@ discord.on('messageCreate', async message => {
 // ── Ready ─────────────────────────────────────────────────────────────────────
 discord.once('ready', () => {
   const provider =
-    config.provider === 'auto'      ? 'auto  (Groq free · Anthropic Opus for senior 4)' :
-    config.provider === 'groq'      ? `groq  (${config.model_groq})` :
-    /* anthropic */                   `anthropic  (${config.model_opus} / ${config.model_sonnet})`;
+    config.provider === 'auto'
+      ? 'auto  (Groq free · Anthropic Opus for senior 4)'
+      : config.provider === 'groq'
+        ? `groq  (${config.model_groq})`
+        : /* anthropic */ `anthropic  (${config.model_opus} / ${config.model_sonnet})`;
 
   console.log(`\n◈ Based HQ  →  ${discord.user.tag}`);
   console.log(`  Provider : ${provider}`);
   console.log(`  Ollama   : ${OLLAMA_BASE_URL} (${MODEL_OLLAMA})`);
-  console.log(`  Groq     : ${groq       ? '✓ configured (free)' : '✗ not configured'}`);
-  console.log(`  Anthropic: ${anthropic  ? '✓ configured'        : '✗ not configured'}`);
+  console.log(`  Groq     : ${groq ? '✓ configured (free)' : '✗ not configured'}`);
+  console.log(`  Anthropic: ${anthropic ? '✓ configured' : '✗ not configured'}`);
   console.log(`  Council  : #${COUNCIL_CHANNEL}`);
   console.log(`\n  Post in #${COUNCIL_CHANNEL} to start a group meeting.\n`);
 
@@ -420,9 +466,14 @@ discord.once('ready', () => {
   const logChannelName = config.log_channel || 'bot-logs';
   for (const guild of discord.guilds.cache.values()) {
     const ch = guild.channels.cache.find(c => c.name === logChannelName && c.isTextBased?.());
-    if (ch) { logChannel = ch; break; }
+    if (ch) {
+      logChannel = ch;
+      break;
+    }
   }
-  log(`Bot started. Provider: ${provider}. Log channel: ${logChannel ? '#' + logChannelName : 'none'}`);
+  log(
+    `Bot started. Provider: ${provider}. Log channel: ${logChannel ? '#' + logChannelName : 'none'}`
+  );
 
   // Register main client under the listener agent slug (default: orchestrator)
   const listenerSlug = config.listener_agent || 'orchestrator';
@@ -431,23 +482,33 @@ discord.once('ready', () => {
   // Connect individual agent bots (if tokens configured)
   if (config.agent_tokens && Object.keys(config.agent_tokens).length) {
     console.log('\n[clients] Connecting individual agent bots...');
-    initAgentClients(config.agent_tokens, config.discord_token).then(() => {
-      console.log('[clients] Agent bots ready.\n');
-    }).catch(err => {
-      console.error('[clients] Agent bot init failed:', err.message);
-    });
+    initAgentClients(config.agent_tokens, config.discord_token)
+      .then(() => {
+        console.log('[clients] Agent bots ready.\n');
+      })
+      .catch(err => {
+        console.error('[clients] Agent bot init failed:', err.message);
+      });
   } else {
     console.log('\n[clients] No agent_tokens in config — all agents using webhook fallback.');
-    console.log('          Add individual bot tokens to config.json to give each agent their own identity.\n');
+    console.log(
+      '          Add individual bot tokens to config.json to give each agent their own identity.\n'
+    );
   }
 });
 
 discord.on('error', e => console.error('Discord error:', e));
 process.on('unhandledRejection', e => console.error('Unhandled:', e));
-process.on('SIGINT',  async () => { await destroyAll(); process.exit(0); });
-process.on('SIGTERM', async () => { await destroyAll(); process.exit(0); });
+process.on('SIGINT', async () => {
+  await destroyAll();
+  process.exit(0);
+});
+process.on('SIGTERM', async () => {
+  await destroyAll();
+  process.exit(0);
+});
 
-const listenerSlug  = config.listener_agent || 'orchestrator';
+const listenerSlug = config.listener_agent || 'orchestrator';
 const listenerToken = config.discord_token || config.agent_tokens?.[listenerSlug];
 if (!listenerToken) {
   console.error(`ERROR: No discord_token and no agent_tokens.${listenerSlug} found in config.json`);

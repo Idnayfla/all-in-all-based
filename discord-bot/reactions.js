@@ -1,24 +1,24 @@
 'use strict';
 const { getAgentClient, getAgentUserIdMap } = require('./clients');
-const { AGENTS }                            = require('./agents');
+const { AGENTS } = require('./agents');
 
 const AGENT_REACTIONS = {
-  'orchestrator':     ['✅', '👍'],
-  'architect':        ['🤔', '👀'],
-  'senior-engineer':  ['👀', '🔥', '💀'],
-  'ai-engineer':      ['🔥', '👀', '🤯'],
-  'product':          ['✅', '👍', '🎯'],
-  'designer':         ['🔥', '✨', '👀'],
-  'devops':           ['👍', '👀', '⚠️'],
-  'security':         ['👀', '🤔', '⚠️'],
-  'qa':               ['🐛', '👀', '✅'],
-  'growth':           ['🔥', '📈', '✅'],
-  'data-analyst':     ['📊', '👀', '🤔'],
-  'mobile':           ['👍', '👀', '😬'],
-  'finance':          ['👍', '🤔', '📊'],
-  'legal':            ['👀', '✅', '🤔'],
-  'community':        ['❤️', '🔥', '✅'],
-  'chief-of-staff':   ['✅', '👍', '📝'],
+  orchestrator: ['✅', '👍'],
+  architect: ['🤔', '👀'],
+  'senior-engineer': ['👀', '🔥', '💀'],
+  'ai-engineer': ['🔥', '👀', '🤯'],
+  product: ['✅', '👍', '🎯'],
+  designer: ['🔥', '✨', '👀'],
+  devops: ['👍', '👀', '⚠️'],
+  security: ['👀', '🤔', '⚠️'],
+  qa: ['🐛', '👀', '✅'],
+  growth: ['🔥', '📈', '✅'],
+  'data-analyst': ['📊', '👀', '🤔'],
+  mobile: ['👍', '👀', '😬'],
+  finance: ['👍', '🤔', '📊'],
+  legal: ['👀', '✅', '🤔'],
+  community: ['❤️', '🔥', '✅'],
+  'chief-of-staff': ['✅', '👍', '📝'],
   'technical-writer': ['✅', '👍', '✏️'],
 };
 
@@ -38,12 +38,12 @@ async function reactToMessage(message) {
     const client = getAgentClient(slug);
     if (!client) continue;
 
-    const pool  = AGENT_REACTIONS[slug] || ['👍'];
+    const pool = AGENT_REACTIONS[slug] || ['👍'];
     const emoji = pool[Math.floor(Math.random() * pool.length)];
 
     await new Promise(r => setTimeout(r, 800 + Math.random() * 3000));
     try {
-      const ch  = await client.channels.fetch(message.channel.id).catch(() => null);
+      const ch = await client.channels.fetch(message.channel.id).catch(() => null);
       if (!ch) continue;
       const msg = await ch.messages.fetch(message.id).catch(() => null);
       if (!msg) continue;
@@ -54,7 +54,7 @@ async function reactToMessage(message) {
 
 // Agents react to each other's bot messages — max 1, 6% chance, can't self-react
 async function reactToAgentMessage(message) {
-  const agentIds  = getAgentUserIdMap();
+  const agentIds = getAgentUserIdMap();
   const senderSlug = agentIds.get(message.author.id);
   if (!senderSlug) return;
 
@@ -68,11 +68,11 @@ async function reactToAgentMessage(message) {
   for (const slug of candidates) {
     const client = getAgentClient(slug);
     if (!client) continue;
-    const pool  = AGENT_REACTIONS[slug] || ['👍'];
+    const pool = AGENT_REACTIONS[slug] || ['👍'];
     const emoji = pool[Math.floor(Math.random() * pool.length)];
     await new Promise(r => setTimeout(r, 1000 + Math.random() * 3000));
     try {
-      const ch  = await client.channels.fetch(message.channel.id).catch(() => null);
+      const ch = await client.channels.fetch(message.channel.id).catch(() => null);
       if (!ch) continue;
       const msg = await ch.messages.fetch(message.id).catch(() => null);
       if (!msg) continue;

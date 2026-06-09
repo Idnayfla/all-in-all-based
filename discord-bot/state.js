@@ -4,6 +4,8 @@
 let lastHusMessageAt = Date.now();
 
 module.exports = {
-  updateLastHusMessage: () => { lastHusMessageAt = Date.now(); },
-  getLastHusMessage:    () => lastHusMessageAt,
+  updateLastHusMessage: () => {
+    lastHusMessageAt = Date.now();
+  },
+  getLastHusMessage: () => lastHusMessageAt,
 };

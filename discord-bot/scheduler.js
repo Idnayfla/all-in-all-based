@@ -1,11 +1,11 @@
 'use strict';
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 const { STANDUP_HOUR_UTC, COUNCIL_CHANNEL } = require('./config');
 const { AGENTS, dispatchAgent } = require('./agents');
 const { getLastHusMessage } = require('./state');
 
-let discordClient   = null;
+let discordClient = null;
 let councilChannelId = null;
 
 // ── Init — call once after Discord ready ──────────────────────────────────────
@@ -57,7 +57,7 @@ function splitLong(text, max = 1900) {
 
 // ── Schedule daily standup ────────────────────────────────────────────────────
 function scheduleStandup() {
-  const now  = new Date();
+  const now = new Date();
   const next = new Date(now);
   next.setUTCHours(STANDUP_HOUR_UTC, 0, 0, 0);
   if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
@@ -79,7 +79,9 @@ async function runDailyStandup() {
   console.log('[scheduler] Running daily standup');
 
   const day = new Date().toLocaleDateString('en-SG', {
-    weekday: 'long', day: 'numeric', month: 'short',
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
     timeZone: 'Asia/Singapore',
   });
 
@@ -98,11 +100,9 @@ Then post a concise standup covering:
 Be direct. Max 300 words. Use Discord markdown.`;
 
   try {
-    const standup = await dispatchAgent(
-      'chief-of-staff',
-      [{ role: 'user', content: prompt }],
-      { onProgress: async () => {} }
-    );
+    const standup = await dispatchAgent('chief-of-staff', [{ role: 'user', content: prompt }], {
+      onProgress: async () => {},
+    });
     await postToCouncil(`**Daily Standup — ${day}**\n\n${standup}`, 'chief-of-staff');
   } catch (err) {
     console.error('[scheduler] Standup failed:', err.message);
@@ -111,12 +111,36 @@ Be direct. Max 300 words. Use Discord markdown.`;
 
 // ── Proactive agent check-ins — Haiku/Groq only, never Opus ──────────────────
 const PROACTIVE = [
-  { slug: 'growth',         prompt: 'You\'re Leila. Share one short observation about Based\'s growth, marketing, or user traction — something you noticed that\'s worth mentioning to the team. One or two sentences max, casual tone.' },
-  { slug: 'devops',         prompt: 'You\'re Lars. Give a one-line infra or cost check-in. Something you\'d naturally mention to the team. Keep it short and dry.' },
-  { slug: 'chief-of-staff', prompt: 'You\'re Priya. Post a brief status note — a decision that needs making, something that\'s drifting, or a quick reminder to the team. One or two sentences.' },
-  { slug: 'community',      prompt: 'You\'re Beatrix. Share something you heard from users recently — a piece of feedback, a sentiment, something the team should know. One or two sentences.' },
-  { slug: 'qa',             prompt: 'You\'re Samara. Share a quick quality or stability observation — something you noticed while checking the app, a potential edge case, or a reassurance that things look solid. One or two sentences.' },
-  { slug: 'product',        prompt: 'You\'re Jordan. Drop a quick product thought — something about the roadmap, user behaviour, or a feature direction worth flagging. One or two sentences.' },
+  {
+    slug: 'growth',
+    prompt:
+      "You're Leila. Share one short observation about Based's growth, marketing, or user traction — something you noticed that's worth mentioning to the team. One or two sentences max, casual tone.",
+  },
+  {
+    slug: 'devops',
+    prompt:
+      "You're Lars. Give a one-line infra or cost check-in. Something you'd naturally mention to the team. Keep it short and dry.",
+  },
+  {
+    slug: 'chief-of-staff',
+    prompt:
+      "You're Priya. Post a brief status note — a decision that needs making, something that's drifting, or a quick reminder to the team. One or two sentences.",
+  },
+  {
+    slug: 'community',
+    prompt:
+      "You're Beatrix. Share something you heard from users recently — a piece of feedback, a sentiment, something the team should know. One or two sentences.",
+  },
+  {
+    slug: 'qa',
+    prompt:
+      "You're Samara. Share a quick quality or stability observation — something you noticed while checking the app, a potential edge case, or a reassurance that things look solid. One or two sentences.",
+  },
+  {
+    slug: 'product',
+    prompt:
+      "You're Jordan. Drop a quick product thought — something about the roadmap, user behaviour, or a feature direction worth flagging. One or two sentences.",
+  },
 ];
 
 async function runProactiveCheckin() {
@@ -165,16 +189,24 @@ function scheduleProactiveCheckins() {
 
 // ── Agent-to-agent conversations — Haiku/Groq only, never Opus ───────────────
 const AGENT_PAIRS = [
-  { a: 'growth',          b: 'community',       topic: 'what users are saying and how to respond to it' },
-  { a: 'product',         b: 'chief-of-staff',  topic: 'roadmap priorities or something that needs a decision' },
-  { a: 'designer',        b: 'product',         topic: 'a UI/UX or design direction question' },
-  { a: 'devops',          b: 'security',        topic: 'infra security or deployment risk they want to flag' },
-  { a: 'qa',              b: 'devops',          topic: 'a stability or reliability concern they noticed' },
-  { a: 'qa',              b: 'product',         topic: 'a quality issue or user-facing bug worth discussing' },
-  { a: 'technical-writer',b: 'product',         topic: 'docs, changelog, or something users need to understand' },
-  { a: 'legal',           b: 'chief-of-staff',  topic: 'a compliance or policy thing worth flagging' },
-  { a: 'growth',          b: 'product',         topic: 'acquisition, onboarding, or something slowing growth' },
-  { a: 'community',       b: 'product',         topic: 'user feedback or a request they\'ve heard repeatedly' },
+  { a: 'growth', b: 'community', topic: 'what users are saying and how to respond to it' },
+  {
+    a: 'product',
+    b: 'chief-of-staff',
+    topic: 'roadmap priorities or something that needs a decision',
+  },
+  { a: 'designer', b: 'product', topic: 'a UI/UX or design direction question' },
+  { a: 'devops', b: 'security', topic: 'infra security or deployment risk they want to flag' },
+  { a: 'qa', b: 'devops', topic: 'a stability or reliability concern they noticed' },
+  { a: 'qa', b: 'product', topic: 'a quality issue or user-facing bug worth discussing' },
+  {
+    a: 'technical-writer',
+    b: 'product',
+    topic: 'docs, changelog, or something users need to understand',
+  },
+  { a: 'legal', b: 'chief-of-staff', topic: 'a compliance or policy thing worth flagging' },
+  { a: 'growth', b: 'product', topic: 'acquisition, onboarding, or something slowing growth' },
+  { a: 'community', b: 'product', topic: "user feedback or a request they've heard repeatedly" },
 ];
 
 async function runAgentConversation() {
@@ -235,43 +267,46 @@ function scheduleAgentConversations() {
 // ── Hus check-in — agents check on Hus after 2.5h of silence ─────────────────
 // Haiku/Groq only — Kai (Opus) should not fire on a timer
 const CHECKIN_AGENTS = [
-  { slug: 'chief-of-staff', message: "everything alright on your end?" },
-  { slug: 'community',      message: "hey, still there? been quiet" },
-  { slug: 'growth',         message: "hey, you doing okay?" },
-  { slug: 'devops',         message: "still alive? nothing's crashed afaik" },
-  { slug: 'qa',             message: "hey, you good? went quiet" },
+  { slug: 'chief-of-staff', message: 'everything alright on your end?' },
+  { slug: 'community', message: 'hey, still there? been quiet' },
+  { slug: 'growth', message: 'hey, you doing okay?' },
+  { slug: 'devops', message: "still alive? nothing's crashed afaik" },
+  { slug: 'qa', message: 'hey, you good? went quiet' },
 ];
 
 let lastCheckinSentAt = 0;
-const CHECKIN_QUIET_MS   = 2.5 * 60 * 60 * 1000; // 2.5h of Hus silence
-const CHECKIN_COOLDOWN_MS = 4  * 60 * 60 * 1000;  // max once per 4h
+const CHECKIN_QUIET_MS = 2.5 * 60 * 60 * 1000; // 2.5h of Hus silence
+const CHECKIN_COOLDOWN_MS = 4 * 60 * 60 * 1000; // max once per 4h
 
 function scheduleHusCheckin() {
-  setInterval(async () => {
-    if (!councilChannelId || !discordClient) return;
-    const now = Date.now();
-    if (now - getLastHusMessage() < CHECKIN_QUIET_MS) return;
-    if (now - lastCheckinSentAt  < CHECKIN_COOLDOWN_MS) return;
+  setInterval(
+    async () => {
+      if (!councilChannelId || !discordClient) return;
+      const now = Date.now();
+      if (now - getLastHusMessage() < CHECKIN_QUIET_MS) return;
+      if (now - lastCheckinSentAt < CHECKIN_COOLDOWN_MS) return;
 
-    const item = CHECKIN_AGENTS[Math.floor(Math.random() * CHECKIN_AGENTS.length)];
-    lastCheckinSentAt = now;
+      const item = CHECKIN_AGENTS[Math.floor(Math.random() * CHECKIN_AGENTS.length)];
+      lastCheckinSentAt = now;
 
-    try {
-      const channel = await discordClient.channels.fetch(councilChannelId);
-      if (!channel) return;
-      const { sendAsAgent } = require('./messenger');
-      await sendAsAgent(channel, item.slug, item.message);
-      console.log(`[scheduler] Hus check-in from ${item.slug}`);
-    } catch (err) {
-      console.error('[scheduler] Hus check-in failed:', err.message);
-    }
-  }, 20 * 60 * 1000);
+      try {
+        const channel = await discordClient.channels.fetch(councilChannelId);
+        if (!channel) return;
+        const { sendAsAgent } = require('./messenger');
+        await sendAsAgent(channel, item.slug, item.message);
+        console.log(`[scheduler] Hus check-in from ${item.slug}`);
+      } catch (err) {
+        console.error('[scheduler] Hus check-in failed:', err.message);
+      }
+    },
+    20 * 60 * 1000
+  );
   console.log('[scheduler] Hus check-in watcher scheduled');
 }
 
 // ── brb / back — agent steps away and comes back ─────────────────────────────
-const BRB_AGENTS   = ['community', 'growth', 'designer', 'qa', 'chief-of-staff', 'product', 'legal'];
-const BRB_PHRASES  = ['brb', 'brb one sec', 'brb real quick', 'stepping away for a bit'];
+const BRB_AGENTS = ['community', 'growth', 'designer', 'qa', 'chief-of-staff', 'product', 'legal'];
+const BRB_PHRASES = ['brb', 'brb one sec', 'brb real quick', 'stepping away for a bit'];
 const BACK_PHRASES = ['back', 'back.', 'k back', 'ok back', 'back now'];
 
 async function runBrbBack() {
@@ -293,28 +328,44 @@ async function runBrbBack() {
 
 function scheduleBrbBack() {
   const fireNext = () => {
-    setTimeout(async () => { await runBrbBack(); fireNext(); },
-      (8 + Math.random() * 8) * 60 * 60 * 1000); // every 8-16h
+    setTimeout(
+      async () => {
+        await runBrbBack();
+        fireNext();
+      },
+      (8 + Math.random() * 8) * 60 * 60 * 1000
+    ); // every 8-16h
   };
-  setTimeout(async () => { await runBrbBack(); fireNext(); },
-    (4 + Math.random() * 4) * 60 * 60 * 1000); // first: 4-8h after startup
+  setTimeout(
+    async () => {
+      await runBrbBack();
+      fireNext();
+    },
+    (4 + Math.random() * 4) * 60 * 60 * 1000
+  ); // first: 4-8h after startup
   console.log('[scheduler] brb/back scheduled');
 }
 
 // ── Status rotation — agents cycle their Discord custom status every 2-4h ─────
 function scheduleStatusRotation() {
   const fireNext = () => {
-    setTimeout(() => {
+    setTimeout(
+      () => {
+        const { rotateRandomStatuses } = require('./clients');
+        rotateRandomStatuses();
+        fireNext();
+      },
+      (2 + Math.random() * 2) * 60 * 60 * 1000
+    ); // 2-4h
+  };
+  setTimeout(
+    () => {
       const { rotateRandomStatuses } = require('./clients');
       rotateRandomStatuses();
       fireNext();
-    }, (2 + Math.random() * 2) * 60 * 60 * 1000); // 2-4h
-  };
-  setTimeout(() => {
-    const { rotateRandomStatuses } = require('./clients');
-    rotateRandomStatuses();
-    fireNext();
-  }, (1 + Math.random()) * 60 * 60 * 1000); // first: 1-2h after startup
+    },
+    (1 + Math.random()) * 60 * 60 * 1000
+  ); // first: 1-2h after startup
   console.log('[scheduler] Status rotation scheduled');
 }
 
@@ -324,10 +375,14 @@ const SCHEDULED_FILE = path.join(__dirname, 'scheduled-messages.json');
 async function fireScheduledMessages() {
   if (!discordClient) return;
   let scheduled = [];
-  try { scheduled = JSON.parse(fs.readFileSync(SCHEDULED_FILE, 'utf-8')); } catch { return; }
+  try {
+    scheduled = JSON.parse(fs.readFileSync(SCHEDULED_FILE, 'utf-8'));
+  } catch {
+    return;
+  }
 
   const now = Date.now();
-  const pending  = scheduled.filter(m => new Date(m.fireAt).getTime() <= now);
+  const pending = scheduled.filter(m => new Date(m.fireAt).getTime() <= now);
   const remaining = scheduled.filter(m => new Date(m.fireAt).getTime() > now);
 
   if (!pending.length) return;
@@ -338,7 +393,9 @@ async function fireScheduledMessages() {
       if (!guild) continue;
 
       // Resolve channel by ID first, then by name
-      let channel = entry.channelId ? await discordClient.channels.fetch(entry.channelId).catch(() => null) : null;
+      let channel = entry.channelId
+        ? await discordClient.channels.fetch(entry.channelId).catch(() => null)
+        : null;
       if (!channel && entry.channelName) {
         channel = guild.channels.cache.find(c => c.name === entry.channelName && c.isTextBased?.());
       }
@@ -349,7 +406,9 @@ async function fireScheduledMessages() {
 
       const { sendAsAgent } = require('./messenger');
       await sendAsAgent(channel, entry.slug, entry.message);
-      console.log(`[scheduler] Fired scheduled message from ${entry.slug}: "${entry.message.slice(0, 60)}"`);
+      console.log(
+        `[scheduler] Fired scheduled message from ${entry.slug}: "${entry.message.slice(0, 60)}"`
+      );
     } catch (err) {
       console.error('[scheduler] Scheduled message failed:', err.message);
     }

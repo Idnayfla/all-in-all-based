@@ -10,10 +10,10 @@
  */
 
 const { WebhookClient, AttachmentBuilder } = require('discord.js');
-const { AGENTS }          = require('./agents');
-const { getAgentClient }  = require('./clients');
-const fs                  = require('fs');
-const path                = require('path');
+const { AGENTS } = require('./agents');
+const { getAgentClient } = require('./clients');
+const fs = require('fs');
+const path = require('path');
 
 // ── Webhook cache ─────────────────────────────────────────────────────────────
 const webhookCache = new Map();
@@ -53,20 +53,22 @@ function splitMessage(text, max = 1900) {
 
 // ── Build Discord attachment objects from file paths or URLs ──────────────────
 function buildAttachments(files = []) {
-  return files.map(f => {
-    if (typeof f === 'string') {
-      // URL — Discord will embed images/videos automatically
-      if (f.startsWith('http://') || f.startsWith('https://')) {
-        return new AttachmentBuilder(f);
+  return files
+    .map(f => {
+      if (typeof f === 'string') {
+        // URL — Discord will embed images/videos automatically
+        if (f.startsWith('http://') || f.startsWith('https://')) {
+          return new AttachmentBuilder(f);
+        }
+        // Local path
+        if (fs.existsSync(f)) {
+          return new AttachmentBuilder(f, { name: path.basename(f) });
+        }
       }
-      // Local path
-      if (fs.existsSync(f)) {
-        return new AttachmentBuilder(f, { name: path.basename(f) });
-      }
-    }
-    // Already an AttachmentBuilder or buffer
-    return f;
-  }).filter(Boolean);
+      // Already an AttachmentBuilder or buffer
+      return f;
+    })
+    .filter(Boolean);
 }
 
 // ── Send via agent's own client ───────────────────────────────────────────────
@@ -75,7 +77,9 @@ async function sendViaClient(agentClient, channel, content, files = [], replyToI
   if (!ch) throw new Error(`Agent client cannot access channel ${channel.id}`);
 
   const attachments = buildAttachments(files);
-  const replyOpt = replyToId ? { reply: { messageReference: replyToId, failIfNotExists: false } } : {};
+  const replyOpt = replyToId
+    ? { reply: { messageReference: replyToId, failIfNotExists: false } }
+    : {};
   let lastMsg = null;
 
   if (attachments.length) {
@@ -94,19 +98,20 @@ async function sendViaClient(agentClient, channel, content, files = [], replyToI
 // ── Send via webhook — with retry so multi-part messages don't get cut off ────
 async function sendViaWebhook(channel, slug, content, files = []) {
   const agent = AGENTS[slug] || { name: slug, icon: '◈', avatarURL: null };
-  const wh    = await getWebhook(channel);
+  const wh = await getWebhook(channel);
 
   const base = {
-    username:        `${agent.icon} ${agent.name}`,
-    avatarURL:       agent.avatarURL || undefined,
+    username: `${agent.icon} ${agent.name}`,
+    avatarURL: agent.avatarURL || undefined,
     allowedMentions: { parse: [] },
   };
   if (channel.isThread?.()) base.threadId = channel.id;
 
-  const whSend = async (payload) => {
+  const whSend = async payload => {
     for (let attempt = 0; attempt < 3; attempt++) {
-      try { return await wh.send(payload); }
-      catch (err) {
+      try {
+        return await wh.send(payload);
+      } catch (err) {
         if (attempt === 2) throw err;
         await new Promise(r => setTimeout(r, 800 * (attempt + 1)));
       }
@@ -130,8 +135,11 @@ async function sendAsAgent(channel, slug, content, replyToId = null) {
   if (!content?.trim()) return null;
   const client = getAgentClient(slug);
   if (client) {
-    try { return await sendViaClient(client, channel, content, [], replyToId); }
-    catch (err) { console.warn(`[messenger] ${slug} client failed (${err.message}) — webhook fallback`); }
+    try {
+      return await sendViaClient(client, channel, content, [], replyToId);
+    } catch (err) {
+      console.warn(`[messenger] ${slug} client failed (${err.message}) — webhook fallback`);
+    }
   }
   await sendViaWebhook(channel, slug, content);
   return null;
@@ -143,8 +151,14 @@ async function sendAsAgentWithFiles(channel, slug, content, files = []) {
 
   const client = getAgentClient(slug);
   if (client) {
-    try { await sendViaClient(client, channel, content, files); return; }
-    catch (err) { console.warn(`[messenger] ${slug} client file send failed (${err.message}) — webhook fallback`); }
+    try {
+      await sendViaClient(client, channel, content, files);
+      return;
+    } catch (err) {
+      console.warn(
+        `[messenger] ${slug} client file send failed (${err.message}) — webhook fallback`
+      );
+    }
   }
   await sendViaWebhook(channel, slug, content, files);
 }
@@ -159,7 +173,10 @@ function splitIntoBursts(text) {
   if (text.includes('```') || /^#{1,3} /m.test(text)) return null;
 
   // Paragraph splits (most natural boundary)
-  const paras = text.split(/\n\n+/).map(p => p.trim()).filter(p => p.length > 10);
+  const paras = text
+    .split(/\n\n+/)
+    .map(p => p.trim())
+    .filter(p => p.length > 10);
   if (paras.length >= 2 && paras.length <= 4) return paras;
 
   // Sentence boundary splits
@@ -184,7 +201,7 @@ function splitIntoBursts(text) {
 async function sendAsAgentBurst(channel, slug, content, replyToId = null) {
   if (!content?.trim()) return null;
 
-  if (content.length > 100 && Math.random() < 0.30) {
+  if (content.length > 100 && Math.random() < 0.3) {
     const chunks = splitIntoBursts(content);
     if (chunks && chunks.length >= 2) {
       let lastMsg = null;
@@ -198,7 +215,12 @@ async function sendAsAgentBurst(channel, slug, content, replyToId = null) {
         lastMsg = await sendAsAgent(channel, slug, chunk, i === 0 ? replyToId : null);
       }
       if (Math.random() < 0.05) {
-        setTimeout(() => { channel.sendTyping().catch(() => {}); }, 2000 + Math.random() * 3000);
+        setTimeout(
+          () => {
+            channel.sendTyping().catch(() => {});
+          },
+          2000 + Math.random() * 3000
+        );
       }
       return lastMsg;
     }
@@ -207,10 +229,21 @@ async function sendAsAgentBurst(channel, slug, content, replyToId = null) {
   const msg = await sendAsAgent(channel, slug, content, replyToId);
 
   if (Math.random() < 0.05) {
-    setTimeout(() => { channel.sendTyping().catch(() => {}); }, 2000 + Math.random() * 3000);
+    setTimeout(
+      () => {
+        channel.sendTyping().catch(() => {});
+      },
+      2000 + Math.random() * 3000
+    );
   }
 
   return msg;
 }
 
-module.exports = { sendAsAgent, sendAsAgentBurst, sendAsAgentWithFiles, sendAsOrchestrator, splitMessage };
+module.exports = {
+  sendAsAgent,
+  sendAsAgentBurst,
+  sendAsAgentWithFiles,
+  sendAsOrchestrator,
+  splitMessage,
+};

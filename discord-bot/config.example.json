@@ -17,35 +17,35 @@
 
   "provider": "auto",
 
-  "model_groq":   "llama-3.3-70b-versatile",
-  "model_opus":   "claude-opus-4-8",
+  "model_groq": "llama-3.3-70b-versatile",
+  "model_opus": "claude-opus-4-8",
   "model_sonnet": "claude-sonnet-4-6",
 
   "exa_api_key": "your exa key for web search",
 
-  "council_channel":   "council",
-  "standup_hour_utc":  1,
+  "council_channel": "council",
+  "standup_hour_utc": 1,
 
   "project_root": "",
-  "agents_dir":   "",
+  "agents_dir": "",
 
   "agent_tokens": {
-    "orchestrator":       "Bot token for Orchestrator",
-    "architect":          "Bot token for Architect",
-    "senior-engineer":    "Bot token for Senior Engineer",
-    "ai-engineer":        "Bot token for AI Engineer",
-    "product":            "Bot token for Product",
-    "designer":           "Bot token for Designer",
-    "devops":             "Bot token for DevOps",
-    "security":           "Bot token for Security",
-    "qa":                 "Bot token for QA",
-    "growth":             "Bot token for Growth",
-    "data-analyst":       "Bot token for Data Analyst",
-    "mobile":             "Bot token for Mobile",
-    "finance":            "Bot token for Finance",
-    "legal":              "Bot token for Legal",
-    "community":          "Bot token for Community",
-    "chief-of-staff":     "Bot token for Chief of Staff",
-    "technical-writer":   "Bot token for Technical Writer"
+    "orchestrator": "Bot token for Orchestrator",
+    "architect": "Bot token for Architect",
+    "senior-engineer": "Bot token for Senior Engineer",
+    "ai-engineer": "Bot token for AI Engineer",
+    "product": "Bot token for Product",
+    "designer": "Bot token for Designer",
+    "devops": "Bot token for DevOps",
+    "security": "Bot token for Security",
+    "qa": "Bot token for QA",
+    "growth": "Bot token for Growth",
+    "data-analyst": "Bot token for Data Analyst",
+    "mobile": "Bot token for Mobile",
+    "finance": "Bot token for Finance",
+    "legal": "Bot token for Legal",
+    "community": "Bot token for Community",
+    "chief-of-staff": "Bot token for Chief of Staff",
+    "technical-writer": "Bot token for Technical Writer"
   }
 }

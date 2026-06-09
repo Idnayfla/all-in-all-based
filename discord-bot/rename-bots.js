@@ -8,22 +8,22 @@
 const config = require('./config.json');
 
 const NAMES = {
-  'orchestrator':     'Maya',
-  'architect':        'Marcus',
-  'senior-engineer':  'Kai',
-  'ai-engineer':      'Zoe',
-  'product':          'Jordan',
-  'designer':         'Ren',
-  'devops':           'Lars',
-  'security':         'Dani',
-  'qa':               'Sam',
-  'growth':           'Leila',
-  'data-analyst':     'Felix',
-  'mobile':           'Tomas',
-  'finance':          'Yuki',
-  'legal':            'Asha',
-  'community':        'Bea',
-  'chief-of-staff':   'Priya',
+  orchestrator: 'Maya',
+  architect: 'Marcus',
+  'senior-engineer': 'Kai',
+  'ai-engineer': 'Zoe',
+  product: 'Jordan',
+  designer: 'Ren',
+  devops: 'Lars',
+  security: 'Dani',
+  qa: 'Sam',
+  growth: 'Leila',
+  'data-analyst': 'Felix',
+  mobile: 'Tomas',
+  finance: 'Yuki',
+  legal: 'Asha',
+  community: 'Bea',
+  'chief-of-staff': 'Priya',
   'technical-writer': 'Owen',
 };
 
@@ -33,7 +33,7 @@ async function rename(slug, token, name) {
   const res = await fetch('https://discord.com/api/v10/users/@me', {
     method: 'PATCH',
     headers: {
-      'Authorization': `Bot ${token}`,
+      Authorization: `Bot ${token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ username: name }),

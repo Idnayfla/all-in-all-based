@@ -47,11 +47,11 @@ function splitMessage(text, max = 1900) {
 // ── Send a message as a specific agent ───────────────────────────────────────
 async function sendAsAgent(channel, slug, content) {
   const agent = AGENTS[slug] || { name: slug, icon: '◈', avatarURL: null };
-  const wh    = await getWebhook(channel);
+  const wh = await getWebhook(channel);
 
   const base = {
-    username:        `${agent.icon} ${agent.name}`,
-    avatarURL:       agent.avatarURL || undefined,
+    username: `${agent.icon} ${agent.name}`,
+    avatarURL: agent.avatarURL || undefined,
     allowedMentions: { parse: [] },
   };
 
