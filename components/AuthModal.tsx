@@ -105,10 +105,10 @@ export default function AuthModal({ defaultTab = 'signin', onClose }: Props) {
     >
       <motion.div
         className="auth-box"
-        initial={{ opacity: 0, scale: 0.94, y: -12 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.94, y: -12 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+        initial={{ opacity: 0, scale: 0.97 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.97 }}
+        transition={{ duration: 0.18, ease: 'easeOut' }}
       >
         {onClose && (
           <button className="auth-close-btn" onClick={onClose} aria-label="Close">

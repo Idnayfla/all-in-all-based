@@ -25,6 +25,7 @@ const eslintConfig = defineConfig([
     'electron/**',
     'public/**',
     '.claude/worktrees/**',
+    'discord-bot/**',
   ]),
 ]);
 

@@ -228,8 +228,7 @@ export default function Home() {
   const [authTab, setAuthTab] = useState<'signin' | 'signup'>('signin');
   const [theme, setTheme] = useState<AppTheme>(DEFAULT_THEME);
   const [showMemoryManager, setShowMemoryManager] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [createError] = useState<string | null>(null);
   // Seed subscription tier from localStorage so Pro users see Pro immediately on
   // refresh, before the async /api/settings call resolves. This prevents the race
   // where auth-session hydration is slow and the fetch fires with an empty token,
@@ -1228,7 +1227,11 @@ export default function Home() {
           }}
         />
       )}
-      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+      {showSplash && (
+        <SplashScreen
+          onDone={() => setShowSplash(false)}
+        />
+      )}
       {subscription.tier === 'pro' && <div className="pro-crown-strip" />}
       <header className="app-header">
         <div
@@ -1237,7 +1240,7 @@ export default function Home() {
           title={currentProject ? 'Back to home' : undefined}
         >
           <span className="brand-logo-wrap">
-            <img
+            <NextImage
               src="/brand-icon-loop.svg"
               className="brand-logo-icon"
               alt="Based"
@@ -2201,7 +2204,7 @@ export default function Home() {
               </div>
             ) : !currentProject ? (
               <div className="no-project">
-                <img
+                <NextImage
                   src="/brand-icon-loop.svg"
                   className="chat-empty-logo"
                   alt="Based"
