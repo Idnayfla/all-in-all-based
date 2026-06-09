@@ -580,10 +580,11 @@ export default function ChatPanel({
       });
       const data = await res.json();
       if (res.status === 401 || res.status === 403) {
-        if (onProRequired) {
-          onProRequired();
-          return;
-        }
+        // Remove the loading placeholder before opening the paywall so the
+        // chat doesn't get permanently stuck showing "Generating image…"
+        setMessages(prev => prev.slice(0, -1));
+        if (onProRequired) onProRequired();
+        return;
       }
       if (data.error) throw new Error(data.error);
       setMessages(prev => [
@@ -635,6 +636,7 @@ export default function ChatPanel({
       });
       const data = await res.json();
       if ((res.status === 401 || res.status === 403) && onProRequired) {
+        setMessages(prev => prev.slice(0, -1));
         onProRequired();
         return;
       }
@@ -692,6 +694,7 @@ export default function ChatPanel({
       });
       const data = await res.json();
       if ((res.status === 401 || res.status === 403) && onProRequired) {
+        setMessages(prev => prev.slice(0, -1));
         onProRequired();
         return;
       }
@@ -1617,10 +1620,34 @@ export default function ChatPanel({
           )}
         </AnimatePresence>
         <AnimatePresence>
-          {isGenerating && (
+          {(isGenerating || isGeneratingMedia) && (
             <motion.button
               className="discard-btn"
-              onClick={discardGeneration}
+              onClick={() => {
+                if (isGenerating) {
+                  discardGeneration();
+                } else {
+                  // For media generation, remove the pending loading message and clear state
+                  setMessages(prev => {
+                    const last = prev[prev.length - 1];
+                    if (
+                      last?.role === 'assistant' &&
+                      Array.isArray(last.content) &&
+                      (last.content as Array<{ type: string; text?: string }>).some(
+                        b =>
+                          b.type === 'text' &&
+                          (b.text === '__generating-image__' ||
+                            b.text === '__generating-video__' ||
+                            b.text === '__generating-music__')
+                      )
+                    ) {
+                      return prev.slice(0, -1);
+                    }
+                    return prev;
+                  });
+                  setIsGeneratingMedia(false);
+                }
+              }}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 6 }}
