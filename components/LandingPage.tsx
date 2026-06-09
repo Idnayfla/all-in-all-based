@@ -177,7 +177,6 @@ export default function LandingPage({ onSignIn }: Props) {
           }}
         />
       )}
-
       <header className="landing-header">
         <div className="landing-logo">B&gt;</div>
         <nav className="landing-header-nav">

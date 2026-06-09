@@ -884,6 +884,23 @@ export default function Home() {
     return () => subscription.unsubscribe();
   }, [getHeaders, handleRemix, loadCloudData, runMigration]);
 
+  // ── Fire entrance ripple on login (user falsy → truthy, no route change) ──
+  const prevUserRef = useRef<User | null | undefined>(undefined);
+  useEffect(() => {
+    if (prevUserRef.current === undefined) {
+      prevUserRef.current = user;
+      return; // skip mount
+    }
+    if (!prevUserRef.current && user) {
+      // user just logged in — fire entrance ripple
+      const el = document.createElement('div');
+      el.className = 'landing-entrance-ripple';
+      document.body.appendChild(el);
+      el.addEventListener('animationend', () => el.remove());
+    }
+    prevUserRef.current = user;
+  }, [user]);
+
   // ── Refresh cloud data when window regains focus or Android app resumes ──
   useEffect(() => {
     const onFocus = () => {
