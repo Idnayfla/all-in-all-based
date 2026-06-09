@@ -18,8 +18,12 @@ function test(label, fn) {
   }
 }
 
-function assert(cond, msg) { if (!cond) throw new Error(msg || 'assertion failed'); }
-function assertEqual(a, b) { if (a !== b) throw new Error(`expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`); }
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg || 'assertion failed');
+}
+function assertEqual(a, b) {
+  if (a !== b) throw new Error(`expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`);
+}
 
 // ── Module loading ────────────────────────────────────────────────────────────
 console.log('\n── Module loading ───────────────────────────────────────────────');
@@ -77,9 +81,23 @@ test('scheduler.js loads', () => {
 console.log('\n── Agent registry ───────────────────────────────────────────────');
 
 const EXPECTED_SLUGS = [
-  'orchestrator','architect','senior-engineer','ai-engineer','product',
-  'designer','devops','security','qa','growth','data-analyst','mobile',
-  'finance','legal','community','chief-of-staff','technical-writer',
+  'orchestrator',
+  'architect',
+  'senior-engineer',
+  'ai-engineer',
+  'product',
+  'designer',
+  'devops',
+  'security',
+  'qa',
+  'growth',
+  'data-analyst',
+  'mobile',
+  'finance',
+  'legal',
+  'community',
+  'chief-of-staff',
+  'technical-writer',
 ];
 
 test('all 17 agents registered', () => {
@@ -88,10 +106,10 @@ test('all 17 agents registered', () => {
 
 test('all agents have required fields', () => {
   for (const [slug, a] of Object.entries(require('./agents').AGENTS)) {
-    assert(a.name,     `${slug}: missing name`);
-    assert(a.icon,     `${slug}: missing icon`);
+    assert(a.name, `${slug}: missing name`);
+    assert(a.icon, `${slug}: missing icon`);
     assert(typeof a.opus === 'boolean', `${slug}: opus must be boolean`);
-    assert(a.avatarURL,`${slug}: missing avatarURL`);
+    assert(a.avatarURL, `${slug}: missing avatarURL`);
   }
 });
 
@@ -110,40 +128,40 @@ console.log('\n── isPureGreeting ──────────────�
 
 const { isPureGreeting, isGroupGreeting, sanitize } = require('./council');
 
-test('hey',          () => assert(isPureGreeting('hey')));
-test('Hey!',         () => assert(isPureGreeting('Hey!')));
-test('heyy',         () => assert(isPureGreeting('heyy')));
-test('hi',           () => assert(isPureGreeting('hi')));
-test('hello',        () => assert(isPureGreeting('hello')));
-test('lol',          () => assert(isPureGreeting('lol')));
-test('morning',      () => assert(isPureGreeting('morning')));
-test('hey team',     () => assert(isPureGreeting('hey team')));
+test('hey', () => assert(isPureGreeting('hey')));
+test('Hey!', () => assert(isPureGreeting('Hey!')));
+test('heyy', () => assert(isPureGreeting('heyy')));
+test('hi', () => assert(isPureGreeting('hi')));
+test('hello', () => assert(isPureGreeting('hello')));
+test('lol', () => assert(isPureGreeting('lol')));
+test('morning', () => assert(isPureGreeting('morning')));
+test('hey team', () => assert(isPureGreeting('hey team')));
 test('hey everyone', () => assert(isPureGreeting('hey everyone')));
-test('heyy everyone',() => assert(isPureGreeting('heyy everyone')));
+test('heyy everyone', () => assert(isPureGreeting('heyy everyone')));
 
 test('NOT: what about the rest', () => assert(!isPureGreeting('what about the rest')));
-test('NOT: fix the drum bug',    () => assert(!isPureGreeting('fix the drum bug')));
-test('NOT: what is the current state of the discord bot work?',
-  () => assert(!isPureGreeting('what is the current state of the discord bot work?')));
-test('NOT: are you all there',   () => assert(!isPureGreeting('are you all there')));
-test('NOT: other workers',       () => assert(!isPureGreeting('other workers')));
+test('NOT: fix the drum bug', () => assert(!isPureGreeting('fix the drum bug')));
+test('NOT: what is the current state of the discord bot work?', () =>
+  assert(!isPureGreeting('what is the current state of the discord bot work?')));
+test('NOT: are you all there', () => assert(!isPureGreeting('are you all there')));
+test('NOT: other workers', () => assert(!isPureGreeting('other workers')));
 
 // ── isGroupGreeting ───────────────────────────────────────────────────────────
 console.log('\n── isGroupGreeting ──────────────────────────────────────────────');
 
-test('hey everyone',     () => assert(isGroupGreeting('hey everyone')));
-test('heyy everyone',    () => assert(isGroupGreeting('heyy everyone')));
-test('hi team',          () => assert(isGroupGreeting('hi team')));
+test('hey everyone', () => assert(isGroupGreeting('hey everyone')));
+test('heyy everyone', () => assert(isGroupGreeting('heyy everyone')));
+test('hi team', () => assert(isGroupGreeting('hi team')));
 test('morning everyone', () => assert(isGroupGreeting('morning everyone')));
-test('hello folks',      () => assert(isGroupGreeting('hello folks')));
-test('yo guys',          () => assert(isGroupGreeting('yo guys')));
+test('hello folks', () => assert(isGroupGreeting('hello folks')));
+test('yo guys', () => assert(isGroupGreeting('yo guys')));
 
-test('NOT: what is the state of all features',
-  () => assert(!isGroupGreeting('what is the state of all features')));
-test('NOT: fix the drum bug',  () => assert(!isGroupGreeting('fix the drum bug')));
-test('NOT: what about the rest',() => assert(!isGroupGreeting('what about the rest')));
-test('NOT: are you all here',  () => assert(!isGroupGreeting('are you all here')));
-test('NOT: how is it all going',() => assert(!isGroupGreeting('how is it all going')));
+test('NOT: what is the state of all features', () =>
+  assert(!isGroupGreeting('what is the state of all features')));
+test('NOT: fix the drum bug', () => assert(!isGroupGreeting('fix the drum bug')));
+test('NOT: what about the rest', () => assert(!isGroupGreeting('what about the rest')));
+test('NOT: are you all here', () => assert(!isGroupGreeting('are you all here')));
+test('NOT: how is it all going', () => assert(!isGroupGreeting('how is it all going')));
 
 // ── sanitize ──────────────────────────────────────────────────────────────────
 console.log('\n── sanitize ─────────────────────────────────────────────────────');
@@ -208,7 +226,7 @@ test('long text splits correctly', () => {
 });
 
 test('split parts rejoin to original content', () => {
-  const long = Array.from({length: 200}, (_, i) => `Line ${i}: some content here`).join('\n');
+  const long = Array.from({ length: 200 }, (_, i) => `Line ${i}: some content here`).join('\n');
   const parts = splitMessage(long);
   const rejoined = parts.join('\n').replace(/\n+/g, '\n');
   const original = long.replace(/\n+/g, '\n');
@@ -232,29 +250,32 @@ test('all tools have name, description, input_schema', () => {
 test('describeUse returns string for all known tools', () => {
   const cases = [
     // Existing
-    ['read_file',           { path: 'app/page.tsx' }],
-    ['write_file',          { path: 'out.txt', content: 'x' }],
-    ['run_command',         { command: 'git status' }],
-    ['search_codebase',     { pattern: 'useEffect' }],
-    ['list_files',          { path: 'app' }],
-    ['get_git_info',        { type: 'log' }],
-    ['web_search',          { query: 'Next.js 15' }],
-    ['consult_agent',       { agent: 'qa', question: 'is this safe?' }],
+    ['read_file', { path: 'app/page.tsx' }],
+    ['write_file', { path: 'out.txt', content: 'x' }],
+    ['run_command', { command: 'git status' }],
+    ['search_codebase', { pattern: 'useEffect' }],
+    ['list_files', { path: 'app' }],
+    ['get_git_info', { type: 'log' }],
+    ['web_search', { query: 'Next.js 15' }],
+    ['consult_agent', { agent: 'qa', question: 'is this safe?' }],
     ['create_github_issue', { title: 'Bug', body: 'details' }],
     // New
-    ['fetch_url',           { url: 'https://example.com', method: 'GET' }],
-    ['browse_web',          { url: 'https://example.com', action: 'read' }],
-    ['download_file',       { url: 'https://example.com/x.png', destination: 'tmp/x.png' }],
-    ['send_email',          { to: 'test@example.com', subject: 'Hi', body: 'Hello' }],
-    ['notify_desktop',      { title: 'Alert', message: 'Something happened' }],
-    ['create_github_pr',    { title: 'Fix drum bug', body: 'details' }],
-    ['manage_files',        { action: 'mkdir', source: 'tmp/new' }],
-    ['get_system_info',     { type: 'all' }],
-    ['send_file',           { file: 'tmp/screenshot.png', caption: 'Here it is' }],
+    ['fetch_url', { url: 'https://example.com', method: 'GET' }],
+    ['browse_web', { url: 'https://example.com', action: 'read' }],
+    ['download_file', { url: 'https://example.com/x.png', destination: 'tmp/x.png' }],
+    ['send_email', { to: 'test@example.com', subject: 'Hi', body: 'Hello' }],
+    ['notify_desktop', { title: 'Alert', message: 'Something happened' }],
+    ['create_github_pr', { title: 'Fix drum bug', body: 'details' }],
+    ['manage_files', { action: 'mkdir', source: 'tmp/new' }],
+    ['get_system_info', { type: 'all' }],
+    ['send_file', { file: 'tmp/screenshot.png', caption: 'Here it is' }],
   ];
   for (const [name, input] of cases) {
     const result = describeUse(name, input);
-    assert(typeof result === 'string' && result.length > 0, `describeUse('${name}') returned empty`);
+    assert(
+      typeof result === 'string' && result.length > 0,
+      `describeUse('${name}') returned empty`
+    );
   }
 });
 
@@ -267,7 +288,17 @@ test('18 tools total', () => {
 
 test('all new tools present', () => {
   const names = DEFINITIONS.map(t => t.name);
-  const newTools = ['fetch_url','browse_web','download_file','send_email','notify_desktop','create_github_pr','manage_files','get_system_info','send_file'];
+  const newTools = [
+    'fetch_url',
+    'browse_web',
+    'download_file',
+    'send_email',
+    'notify_desktop',
+    'create_github_pr',
+    'manage_files',
+    'get_system_info',
+    'send_file',
+  ];
   for (const t of newTools) assert(names.includes(t), `Missing tool: ${t}`);
 });
 
@@ -279,7 +310,7 @@ test('send_file definition has required: file', () => {
 
 test('browse_web definition has required: url, action', () => {
   const def = DEFINITIONS.find(t => t.name === 'browse_web');
-  assert(def.input_schema.required.includes('url'),    'browse_web must require url');
+  assert(def.input_schema.required.includes('url'), 'browse_web must require url');
   assert(def.input_schema.required.includes('action'), 'browse_web must require action');
 });
 
@@ -301,18 +332,29 @@ test('send_file without channel context returns error string', async () => {
   const { execute } = require('./tools');
   const result = await execute('send_file', { file: 'nonexistent.png' }, {});
   assert(typeof result === 'string', 'should return string');
-  assert(result.includes('channel') || result.includes('context'), `expected channel/context message, got: ${result}`);
+  assert(
+    result.includes('channel') || result.includes('context'),
+    `expected channel/context message, got: ${result}`
+  );
 });
 
 test('send_file with missing local file returns error string', async () => {
   const { execute } = require('./tools');
   // Pass a fake channel object — file doesn't exist so should fail before trying to send
   const fakeChannel = { id: '123', isThread: () => false };
-  const result = await execute('send_file', { file: 'definitely_does_not_exist_xyz.png' }, {
-    channel: fakeChannel, currentAgent: 'qa',
-  });
+  const result = await execute(
+    'send_file',
+    { file: 'definitely_does_not_exist_xyz.png' },
+    {
+      channel: fakeChannel,
+      currentAgent: 'qa',
+    }
+  );
   assert(typeof result === 'string', 'should return string');
-  assert(result.toLowerCase().includes('not found') || result.toLowerCase().includes('error'), `expected not-found error, got: ${result}`);
+  assert(
+    result.toLowerCase().includes('not found') || result.toLowerCase().includes('error'),
+    `expected not-found error, got: ${result}`
+  );
 });
 
 // ── Config fields ─────────────────────────────────────────────────────────────
@@ -329,8 +371,8 @@ test('STANDUP_HOUR_UTC is 0–23', () => {
 
 test('MODEL_OPUS and MODEL_SONNET defined', () => {
   const { MODEL_OPUS, MODEL_SONNET } = require('./config');
-  assert(MODEL_OPUS.includes('claude'),  'MODEL_OPUS should contain "claude"');
-  assert(MODEL_SONNET.includes('claude'),'MODEL_SONNET should contain "claude"');
+  assert(MODEL_OPUS.includes('claude'), 'MODEL_OPUS should contain "claude"');
+  assert(MODEL_SONNET.includes('claude'), 'MODEL_SONNET should contain "claude"');
 });
 
 // ── Summary ───────────────────────────────────────────────────────────────────

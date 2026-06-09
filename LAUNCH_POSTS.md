@@ -22,7 +22,7 @@
 >
 > If you've ever wished your AI actually remembered who you are, this is for you.
 >
-> → [PH link]
+> → https://www.producthunt.com/posts/based-3
 > → getbased.dev
 
 ---

@@ -1,9 +1,9 @@
 'use strict';
 const { AGENTS, dispatchAgent, anthropic } = require('./agents');
-const { MODEL_SONNET }                     = require('./config');
+const { MODEL_SONNET } = require('./config');
 const { sendAsAgent, sendAsOrchestrator, sendAsAgentWithFiles } = require('./messenger');
-const { getAgentClient }                   = require('./clients');
-const { searchGifUrl }                     = require('./tools');
+const { getAgentClient } = require('./clients');
+const { searchGifUrl } = require('./tools');
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -18,35 +18,53 @@ function detectTone(text) {
   const excited = (text.match(/!/g) || []).length >= 2 || allCaps;
   const veryShort = text.trim().length < 25;
   const detailed = text.trim().length > 250;
-  if (excited)    return 'Hus is excited — match the energy, be punchy';
-  if (veryShort)  return 'Hus is being brief — keep your reply very short';
-  if (detailed)   return 'Hus sent a detailed message — being thorough is fine';
+  if (excited) return 'Hus is excited — match the energy, be punchy';
+  if (veryShort) return 'Hus is being brief — keep your reply very short';
+  if (detailed) return 'Hus sent a detailed message — being thorough is fine';
   return '';
 }
 
 // ── Strip XML tool-call artifacts that models sometimes output as plain text ──
 function sanitize(text) {
   if (!text) return '';
-  return text
-    // Standard Anthropic tool-use XML
-    .replace(/<function_calls>[\s\S]*?<\/antml:function_calls>/g, '')
-    // Generic <function_calls> block
-    .replace(/<function_calls>[\s\S]*?<\/function_calls>/g, '')
-    // Stray <invoke> blocks
-    .replace(/<invoke[\s\S]*?<\/invoke>/g, '')
-    // Stray <parameter> lines
-    .replace(/<parameter[^>]*>[\s\S]*?<\/parameter>/g, '')
-    // Any remaining angle-bracket XML-looking lines
-    .replace(/^<[a-z_]+[^>]*>.*$/gim, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  return (
+    text
+      // Standard Anthropic tool-use XML
+      .replace(/<function_calls>[\s\S]*?<\/antml:function_calls>/g, '')
+      // Generic <function_calls> block
+      .replace(/<function_calls>[\s\S]*?<\/function_calls>/g, '')
+      // Stray <invoke> blocks
+      .replace(/<invoke[\s\S]*?<\/invoke>/g, '')
+      // Stray <parameter> lines
+      .replace(/<parameter[^>]*>[\s\S]*?<\/parameter>/g, '')
+      // Any remaining angle-bracket XML-looking lines
+      .replace(/^<[a-z_]+[^>]*>.*$/gim, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  );
 }
 
 // ── Detect pure one-word / short greeting ─────────────────────────────────────
 function isPureGreeting(text) {
   // Strip trailing punctuation only — no letters
-  const lower = text.toLowerCase().trim().replace(/[!?.,]+$/, '');
-  const words  = ['hey', 'hi', 'hello', 'sup', 'yo', 'morning', 'haha', 'lol', 'hahaha', 'lmao', 'heyyy', 'heyy'];
+  const lower = text
+    .toLowerCase()
+    .trim()
+    .replace(/[!?.,]+$/, '');
+  const words = [
+    'hey',
+    'hi',
+    'hello',
+    'sup',
+    'yo',
+    'morning',
+    'haha',
+    'lol',
+    'hahaha',
+    'lmao',
+    'heyyy',
+    'heyy',
+  ];
   return (
     text.length < 30 &&
     words.some(g => lower === g || lower.startsWith(g + ' ') || lower.startsWith(g + ','))
@@ -66,7 +84,10 @@ async function runBroadcast(originalMessage, channel) {
     await sleep(1500 + Math.random() * 1500); // 1.5-3s between each — no rate limit hits
     await humanDelay();
     const t = startTyping(channel);
-    const priorStr = seen.slice(-3).map(r => `${r.name}: ${r.reply}`).join('\n');
+    const priorStr = seen
+      .slice(-3)
+      .map(r => `${r.name}: ${r.reply}`)
+      .join('\n');
     const prompt = priorStr
       ? `${originalMessage}\n\nTeammates already said:\n${priorStr}\n\nYour turn. One line, your own voice.`
       : `${originalMessage}\n\nOne line response in your own voice.`;
@@ -78,7 +99,9 @@ async function runBroadcast(originalMessage, channel) {
         await sendAsAgent(channel, slug, clean);
         seen.push({ name: AGENTS[slug]?.name || slug, reply: clean });
       }
-    } catch { clearInterval(t); }
+    } catch {
+      clearInterval(t);
+    }
   }
 }
 
@@ -132,21 +155,28 @@ async function getRouting(task) {
   if (!anthropic) throw new Error('Anthropic required for routing.');
 
   const res = await anthropic.messages.create({
-    model: MODEL_SONNET, max_tokens: 512,
+    model: MODEL_SONNET,
+    max_tokens: 512,
     system: ROUTING_SYSTEM,
     messages: [{ role: 'user', content: task }],
   });
 
-  const text  = res.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
+  const text = res.content
+    .filter(b => b.type === 'text')
+    .map(b => b.text)
+    .join('')
+    .trim();
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error(`Non-JSON routing response: ${text.slice(0, 200)}`);
 
   const routing = JSON.parse(match[0]);
-  console.log(`[routing] broadcast=${routing.broadcast} casual=${routing.casual} agents=[${(routing.agents || []).join(',')}] executor=${routing.executor || 'none'}`);
+  console.log(
+    `[routing] broadcast=${routing.broadcast} casual=${routing.casual} agents=[${(routing.agents || []).join(',')}] executor=${routing.executor || 'none'}`
+  );
 
   if (routing.broadcast) return routing;
 
-  const valid    = Object.keys(AGENTS).filter(s => s !== 'orchestrator');
+  const valid = Object.keys(AGENTS).filter(s => s !== 'orchestrator');
   routing.agents = (routing.agents || []).filter(s => valid.includes(s)).slice(0, 4);
 
   if (!routing.casual) {
@@ -162,10 +192,18 @@ async function quickReply(slug, message) {
   const { loadSystemPrompt } = require('./agents');
   const system = loadSystemPrompt(slug);
   const res = await anthropic.messages.create({
-    model: MODEL_SONNET, max_tokens: 120, system,
+    model: MODEL_SONNET,
+    max_tokens: 120,
+    system,
     messages: [{ role: 'user', content: message }],
   });
-  return sanitize(res.content.filter(b => b.type === 'text').map(b => b.text).join('').trim());
+  return sanitize(
+    res.content
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('')
+      .trim()
+  );
 }
 
 // ── Council discussion reply — 300 tokens (~220 words, safely under 2000 chars)
@@ -173,10 +211,18 @@ async function councilReply(slug, message) {
   const { loadSystemPrompt } = require('./agents');
   const system = loadSystemPrompt(slug);
   const res = await anthropic.messages.create({
-    model: MODEL_SONNET, max_tokens: 300, system,
+    model: MODEL_SONNET,
+    max_tokens: 300,
+    system,
     messages: [{ role: 'user', content: message }],
   });
-  return sanitize(res.content.filter(b => b.type === 'text').map(b => b.text).join('').trim());
+  return sanitize(
+    res.content
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('')
+      .trim()
+  );
 }
 
 // ── Typing indicator ──────────────────────────────────────────────────────────
@@ -218,7 +264,11 @@ async function runExecutor(slug, task, responses, channel) {
 
   const typing = startTyping(channel);
   try {
-    const result = await dispatchAgent(slug, [{ role: 'user', content: prompt }], { currentAgent: slug, council: true, channel });
+    const result = await dispatchAgent(slug, [{ role: 'user', content: prompt }], {
+      currentAgent: slug,
+      council: true,
+      channel,
+    });
     clearInterval(typing);
     await sendAsAgent(channel, slug, sanitize(result) || 'Done.');
   } catch (err) {
@@ -229,7 +279,6 @@ async function runExecutor(slug, task, responses, channel) {
 
 // ── Main council entrypoint ───────────────────────────────────────────────────
 async function runCouncil(task, channel) {
-
   // Simple solo greeting ("hey", "lol") → just Maya, skip routing cost
   if (isPureGreeting(task)) {
     const typing = startTyping(channel);
@@ -251,7 +300,13 @@ async function runCouncil(task, channel) {
   } catch (err) {
     console.error('[routing error]', err.message);
     await sendAsOrchestrator(channel, 'Routing failed, falling back to Senior Engineer.');
-    routing = { broadcast: false, casual: false, reasoning: 'Fallback', agents: ['senior-engineer'], executor: 'senior-engineer' };
+    routing = {
+      broadcast: false,
+      casual: false,
+      reasoning: 'Fallback',
+      agents: ['senior-engineer'],
+      executor: 'senior-engineer',
+    };
   }
 
   // Broadcast → all agents respond as themselves
@@ -273,10 +328,13 @@ async function runCouncil(task, channel) {
       mayaReply = await quickReply('orchestrator', task + toneCtx);
       clearInterval(typing);
       await sendAsOrchestrator(channel, mayaReply);
-    } catch (err) { clearInterval(typing); return; }
+    } catch (err) {
+      clearInterval(typing);
+      return;
+    }
 
     // ~40% chance one extra agent chimes in, ~15% chance two do
-    const chimeCount = Math.random() < 0.15 ? 2 : Math.random() < 0.40 ? 1 : 0;
+    const chimeCount = Math.random() < 0.15 ? 2 : Math.random() < 0.4 ? 1 : 0;
     if (chimeCount > 0) {
       const pool = Object.keys(AGENTS).filter(s => s !== 'orchestrator');
       const pickers = [...pool].sort(() => Math.random() - 0.5).slice(0, chimeCount);
@@ -285,7 +343,8 @@ async function runCouncil(task, channel) {
         await humanDelay();
         const t = startTyping(channel);
         try {
-          const chime = await quickReply(slug,
+          const chime = await quickReply(
+            slug,
             `In your team Discord, Hus said: "${task}"\nMaya replied: "${mayaReply}"\n${toneCtx}\nIf you genuinely have something to add — a reaction, a take, a question — say it in one line. If you have nothing to add, respond with exactly: [pass]`
           );
           clearInterval(t);
@@ -293,42 +352,47 @@ async function runCouncil(task, channel) {
           if (clean && !clean.toLowerCase().includes('[pass]') && clean.length > 3) {
             await sendAsAgent(channel, slug, clean);
           }
-        } catch { clearInterval(t); }
+        } catch {
+          clearInterval(t);
+        }
       }
     }
     return;
   }
 
   // Real task → bring in the team
-  const mentions = routing.agents.map(s => {
-    const id = getAgentClient(s)?.user?.id;
-    return id ? `<@${id}>` : (AGENTS[s]?.name || s);
-  }).join(', ');
+  const mentions = routing.agents
+    .map(s => {
+      const id = getAgentClient(s)?.user?.id;
+      return id ? `<@${id}>` : AGENTS[s]?.name || s;
+    })
+    .join(', ');
 
   const discussionChannel = channel;
   if (!channel.isThread?.()) {
     await sendAsOrchestrator(channel, `${routing.reasoning} — looping in ${mentions}.`);
   }
 
-  const responses   = {};
-  let priorContext  = '';
-  const capped      = routing.agents.slice(0, 3); // max 3 agents — keeps it a conversation not a monologue wall
+  const responses = {};
+  let priorContext = '';
+  const capped = routing.agents.slice(0, 3); // max 3 agents — keeps it a conversation not a monologue wall
 
   for (const slug of capped) {
     await sleep(AGENT_GAP_MS + Math.random() * 3000); // 4-7s between agents
-    responses[slug]  = await runCouncilAgent(slug, task, discussionChannel, priorContext);
-    priorContext     += `\n**${AGENTS[slug]?.name}:** ${responses[slug].slice(0, 300)}\n`;
+    responses[slug] = await runCouncilAgent(slug, task, discussionChannel, priorContext);
+    priorContext += `\n**${AGENTS[slug]?.name}:** ${responses[slug].slice(0, 300)}\n`;
   }
 
   // Orchestrator wraps up (only when multiple agents weighed in)
   if (routing.agents.length > 1) {
     await sleep(AGENT_GAP_MS);
-    const ctx     = Object.entries(responses)
+    const ctx = Object.entries(responses)
       .map(([s, r]) => `**${AGENTS[s]?.name}:** ${r.slice(0, 600)}`)
       .join('\n\n');
     const typing = startTyping(discussionChannel);
     try {
-      const synthesis = await councilReply('orchestrator',
+      const synthesis = await councilReply(
+        'orchestrator',
         `Team just weighed in on: ${task}\n\nWhat they said:\n${ctx}\n\nWrap it up in 2-3 sentences. What's the call, who owns what, what happens next. No bullet points, no headers — just talk.`
       );
       clearInterval(typing);
@@ -339,7 +403,7 @@ async function runCouncil(task, channel) {
       if (priya) {
         setTimeout(async () => {
           try {
-            const ch   = await priya.channels.fetch(discussionChannel.id).catch(() => null);
+            const ch = await priya.channels.fetch(discussionChannel.id).catch(() => null);
             if (!ch) return;
             const msgs = await ch.messages.fetch({ limit: 1 });
             const last = msgs.first();
@@ -347,7 +411,9 @@ async function runCouncil(task, channel) {
           } catch {}
         }, 2500);
       }
-    } catch (err) { clearInterval(typing); }
+    } catch (err) {
+      clearInterval(typing);
+    }
   }
 
   // Executor acts (only for code/file work tasks)
@@ -361,7 +427,7 @@ async function runCouncil(task, channel) {
 
 // ── Celebration — 1-2 random agents react when something ships ────────────────
 async function runCelebration(task, channel) {
-  const pool  = Object.keys(AGENTS).filter(s => s !== 'orchestrator');
+  const pool = Object.keys(AGENTS).filter(s => s !== 'orchestrator');
   const count = Math.random() < 0.25 ? 2 : Math.random() < 0.65 ? 1 : 0;
   if (!count) return;
 
@@ -371,21 +437,24 @@ async function runCelebration(task, channel) {
     await humanDelay();
     const t = startTyping(channel);
     try {
-      const reply = await quickReply(slug,
+      const reply = await quickReply(
+        slug,
         `The team just shipped this: "${task.slice(0, 120)}". Give a brief, genuine reaction in your own voice — could be a "nice", a relevant observation, or just acknowledging it. One line.`
       );
       clearInterval(t);
       const clean = sanitize(reply);
       if (clean) await sendAsAgent(channel, slug, clean);
-    } catch { clearInterval(t); }
+    } catch {
+      clearInterval(t);
+    }
   }
 
   // 10% chance: drop a celebration GIF
   const { config } = require('./config');
-  if (Math.random() < 0.10 && config.giphy_api_key) {
+  if (Math.random() < 0.1 && config.giphy_api_key) {
     const queries = ['ship it', 'celebrating', 'lets go', 'great job', 'nice work'];
-    const query   = queries[Math.floor(Math.random() * queries.length)];
-    const gifUrl  = await searchGifUrl(query).catch(() => null);
+    const query = queries[Math.floor(Math.random() * queries.length)];
+    const gifUrl = await searchGifUrl(query).catch(() => null);
     if (gifUrl) {
       const gifAgent = [...pool].sort(() => Math.random() - 0.5)[0];
       await sendAsAgentWithFiles(channel, gifAgent, '', [gifUrl]).catch(() => {});

@@ -1,9 +1,18 @@
 'use strict';
-const fs        = require('fs');
-const path      = require('path');
+const fs = require('fs');
+const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
-const Groq      = require('groq-sdk');
-const { config, AGENTS_DIR, PROVIDER, MODEL_OPUS, MODEL_SONNET, MODEL_GROQ, MODEL_OLLAMA, OLLAMA_BASE_URL } = require('./config');
+const Groq = require('groq-sdk');
+const {
+  config,
+  AGENTS_DIR,
+  PROVIDER,
+  MODEL_OPUS,
+  MODEL_SONNET,
+  MODEL_GROQ,
+  MODEL_OLLAMA,
+  OLLAMA_BASE_URL,
+} = require('./config');
 const MODEL_HAIKU = config.model_haiku || 'claude-haiku-4-5-20251001';
 const { DEFINITIONS, execute, describeUse } = require('./tools');
 
@@ -17,23 +26,23 @@ const AVATAR = slug =>
 //       'groq'  = Groq llama      — free, chat-only agents who never need tools
 // Mac Mini arrives → add 'local' tier, no other changes needed
 const AGENTS = {
-  orchestrator:       { name: 'Maya',    tier: 'opus',  icon: '◉', avatarURL: AVATAR('maya')    },
-  architect:          { name: 'Marcus',  tier: 'opus',  icon: '⬡', avatarURL: AVATAR('marcus')  },
-  'senior-engineer':  { name: 'Kai',     tier: 'opus',  icon: '◈', avatarURL: AVATAR('kai')     },
-  'ai-engineer':      { name: 'Zoe',     tier: 'opus',  icon: '⊙', avatarURL: AVATAR('zoe')     },
-  'data-analyst':     { name: 'Felix',   tier: 'opus',  icon: '⬡', avatarURL: AVATAR('felix')   },
-  finance:            { name: 'Yuki',    tier: 'opus',  icon: '◉', avatarURL: AVATAR('yuki')    },
-  product:            { name: 'Jordan',  tier: 'haiku', icon: '◈', avatarURL: AVATAR('jordan')  },
-  devops:             { name: 'Lars',    tier: 'haiku', icon: '⬡', avatarURL: AVATAR('lars')    },
-  security:           { name: 'Dani',    tier: 'haiku', icon: '◈', avatarURL: AVATAR('dani')    },
-  qa:                 { name: 'Samara',  tier: 'haiku', icon: '⊙', avatarURL: AVATAR('samara')  },
-  'chief-of-staff':   { name: 'Priya',   tier: 'haiku', icon: '◈', avatarURL: AVATAR('priya')   },
-  'technical-writer': { name: 'Owen',    tier: 'haiku', icon: '◉', avatarURL: AVATAR('owen')    },
-  designer:           { name: 'Ren',     tier: 'groq',  icon: '◉', avatarURL: AVATAR('ren')     },
-  growth:             { name: 'Leila',   tier: 'groq',  icon: '◉', avatarURL: AVATAR('leila')   },
-  mobile:             { name: 'Tomás',   tier: 'groq',  icon: '◈', avatarURL: AVATAR('tomas')   },
-  legal:              { name: 'Asha',    tier: 'groq',  icon: '⊙', avatarURL: AVATAR('asha')    },
-  community:          { name: 'Beatrix', tier: 'groq',  icon: '⬡', avatarURL: AVATAR('beatrix') },
+  orchestrator: { name: 'Maya', tier: 'opus', icon: '◉', avatarURL: AVATAR('maya') },
+  architect: { name: 'Marcus', tier: 'opus', icon: '⬡', avatarURL: AVATAR('marcus') },
+  'senior-engineer': { name: 'Kai', tier: 'opus', icon: '◈', avatarURL: AVATAR('kai') },
+  'ai-engineer': { name: 'Zoe', tier: 'opus', icon: '⊙', avatarURL: AVATAR('zoe') },
+  'data-analyst': { name: 'Felix', tier: 'opus', icon: '⬡', avatarURL: AVATAR('felix') },
+  finance: { name: 'Yuki', tier: 'opus', icon: '◉', avatarURL: AVATAR('yuki') },
+  product: { name: 'Jordan', tier: 'haiku', icon: '◈', avatarURL: AVATAR('jordan') },
+  devops: { name: 'Lars', tier: 'haiku', icon: '⬡', avatarURL: AVATAR('lars') },
+  security: { name: 'Dani', tier: 'haiku', icon: '◈', avatarURL: AVATAR('dani') },
+  qa: { name: 'Samara', tier: 'haiku', icon: '⊙', avatarURL: AVATAR('samara') },
+  'chief-of-staff': { name: 'Priya', tier: 'haiku', icon: '◈', avatarURL: AVATAR('priya') },
+  'technical-writer': { name: 'Owen', tier: 'haiku', icon: '◉', avatarURL: AVATAR('owen') },
+  designer: { name: 'Ren', tier: 'groq', icon: '◉', avatarURL: AVATAR('ren') },
+  growth: { name: 'Leila', tier: 'groq', icon: '◉', avatarURL: AVATAR('leila') },
+  mobile: { name: 'Tomás', tier: 'groq', icon: '◈', avatarURL: AVATAR('tomas') },
+  legal: { name: 'Asha', tier: 'groq', icon: '⊙', avatarURL: AVATAR('asha') },
+  community: { name: 'Beatrix', tier: 'groq', icon: '⬡', avatarURL: AVATAR('beatrix') },
 };
 
 const DISCORD_ADDENDUM = `
@@ -70,11 +79,12 @@ When your answer touches another teammate's domain, naturally loop them in: "cc 
 
 // ── SGT time context — injected fresh into each system prompt ─────────────────
 function getSGTTimeNote() {
-  const now     = new Date();
-  const h       = (now.getUTCHours() + 8) % 24;
-  const hh      = `${h}:${String(now.getUTCMinutes()).padStart(2, '0')}`;
-  if (h >= 23 || h < 5)  return `\n\nIt's ${hh} in Singapore — late night. Keep it short and low-energy unless it's genuinely urgent.`;
-  if (h >= 5  && h < 8)  return `\n\nIt's ${hh} in Singapore — early morning. Brief is fine.`;
+  const now = new Date();
+  const h = (now.getUTCHours() + 8) % 24;
+  const hh = `${h}:${String(now.getUTCMinutes()).padStart(2, '0')}`;
+  if (h >= 23 || h < 5)
+    return `\n\nIt's ${hh} in Singapore — late night. Keep it short and low-energy unless it's genuinely urgent.`;
+  if (h >= 5 && h < 8) return `\n\nIt's ${hh} in Singapore — early morning. Brief is fine.`;
   return '';
 }
 
@@ -83,13 +93,14 @@ const anthropic = config.anthropic_api_key
   ? new Anthropic({ apiKey: config.anthropic_api_key })
   : null;
 
-const groq = config.groq_api_key
-  ? new Groq({ apiKey: config.groq_api_key })
-  : null;
+const groq = config.groq_api_key ? new Groq({ apiKey: config.groq_api_key }) : null;
 
 // ── Weekend detection (Singapore timezone) ────────────────────────────────────
 function isWeekend() {
-  const day = new Date().toLocaleDateString('en-SG', { weekday: 'long', timeZone: 'Asia/Singapore' });
+  const day = new Date().toLocaleDateString('en-SG', {
+    weekday: 'long',
+    timeZone: 'Asia/Singapore',
+  });
   return day === 'Saturday' || day === 'Sunday';
 }
 
@@ -99,7 +110,8 @@ function isWeekend() {
 // Strip everything from the first ## heading after the personality block.
 function extractPersonality(raw) {
   // Keep the personality section — stop at the first ## that isn't personality-related
-  const stopMarkers = /^## (Identity|When I activate|Routing|How I run|Parallel|Shared context|Output format|Behaviour|Capabilities|Tools|Commands|Workflow)/m;
+  const stopMarkers =
+    /^## (Identity|When I activate|Routing|How I run|Parallel|Shared context|Output format|Behaviour|Capabilities|Tools|Commands|Workflow)/m;
   const match = raw.search(stopMarkers);
   return match > 0 ? raw.slice(0, match).trim() : raw;
 }
@@ -110,8 +122,9 @@ function loadSystemPrompt(slug) {
     try {
       const raw = fs.readFileSync(path.join(AGENTS_DIR, `${slug}.md`), 'utf-8');
       return extractPersonality(raw);
+    } catch {
+      return `You are the ${AGENTS[slug]?.name || slug} specialist for Based AI studio.`;
     }
-    catch { return `You are the ${AGENTS[slug]?.name || slug} specialist for Based AI studio.`; }
   })();
 
   const memory = getMemory(slug);
@@ -127,18 +140,26 @@ function loadSystemPrompt(slug) {
 async function runAnthropicLoop(slug, messages, context = {}, depth = 0) {
   if (depth > 50) return '[Max depth reached]';
 
-  const agent  = AGENTS[slug];
-  const tier   = agent?.tier || 'opus';
-  const model  = tier === 'haiku' ? MODEL_HAIKU : MODEL_OPUS;
+  const agent = AGENTS[slug];
+  const tier = agent?.tier || 'opus';
+  const model = tier === 'haiku' ? MODEL_HAIKU : MODEL_OPUS;
   const system = loadSystemPrompt(slug);
 
   const res = await anthropic.messages.create({
-    model, max_tokens: 8192, system, messages,
-    tools: DEFINITIONS, tool_choice: { type: 'auto' },
+    model,
+    max_tokens: 8192,
+    system,
+    messages,
+    tools: DEFINITIONS,
+    tool_choice: { type: 'auto' },
   });
 
   if (res.stop_reason !== 'tool_use') {
-    return res.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
+    return res.content
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('')
+      .trim();
   }
 
   const toolBlocks = res.content.filter(b => b.type === 'tool_use');
@@ -149,30 +170,43 @@ async function runAnthropicLoop(slug, messages, context = {}, depth = 0) {
     await context.onProgress(`${agent?.icon} **${agent?.name}:** ${summary}...`).catch(() => {});
   }
 
-  const results = await Promise.all(toolBlocks.map(async b => ({
-    type: 'tool_result',
-    tool_use_id: b.id,
-    content: String(await execute(b.name, b.input, { ...context, currentAgent: slug })),
-  })));
+  const results = await Promise.all(
+    toolBlocks.map(async b => ({
+      type: 'tool_result',
+      tool_use_id: b.id,
+      content: String(await execute(b.name, b.input, { ...context, currentAgent: slug })),
+    }))
+  );
 
-  return runAnthropicLoop(slug, [
-    ...messages,
-    { role: 'assistant', content: res.content },
-    { role: 'user',      content: results },
-  ], context, depth + 1);
+  return runAnthropicLoop(
+    slug,
+    [...messages, { role: 'assistant', content: res.content }, { role: 'user', content: results }],
+    context,
+    depth + 1
+  );
 }
 
 // ── Groq agentic loop — full tool support via OpenAI-compatible function calling
 async function runGroqLoop(slug, messages, context = {}) {
-  const system = loadSystemPrompt(slug) +
+  const system =
+    loadSystemPrompt(slug) +
     '\n\nYou have tools available. When asked about code, git, files, GitHub, Stripe, PostHog, or any live system state — call the relevant tool. Never fabricate data you could look up.';
   const groqMsgs = [
     { role: 'system', content: system },
-    ...messages.map(m => ({
-      role: m.role,
-      content: typeof m.content === 'string' ? m.content
-             : Array.isArray(m.content) ? m.content.filter(b => b.type === 'text').map(b => b.text || '').join('') : '',
-    })).filter(m => m.content !== ''),
+    ...messages
+      .map(m => ({
+        role: m.role,
+        content:
+          typeof m.content === 'string'
+            ? m.content
+            : Array.isArray(m.content)
+              ? m.content
+                  .filter(b => b.type === 'text')
+                  .map(b => b.text || '')
+                  .join('')
+              : '',
+      }))
+      .filter(m => m.content !== ''),
   ];
   return _groqAgentic(slug, groqMsgs, context, 0);
 }
@@ -186,7 +220,11 @@ async function _groqAgentic(slug, groqMsgs, context, depth) {
   }));
 
   const res = await groq.chat.completions.create({
-    model: MODEL_GROQ, messages: groqMsgs, tools, tool_choice: 'auto', max_tokens: 4096,
+    model: MODEL_GROQ,
+    messages: groqMsgs,
+    tools,
+    tool_choice: 'auto',
+    max_tokens: 4096,
   });
 
   const msg = res.choices[0].message;
@@ -194,25 +232,41 @@ async function _groqAgentic(slug, groqMsgs, context, depth) {
 
   const agent = AGENTS[slug];
   if (context.onProgress) {
-    const summary = msg.tool_calls.map(tc => {
-      try { return describeUse(tc.function.name, JSON.parse(tc.function.arguments || '{}')); }
-      catch { return tc.function.name; }
-    }).join(' · ');
+    const summary = msg.tool_calls
+      .map(tc => {
+        try {
+          return describeUse(tc.function.name, JSON.parse(tc.function.arguments || '{}'));
+        } catch {
+          return tc.function.name;
+        }
+      })
+      .join(' · ');
     await context.onProgress(`${agent?.icon} **${agent?.name}:** ${summary}...`).catch(() => {});
   }
 
-  const toolResults = await Promise.all(msg.tool_calls.map(async tc => {
-    let input = {};
-    try { input = JSON.parse(tc.function.arguments || '{}'); } catch {}
-    const result = String(await execute(tc.function.name, input, { ...context, currentAgent: slug }));
-    return { role: 'tool', tool_call_id: tc.id, content: result };
-  }));
+  const toolResults = await Promise.all(
+    msg.tool_calls.map(async tc => {
+      let input = {};
+      try {
+        input = JSON.parse(tc.function.arguments || '{}');
+      } catch {}
+      const result = String(
+        await execute(tc.function.name, input, { ...context, currentAgent: slug })
+      );
+      return { role: 'tool', tool_call_id: tc.id, content: result };
+    })
+  );
 
-  return _groqAgentic(slug, [
-    ...groqMsgs,
-    { role: 'assistant', content: msg.content || null, tool_calls: msg.tool_calls },
-    ...toolResults,
-  ], context, depth + 1);
+  return _groqAgentic(
+    slug,
+    [
+      ...groqMsgs,
+      { role: 'assistant', content: msg.content || null, tool_calls: msg.tool_calls },
+      ...toolResults,
+    ],
+    context,
+    depth + 1
+  );
 }
 
 // ── Ollama loop — local models via OpenAI-compatible API ──────────────────────
@@ -241,7 +295,7 @@ async function runOllamaLoop(slug, messages) {
 // PROVIDER override in config forces all agents to one provider
 async function dispatchAgent(slug, messages, context = {}) {
   const agent = AGENTS[slug];
-  const tier  = agent?.tier || 'groq';
+  const tier = agent?.tier || 'groq';
 
   // Hard provider overrides
   if (PROVIDER === 'anthropic') {
@@ -251,8 +305,9 @@ async function dispatchAgent(slug, messages, context = {}) {
   if (PROVIDER === 'ollama') return runOllamaLoop(slug, messages);
   if (PROVIDER === 'groq') {
     if (!groq) throw new Error('Groq not configured.');
-    try { return await runGroqLoop(slug, messages, context); }
-    catch (err) {
+    try {
+      return await runGroqLoop(slug, messages, context);
+    } catch (err) {
       console.warn(`[${slug}] Groq failed — Anthropic fallback`);
       if (!anthropic) throw err;
       return runAnthropicLoop(slug, messages, context);
@@ -268,12 +323,18 @@ async function dispatchAgent(slug, messages, context = {}) {
   }
 
   // groq tier — chat only (Leila, Ren, Beatrix, Asha, Tomás)
-  try { return await runOllamaLoop(slug, messages); }
-  catch { /* Ollama not running, continue */ }
+  try {
+    return await runOllamaLoop(slug, messages);
+  } catch {
+    /* Ollama not running, continue */
+  }
 
   if (groq) {
-    try { return await runGroqLoop(slug, messages, context); }
-    catch (err) { console.warn(`[${slug}] Groq failed — Anthropic fallback`); }
+    try {
+      return await runGroqLoop(slug, messages, context);
+    } catch (err) {
+      console.warn(`[${slug}] Groq failed — Anthropic fallback`);
+    }
   }
 
   if (!anthropic) throw new Error('All providers unavailable.');

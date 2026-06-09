@@ -1,9 +1,19 @@
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
 
 interface Props {
   onSignIn: (tab?: 'signin' | 'signup') => void;
+}
+
+/** Spawn a lavender ripple that expands from the click point, then cleans itself up. */
+function fireRipple(e: React.MouseEvent) {
+  if (typeof document === 'undefined') return;
+  const el = document.createElement('div');
+  el.className = 'landing-click-ripple';
+  el.style.left = `${e.clientX}px`;
+  el.style.top = `${e.clientY}px`;
+  document.body.appendChild(el);
+  el.addEventListener('animationend', () => el.remove());
 }
 
 interface GalleryItem {
@@ -142,6 +152,11 @@ function LandingGalleryCard({ item }: { item: GalleryItem }) {
 
 export default function LandingPage({ onSignIn }: Props) {
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
+  const [entered, setEntered] = useState(false);
+
+  useEffect(() => {
+    setEntered(true);
+  }, []);
 
   useEffect(() => {
     fetch('/api/gallery')
@@ -154,6 +169,14 @@ export default function LandingPage({ onSignIn }: Props) {
 
   return (
     <div className="landing-root">
+      {entered && (
+        <div
+          className="landing-entrance-ripple"
+          onAnimationEnd={e => {
+            e.currentTarget.style.display = 'none';
+          }}
+        />
+      )}
       <header className="landing-header">
         <div className="landing-logo">B&gt;</div>
         <nav className="landing-header-nav">
@@ -169,7 +192,13 @@ export default function LandingPage({ onSignIn }: Props) {
           <a href="/roadmap" className="landing-nav-link">
             Roadmap
           </a>
-          <button className="landing-signin-btn" onClick={() => onSignIn('signin')}>
+          <button
+            className="landing-signin-btn"
+            onClick={e => {
+              fireRipple(e);
+              onSignIn('signin');
+            }}
+          >
             Sign In
           </button>
         </nav>
@@ -178,44 +207,36 @@ export default function LandingPage({ onSignIn }: Props) {
       {/* ── Hero ── */}
       <section className="landing-hero">
         <div className="landing-hero-glow" />
-        <motion.div
-          className="landing-hero-badge"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
+        <div className="landing-hero-badge">
           ◈ Personal Assistant AI
-        </motion.div>
-        <motion.h1
-          className="landing-headline"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.18, type: 'spring', stiffness: 180, damping: 24 }}
-        >
+        </div>
+        <h1 className="landing-headline">
           <span style={{ whiteSpace: 'nowrap' }}>Never leaves</span>
           <br />
           your side.
-        </motion.h1>
-        <motion.p
-          className="landing-subheadline"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.28 }}
-        >
+        </h1>
+        <p className="landing-subheadline">
           Not a tool. Not just a chatbot. Based is your personal assistant AI — it builds your apps,
           edits your video, composes your music, answers anything, and remembers everything about
           you.
-        </motion.p>
-        <motion.div
-          className="landing-ctas"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.38 }}
-        >
-          <button className="landing-cta-primary" onClick={() => onSignIn('signup')}>
+        </p>
+        <div className="landing-ctas">
+          <button
+            className="landing-cta-primary"
+            onClick={e => {
+              fireRipple(e);
+              onSignIn('signup');
+            }}
+          >
             Start free →
           </button>
-          <button className="landing-cta-secondary" onClick={() => onSignIn('signin')}>
+          <button
+            className="landing-cta-secondary"
+            onClick={e => {
+              fireRipple(e);
+              onSignIn('signin');
+            }}
+          >
             Sign In
           </button>
           <a
@@ -225,15 +246,10 @@ export default function LandingPage({ onSignIn }: Props) {
           >
             ↓ Windows App
           </a>
-        </motion.div>
-        <motion.div
-          className="landing-hint"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.55 }}
-        >
+        </div>
+        <div className="landing-hint">
           Free to start · 10 generations/month · No credit card needed
-        </motion.div>
+        </div>
       </section>
 
       {/* ── Capability marquee ── */}
@@ -250,55 +266,31 @@ export default function LandingPage({ onSignIn }: Props) {
 
       {/* ── Companion story bento ── */}
       <section className="landing-bento-section">
-        {BENTO.map((card, i) => (
-          <motion.div
-            key={card.title}
-            className="landing-bento-card"
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 + i * 0.1, type: 'spring', stiffness: 200, damping: 26 }}
-          >
+        {BENTO.map(card => (
+          <div key={card.title} className="landing-bento-card">
             <span className="landing-bento-icon">{card.icon}</span>
             <div className="landing-bento-title">{card.title}</div>
             <div className="landing-bento-desc">{card.desc}</div>
             <span className="landing-bento-tag">{card.tag}</span>
-          </motion.div>
+          </div>
         ))}
       </section>
 
       {/* ── Four pillars ── */}
       <section className="landing-features">
-        {PILLARS.map((f, i) => (
-          <motion.div
-            key={f.title}
-            className="landing-feature-card"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 + i * 0.1 }}
-          >
+        {PILLARS.map(f => (
+          <div key={f.title} className="landing-feature-card">
             <span className="landing-feature-icon">{f.icon}</span>
             <div className="landing-feature-title">{f.title}</div>
             <div className="landing-feature-desc">{f.desc}</div>
-          </motion.div>
+          </div>
         ))}
       </section>
 
       {/* ── Comparison ── */}
       <section className="landing-comparison">
-        <motion.div
-          className="landing-comparison-title"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-        >
-          Based vs everything else
-        </motion.div>
-        <motion.div
-          className="landing-comparison-table"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
+        <div className="landing-comparison-title">Based vs everything else</div>
+        <div className="landing-comparison-table">
           <div className="landing-comparison-col landing-comparison-col--them">
             <div className="landing-comparison-col-header">Others</div>
             {COMPARISONS.map(c => (
@@ -315,7 +307,7 @@ export default function LandingPage({ onSignIn }: Props) {
               </div>
             ))}
           </div>
-        </motion.div>
+        </div>
       </section>
 
       {/* ── Community gallery ── */}
@@ -348,12 +340,7 @@ export default function LandingPage({ onSignIn }: Props) {
 
       {/* ── Always shipping strip ── */}
       <section className="landing-roadmap">
-        <motion.div
-          className="landing-roadmap-header"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
+        <div className="landing-roadmap-header">
           <div>
             <div className="landing-roadmap-label">Built in public · Shaped by users</div>
             <h2 className="landing-roadmap-title">Always shipping.</h2>
@@ -365,13 +352,8 @@ export default function LandingPage({ onSignIn }: Props) {
           <a href="/roadmap" className="landing-roadmap-btn">
             Full roadmap →
           </a>
-        </motion.div>
-        <motion.div
-          className="landing-roadmap-grid"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
+        </div>
+        <div className="landing-roadmap-grid">
           <div className="landing-roadmap-col">
             <div className="landing-roadmap-col-label">◈ Recently shipped</div>
             {SHIPPED_RECENT.map(item => (
@@ -399,25 +381,13 @@ export default function LandingPage({ onSignIn }: Props) {
               See full roadmap →
             </a>
           </div>
-        </motion.div>
+        </div>
       </section>
 
       {/* ── Pricing ── */}
       <section className="landing-pricing">
-        <motion.div
-          className="landing-pricing-title"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-        >
-          Start free. Upgrade when you love it.
-        </motion.div>
-        <motion.div
-          className="landing-pricing-tiers"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-        >
+        <div className="landing-pricing-title">Start free. Upgrade when you love it.</div>
+        <div className="landing-pricing-tiers">
           <div className="landing-tier landing-tier--free">
             <div className="landing-tier-label">Free</div>
             <div className="landing-tier-price">
@@ -430,7 +400,13 @@ export default function LandingPage({ onSignIn }: Props) {
               <li>Chat + code generation</li>
               <li>Cloud sync</li>
             </ul>
-            <button className="landing-tier-cta" onClick={() => onSignIn('signup')}>
+            <button
+              className="landing-tier-cta"
+              onClick={e => {
+                fireRipple(e);
+                onSignIn('signup');
+              }}
+            >
               Start free →
             </button>
           </div>
@@ -451,39 +427,38 @@ export default function LandingPage({ onSignIn }: Props) {
             </ul>
             <button
               className="landing-tier-cta landing-tier-cta--pro"
-              onClick={() => onSignIn('signup')}
+              onClick={e => {
+                fireRipple(e);
+                onSignIn('signup');
+              }}
             >
               Keep building →
             </button>
           </div>
-        </motion.div>
-        <motion.p
-          className="landing-pricing-founder"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.45 }}
-        >
+        </div>
+        <p className="landing-pricing-founder">
           Made by one person in Singapore. Every subscription directly funds the next feature.
-        </motion.p>
+        </p>
       </section>
 
       {/* ── Closing CTA ── */}
       <section className="landing-closer">
-        <motion.div
-          className="landing-closer-inner"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
+        <div className="landing-closer-inner">
           <div className="landing-closer-badge">B&gt;</div>
           <h2 className="landing-closer-headline">Your companion is waiting.</h2>
           <p className="landing-closer-sub">
             Free to start · 10 generations/month · No credit card needed.
           </p>
-          <button className="landing-cta-primary" onClick={() => onSignIn('signup')}>
+          <button
+            className="landing-cta-primary"
+            onClick={e => {
+              fireRipple(e);
+              onSignIn('signup');
+            }}
+          >
             Start free →
           </button>
-        </motion.div>
+        </div>
       </section>
 
       <footer className="landing-footer">

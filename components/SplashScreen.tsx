@@ -31,6 +31,7 @@ export default function SplashScreen({ onDone }: Props) {
   const [tapHintIn, setTapHintIn] = useState(false);
   const [ringPulse, setRingPulse] = useState(false);
   const [exiting, setExiting] = useState(false);
+  const [ripple, setRipple] = useState(false);
 
   const exit = useCallback(() => {
     if (exitedRef.current) return;
@@ -54,6 +55,7 @@ export default function SplashScreen({ onDone }: Props) {
       // Audio unavailable — continue silently
     }
     setExiting(true);
+    setRipple(true);
     setTimeout(onDone, 500);
   }, [onDone]);
 
@@ -139,6 +141,7 @@ export default function SplashScreen({ onDone }: Props) {
       </div>
       <div className="splash-grain" />
       <div className={`splash-tap-hint${tapHintIn ? ' visible' : ''}`}>tap anywhere to enter</div>
+      <div className={`splash-ripple${ripple ? ' active' : ''}`} />
     </div>
   );
 }
@@ -146,79 +149,150 @@ export default function SplashScreen({ onDone }: Props) {
 function startAudio(ctx: AudioContext): GainNode {
   const now = ctx.currentTime;
   const master = ctx.createGain();
-  master.gain.setValueAtTime(1, now);
+  master.gain.setValueAtTime(0.9, now);
   master.connect(ctx.destination);
 
-  /* sub-bass drone */
-  const bass = ctx.createOscillator();
-  const bassGain = ctx.createGain();
-  bass.frequency.setValueAtTime(40, now);
-  bass.type = 'sine';
-  bassGain.gain.setValueAtTime(0, now);
-  bassGain.gain.linearRampToValueAtTime(0.3, now + 0.5);
-  bassGain.gain.linearRampToValueAtTime(0, now + 1.4);
-  bass.connect(bassGain);
-  bassGain.connect(master);
-  bass.start(now);
-  bass.stop(now + 1.5);
-
-  /* rising frequency sweep */
-  const sweep = ctx.createOscillator();
-  const sweepGain = ctx.createGain();
-  sweep.frequency.setValueAtTime(80, now + 0.8);
-  sweep.frequency.linearRampToValueAtTime(200, now + 1.2);
-  sweepGain.gain.setValueAtTime(0.2, now + 0.8);
-  sweepGain.gain.linearRampToValueAtTime(0, now + 1.2);
-  sweep.connect(sweepGain);
-  sweepGain.connect(master);
-  sweep.start(now + 0.8);
-  sweep.stop(now + 1.3);
-
-  /* impact thud */
-  for (const freq of [80, 84]) {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.frequency.setValueAtTime(freq, now + 1.2);
-    gain.gain.setValueAtTime(0.45, now + 1.2);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
-    osc.connect(gain);
-    gain.connect(master);
-    osc.start(now + 1.2);
-    osc.stop(now + 1.6);
+  function noiseBuffer(seconds: number) {
+    const len = Math.ceil(ctx.sampleRate * seconds);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
   }
 
-  /* crystalline chord */
-  for (const freq of [466, 587, 740]) {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(freq, now + 1.2);
-    gain.gain.setValueAtTime(0.12, now + 1.2);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 2.1);
-    osc.connect(gain);
-    gain.connect(master);
-    osc.start(now + 1.2);
-    osc.stop(now + 2.2);
-  }
+  /* sub rumble — filtered noise, not oscillator */
+  const rumble = ctx.createBufferSource();
+  const rumbleLPF = ctx.createBiquadFilter();
+  const rumbleGain = ctx.createGain();
+  rumble.buffer = noiseBuffer(1.1);
+  rumbleLPF.type = 'lowpass';
+  rumbleLPF.frequency.setValueAtTime(90, now);
+  rumbleLPF.frequency.exponentialRampToValueAtTime(35, now + 0.9);
+  rumbleGain.gain.setValueAtTime(0, now);
+  rumbleGain.gain.linearRampToValueAtTime(0.28, now + 0.12);
+  rumbleGain.gain.linearRampToValueAtTime(0, now + 1.0);
+  rumble.connect(rumbleLPF);
+  rumbleLPF.connect(rumbleGain);
+  rumbleGain.connect(master);
+  rumble.start(now);
 
-  /* white-noise shimmer */
-  const bufLen = Math.ceil(ctx.sampleRate * 0.06);
-  const buffer = ctx.createBuffer(1, bufLen, ctx.sampleRate);
-  const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
-  const noise = ctx.createBufferSource();
-  const noiseFilter = ctx.createBiquadFilter();
-  const noiseGain = ctx.createGain();
-  noise.buffer = buffer;
-  noiseFilter.type = 'highpass';
-  noiseFilter.frequency.setValueAtTime(3000, now + 1.4);
-  noiseGain.gain.setValueAtTime(0, now + 1.4);
-  noiseGain.gain.linearRampToValueAtTime(0.1, now + 1.42);
-  noiseGain.gain.linearRampToValueAtTime(0, now + 1.46);
-  noise.connect(noiseFilter);
-  noiseFilter.connect(noiseGain);
-  noiseGain.connect(master);
-  noise.start(now + 1.4);
+  /* whoosh riser — bandpass noise sweep, not oscillator */
+  const whoosh = ctx.createBufferSource();
+  const whooshBPF = ctx.createBiquadFilter();
+  const whooshGain = ctx.createGain();
+  whoosh.buffer = noiseBuffer(0.7);
+  whooshBPF.type = 'bandpass';
+  whooshBPF.Q.value = 1.2;
+  whooshBPF.frequency.setValueAtTime(120, now + 0.55);
+  whooshBPF.frequency.exponentialRampToValueAtTime(2400, now + 1.1);
+  whooshGain.gain.setValueAtTime(0, now + 0.55);
+  whooshGain.gain.linearRampToValueAtTime(0.2, now + 0.85);
+  whooshGain.gain.linearRampToValueAtTime(0, now + 1.12);
+  whoosh.connect(whooshBPF);
+  whooshBPF.connect(whooshGain);
+  whooshGain.connect(master);
+  whoosh.start(now + 0.55);
+
+  /* impact — noise transient body + pitch-drop sub punch */
+  const impactNoise = ctx.createBufferSource();
+  const impactHPF = ctx.createBiquadFilter();
+  const impactNoiseGain = ctx.createGain();
+  impactNoise.buffer = noiseBuffer(0.25);
+  impactHPF.type = 'bandpass';
+  impactHPF.frequency.setValueAtTime(180, now + 1.13);
+  impactHPF.Q.value = 0.6;
+  impactNoiseGain.gain.setValueAtTime(0.6, now + 1.13);
+  impactNoiseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.32);
+  impactNoise.connect(impactHPF);
+  impactHPF.connect(impactNoiseGain);
+  impactNoiseGain.connect(master);
+  impactNoise.start(now + 1.13);
+
+  const punch = ctx.createOscillator();
+  const punchGain = ctx.createGain();
+  punch.type = 'sine';
+  punch.frequency.setValueAtTime(130, now + 1.13);
+  punch.frequency.exponentialRampToValueAtTime(32, now + 1.5);
+  // Tiny hard attack then exponential drop — a real membrane snaps, it doesn't fade in.
+  punchGain.gain.setValueAtTime(0, now + 1.13);
+  punchGain.gain.linearRampToValueAtTime(0.6, now + 1.137);
+  punchGain.gain.exponentialRampToValueAtTime(0.001, now + 1.55);
+  punch.connect(punchGain);
+  punchGain.connect(master);
+  punch.start(now + 1.13);
+  punch.stop(now + 1.6);
+
+  /* chord — 3 detuned oscillators per note, strummed (not block-struck), so it
+     sounds like a hand played it. Each note enters a few ms later than the last
+     and every voice gets a touch of random gain/detune so no two are identical. */
+  const notes = [466, 587, 740];
+  const detuneCents = [-7, 0, 7];
+  notes.forEach((base, noteIndex) => {
+    // Low note first, top note last — a real upward strum spans ~14ms per string.
+    const strum = noteIndex * 0.014 + (Math.random() - 0.5) * 0.006;
+    const noteStart = now + 1.16 + strum;
+    for (const cents of detuneCents) {
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = cents === 0 ? 'sine' : 'triangle';
+      // Base detune plus a tiny random drift so the chorus never phase-locks.
+      const drift = (Math.random() - 0.5) * 4;
+      osc.frequency.setValueAtTime(base * Math.pow(2, (cents + drift) / 1200), noteStart);
+      // Per-voice gain humanization — fingers never hit two strings equally hard.
+      const baseVol = cents === 0 ? 0.08 : 0.05;
+      const vol = baseVol * (0.85 + Math.random() * 0.3);
+      g.gain.setValueAtTime(0, noteStart);
+      g.gain.linearRampToValueAtTime(vol, noteStart + 0.08);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 2.6);
+      osc.connect(g);
+      g.connect(master);
+      osc.start(noteStart);
+      osc.stop(now + 2.7);
+    }
+  });
+
+  /* shimmer tail — longer air decay, not a click */
+  const shimmer = ctx.createBufferSource();
+  const shimmerHPF = ctx.createBiquadFilter();
+  const shimmerGain = ctx.createGain();
+  shimmer.buffer = noiseBuffer(1.4);
+  shimmerHPF.type = 'highpass';
+  shimmerHPF.frequency.setValueAtTime(5000, now + 1.2);
+  shimmerGain.gain.setValueAtTime(0, now + 1.2);
+  shimmerGain.gain.linearRampToValueAtTime(0.07, now + 1.3);
+  shimmerGain.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+  shimmer.connect(shimmerHPF);
+  shimmerHPF.connect(shimmerGain);
+  shimmerGain.connect(master);
+  shimmer.start(now + 1.2);
+
+  /* pop — warm thud at ripple expand (~0.42s after tap, lines up with the bloom) */
+  const pop = ctx.createOscillator();
+  const popGain = ctx.createGain();
+  pop.type = 'sine';
+  pop.frequency.setValueAtTime(90, now + 0.42);
+  pop.frequency.exponentialRampToValueAtTime(28, now + 0.62);
+  popGain.gain.setValueAtTime(0, now + 0.42);
+  popGain.gain.linearRampToValueAtTime(0.5, now + 0.425);
+  popGain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+  pop.connect(popGain);
+  popGain.connect(master);
+  pop.start(now + 0.42);
+  pop.stop(now + 0.7);
+
+  const popNoise = ctx.createBufferSource();
+  const popNoiseBPF = ctx.createBiquadFilter();
+  const popNoiseGain = ctx.createGain();
+  popNoise.buffer = noiseBuffer(0.2);
+  popNoiseBPF.type = 'bandpass';
+  popNoiseBPF.frequency.setValueAtTime(220, now + 0.42);
+  popNoiseBPF.Q.value = 1.5;
+  popNoiseGain.gain.setValueAtTime(0.25, now + 0.42);
+  popNoiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+  popNoise.connect(popNoiseBPF);
+  popNoiseBPF.connect(popNoiseGain);
+  popNoiseGain.connect(master);
+  popNoise.start(now + 0.42);
 
   return master;
 }

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import ClientOnly from '@/components/ClientOnly';
 import AppChrome from '@/components/AppChrome';
+import RouteRipple from '@/components/RouteRipple';
 import Script from 'next/script';
 
 export const metadata: Metadata = {
@@ -82,6 +83,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body suppressHydrationWarning>
         <ClientOnly>
           <AppChrome>{children}</AppChrome>
+          <RouteRipple />
         </ClientOnly>
       </body>
     </html>

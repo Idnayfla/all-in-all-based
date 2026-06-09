@@ -7,19 +7,22 @@
  *   memories.json  — per-agent long-term memory summaries (extracted by Haiku)
  */
 
-const fs   = require('fs');
+const fs = require('fs');
 const path = require('path');
 
-const DATA_DIR      = path.join(__dirname, 'data');
+const DATA_DIR = path.join(__dirname, 'data');
 const HISTORIES_FILE = path.join(DATA_DIR, 'histories.json');
-const MEMORIES_FILE  = path.join(DATA_DIR, 'memories.json');
+const MEMORIES_FILE = path.join(DATA_DIR, 'memories.json');
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 
 // ── Load / save helpers ────────────────────────────────────────────────────────
 function loadJSON(file, fallback) {
-  try { return JSON.parse(fs.readFileSync(file, 'utf-8')); }
-  catch { return fallback; }
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf-8'));
+  } catch {
+    return fallback;
+  }
 }
 
 function saveJSON(file, data) {
@@ -70,10 +73,12 @@ async function extractMemory(slug, history, anthropic, model) {
 
   try {
     const res = await anthropic.messages.create({
-      model, max_tokens: 400,
-      messages: [{
-        role: 'user',
-        content: `You extract memory for an AI agent named ${slug} in a Discord team server.
+      model,
+      max_tokens: 400,
+      messages: [
+        {
+          role: 'user',
+          content: `You extract memory for an AI agent named ${slug} in a Discord team server.
 
 EXISTING MEMORY:
 ${existing || 'None yet'}
@@ -82,10 +87,15 @@ RECENT CONVERSATION:
 ${conversation}
 
 Extract key facts worth remembering: ongoing projects, decisions made, preferences, context that will matter in future conversations. Merge with existing memory. Return ONLY a plain numbered list, max 15 items. No markdown, no headers. If nothing new, return existing memory unchanged.`,
-      }],
+        },
+      ],
     });
 
-    const text = res.content.filter(b => b.type === 'text').map(b => b.text).join('').trim();
+    const text = res.content
+      .filter(b => b.type === 'text')
+      .map(b => b.text)
+      .join('')
+      .trim();
     if (text) setMemory(slug, text);
   } catch {
     // non-critical — memory extraction failures are silent
