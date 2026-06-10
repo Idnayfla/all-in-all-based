@@ -139,6 +139,7 @@ export default function CompanionOverlayPage() {
   const greetingFiredRef = useRef(false);
   const voiceEnabledRef = useRef(voiceEnabled);
   const speakRef = useRef<(text: string) => Promise<void>>(async () => {});
+  const authTokenRef = useRef(authToken);
 
   const [panelWidth, setPanelWidth] = useState<number>(WIDTH_DEFAULT);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -147,6 +148,10 @@ export default function CompanionOverlayPage() {
   useEffect(() => {
     voiceEnabledRef.current = voiceEnabled;
   }, [voiceEnabled]);
+
+  useEffect(() => {
+    authTokenRef.current = authToken;
+  }, [authToken]);
 
   const speak = async (text: string) => {
     if (!voiceEnabled) return;
@@ -163,7 +168,10 @@ export default function CompanionOverlayPage() {
     try {
       const res = await fetch('/api/tts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authTokenRef.current ? { Authorization: `Bearer ${authTokenRef.current}` } : {}),
+        },
         body: JSON.stringify({ text, gender: voiceGender }),
       });
       if (!res.ok) throw new Error('tts failed');
