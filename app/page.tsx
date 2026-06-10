@@ -2452,6 +2452,7 @@ export default function Home() {
                         ? (prompt: string) => handleAutoName(currentProject.id, prompt)
                         : undefined
                     }
+                    onLogoClick={startChat}
                   />
                 </div>
                 <div className={`panel ${activePanel === 'editor' ? 'panel-active' : ''}`}>

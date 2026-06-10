@@ -236,6 +236,7 @@ export default function ChatPanel({
   persona = 'based',
   onPanelSwitch,
   onAutoName,
+  onLogoClick,
 }: {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -258,6 +259,7 @@ export default function ChatPanel({
   persona?: PersonaKey;
   onPanelSwitch?: (panel: string) => void;
   onAutoName?: (firstPrompt: string) => void;
+  onLogoClick?: () => void;
 }) {
   const [input, setInput] = useState(prefillMessage ?? '');
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
@@ -1739,36 +1741,16 @@ export default function ChatPanel({
       <div className="chat-messages">
         {messages.length === 0 ? (
           <div className="chat-empty">
-            <div className="chat-empty-logo" aria-hidden="true">
+            <button
+              className="chat-empty-logo-btn"
+              onClick={onLogoClick}
+              aria-label="Ask Based anything"
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/brand-icon-loop.svg" alt="" width={64} height={64} />
-            </div>
+            </button>
             <div className="chat-empty-title">BASED</div>
             <div className="chat-empty-sub">{t('chat.empty.subtitle')}</div>
-            <div className="chat-suggestions">
-              {suggestions.map((s, index) => (
-                <motion.button
-                  key={s}
-                  className="suggestion-btn"
-                  onClick={() => {
-                    setInput(s);
-                    if (window.innerWidth <= 768) {
-                      setMobileInputOpen(true);
-                      setTimeout(() => mobileTextareaRef.current?.focus(), 50);
-                    } else {
-                      setTimeout(() => textareaRef.current?.focus(), 0);
-                    }
-                  }}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.06, type: 'spring', stiffness: 400, damping: 30 }}
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                >
-                  {s}
-                </motion.button>
-              ))}
-            </div>
           </div>
         ) : (
           <AnimatePresence initial={false}>
