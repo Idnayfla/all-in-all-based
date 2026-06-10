@@ -2491,6 +2491,7 @@ body {
   padding: 10px 0;
   color: var(--text-muted);
   font-size: 13px;
+  font-family: inherit;
   text-decoration: none;
   background: none;
   border: none;
