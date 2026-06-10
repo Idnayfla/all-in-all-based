@@ -1230,6 +1230,22 @@ export default function ChatPanel({
     }
   };
 
+  // Listen for preview syntax-error retry requests dispatched by PreviewPanel.
+  // Using a ref so the listener always calls the current `send` without needing
+  // to re-register the listener every render.
+  const sendRef = useRef(send);
+  useEffect(() => {
+    sendRef.current = send;
+  });
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const note = (e as CustomEvent<string>).detail;
+      if (note) sendRef.current(note);
+    };
+    window.addEventListener('based:preview-retry', handler);
+    return () => window.removeEventListener('based:preview-retry', handler);
+  }, []);
+
   const handleSend = () => {
     const t = input.trim();
 
@@ -1431,9 +1447,12 @@ export default function ChatPanel({
 
   const EDIT_INTENT_BANNER_RE =
     /\b(darken|brighten|lighten|darker|brighter|crop|filter|rotate|flip|blur|sharpen|resize|adjust|enhance|edit|retouch|remove\s+background|color|saturate|exposure)\b/i;
+  const VIDEO_INTENT_BANNER_RE = /\b(animate|animation|video|motion|move|moving)\b/i;
   // Reset dismissed state whenever the triggering conditions are no longer met,
   // so the banner re-appears if the user re-adds an image with edit keywords
-  const editIntentActive = pendingImages.length > 0 && EDIT_INTENT_BANNER_RE.test(input);
+  const imageEditIntentActive = pendingImages.length > 0 && EDIT_INTENT_BANNER_RE.test(input);
+  const videoIntentActive = pendingImages.length > 0 && VIDEO_INTENT_BANNER_RE.test(input);
+  const editIntentActive = imageEditIntentActive || videoIntentActive;
   useEffect(() => {
     if (!editIntentActive) setStudioBannerDismissed(false);
   }, [editIntentActive]);
@@ -1642,10 +1661,21 @@ export default function ChatPanel({
               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             >
               <span className="studio-tip-text">
-                ◈ Want to edit directly?{' '}
-                <button className="studio-tip-link" onClick={() => onPanelSwitch?.('image')}>
-                  Open Image Studio →
-                </button>
+                {videoIntentActive ? (
+                  <>
+                    ◈ Want to animate this?{' '}
+                    <button className="studio-tip-link" onClick={() => onPanelSwitch?.('video')}>
+                      Open Video Studio →
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    ◈ Want to edit directly?{' '}
+                    <button className="studio-tip-link" onClick={() => onPanelSwitch?.('image')}>
+                      Open Image Studio →
+                    </button>
+                  </>
+                )}
               </span>
               <button
                 className="studio-tip-dismiss"

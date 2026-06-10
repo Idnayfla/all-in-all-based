@@ -1137,6 +1137,17 @@ function sanitizeHTML(html: string): string {
     ? html.replace('<head>', '<head>' + errorCatcher)
     : errorCatcher + html;
 
+  // Error reporter — posts JS errors (including SyntaxErrors) to the parent frame
+  // so PreviewPanel can detect them and trigger an auto-retry.
+  // MUST be injected AFTER errorCatcher so it ends up BEFORE errorCatcher in the
+  // document (each head-prepend shifts earlier scripts rightward). This guarantees
+  // it runs before the parentOverride script freezes window.parent, so the real
+  // parent reference is captured first.
+  const errorReporter = `<script>(function(){var _p=window.parent;window.__basedReportError=function(m,l,e){if(_p&&_p!==window){try{_p.postMessage({type:'BASED_PREVIEW_ERROR',isSyntax:!!(e instanceof SyntaxError||(m&&m.includes&&m.includes('SyntaxError'))),message:String(m),line:l||0},'*');}catch(_){}}};window.onerror=function(m,s,l,c,e){window.__basedReportError(m,l,e);return false;};})();</script>`;
+  html = html.includes('<head>')
+    ? html.replace('<head>', '<head>' + errorReporter)
+    : errorReporter + html;
+
   // Universal audio unlock — first user gesture unblocks all audio in the sandbox.
   // Without this, AudioContext stays suspended and audio.play() is silently rejected
   // because the iframe counts as a cross-origin context for autoplay policy purposes.
