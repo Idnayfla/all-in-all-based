@@ -21,9 +21,16 @@ interface Task {
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const PRIORITY_COLORS: Record<Priority, string> = {
   urgent: '#ef4444',
-  high: '#f97316',
+  high: '#f59e0b',
   normal: 'var(--accent)',
   low: 'var(--text3)',
+};
+
+const PRIORITY_ORDER: Record<Priority, number> = {
+  urgent: 0,
+  high: 1,
+  normal: 2,
+  low: 3,
 };
 
 const PRIORITY_LABELS: Record<Priority, string> = {
@@ -69,6 +76,60 @@ function formatDue(dateStr: string): string {
   if (diff < 0) return `${Math.abs(diff)}d ago`;
   if (diff < 7) return `In ${diff}d`;
   return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function formatDueCallout(dateStr: string): string {
+  const d = new Date(dateStr);
+  const today = new Date();
+  const diff = Math.round((d.setHours(0, 0, 0, 0) - today.setHours(0, 0, 0, 0)) / 86400000);
+  if (diff === 0) return 'Due today';
+  if (diff === 1) return 'Due tomorrow';
+  if (diff === 2) return 'Due in 2 days';
+  if (diff === 3) return 'Due in 3 days';
+  if (diff < 0) return `Overdue by ${Math.abs(diff)}d`;
+  return `Due ${new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
+}
+
+function getNextTask(tasks: Task[]): Task | null {
+  const active = tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled');
+  if (active.length === 0) return null;
+  return active.slice().sort((a, b) => {
+    const po = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
+    if (po !== 0) return po;
+    if (a.due_date && b.due_date)
+      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+    if (a.due_date) return -1;
+    if (b.due_date) return 1;
+    return 0;
+  })[0];
+}
+
+function getRecommendations(tasks: Task[]): string[] {
+  const active = tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled');
+  const overdueTasks = active.filter(isOverdue);
+  const urgentTasks = active.filter(t => t.priority === 'urgent');
+  const todayTasks = active.filter(isDueToday);
+  const allDone = tasks.length > 0 && active.length === 0;
+
+  if (allDone) return ['All caught up! ◈'];
+
+  const recs: string[] = [];
+
+  if (overdueTasks.length > 0) {
+    recs.push(
+      `You have ${overdueTasks.length} overdue task${overdueTasks.length > 1 ? 's' : ''} — tackle these first`
+    );
+  }
+
+  if (urgentTasks.length > 0 && recs.length < 2) {
+    recs.push(`Focus on "${urgentTasks[0].title}" — it's marked urgent`);
+  }
+
+  if (recs.length < 2 && todayTasks.length === 0 && overdueTasks.length === 0) {
+    recs.push('Clear day ahead — good time to work on upcoming tasks');
+  }
+
+  return recs.slice(0, 2);
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -263,6 +324,12 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     visibleUpcoming.length === 0 &&
     visibleDone.length === 0;
 
+  // Next Up callout data
+  const nextTask = !loading && authToken ? getNextTask(tasks) : null;
+  const recommendations =
+    !loading && authToken && tasks.length > 0 ? getRecommendations(tasks) : [];
+  const showCallout = !loading && authToken;
+
   return (
     <div className="tasks-root">
       {/* Add task row */}
@@ -301,6 +368,57 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
           + Add
         </button>
       </div>
+
+      {/* Next Up callout */}
+      {showCallout && (
+        <div className="tasks-callout">
+          {tasks.length === 0 ? (
+            <div className="tasks-callout-empty">
+              ◈ No tasks yet. Tell Based to add one — try: &ldquo;add a task: [your task]&rdquo;
+            </div>
+          ) : (
+            <>
+              {nextTask && (
+                <div
+                  className="tasks-nextup-card"
+                  style={{ borderLeftColor: PRIORITY_COLORS[nextTask.priority] }}
+                >
+                  <div className="tasks-nextup-header">
+                    <span className="tasks-nextup-label">Next Up</span>
+                    <span
+                      className="tasks-nextup-badge"
+                      style={{
+                        color: PRIORITY_COLORS[nextTask.priority],
+                        borderColor: PRIORITY_COLORS[nextTask.priority],
+                      }}
+                    >
+                      {PRIORITY_LABELS[nextTask.priority]}
+                    </span>
+                  </div>
+                  <div className="tasks-nextup-title">{nextTask.title}</div>
+                  {nextTask.due_date && (
+                    <div
+                      className="tasks-nextup-due"
+                      style={isOverdue(nextTask) ? { color: '#ef4444' } : undefined}
+                    >
+                      {formatDueCallout(nextTask.due_date)}
+                    </div>
+                  )}
+                </div>
+              )}
+              {recommendations.length > 0 && (
+                <div className="tasks-recs">
+                  {recommendations.map((rec, i) => (
+                    <div key={i} className="tasks-rec-item">
+                      ◈ {rec}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {/* Filter tabs */}
       <div className="tasks-filter-tabs">
