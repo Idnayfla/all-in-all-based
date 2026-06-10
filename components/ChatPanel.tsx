@@ -1158,6 +1158,10 @@ export default function ChatPanel({
                     },
                   })
                 );
+                // Notify panels that tasks/entities may have changed (brain tools run server-side
+                // and cannot dispatch window events themselves — we do it here after every reply).
+                window.dispatchEvent(new CustomEvent('based:task-updated'));
+                window.dispatchEvent(new CustomEvent('based:entity-updated'));
                 doneHandled = true;
                 setGenProgress(null);
                 setIsGenerating(false);
