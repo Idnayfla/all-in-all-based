@@ -1343,8 +1343,15 @@ export default function Home() {
       <header className="app-header">
         <div
           className={`logo${currentProject ? ' logo-home' : ''}`}
-          onClick={() => !incognito && startChat()}
-          title="Ask Based anything"
+          onClick={() => {
+            if (incognito) return;
+            if (currentProject) {
+              setCurrentProject(null);
+            } else {
+              startChat();
+            }
+          }}
+          title={currentProject ? 'Back to home' : 'Ask Based anything'}
         >
           <span className="brand-logo-wrap">
             <NextImage
@@ -1525,7 +1532,7 @@ export default function Home() {
           <button
             className={`tab-btn ${activePanel === 'chat' ? 'active' : ''}`}
             onClick={() => {
-              if (!currentProject && !incognito) {
+              if (!incognito) {
                 startChat();
               } else {
                 setActivePanel('chat');

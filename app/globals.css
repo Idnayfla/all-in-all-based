@@ -2325,11 +2325,12 @@ body {
   animation: fadeSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .no-project-tap-hint {
-  font-size: 13px;
+  font-size: 19px;
   font-family: var(--font-pixel);
   color: var(--text3);
   text-align: center;
   letter-spacing: 0.3px;
+  margin-left: 10px;
   animation:
     fadeSlideUp 0.5s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both,
     tapHintPulse 2.8s 0.8s ease-in-out infinite;
@@ -15955,61 +15956,53 @@ body:has(.legal-page) {
   font-family: monospace;
 }
 
-/* ── Quick-chat overlay modal ── */
-/* Rendered inside .main-content (position: relative) so the dim covers only the
-   content area below the fixed header + tab bar — never the header or tab rows. */
+/* ── Quick-chat overlay ─────────────────────────────────────────────────── */
 .quick-chat-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 200;
-  background: rgba(0, 0, 0, 0.75);
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.85);
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 32px 16px 0;
+  padding: 80px 16px 0;
 }
-
 .quick-chat-modal {
   width: 90%;
   max-width: 480px;
-  background: var(--bg2);
-  border: 1px solid var(--border);
+  background: #0f0e1a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.9);
   animation: fadeSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
-
 .quick-chat-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 14px 16px 12px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
-
 .quick-chat-title {
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text, var(--text1));
+  color: #fff;
 }
-
 .quick-chat-logo {
   color: var(--accent);
-  font-family: var(--font-brand, var(--font-mono, monospace));
   font-weight: 800;
-  margin-right: 4px;
+  margin-right: 6px;
 }
-
 .quick-chat-close {
   background: transparent;
   border: none;
-  color: var(--text3);
+  color: rgba(255, 255, 255, 0.4);
   font-size: 22px;
   line-height: 1;
   cursor: pointer;
@@ -16017,77 +16010,70 @@ body:has(.legal-page) {
   transition: color 0.15s;
 }
 .quick-chat-close:hover {
-  color: var(--text, var(--text1));
+  color: #fff;
 }
-
 .quick-chat-body {
   padding: 12px 14px;
+  background: #0f0e1a;
 }
-
 .quick-chat-textarea {
   width: 100%;
   min-height: 200px;
-  background: var(--bg2);
+  background: #0f0e1a;
   border: none;
   outline: none;
   resize: none;
-  color: var(--text, var(--text1));
-  font-family: var(--font-mono, monospace);
+  color: #fff;
+  font-family: var(--font-mono);
   font-size: 14px;
   line-height: 1.6;
   box-sizing: border-box;
 }
 .quick-chat-textarea::placeholder {
-  color: var(--text3);
+  color: rgba(255, 255, 255, 0.3);
 }
-
 .quick-chat-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px 14px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   gap: 10px;
+  background: #0f0e1a;
 }
-
 .quick-chat-cancel {
   background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text3);
-  font-family: var(--font-mono, monospace);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.6);
+  font-family: var(--font-mono);
   font-size: 13px;
-  padding: 7px 16px;
-  border-radius: var(--r-md, 8px);
   cursor: pointer;
-  transition:
-    border-color 0.15s,
-    color 0.15s;
+  border-radius: 24px;
+  padding: 8px 20px;
+  transition: all 0.2s ease;
 }
 .quick-chat-cancel:hover {
-  border-color: var(--text2);
-  color: var(--text, var(--text1));
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
 }
-
 .quick-chat-send {
   background: var(--accent);
   border: none;
   color: #fff;
-  font-family: var(--font-mono, monospace);
+  font-family: var(--font-mono);
   font-size: 13px;
-  font-weight: 700;
-  padding: 7px 20px;
-  border-radius: var(--r-md, 8px);
+  font-weight: 600;
   cursor: pointer;
-  transition:
-    background 0.15s,
-    box-shadow 0.15s,
-    opacity 0.15s;
+  border-radius: 24px;
+  padding: 8px 24px;
+  transition: all 0.2s ease;
 }
 .quick-chat-send:hover:not(:disabled) {
-  background: var(--accent-hover, var(--accent));
-  box-shadow: 0 0 0 3px var(--accent-glow, rgba(139, 92, 246, 0.25));
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--accent-glow);
 }
 .quick-chat-send:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
 }
