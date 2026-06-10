@@ -9,6 +9,7 @@ import { getCrowdInfo } from '@/lib/crowd';
 import { getTrafficInfo } from '@/lib/traffic';
 import { createLangfuseClient } from '@/lib/langfuse';
 import { MODEL_OPUS, MODEL_SONNET, MODEL_HAIKU, MODEL_GROQ, MODEL_CEREBRAS } from '@/lib/models';
+import { BRAIN_TOOLS, runBrainTool } from '@/lib/brainTools';
 
 export const maxDuration = 300;
 
@@ -1530,6 +1531,95 @@ async function streamText(
   return streamPantheonCollecting(messages, taskType, maxTokens, onChunk, onRetry);
 }
 
+// ── Digital-brain chat tool loop ──────────────────────────────────────────────
+// Runs the Anthropic chat with the task/entity tools enabled. Tool rounds are
+// resolved non-streamed (fast, no token deltas needed); once the model stops
+// requesting tools, the final natural-language answer is streamed to the client
+// via onChunk. Falls back to a plain streamed reply if anything goes wrong.
+async function runChatWithTools(
+  userId: string,
+  systemBlocks: Array<{ type: 'text'; text: string; cache_control?: { type: 'ephemeral' } }>,
+  anthropicMessages: Array<{ role: 'user' | 'assistant'; content: unknown }>,
+  lastUserMessage: string,
+  onChunk: (text: string) => void,
+  onTool: (label: string) => void
+): Promise<string> {
+  const TOOL_LABELS: Record<string, string> = {
+    create_task: 'Adding task',
+    list_tasks: 'Checking tasks',
+    complete_task: 'Completing task',
+    search_entities: 'Recalling context',
+    upsert_entity: 'Updating memory',
+  };
+  const today = new Date().toISOString().slice(0, 10);
+  const system = [
+    ...systemBlocks,
+    {
+      type: 'text' as const,
+      text: `\nTODAY'S DATE: ${today}. When creating tasks with relative due dates (tomorrow, next week), resolve them to an absolute ISO date. You have tools to manage the user's tasks and personal knowledge base (entities). Use search_entities to pull context when the user references something specific from their life before answering. Use upsert_entity when they share a new fact about a project, person, account, or topic. After using a tool, give a short natural confirmation — never expose raw JSON or tool mechanics.`,
+    },
+  ];
+
+  const convo: Anthropic.MessageParam[] = anthropicMessages.map(m => ({
+    role: m.role,
+    content:
+      typeof m.content === 'string' ? m.content : (m.content as Anthropic.ContentBlockParam[]),
+  }));
+
+  let usedTool = false;
+  const MAX_ROUNDS = 5;
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    const response = await client.messages.create({
+      model: MODEL_OPUS,
+      max_tokens: 4000,
+      system,
+      tools: BRAIN_TOOLS,
+      messages: convo,
+    });
+
+    const toolUses = response.content.filter(
+      (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use'
+    );
+
+    if (response.stop_reason !== 'tool_use' || toolUses.length === 0) {
+      // No (more) tools requested. If a tool ran this turn, stream the model's
+      // final text; otherwise fall through to streaming so the very first reply
+      // is still streamed token-by-token.
+      if (usedTool) {
+        const finalText = response.content
+          .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+          .map(b => b.text)
+          .join('');
+        onChunk(finalText);
+        return finalText;
+      }
+      break;
+    }
+
+    usedTool = true;
+    convo.push({ role: 'assistant', content: response.content });
+    const results: Anthropic.ToolResultBlockParam[] = [];
+    for (const tu of toolUses) {
+      onTool(TOOL_LABELS[tu.name] ?? 'Working');
+      const out = await runBrainTool(userId, tu.name, tu.input as Record<string, unknown>);
+      results.push({ type: 'tool_result', tool_use_id: tu.id, content: out });
+    }
+    convo.push({ role: 'user', content: results });
+  }
+
+  // No tool was used (or loop exhausted) — produce the reply via the normal
+  // streaming path so the first answer streams naturally.
+  const sysText = system.map(b => b.text).join('\n');
+  const msgs = [
+    { role: 'system', content: sysText },
+    ...anthropicMessages.map(m => ({
+      role: m.role,
+      content: typeof m.content === 'string' ? m.content : lastUserMessage,
+    })),
+  ];
+  return streamText(msgs, 12000, onChunk, () => {}, 'based');
+}
+
 export async function POST(req: NextRequest) {
   // ── Auth guard ───────────────────────────────────────────────────────────
   let userId: string;
@@ -2122,6 +2212,20 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                   );
                 }
               }
+            } else if (!usingFreeModel && HAS_ANTHROPIC_KEY) {
+              // Based AI (Claude) chat path — runs the digital-brain tool loop so
+              // Based can manage tasks and read/update entities mid-conversation.
+              // Resolve the tool calls first (non-streamed), then stream the final
+              // natural-language reply to the user.
+              fullText = await runChatWithTools(
+                userId,
+                systemBlocks,
+                anthropicMessages,
+                lastUserMessage,
+                t =>
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+                tool => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tool })}\n\n`))
+              );
             } else {
               const sysText = usingFreeModel
                 ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally. Focus on the current message only — do not recap or reference previous topics unless the user explicitly asks.'

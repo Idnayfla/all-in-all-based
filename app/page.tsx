@@ -35,6 +35,8 @@ import VideoEditorPanel from '@/components/VideoEditorPanel';
 const StudioPanel = dynamic(() => import('@/components/StudioPanel'), { ssr: false });
 const ImageStudioPanel = dynamic(() => import('@/components/ImageStudioPanel'), { ssr: false });
 import NotesPanel from '@/components/NotesPanel';
+import TasksPanel from '@/components/TasksPanel';
+import EntityPanel from '@/components/EntityPanel';
 import ThreeDStudio from '@/components/ThreeDStudio';
 import ProactiveCheckin from '@/components/ProactiveCheckin';
 import WallpaperCropper from '@/components/WallpaperCropper';
@@ -164,7 +166,18 @@ export default function Home() {
   const [incognito, setIncognito] = useState(false);
   const [incognitoMessages, setIncognitoMessages] = useState<Message[]>([]);
   const [activePanel, setActivePanel] = useState<
-    'chat' | 'editor' | 'preview' | 'debug' | 'video' | 'studio' | 'image' | 'notes' | '3d' | 'spec'
+    | 'chat'
+    | 'editor'
+    | 'preview'
+    | 'debug'
+    | 'video'
+    | 'studio'
+    | 'image'
+    | 'notes'
+    | '3d'
+    | 'spec'
+    | 'tasks'
+    | 'brain'
   >('chat');
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
@@ -1355,6 +1368,24 @@ export default function Home() {
               Spec
             </button>
             <button
+              className={`tab-btn tab-btn-secondary ${activePanel === 'tasks' ? 'active' : ''}`}
+              onClick={() => {
+                setActivePanel('tasks');
+                setShowSettings(false);
+              }}
+            >
+              Tasks
+            </button>
+            <button
+              className={`tab-btn tab-btn-secondary ${activePanel === 'brain' ? 'active' : ''}`}
+              onClick={() => {
+                setActivePanel('brain');
+                setShowSettings(false);
+              }}
+            >
+              Brain
+            </button>
+            <button
               className={`tab-btn tab-btn-debug tab-btn-secondary ${activePanel === 'debug' ? 'active' : ''}`}
               onClick={() => {
                 setActivePanel('debug');
@@ -1366,11 +1397,21 @@ export default function Home() {
             </button>
             {/* More toggle — only visible on mobile */}
             <button
-              className={`tab-btn tab-btn-more${showMoreTabs ? ' active' : ''}${['video', 'studio', 'image', 'notes', '3d', 'debug', 'spec'].includes(activePanel) ? ' tab-btn-more--highlight' : ''}`}
+              className={`tab-btn tab-btn-more${showMoreTabs ? ' active' : ''}${['video', 'studio', 'image', 'notes', '3d', 'debug', 'spec', 'tasks', 'brain'].includes(activePanel) ? ' tab-btn-more--highlight' : ''}`}
               onClick={() => setShowMoreTabs(s => !s)}
               title="More tools"
             >
-              {['video', 'studio', 'image', 'notes', '3d', 'debug', 'spec'].includes(activePanel)
+              {[
+                'video',
+                'studio',
+                'image',
+                'notes',
+                '3d',
+                'debug',
+                'spec',
+                'tasks',
+                'brain',
+              ].includes(activePanel)
                 ? ((
                     {
                       video: 'Video',
@@ -1380,6 +1421,8 @@ export default function Home() {
                       '3d': '3D',
                       debug: '◈',
                       spec: 'Spec',
+                      tasks: 'Tasks',
+                      brain: 'Brain',
                     } as Record<string, string>
                   )[activePanel] ?? 'More')
                 : 'More'}
@@ -1561,6 +1604,13 @@ export default function Home() {
             { id: 'notes', label: 'Notes', icon: '◈', desc: 'Sync your notes' },
             { id: '3d', label: '3D Studio', icon: '⊙', desc: 'Three.js scene builder' },
             { id: 'spec', label: 'Spec', icon: '◈', desc: 'Requirements & SRS generator' },
+            { id: 'tasks', label: 'Tasks', icon: '◈', desc: 'Your to-do list' },
+            {
+              id: 'brain',
+              label: 'Brain',
+              icon: '⬡',
+              desc: 'Entity memory — people, projects, accounts',
+            },
           ] as const
         ).map(t => (
           <button
@@ -2173,6 +2223,12 @@ export default function Home() {
           <div className={`panel ${activePanel === 'notes' ? 'panel-active' : ''}`}>
             <NotesPanel authToken={authToken} />
           </div>
+          <div className={`panel ${activePanel === 'tasks' ? 'panel-active' : ''}`}>
+            <TasksPanel authToken={authToken} />
+          </div>
+          <div className={`panel ${activePanel === 'brain' ? 'panel-active' : ''}`}>
+            <EntityPanel authToken={authToken} />
+          </div>
           <div className={`panel ${activePanel === '3d' ? 'panel-active' : ''}`}>
             <ThreeDStudio />
           </div>
@@ -2194,6 +2250,8 @@ export default function Home() {
             activePanel !== 'notes' &&
             activePanel !== '3d' &&
             activePanel !== 'spec' &&
+            activePanel !== 'tasks' &&
+            activePanel !== 'brain' &&
             (incognito ? (
               <div className="panel panel-active">
                 <div className="incognito-banner">
@@ -2342,6 +2400,8 @@ export default function Home() {
                           | 'notes'
                           | '3d'
                           | 'spec'
+                          | 'tasks'
+                          | 'brain'
                       )
                     }
                   />
