@@ -1311,6 +1311,37 @@ export default function ChatPanel({
                 // and cannot dispatch window events themselves — we do it here after every reply).
                 window.dispatchEvent(new CustomEvent('based:task-updated'));
                 window.dispatchEvent(new CustomEvent('based:entity-updated'));
+
+                // Fire-and-forget entity extraction — runs silently in background
+                const lastUser = newMessages.findLast((m: Message) => m.role === 'user');
+                const lastAssistant = data.reply || assistantMsg;
+                if (lastUser && lastAssistant && authToken) {
+                  const extractMsgs = [
+                    {
+                      role: 'user',
+                      content:
+                        typeof lastUser.content === 'string'
+                          ? lastUser.content
+                          : (lastUser.content as Array<{ type: string; text?: string }>)
+                              .filter(b => b.type === 'text')
+                              .map(b => (b as { type: string; text: string }).text)
+                              .join(' '),
+                    },
+                    { role: 'assistant', content: lastAssistant },
+                  ].filter(m => m.content && m.content.trim());
+
+                  if (extractMsgs.length > 0) {
+                    fetch('/api/brain/extract', {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${authToken}`,
+                      },
+                      body: JSON.stringify({ messages: extractMsgs }),
+                    }).catch(() => {}); // truly fire-and-forget
+                  }
+                }
+
                 doneHandled = true;
                 setGenProgress(null);
                 setIsGenerating(false);
