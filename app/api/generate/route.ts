@@ -1966,6 +1966,69 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             }
           }
 
+          // ── Brain-save shortcut ─────────────────────────────────────────
+          // Detect "save/store/extract to brain/memory/entities" intents BEFORE
+          // the planner AND before the file-analysis shortcut so they always reach
+          // runChatWithTools with BRAIN_TOOLS available. Without this guard the
+          // file-analysis path (simplified system, no tools) or plain chat path
+          // (no tools) would intercept these requests and the model would
+          // hallucinate a tool call like { "command": "view", "path": "/memories" }.
+          const BRAIN_SAVE_RE =
+            /\b(save|add|store|put|record|log|remember|extract|pull|keep)\b.{0,60}\b(brain|memory|entities|entity|notes?)\b|\b(brain|memory)\b.{0,30}\b(save|add|store|update|record)\b/i;
+          if (BRAIN_SAVE_RE.test(lastUserMessage)) {
+            let fullText = '';
+            if (!usingFreeModel && HAS_ANTHROPIC_KEY) {
+              // Inject a specialised instruction block so the model knows to call
+              // upsert_entity for each significant entity found in the attached files.
+              const brainSaveBlocks = [
+                ...systemBlocks,
+                {
+                  type: 'text' as const,
+                  text: `\nBRAIN-SAVE MODE: The user wants to extract and save entities from the attached files into their knowledge base. You MUST use the upsert_entity tool — call it once for each significant entity (decision, project, person, account, plan, phase, or context item) found in the files. Do NOT use any other tool format. Do NOT invent tool calls not defined here. After saving all entities, reply with a brief plain-text summary of what was saved.`,
+                },
+              ];
+              fullText = await runChatWithTools(
+                userId,
+                brainSaveBlocks,
+                anthropicMessages,
+                lastUserMessage,
+                t =>
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+                tool => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tool })}\n\n`))
+              );
+            } else {
+              const sysText =
+                'You are Based — a sharp, direct AI assistant. The user wants to save information to their brain/memory. Read the attached files and summarize the key entities, decisions, and context they contain. Reply in clear markdown.';
+              const msgs = [
+                { role: 'system', content: sysText },
+                ...anthropicMessages.map((m: { role: string; content: unknown }) => ({
+                  role: m.role,
+                  content: typeof m.content === 'string' ? m.content : lastUserMessage,
+                })),
+              ];
+              fullText = await streamText(
+                msgs,
+                8000,
+                t =>
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+                () =>
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)
+                  ),
+                usingFreeModel ? 'free' : 'based'
+              );
+            }
+            const files = parseFiles(fullText);
+            const projectType = parseType(fullText);
+            const reply = stripTags(fullText);
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ done: true, reply, files, projectType })}\n\n`
+              )
+            );
+            return;
+          }
+
           // ── Task-management shortcut ────────────────────────────────────
           // Detect task/brain management phrases BEFORE the planner so they are
           // always routed to the chat/tool path (runChatWithTools) and never
@@ -2058,6 +2121,71 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
               )
             );
             return;
+          }
+
+          // ── File-analysis shortcut ─────────────────────────────────────
+          // If the last user message contains an attached-file marker AND the
+          // plain-text part is a short analysis request, skip the planner and
+          // return an inline markdown response. This prevents analysis verbs like
+          // "refactor" or "explain" from triggering the full app-builder pipeline.
+          const FILE_ANALYSIS_RE =
+            /^\s*(refactor|rewrite|explain|review|summarise|summarize|analyse|analyze|what does|what is|how does|how do|find (bugs?|issues?|errors?|problems?)|check (for|this)|look at|read (this|through)|critique|improve|clean ?up|optimise|optimize|describe|document|audit)\b/i;
+          const lastUserContent = lastUserMsg?.content;
+          const hasFileMarker =
+            Array.isArray(lastUserContent) &&
+            (lastUserContent as ApiContentBlock[]).some(
+              b =>
+                b.type === 'text' &&
+                /^---\s.+\s---/.test((b as { type: 'text'; text: string }).text.trim())
+            );
+          if (hasFileMarker) {
+            const plainTextBlocks = Array.isArray(lastUserContent)
+              ? (lastUserContent as ApiContentBlock[])
+                  .filter(
+                    b =>
+                      b.type === 'text' &&
+                      !/^---\s.+\s---/.test((b as { type: 'text'; text: string }).text.trim())
+                  )
+                  .map(b => (b as { type: 'text'; text: string }).text)
+                  .join(' ')
+                  .trim()
+              : '';
+            // Never let the file-analysis shortcut intercept brain-save requests —
+            // those need the full tool-calling path (BRAIN_SAVE_RE already handled
+            // them above, but guard here too in case of future regex ordering changes).
+            if (
+              !BRAIN_SAVE_RE.test(plainTextBlocks) &&
+              plainTextBlocks.length <= 120 &&
+              FILE_ANALYSIS_RE.test(plainTextBlocks)
+            ) {
+              const fileAnalysisSystem =
+                'You are Based, a personal AI assistant. The user has attached files for you to analyse. Respond with clear, helpful markdown — no code generation pipeline, no HTML apps. Just answer their question about the files.';
+              const msgs = [
+                { role: 'system', content: fileAnalysisSystem },
+                ...anthropicMessages.map((m: { role: string; content: unknown }) => ({
+                  role: m.role,
+                  content: typeof m.content === 'string' ? m.content : lastUserMessage,
+                })),
+              ];
+              let fullText = '';
+              fullText = await streamText(
+                msgs,
+                8000,
+                t =>
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+                () =>
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)
+                  ),
+                usingFreeModel ? 'free' : 'based'
+              );
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ done: true, reply: fullText, files: [], projectType: 'html' })}\n\n`
+                )
+              );
+              return;
+            }
           }
 
           // Step 1: Planner classifies intent and plans files

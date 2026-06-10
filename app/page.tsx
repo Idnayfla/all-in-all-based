@@ -114,6 +114,7 @@ export interface FileNode {
 
 export type ContentBlock =
   | { type: 'text'; text: string }
+  | { type: 'file'; name: string; relativePath: string; content: string }
   | {
       type: 'image';
       mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
@@ -187,7 +188,10 @@ export default function Home() {
   const [shareUrl, setShareUrl] = useState('');
   const [shareId, setShareId] = useState('');
   const [isSharing, setIsSharing] = useState(false);
-  const [showMoreTabs, setShowMoreTabs] = useState(false);
+  const [showStudioMenu, setShowStudioMenu] = useState(false);
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
+  const studioMenuRef = useRef<HTMLDivElement>(null);
+  const toolsMenuRef = useRef<HTMLDivElement>(null);
   const [showGalleryPublish, setShowGalleryPublish] = useState(false);
   const [galleryAuthorName, setGalleryAuthorName] = useState('');
   const [galleryPublished, setGalleryPublished] = useState(false);
@@ -228,6 +232,23 @@ export default function Home() {
   useEffect(() => {
     track('panel_switched', { panel: activePanel });
   }, [activePanel]);
+
+  // Close group dropdowns when clicking outside them. Each wrapper has its own
+  // ref so clicking the Studio button never closes the Tools menu (and vice
+  // versa), and clicking inside a menu's own wrapper keeps it open.
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (studioMenuRef.current && !studioMenuRef.current.contains(target)) {
+        setShowStudioMenu(false);
+      }
+      if (toolsMenuRef.current && !toolsMenuRef.current.contains(target)) {
+        setShowToolsMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const LATEST_CHANGELOG = '2026-06-02';
   useEffect(() => {
@@ -296,6 +317,7 @@ export default function Home() {
   const [wallpaperBlur, setWallpaperBlur] = useState(0);
   const [cropperSrc, setCropperSrc] = useState<string | null>(null);
   const wallpaperInputRef = useRef<HTMLInputElement>(null);
+  const [chatInputTrigger, setChatInputTrigger] = useState(0);
 
   // ── Project cache helpers (localStorage) ────────────────────────────────
   const PROJECTS_CACHE_KEY = 'based_projects_cache';
@@ -1070,6 +1092,34 @@ export default function Home() {
     createProject(name);
   };
 
+  const startChat = () => {
+    const isBetaEnv =
+      process.env.NEXT_PUBLIC_BUILD_ENV === 'beta' ||
+      (typeof window !== 'undefined' && window.location.hostname === 'beta.getbased.dev');
+    if (!isBetaEnv && subscription.tier === 'free' && projects.length >= 3) {
+      setPricingReason('projects');
+      setShowPricing(true);
+      return;
+    }
+    if (!currentProject && !incognito) {
+      createProject('New chat');
+    }
+    setChatInputTrigger(t => t + 1);
+  };
+
+  const handleAutoName = async (projectId: string, firstPrompt: string) => {
+    try {
+      const res = await fetch('/api/autoname', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: firstPrompt }),
+      });
+      if (!res.ok) return;
+      const { name } = await res.json();
+      if (name) renameProject(projectId, name);
+    } catch {}
+  };
+
   const createProject = async (name: string) => {
     setProjectModal(false);
 
@@ -1285,8 +1335,15 @@ export default function Home() {
       <header className="app-header">
         <div
           className={`logo${currentProject ? ' logo-home' : ''}`}
-          onClick={() => currentProject && setCurrentProject(null)}
-          title={currentProject ? 'Back to home' : undefined}
+          onClick={() => {
+            if (incognito) return;
+            if (currentProject) {
+              setCurrentProject(null);
+            } else {
+              startChat();
+            }
+          }}
+          title={currentProject ? 'Back to home' : 'Ask Based anything'}
         >
           <span className="brand-logo-wrap">
             <NextImage
@@ -1303,155 +1360,7 @@ export default function Home() {
           <span className="early-access-chip">◈ Early Access</span>
         </div>
         <nav className="header-nav">
-          <div className="tab-switcher">
-            {/* Primary tabs — always visible */}
-            <button
-              className={`tab-btn ${activePanel === 'chat' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('chat');
-                setShowSettings(false);
-                setShowMoreTabs(false);
-              }}
-            >
-              Chat
-            </button>
-            <button
-              className={`tab-btn ${activePanel === 'editor' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('editor');
-                setShowSettings(false);
-                setShowMoreTabs(false);
-              }}
-            >
-              Editor
-            </button>
-            <button
-              className={`tab-btn ${activePanel === 'preview' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('preview');
-                setShowSettings(false);
-                setShowMoreTabs(false);
-              }}
-            >
-              Preview
-            </button>
-            {/* Secondary tabs — hidden on mobile, shown in More drawer */}
-            <button
-              className={`tab-btn tab-btn-secondary ${activePanel === 'video' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('video');
-                setShowSettings(false);
-              }}
-            >
-              Video
-            </button>
-            <button
-              className={`tab-btn tab-btn-secondary ${activePanel === 'studio' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('studio');
-                setShowSettings(false);
-              }}
-            >
-              Studio
-            </button>
-            <button
-              className={`tab-btn tab-btn-secondary ${activePanel === 'image' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('image');
-                setShowSettings(false);
-              }}
-            >
-              Image
-            </button>
-            <button
-              className={`tab-btn tab-btn-secondary ${activePanel === 'notes' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('notes');
-                setShowSettings(false);
-              }}
-            >
-              Notes
-            </button>
-            <button
-              className={`tab-btn tab-btn-secondary ${activePanel === '3d' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('3d');
-                setShowSettings(false);
-              }}
-            >
-              3D
-            </button>
-            <button
-              className={`tab-btn tab-btn-secondary ${activePanel === 'spec' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('spec');
-                setShowSettings(false);
-              }}
-            >
-              Spec
-            </button>
-            <button
-              className={`tab-btn tab-btn-secondary ${activePanel === 'tasks' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('tasks');
-                setShowSettings(false);
-              }}
-            >
-              Tasks
-            </button>
-            <button
-              className={`tab-btn tab-btn-secondary ${activePanel === 'brain' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('brain');
-                setShowSettings(false);
-              }}
-            >
-              Brain
-            </button>
-            <button
-              className={`tab-btn tab-btn-debug tab-btn-secondary ${activePanel === 'debug' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('debug');
-                setShowSettings(false);
-              }}
-              title="Debug stream"
-            >
-              ◈
-            </button>
-            {/* More toggle — only visible on mobile */}
-            <button
-              className={`tab-btn tab-btn-more${showMoreTabs ? ' active' : ''}${['video', 'studio', 'image', 'notes', '3d', 'debug', 'spec', 'tasks', 'brain'].includes(activePanel) ? ' tab-btn-more--highlight' : ''}`}
-              onClick={() => setShowMoreTabs(s => !s)}
-              title="More tools"
-            >
-              {[
-                'video',
-                'studio',
-                'image',
-                'notes',
-                '3d',
-                'debug',
-                'spec',
-                'tasks',
-                'brain',
-              ].includes(activePanel)
-                ? ((
-                    {
-                      video: 'Video',
-                      studio: 'Studio',
-                      image: 'Image',
-                      notes: 'Notes',
-                      '3d': '3D',
-                      debug: '◈',
-                      spec: 'Spec',
-                      tasks: 'Tasks',
-                      brain: 'Brain',
-                    } as Record<string, string>
-                  )[activePanel] ?? 'More')
-                : 'More'}
-              <span className="tab-more-chevron">{showMoreTabs ? '▲' : '▼'}</span>
-            </button>
-          </div>
+          {/* tab-switcher relocated to its own dedicated row below the header (see .tab-bar-row) */}
           <div className="header-controls">
             {currentProject && files.length > 0 && (
               <>
@@ -1608,6 +1517,146 @@ export default function Home() {
         </nav>
       </header>
 
+      {/* Tab bar — its own dedicated row below the header (never shares a row with header buttons) */}
+      <div className="tab-bar-row">
+        <div className="tab-switcher">
+          {/* Chat — always visible */}
+          <button
+            className={`tab-btn ${activePanel === 'chat' ? 'active' : ''}`}
+            onClick={() => {
+              if (!incognito) {
+                startChat();
+              } else {
+                setActivePanel('chat');
+              }
+              setShowSettings(false);
+              setShowStudioMenu(false);
+              setShowToolsMenu(false);
+            }}
+          >
+            Chat
+          </button>
+          {/* Preview — always visible */}
+          <button
+            className={`tab-btn ${activePanel === 'preview' ? 'active' : ''}`}
+            onClick={() => {
+              setActivePanel('preview');
+              setShowSettings(false);
+              setShowStudioMenu(false);
+              setShowToolsMenu(false);
+            }}
+          >
+            Preview
+          </button>
+          {/* Studio group: Video · Music · Image · 3D · Code (Editor) */}
+          {(() => {
+            const STUDIO_PANELS = ['video', 'studio', 'image', '3d', 'editor'] as const;
+            const studioActive = (STUDIO_PANELS as readonly string[]).includes(activePanel);
+            const activeLabel = studioActive
+              ? ((
+                  {
+                    video: 'Video',
+                    studio: 'Music',
+                    image: 'Image',
+                    '3d': '3D',
+                    editor: 'Code',
+                  } as Record<string, string>
+                )[activePanel] ?? 'Studio')
+              : 'Studio';
+            return (
+              <div className="tab-group-wrap" ref={studioMenuRef}>
+                <button
+                  className={`tab-btn${studioActive ? ' active' : ''}`}
+                  onClick={() => {
+                    setShowStudioMenu(s => !s);
+                    setShowToolsMenu(false);
+                    setShowSettings(false);
+                  }}
+                >
+                  {activeLabel} ▾
+                </button>
+                {showStudioMenu && (
+                  <div className="tab-group-menu">
+                    {(
+                      [
+                        { id: 'video', label: 'Video' },
+                        { id: 'studio', label: 'Music' },
+                        { id: 'image', label: 'Image' },
+                        { id: '3d', label: '3D' },
+                        { id: 'editor', label: 'Code' },
+                      ] as const
+                    ).map(item => (
+                      <button
+                        key={item.id}
+                        className={`tab-group-item${activePanel === item.id ? ' active' : ''}`}
+                        onClick={() => {
+                          setActivePanel(item.id);
+                          setShowStudioMenu(false);
+                          setShowSettings(false);
+                        }}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+          {/* Tools group: Notes · Tasks · Brain */}
+          {(() => {
+            const TOOLS_PANELS = ['notes', 'tasks', 'brain'] as const;
+            const toolsActive = (TOOLS_PANELS as readonly string[]).includes(activePanel);
+            const activeLabel = toolsActive
+              ? ((
+                  {
+                    notes: 'Notes',
+                    tasks: 'Tasks',
+                    brain: 'Brain',
+                  } as Record<string, string>
+                )[activePanel] ?? 'Tools')
+              : 'Tools';
+            return (
+              <div className="tab-group-wrap" ref={toolsMenuRef}>
+                <button
+                  className={`tab-btn${toolsActive ? ' active' : ''}`}
+                  onClick={() => {
+                    setShowToolsMenu(s => !s);
+                    setShowStudioMenu(false);
+                    setShowSettings(false);
+                  }}
+                >
+                  {activeLabel} ▾
+                </button>
+                {showToolsMenu && (
+                  <div className="tab-group-menu">
+                    {(
+                      [
+                        { id: 'notes', label: 'Notes' },
+                        { id: 'tasks', label: 'Tasks' },
+                        { id: 'brain', label: 'Brain' },
+                      ] as const
+                    ).map(item => (
+                      <button
+                        key={item.id}
+                        className={`tab-group-item${activePanel === item.id ? ' active' : ''}`}
+                        onClick={() => {
+                          setActivePanel(item.id);
+                          setShowToolsMenu(false);
+                          setShowSettings(false);
+                        }}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+
       {/* Due-task banner — shown once per session when tasks are due today */}
       {dueBanner && (
         <div className="due-task-banner">
@@ -1641,53 +1690,6 @@ export default function Home() {
           </button>
         </div>
       )}
-
-      {/* More-tabs drawer — mobile only */}
-      {showMoreTabs && (
-        <div className="more-tabs-backdrop" onClick={() => setShowMoreTabs(false)} />
-      )}
-      <div className={`more-tabs-drawer${showMoreTabs ? ' more-tabs-drawer--open' : ''}`}>
-        <div className="more-tabs-header">
-          <span className="more-tabs-title">◈ Tools</span>
-          <button className="more-tabs-close" onClick={() => setShowMoreTabs(false)}>
-            ✕
-          </button>
-        </div>
-        {(
-          [
-            { id: 'video', label: 'Video', icon: '▶', desc: 'Edit & generate clips' },
-            { id: 'studio', label: 'Studio', icon: '⬡', desc: 'AI art generation' },
-            { id: 'image', label: 'Image', icon: '◉', desc: 'Edit & generate images' },
-            { id: 'notes', label: 'Notes', icon: '◈', desc: 'Sync your notes' },
-            { id: '3d', label: '3D Studio', icon: '⊙', desc: 'Three.js scene builder' },
-            { id: 'spec', label: 'Spec', icon: '◈', desc: 'Requirements & SRS generator' },
-            { id: 'tasks', label: 'Tasks', icon: '◈', desc: 'Your to-do list' },
-            {
-              id: 'brain',
-              label: 'Brain',
-              icon: '⬡',
-              desc: 'Entity memory — people, projects, accounts',
-            },
-          ] as const
-        ).map(t => (
-          <button
-            key={t.id}
-            className={`more-tabs-item${activePanel === t.id ? ' active' : ''}`}
-            onClick={() => {
-              setActivePanel(t.id as typeof activePanel);
-              setShowSettings(false);
-              setShowMoreTabs(false);
-            }}
-          >
-            <span className="more-tabs-item-icon">{t.icon}</span>
-            <span className="more-tabs-item-label">
-              <span className="more-tabs-item-name">{t.label}</span>
-              <span className="more-tabs-item-desc">{t.desc}</span>
-            </span>
-            {activePanel === t.id && <span className="more-tabs-item-check">◈</span>}
-          </button>
-        ))}
-      </div>
 
       {/* Tips guide for new users */}
       <TipsGuide />
@@ -2332,19 +2334,21 @@ export default function Home() {
               </div>
             ) : !currentProject ? (
               <div className="no-project">
-                <NextImage
-                  src="/brand-icon-loop.svg"
-                  className="chat-empty-logo"
-                  alt="Based"
-                  width={80}
-                  height={80}
-                />
+                <div className="no-project-tap-hint">Tap me to start chatting.</div>
+                <button
+                  className="chat-empty-logo-btn"
+                  onClick={startChat}
+                  aria-label="Start chatting"
+                >
+                  <NextImage
+                    src="/brand-icon-loop.svg"
+                    className="chat-empty-logo"
+                    alt="Based"
+                    width={80}
+                    height={80}
+                  />
+                </button>
                 <div className="no-project-title">BASED</div>
-                <div className="no-project-sub">You describe it. Based builds it.</div>
-                <div className="no-project-features">
-                  HTML &nbsp;·&nbsp; Canvas games &nbsp;·&nbsp; Web apps &nbsp;·&nbsp; Tools
-                  &nbsp;·&nbsp; Dashboards
-                </div>
                 <AnimatePresence>
                   {checkin && (
                     <ProactiveCheckin
@@ -2352,19 +2356,16 @@ export default function Home() {
                       fromDevice={checkin.fromDevice}
                       error={checkin.error}
                       onContinue={async () => {
-                        // 1. Check in-memory state (already loaded)
                         const inState = projects.find(p => p.id === checkin.id);
                         if (inState) {
                           loadProject(inState);
                           return;
                         }
-                        // 2. Check localStorage cache (available before cloud load)
                         const cached = loadProjectsCache().find(p => p.id === checkin.id);
                         if (cached) {
                           loadProject(cached);
                           return;
                         }
-                        // 3. Live fetch — cloud may not have loaded yet when checkin fired
                         try {
                           const headers = await getHeaders();
                           const res = await fetch(`/api/projects/${checkin.id}`, { headers });
@@ -2376,7 +2377,6 @@ export default function Home() {
                             }
                           }
                         } catch {}
-                        // 4. Project is truly gone — show error instead of silently dismissing
                         setCheckin(prev =>
                           prev ? { ...prev, error: 'That project was deleted.' } : null
                         );
@@ -2385,21 +2385,6 @@ export default function Home() {
                     />
                   )}
                 </AnimatePresence>
-                <button className="new-project-btn-large" onClick={newProject}>
-                  + New Project
-                </button>
-                <div className="no-project-examples">
-                  {[
-                    'Build a snake game',
-                    'Sales dashboard with charts',
-                    'Scientific calculator',
-                    'Portfolio website',
-                  ].map(p => (
-                    <span key={p} onClick={() => quickProject(p)}>
-                      {p}
-                    </span>
-                  ))}
-                </div>
                 <div className="no-project-hint">Sign in free · Projects save to your account</div>
                 <div className="memory-pitch">
                   <span className="memory-pitch-icon">◉</span>
@@ -2461,6 +2446,13 @@ export default function Home() {
                           | 'brain'
                       )
                     }
+                    onAutoName={
+                      currentProject
+                        ? (prompt: string) => handleAutoName(currentProject.id, prompt)
+                        : undefined
+                    }
+                    onLogoClick={startChat}
+                    openInputTrigger={chatInputTrigger}
                   />
                 </div>
                 <div className={`panel ${activePanel === 'editor' ? 'panel-active' : ''}`}>
