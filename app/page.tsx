@@ -282,6 +282,7 @@ export default function Home() {
     fromDevice?: 'mobile' | 'tablet' | 'desktop';
     error?: string;
   } | null>(null);
+  const [dueBanner, setDueBanner] = useState<{ count: number; firstTitle: string } | null>(null);
   const [aiModel, setAiModelState] = useState<'based' | 'free'>('based');
   const [persona, setPersona] =
     useState<import('@/components/PersonaSwitcher').PersonaKey>('based');
@@ -961,6 +962,28 @@ export default function Home() {
     return () => window.removeEventListener('memory-updated', handler);
   }, [user, getHeaders]);
 
+  // ── Due-task banner: show once per session when tasks are due today ───────
+  useEffect(() => {
+    if (!user || !authToken) return;
+    // Only show once per browser session
+    try {
+      if (sessionStorage.getItem('based_due_banner_dismissed')) return;
+    } catch {}
+    (async () => {
+      try {
+        const headers = await getHeaders();
+        const res = await fetch('/api/tasks?due_today=true', { headers });
+        if (!res.ok) return;
+        const data = await res.json();
+        const tasks: Array<{ title: string; status: string }> = Array.isArray(data) ? data : [];
+        const active = tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled');
+        if (active.length > 0) {
+          setDueBanner({ count: active.length, firstTitle: active[0].title });
+        }
+      } catch {}
+    })();
+  }, [user, authToken]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── Detect intermediate in-progress message content (never persist these) ─
   function isInProgressContent(content: Message['content']): boolean {
     if (typeof content !== 'string') return false;
@@ -1584,6 +1607,40 @@ export default function Home() {
           </div>
         </nav>
       </header>
+
+      {/* Due-task banner — shown once per session when tasks are due today */}
+      {dueBanner && (
+        <div className="due-task-banner">
+          <span className="due-task-banner-text">
+            ◈ You have {dueBanner.count} task{dueBanner.count !== 1 ? 's' : ''} due today —{' '}
+            {dueBanner.firstTitle}
+          </span>
+          <button
+            className="due-task-banner-view"
+            onClick={() => {
+              setActivePanel('tasks');
+              setDueBanner(null);
+              try {
+                sessionStorage.setItem('based_due_banner_dismissed', '1');
+              } catch {}
+            }}
+          >
+            View Tasks
+          </button>
+          <button
+            className="due-task-banner-close"
+            onClick={() => {
+              setDueBanner(null);
+              try {
+                sessionStorage.setItem('based_due_banner_dismissed', '1');
+              } catch {}
+            }}
+            title="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* More-tabs drawer — mobile only */}
       {showMoreTabs && (
