@@ -283,7 +283,12 @@ body {
   display: none;
 }
 .tab-btn {
-  padding: 5px 16px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 5px 8px;
   background: transparent;
   border: none;
   color: var(--text2);
@@ -2952,11 +2957,17 @@ body {
 /* -- Grouped tab dropdowns ------------------------------------------ */
 .tab-group-wrap {
   position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+.tab-group-wrap .tab-btn {
+  width: 100%;
 }
 
 .tab-group-menu {
   position: absolute;
-  bottom: calc(100% + 8px);
+  top: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
   background: var(--surface-1, #1a1a1f);
@@ -2965,7 +2976,7 @@ body {
   overflow: hidden;
   z-index: 300;
   min-width: 140px;
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
 }
 
 .tab-group-item {
@@ -2995,14 +3006,12 @@ body {
 }
 
 /* -- Mode bar (above chat input) ------------------------------------ */
+/* Only rendered when a non-chat mode is active */
 .chat-mode-bar {
   display: flex;
   align-items: center;
-  padding: 4px 8px 0;
-}
-
-.chat-mode-bar--default {
-  opacity: 0.45;
+  padding: 2px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .chat-mode-bar--active {
