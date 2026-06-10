@@ -242,7 +242,7 @@ body {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   flex-shrink: 0;
-  z-index: 20;
+  z-index: 10000;
 }
 
 .logo {
@@ -325,7 +325,7 @@ body {
   /* The tab dropdown menus are absolutely positioned children — must not be clipped */
   overflow: visible;
   position: relative;
-  z-index: 19;
+  z-index: 10000;
 }
 .tab-bar-row .tab-switcher {
   flex: 1;
@@ -15959,12 +15959,9 @@ body:has(.legal-page) {
 /* ── Quick-chat overlay ─────────────────────────────────────────────────── */
 .quick-chat-overlay {
   position: fixed;
-  top: calc(56px + env(safe-area-inset-top) + 48px);
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   z-index: 9999;
-  background: rgba(0, 0, 0, 0.97);
+  background: #000;
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -15979,8 +15976,12 @@ body:has(.legal-page) {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.9);
+  box-shadow:
+    0 0 0 1px rgba(120, 80, 255, 0.15),
+    0 0 40px rgba(100, 60, 255, 0.2),
+    0 24px 64px rgba(0, 0, 0, 0.9);
   animation: fadeSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+  margin-top: calc(56px + env(safe-area-inset-top) + 48px);
 }
 .quick-chat-header {
   display: flex;
