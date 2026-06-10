@@ -444,32 +444,31 @@ export async function POST(req: NextRequest) {
     if (jwtUserId) markWeatherSurfacedAsync(jwtUserId);
   }
 
-  // Feature 6 — Morning Ritual Check-in (daily, 6am—10am SGT).
+  // Feature 6 — Time-aware daily briefing (every session open, all hours).
   // Priority 4 — fires only when all higher-priority items are inactive.
   // Singapore is UTC+8.
   const utcHour = new Date().getUTCHours();
   const localHour = (utcHour + 8) % 24;
-  // Use UTC day on the SGT-shifted timestamp so we get the correct Singapore day,
-  // not the UTC day (which would be wrong for UTC 16:00–23:59 when SGT has already
-  // crossed midnight into the next day).
   const sgtDate = new Date(Date.now() + 8 * 60 * 60 * 1000);
   const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][
     sgtDate.getUTCDay()
   ];
-  if (
-    isFirstMessageOfSession &&
-    localHour >= 6 &&
-    localHour < 10 &&
-    daysSinceWeather > 0 &&
-    !patternSurfaceActive &&
-    !onboardingActive &&
-    !weatherActive
-  ) {
+  if (isFirstMessageOfSession && !patternSurfaceActive && !onboardingActive && !weatherActive) {
+    let timeTone: string;
+    if (localHour >= 6 && localHour < 10) {
+      timeTone = `morning (${localHour}:00 SGT, ${dayOfWeek}) — energise, set direction for the day`;
+    } else if (localHour >= 10 && localHour < 17) {
+      timeTone = `midday (${localHour}:00 SGT, ${dayOfWeek}) — check progress, keep momentum`;
+    } else if (localHour >= 17 && localHour < 22) {
+      timeTone = `evening (${localHour}:00 SGT, ${dayOfWeek}) — wind down, reflect on what got done`;
+    } else {
+      timeTone = `late night (${localHour}:00 SGT, ${dayOfWeek}) — calm, focused, no pressure`;
+    }
     const taskNote = todayTasksContext
-      ? ` Today's tasks:\n${todayTasksContext}\n\nBriefly name what's on their plate today in your opening.`
+      ? ` Today's tasks:\n${todayTasksContext}\nMention these briefly in your opening — name what's on their plate.`
       : '';
     dynamicInstructions.push(
-      `MORNING RITUAL: It is morning for this user (${localHour}:00 SGT, ${dayOfWeek}).${taskNote} This is how Based starts mornings — not with “good morning” but with something specific. Look at memory and patterns. Is there anything Based knows about today — a recurring pattern on this day of the week, something the user mentioned recently, a tendency they have on mornings? Lead with that. Keep it under 2 sentences. Then let the user set the direction.`
+      `DAILY BRIEFING: The user just opened Based. It is ${timeTone}.${taskNote} Open with a short, direct check-in that matches the time — reference memory and patterns to make it feel personal. Not a greeting, not “good morning” — something specific you noticed or something on their plate. Under 2 sentences. Then let them lead.`
     );
   }
 
