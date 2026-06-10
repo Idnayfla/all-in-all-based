@@ -1250,7 +1250,8 @@ function toClaudeContent(
   for (const block of content) {
     if (block.type === 'text') {
       const b = block as { type: 'text'; text: string };
-      blocks.push({ type: 'text', text: b.text });
+      // Skip empty text blocks — Anthropic rejects { type: 'text', text: '' }
+      if (b.text) blocks.push({ type: 'text', text: b.text });
     } else if (block.type === 'image') {
       const b = block as { type: 'image'; mediaType: string; data: string };
       if (b.mediaType && b.data) {
@@ -1273,7 +1274,8 @@ function toClaudeContent(
     }
     // generated-image, generated-video, generated-music, etc. — skip, not relevant to generation context
   }
-  if (appendText) blocks.push({ type: 'text', text: appendText });
+  // Only append text if it is non-empty — Anthropic rejects empty text blocks
+  if (appendText && appendText.trim()) blocks.push({ type: 'text', text: appendText });
   // if all we have is appendText and no real content, return as string
   if (blocks.length === 0) return appendText ?? '';
   if (blocks.length === 1 && blocks[0].type === 'text' && !blocks.some(b => b.type === 'image')) {
@@ -1757,13 +1759,15 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             ? `\n\nExisting files (read before deciding which files to include):\n${(existingFiles as ProjectFile[]).map(f => `--- ${f.name} ---\n${f.content.slice(0, 200).replace(/\n/g, ' ')}`).join('\n')}`
             : '';
 
+          const plannerTextContent =
+            (lastUserMessage + existingFilesContext).trim() || 'Please look at this image.';
           const plannerPromptContent =
             imageBlocks.length > 0
               ? [
                   ...imageBlocks,
                   {
                     type: 'text' as const,
-                    text: lastUserMessage + existingFilesContext,
+                    text: plannerTextContent,
                   },
                 ]
               : lastUserMessage + existingFilesContext;

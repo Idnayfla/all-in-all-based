@@ -502,11 +502,16 @@ export async function POST(req: NextRequest) {
         | 'image/webp'
         | 'image/gif';
       const base64 = screenshot.replace(/^data:image\/\w+;base64,/, '');
+      // Only include the text block when the user actually typed something.
+      // Anthropic rejects { type: 'text', text: '' } with a 400 error.
+      const textContent = m.content?.trim();
       return {
         role: 'user' as const,
         content: [
           { type: 'image' as const, source: { type: 'base64' as const, media_type, data: base64 } },
-          { type: 'text' as const, text: m.content },
+          ...(textContent
+            ? [{ type: 'text' as const, text: textContent }]
+            : [{ type: 'text' as const, text: 'Please look at this image.' }]),
         ],
       };
     }
