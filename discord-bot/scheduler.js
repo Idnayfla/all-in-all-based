@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { STANDUP_HOUR_UTC, COUNCIL_CHANNEL } = require('./config');
-const { AGENTS, dispatchAgent } = require('./agents');
+const { AGENTS, dispatchAgent, anthropic } = require('./agents');
 const { getLastHusMessage } = require('./state');
 
 let discordClient = null;
@@ -18,6 +18,7 @@ function init(discord) {
   scheduleBrbBack();
   scheduleStatusRotation();
   scheduleMessagePoller();
+  scheduleModelMonitor();
   console.log(`[scheduler] Standup set for ${STANDUP_HOUR_UTC}:00 UTC daily (9am SGT)`);
 }
 
@@ -420,6 +421,56 @@ async function fireScheduledMessages() {
 function scheduleMessagePoller() {
   setInterval(fireScheduledMessages, 60 * 1000); // check every minute
   console.log('[scheduler] Scheduled message poller active');
+}
+
+// ── Model monitor — checks Anthropic for new models every 12h ────────────────
+const KNOWN_MODELS_PATH = path.join(__dirname, 'known-models.json');
+
+async function checkForNewModels() {
+  if (!anthropic) return;
+  let known = [];
+  try {
+    known = JSON.parse(fs.readFileSync(KNOWN_MODELS_PATH, 'utf8'));
+  } catch {
+    // first run — will save baseline silently
+  }
+
+  try {
+    const page = await anthropic.models.list({ limit: 100 });
+    const current = page.data.map(m => m.id).sort();
+
+    if (known.length === 0) {
+      fs.writeFileSync(KNOWN_MODELS_PATH, JSON.stringify(current, null, 2));
+      console.log(`[model-monitor] Baseline saved — ${current.length} models`);
+      return;
+    }
+
+    const added = current.filter(id => !known.includes(id));
+    const removed = known.filter(id => !current.includes(id));
+
+    if (added.length > 0 || removed.length > 0) {
+      fs.writeFileSync(KNOWN_MODELS_PATH, JSON.stringify(current, null, 2));
+      let msg = '**New Anthropic model detected**\n';
+      if (added.length > 0) msg += `+ Added: \`${added.join('`, `')}\`\n`;
+      if (removed.length > 0) msg += `- Removed: \`${removed.join('`, `')}\`\n`;
+      msg += '\nConsider updating `MODEL_OPUS` / `MODEL_SONNET` in `lib/models.ts` and Vercel env vars.';
+      console.log(`[model-monitor] ${msg}`);
+      await postToCouncil(msg, 'ai-engineer');
+    } else {
+      console.log(`[model-monitor] No new models (${current.length} known)`);
+    }
+  } catch (err) {
+    console.error('[model-monitor] Check failed:', err.message);
+  }
+}
+
+function scheduleModelMonitor() {
+  // Run once 30s after boot, then every 12h
+  setTimeout(async () => {
+    await checkForNewModels();
+    setInterval(checkForNewModels, 12 * 60 * 60 * 1000);
+  }, 30_000);
+  console.log('[scheduler] Model monitor active — checks every 12h');
 }
 
 // ── Public: any agent can call this to alert the team ─────────────────────────
