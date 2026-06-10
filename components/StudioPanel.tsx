@@ -931,8 +931,11 @@ export default function StudioPanel({
     if (!ctx) return;
 
     // Load pitch-shifter AudioWorklet once (cached in workletReadyRef)
+    // audioWorklet is undefined in non-secure contexts or unsupported browsers — skip gracefully
     if (!workletReadyRef.current) {
-      workletReadyRef.current = ctx.audioWorklet.addModule('/pitch-worklet.js').catch(() => {});
+      workletReadyRef.current = ctx.audioWorklet
+        ? ctx.audioWorklet.addModule('/pitch-worklet.js').catch(() => {})
+        : Promise.resolve();
     }
 
     void workletReadyRef.current.then(() => {
