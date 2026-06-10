@@ -6934,6 +6934,53 @@ body {
 /* â”€â”€ Response flag â”€â”€ */
 .msg-flag-area {
   margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.msg-save-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text3);
+  padding: 2px 0;
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    color 0.15s;
+}
+.message.assistant:hover .msg-save-btn {
+  opacity: 1;
+}
+.msg-save-btn:hover:not(:disabled) {
+  color: var(--accent);
+}
+.msg-save-btn:disabled {
+  cursor: default;
+  opacity: 1;
+}
+.msg-save-noted {
+  font-size: 10px;
+  color: var(--accent3);
+  font-family: var(--font-mono);
+  animation: msg-save-fade 2s ease forwards;
+}
+@keyframes msg-save-fade {
+  0% {
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 .msg-flag-btn {
   background: none;

@@ -292,6 +292,9 @@ export default function ChatPanel({
   const [flagSending, setFlagSending] = useState(false);
   const [reportedErrors, setReportedErrors] = useState<Set<string>>(new Set());
   const reportingInFlight = useRef<Set<string>>(new Set());
+  const [savedNoteIdx, setSavedNoteIdx] = useState<Set<number>>(new Set());
+  const [savingNoteIdx, setSavingNoteIdx] = useState<number | null>(null);
+  const savedNoteTimers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
   const [micState, setMicState] = useState<'idle' | 'warming' | 'recording' | 'transcribing'>(
     'idle'
   );
@@ -348,6 +351,66 @@ export default function ChatPanel({
       setFlagSending(false);
     }
   };
+
+  // Persist an assistant message as a Note. Saves the full text as content and a
+  // 60-char trimmed prefix as the title, tagged with source:'chat'. Shows a brief
+  // "Saved ◈" confirmation that fades after 2s.
+  const saveMessageAsNote = async (msgIdx: number, content: Message['content']) => {
+    if (savingNoteIdx === msgIdx || savedNoteIdx.has(msgIdx)) return;
+    const text =
+      typeof content === 'string'
+        ? content
+        : (content as ContentBlock[])
+            .filter((b: ContentBlock) => b.type === 'text')
+            .map((b: ContentBlock) => (b as Extract<ContentBlock, { type: 'text' }>).text)
+            .join('\n');
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    setSavingNoteIdx(msgIdx);
+    try {
+      // The Notes panel renders content as HTML (Tiptap), so wrap the plain text
+      // in a paragraph and escape it to avoid injecting markup.
+      const escaped = trimmed.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const htmlContent = `<p>${escaped.replace(/\n/g, '<br>')}</p>`;
+      const res = await fetch('/api/notes', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+        body: JSON.stringify({
+          title: trimmed.slice(0, 60).trim() || 'Untitled Note',
+          content: htmlContent,
+          source: 'chat',
+        }),
+      });
+      if (!res.ok) throw new Error(`Save failed (${res.status})`);
+      setSavedNoteIdx(prev => new Set(prev).add(msgIdx));
+      const existing = savedNoteTimers.current.get(msgIdx);
+      if (existing) clearTimeout(existing);
+      const timer = setTimeout(() => {
+        setSavedNoteIdx(prev => {
+          const next = new Set(prev);
+          next.delete(msgIdx);
+          return next;
+        });
+        savedNoteTimers.current.delete(msgIdx);
+      }, 2000);
+      savedNoteTimers.current.set(msgIdx, timer);
+    } catch {
+      // Silent — leave the button clickable so the user can retry
+    } finally {
+      setSavingNoteIdx(null);
+    }
+  };
+
+  useEffect(() => {
+    const timers = savedNoteTimers.current;
+    return () => {
+      timers.forEach(clearTimeout);
+      timers.clear();
+    };
+  }, []);
 
   const openMicPicker = async () => {
     const all = await navigator.mediaDevices.enumerateDevices();
@@ -1545,6 +1608,19 @@ export default function ChatPanel({
                     m.content.every((b: ContentBlock) => b.type === 'error')
                   ) && (
                     <div className="msg-flag-area">
+                      {flaggingIdx !== i &&
+                        (savedNoteIdx.has(i) ? (
+                          <span className="msg-save-noted">Saved ◈</span>
+                        ) : (
+                          <button
+                            className="msg-save-btn"
+                            disabled={savingNoteIdx === i}
+                            onClick={() => saveMessageAsNote(i, m.content)}
+                            title="Save this response to Notes"
+                          >
+                            {savingNoteIdx === i ? '· Saving…' : '◈ Save'}
+                          </button>
+                        ))}
                       {flaggedSet.has(i) ? (
                         <span className="msg-flag-noted">{t('chat.flag.noted')}</span>
                       ) : flaggingIdx === i ? (
