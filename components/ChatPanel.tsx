@@ -274,11 +274,13 @@ export default function ChatPanel({
   const discardGeneration = () => {
     abortRef.current?.abort();
   };
-  const [pendingImage, setPendingImage] = useState<{
-    data: string;
-    mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
-    previewUrl: string;
-  } | null>(null);
+  const [pendingImages, setPendingImages] = useState<
+    Array<{
+      data: string;
+      mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+      previewUrl: string;
+    }>
+  >([]);
   const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
   const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
   const [showSupportNudge, setShowSupportNudge] = useState(false);
@@ -485,53 +487,65 @@ export default function ChatPanel({
     }
   };
 
+  const processImageFile = (
+    file: File
+  ): Promise<{
+    data: string;
+    mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
+    previewUrl: string;
+  }> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const dataUrl = ev.target?.result as string;
+        if (file.type === 'image/gif') {
+          const [, data] = dataUrl.split(',');
+          resolve({ data, mediaType: 'image/gif', previewUrl: dataUrl });
+          return;
+        }
+        const img = new window.Image();
+        img.onload = () => {
+          const MAX = 1568;
+          let { width, height } = img;
+          if (width > MAX || height > MAX) {
+            if (width > height) {
+              height = Math.round((height * MAX) / width);
+              width = MAX;
+            } else {
+              width = Math.round((width * MAX) / height);
+              height = MAX;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.85);
+          const [, data] = compressed.split(',');
+          resolve({ data, mediaType: 'image/jpeg', previewUrl: compressed });
+        };
+        img.onerror = () => reject(new Error('Image decode failed'));
+        img.src = dataUrl;
+      };
+      reader.onerror = () => reject(new Error('Failed to read image file'));
+      reader.readAsDataURL(file);
+    });
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    if (files.length > 1) {
-      console.warn(`[Based] ${files.length} images selected — only the first will be attached.`);
-    }
-    const file = files[0];
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const dataUrl = ev.target?.result as string;
-      // GIFs can't be resized via canvas — send as-is
-      if (file.type === 'image/gif') {
-        const [, data] = dataUrl.split(',');
-        setPendingImage({ data, mediaType: 'image/gif', previewUrl: dataUrl });
-        return;
-      }
-      // Resize + compress to stay under API payload limits (max 1568px, JPEG 0.85)
-      const img = new window.Image();
-      img.onload = () => {
-        const MAX = 1568;
-        let { width, height } = img;
-        if (width > MAX || height > MAX) {
-          if (width > height) {
-            height = Math.round((height * MAX) / width);
-            width = MAX;
-          } else {
-            width = Math.round((width * MAX) / height);
-            height = MAX;
-          }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
-        const compressed = canvas.toDataURL('image/jpeg', 0.85);
-        const [, data] = compressed.split(',');
-        setPendingImage({ data, mediaType: 'image/jpeg', previewUrl: compressed });
-      };
-      img.src = dataUrl;
-    };
-    reader.onerror = () => console.error('Failed to read image file');
-    reader.readAsDataURL(file);
+    const MAX_IMAGES = 4;
+    const selected = Array.from(files).slice(0, MAX_IMAGES);
+    Promise.all(selected.map(processImageFile))
+      .then(results => {
+        setPendingImages(prev => [...prev, ...results].slice(0, MAX_IMAGES));
+      })
+      .catch(err => console.error('[Based] image processing failed:', err));
     e.target.value = '';
   };
 
-  const clearPendingImage = () => {
-    setPendingImage(null);
+  const clearPendingImage = (index: number) => {
+    setPendingImages(prev => prev.filter((_, i) => i !== index));
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -567,11 +581,12 @@ export default function ChatPanel({
       prompt,
       model: generationMode === 'nano-banana' ? 'nano-banana' : 'flux',
     };
-    if (pendingImage) {
-      body.sourceImageData = pendingImage.data;
-      body.sourceMediaType = pendingImage.mediaType;
+    const firstImage = pendingImages[0];
+    if (firstImage) {
+      body.sourceImageData = firstImage.data;
+      body.sourceMediaType = firstImage.mediaType;
     }
-    setPendingImage(null);
+    setPendingImages([]);
 
     try {
       const res = await fetch('/api/image', {
@@ -681,11 +696,12 @@ export default function ChatPanel({
     setMessages(prev => [...prev, userMsg, loadingMsg]);
 
     const body: Record<string, string | boolean> = { prompt, generateAudio };
-    if (pendingImage) {
-      body.imageData = pendingImage.data;
-      body.mediaType = pendingImage.mediaType;
+    const firstImage = pendingImages[0];
+    if (firstImage) {
+      body.imageData = firstImage.data;
+      body.mediaType = firstImage.mediaType;
     }
-    setPendingImage(null);
+    setPendingImages([]);
 
     try {
       const res = await fetch('/api/video', {
@@ -727,7 +743,7 @@ export default function ChatPanel({
 
   const send = async (text?: string) => {
     const trimmed = (text ?? input).trim();
-    if (!trimmed && !pendingImage) return;
+    if (!trimmed && pendingImages.length === 0) return;
     if (isGenerating) return;
 
     // Client-side pre-check so limit modal shows even if server count is stale
@@ -737,15 +753,20 @@ export default function ChatPanel({
       return;
     }
 
-    const messageContent: Message['content'] = pendingImage
-      ? [
-          { type: 'image', mediaType: pendingImage.mediaType, data: pendingImage.data },
-          ...(trimmed ? [{ type: 'text' as const, text: trimmed }] : []),
-        ]
-      : trimmed;
+    const messageContent: Message['content'] =
+      pendingImages.length > 0
+        ? [
+            ...pendingImages.map(img => ({
+              type: 'image' as const,
+              mediaType: img.mediaType,
+              data: img.data,
+            })),
+            ...(trimmed ? [{ type: 'text' as const, text: trimmed }] : []),
+          ]
+        : trimmed;
 
     setInput('');
-    setPendingImage(null);
+    setPendingImages([]);
     setGenProgress(null);
     setLastSuggestions([]);
 
@@ -1675,19 +1696,28 @@ export default function ChatPanel({
           )}
         </AnimatePresence>
         <AnimatePresence>
-          {pendingImage && pendingImage.previewUrl && (
+          {pendingImages.length > 0 && (
             <motion.div
               className="chat-image-preview"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="chat-img-thumb" src={pendingImage.previewUrl} alt="pending upload" />
-              <button className="img-clear-btn" onClick={clearPendingImage} title="Remove image">
-                ✕
-              </button>
+              {pendingImages.map((img, idx) => (
+                <div key={idx} style={{ position: 'relative', display: 'inline-block' }}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img className="chat-img-thumb" src={img.previewUrl} alt="pending upload" />
+                  <button
+                    className="img-clear-btn"
+                    onClick={() => clearPendingImage(idx)}
+                    title="Remove image"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
             </motion.div>
           )}
         </AnimatePresence>
@@ -1833,7 +1863,9 @@ export default function ChatPanel({
           <motion.button
             className={`send-btn${generationMode !== 'chat' ? ' send-btn-image' : ''}`}
             onClick={handleSend}
-            disabled={isGenerating || isGeneratingMedia || (!input.trim() && !pendingImage)}
+            disabled={
+              isGenerating || isGeneratingMedia || (!input.trim() && pendingImages.length === 0)
+            }
             whileTap={{ scale: 0.95 }}
           >
             {isGeneratingMedia ? (
@@ -1915,7 +1947,7 @@ export default function ChatPanel({
                 </button>
                 <button
                   className="mobile-input-send"
-                  disabled={!input.trim() && !pendingImage}
+                  disabled={!input.trim() && pendingImages.length === 0}
                   onClick={() => {
                     setMobileInputOpen(false);
                     handleSend();
