@@ -440,6 +440,7 @@ export default function StudioPanel({
   const [musicDuration, setMusicDuration] = useState(30);
   const [musicGenerating, setMusicGenerating] = useState(false);
   const [musicError, setMusicError] = useState('');
+  const musicAbortRef = useRef<AbortController | null>(null);
   const [generatedTracks, setGeneratedTracks] = useState<{ url: string; prompt: string }[]>([]);
   const [octave, setOctave] = useState(4);
   const [litKeys, setLitKeys] = useState<Set<string>>(new Set());
@@ -1194,12 +1195,15 @@ export default function StudioPanel({
   const generateAiMusic = async (overridePrompt?: string) => {
     const base = (overridePrompt ?? musicPrompt).trim();
     if (!authToken || !base) return;
+    const abort = new AbortController();
+    musicAbortRef.current = abort;
     setMusicGenerating(true);
     setMusicError('');
     try {
       const fullPrompt = musicGenre ? `${musicGenre}: ${base}` : base;
       const res = await fetch('/api/music', {
         method: 'POST',
+        signal: abort.signal,
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${authToken}`,
@@ -1212,8 +1216,10 @@ export default function StudioPanel({
       setGeneratedTracks(prev => [{ url: data.url, prompt: displayPrompt }, ...prev]);
       setMusicPrompt('');
     } catch (e: unknown) {
+      if (e instanceof Error && e.name === 'AbortError') return;
       setMusicError(e instanceof Error ? e.message : String(e));
     } finally {
+      musicAbortRef.current = null;
       setMusicGenerating(false);
     }
   };
@@ -1844,6 +1850,18 @@ export default function StudioPanel({
                     >
                       {musicGenerating ? '◈ Generating...' : '◈ Generate'}
                     </button>
+                    {musicGenerating && (
+                      <button
+                        className="studio-btn"
+                        onClick={() => {
+                          musicAbortRef.current?.abort();
+                          setMusicGenerating(false);
+                        }}
+                        title="Cancel generation"
+                      >
+                        ⏹ Stop
+                      </button>
+                    )}
                   </div>
                   {musicError && <div className="studio-ai-gen-error">{musicError}</div>}
                   <div className="studio-ai-gen-tracks">

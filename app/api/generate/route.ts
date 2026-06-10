@@ -1755,6 +1755,49 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             }
           }
 
+          // ── Inline code review shortcut ────────────────────────────────
+          // If the user pastes raw source code AND uses an improvement keyword,
+          // skip the planner/file pipeline and return improved code directly.
+          const CODE_INTENT_RE =
+            /\b(improve|review|fix|explain|clean|refactor|rewrite|optimise|optimize|debug|critique|check)\b/i;
+          const hasCodeIntentKeyword = CODE_INTENT_RE.test(lastUserMessage);
+          const looksLikeCode =
+            (lastUserMessage.match(/\n/g) ?? []).length >= 3 &&
+            /[{};]/.test(lastUserMessage) &&
+            /\b(import|function|class|const|let|var|def|return|if|for|while|=>)\b/.test(
+              lastUserMessage
+            );
+
+          if (hasCodeIntentKeyword && looksLikeCode) {
+            const codeReviewSystem =
+              'The user has shared code and wants it improved or reviewed. Return ONLY the improved code in a markdown code block with the language tag, followed by a short bulleted list of what changed. Do not create files. Do not generate an app.';
+            const sysText = usingFreeModel ? codeReviewSystem : codeReviewSystem;
+            const msgs = [
+              { role: 'system', content: sysText },
+              ...anthropicMessages.map((m: { role: string; content: unknown }) => ({
+                role: m.role,
+                content: typeof m.content === 'string' ? m.content : lastUserMessage,
+              })),
+            ];
+            let fullText = '';
+            fullText = await streamText(
+              msgs,
+              8000,
+              t => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+              () =>
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)
+                ),
+              usingFreeModel ? 'free' : 'based'
+            );
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ done: true, reply: fullText, files: [], projectType: 'html' })}\n\n`
+              )
+            );
+            return;
+          }
+
           // Step 1: Planner classifies intent and plans files
           const existingFilesContext = existingFiles?.length
             ? `\n\nExisting files (read before deciding which files to include):\n${(existingFiles as ProjectFile[]).map(f => `--- ${f.name} ---\n${f.content.slice(0, 200).replace(/\n/g, ' ')}`).join('\n')}`
