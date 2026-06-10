@@ -1,6 +1,7 @@
 ﻿import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import Anthropic from '@anthropic-ai/sdk';
+import vm from 'vm';
 import { getUserId, supabaseAdmin } from '../_auth';
 import { searchWeb, exaSearch } from '@/lib/tavily';
 import { getWeather } from '@/lib/weather';
@@ -1045,6 +1046,57 @@ const FILE_GENERATOR_SYSTEM_BLOCKS = [
 
 const IMAGE_SRC_PLACEHOLDER = '__BASED_IMAGE_SRC__';
 
+/**
+ * Extracts all inline <script> contents from an HTML string (skips src= scripts).
+ * Returns an array of { content, index } so callers can identify which block failed.
+ */
+function extractInlineScripts(html: string): { content: string; index: number }[] {
+  const results: { content: string; index: number }[] = [];
+  const re = /<script(\b[^>]*)>([\s\S]*?)<\/script>/gi;
+  let m;
+  let idx = 0;
+  while ((m = re.exec(html)) !== null) {
+    if (/\bsrc\s*=/i.test(m[1])) continue; // skip external scripts
+    const body = m[2].trim();
+    if (body) results.push({ content: body, index: idx++ });
+  }
+  return results;
+}
+
+/**
+ * Checks JS content for syntax errors using Node's vm module.
+ * Returns the SyntaxError if one is found, otherwise null.
+ */
+function checkJSSyntax(code: string): SyntaxError | null {
+  try {
+    new vm.Script(code);
+    return null;
+  } catch (e) {
+    if (e instanceof SyntaxError) return e;
+    return null;
+  }
+}
+
+/**
+ * Server-side syntax validation for a generated file's content.
+ * For HTML files: extracts all inline <script> blocks and validates each.
+ * For JS files: validates the entire content directly.
+ * Returns the first SyntaxError found, or null if all scripts are valid.
+ */
+function findSyntaxError(content: string, language: string): SyntaxError | null {
+  if (language === 'html') {
+    for (const { content: script } of extractInlineScripts(content)) {
+      const err = checkJSSyntax(script);
+      if (err) return err;
+    }
+    return null;
+  }
+  if (language === 'javascript' || language === 'js') {
+    return checkJSSyntax(content);
+  }
+  return null;
+}
+
 function sanitizeHTML(html: string): string {
   // Add defer to LOCAL/relative scripts only. CDN scripts (https:// URLs) must
   // stay synchronous so libraries (Three.js, Phaser, etc.) are available before
@@ -1136,17 +1188,6 @@ function sanitizeHTML(html: string): string {
   html = html.includes('<head>')
     ? html.replace('<head>', '<head>' + errorCatcher)
     : errorCatcher + html;
-
-  // Error reporter — posts JS errors (including SyntaxErrors) to the parent frame
-  // so PreviewPanel can detect them and trigger an auto-retry.
-  // MUST be injected AFTER errorCatcher so it ends up BEFORE errorCatcher in the
-  // document (each head-prepend shifts earlier scripts rightward). This guarantees
-  // it runs before the parentOverride script freezes window.parent, so the real
-  // parent reference is captured first.
-  const errorReporter = `<script>(function(){var _p=window.parent;window.__basedReportError=function(m,l,e){if(_p&&_p!==window){try{_p.postMessage({type:'BASED_PREVIEW_ERROR',isSyntax:!!(e instanceof SyntaxError||(m&&m.includes&&m.includes('SyntaxError'))),message:String(m),line:l||0},'*');}catch(_){}}};window.onerror=function(m,s,l,c,e){window.__basedReportError(m,l,e);return false;};})();</script>`;
-  html = html.includes('<head>')
-    ? html.replace('<head>', '<head>' + errorReporter)
-    : errorReporter + html;
 
   // Universal audio unlock — first user gesture unblocks all audio in the sandbox.
   // Without this, AudioContext stays suspended and audio.play() is silently rejected
@@ -2191,7 +2232,7 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
             }
 
             const parsedFiles = parseFiles(fileText);
-            const filesToAdd =
+            let filesToAdd =
               parsedFiles.length > 0
                 ? parsedFiles
                 : [
@@ -2202,6 +2243,92 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
                         fileText.replace(/^<forge_file[^>]*>\n?/, '').trim() || fileText.trim(),
                     },
                   ];
+
+            // ── Server-side JS syntax validation ──────────────────────────
+            // Check each generated file for inline JS syntax errors before
+            // adding it to generatedFiles. If a SyntaxError is found, retry
+            // that file's generation once with the error details appended.
+            const validatedFiles: typeof filesToAdd = [];
+            for (const f of filesToAdd) {
+              const syntaxErr = findSyntaxError(f.content, f.language);
+              if (syntaxErr) {
+                console.warn(
+                  `[Based] SyntaxError in generated ${f.name}: ${syntaxErr.message} — retrying once`
+                );
+                const retryNote = `\n\n[IMPORTANT: The previous attempt had a JavaScript SyntaxError: "${syntaxErr.message}". This was likely caused by: unterminated template literals (check backtick pairs), invalid regex syntax, missing closing brackets/braces/parens, or trailing commas in wrong places. Generate clean, valid JavaScript only.]`;
+                const retryFilePrompt = filePrompt + retryNote;
+                let retryText = '';
+                try {
+                  if (imageBlocks.length > 0) {
+                    const retryStream = client.messages.stream({
+                      model: MODEL_OPUS,
+                      max_tokens: 16000,
+                      system: FILE_GENERATOR_SYSTEM_BLOCKS,
+                      messages: [
+                        {
+                          role: 'user',
+                          content: [
+                            ...imageBlocks,
+                            { type: 'text' as const, text: retryFilePrompt },
+                          ],
+                        },
+                      ],
+                    });
+                    for await (const chunk of retryStream) {
+                      if (
+                        chunk.type === 'content_block_delta' &&
+                        chunk.delta.type === 'text_delta'
+                      ) {
+                        retryText += chunk.delta.text;
+                        controller.enqueue(
+                          encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
+                        );
+                      }
+                    }
+                  } else {
+                    const retryMsgs = [
+                      { role: 'system', content: FILE_GENERATOR_SYSTEM },
+                      { role: 'user', content: retryFilePrompt },
+                    ];
+                    retryText = await streamText(
+                      retryMsgs,
+                      16000,
+                      t =>
+                        controller.enqueue(
+                          encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)
+                        ),
+                      () =>
+                        controller.enqueue(
+                          encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)
+                        ),
+                      usingFreeModel ? 'free' : 'based'
+                    );
+                  }
+                  const retryParsed = parseFiles(retryText);
+                  const retryFiles =
+                    retryParsed.length > 0
+                      ? retryParsed
+                      : [
+                          {
+                            name: f.name,
+                            language: f.language,
+                            content:
+                              retryText.replace(/^<forge_file[^>]*>\n?/, '').trim() ||
+                              retryText.trim(),
+                          },
+                        ];
+                  validatedFiles.push(...retryFiles);
+                } catch (retryErr) {
+                  console.error('[Based] Syntax-error retry failed:', retryErr);
+                  // Fall back to the original file rather than dropping it
+                  validatedFiles.push(f);
+                }
+              } else {
+                validatedFiles.push(f);
+              }
+            }
+            filesToAdd = validatedFiles;
+            // ── End syntax validation ──────────────────────────────────────
 
             const imageDataUrl =
               imageBlocks.length > 0
