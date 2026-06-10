@@ -1525,7 +1525,7 @@ export default function Home() {
           <button
             className={`tab-btn ${activePanel === 'chat' ? 'active' : ''}`}
             onClick={() => {
-              if (!incognito) {
+              if (!currentProject && !incognito) {
                 startChat();
               } else {
                 setActivePanel('chat');
