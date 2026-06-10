@@ -2,6 +2,10 @@ const { app, BrowserWindow, shell, Menu, globalShortcut, ipcMain, screen, sessio
 const path = require('path');
 const fs = require('fs');
 
+// Disable Chromium's autoplay restriction so TTS audio plays without a prior
+// user gesture — required for the auto-greeting in the companion overlay.
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
 const IS_DEV = process.env.ELECTRON_DEV === 'true';
 const APP_URL = IS_DEV ? 'http://localhost:3000' : 'https://www.getbased.dev';
 const OVERLAY_URL = IS_DEV ? 'http://localhost:3000/companion' : 'https://www.getbased.dev/companion';
