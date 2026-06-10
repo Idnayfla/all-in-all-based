@@ -310,6 +310,7 @@ export default function ChatPanel({
   );
   const [micDevices, setMicDevices] = useState<MediaDeviceInfo[]>([]);
   const [showMicPicker, setShowMicPicker] = useState(false);
+  const micPickerRef = useRef<HTMLDivElement>(null);
   const [mobileInputOpen, setMobileInputOpen] = useState(false);
   const [studioBannerDismissed, setStudioBannerDismissed] = useState(false);
   const mobileTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -423,6 +424,19 @@ export default function ChatPanel({
     setMicDevices(all.filter(d => d.kind === 'audioinput'));
     setShowMicPicker(true);
   };
+
+  // Close the mic device picker when clicking anywhere outside it. The handler
+  // only attaches while the picker is open, so there's no idle cost.
+  useEffect(() => {
+    if (!showMicPicker) return;
+    const handler = (e: MouseEvent) => {
+      if (micPickerRef.current && !micPickerRef.current.contains(e.target as Node)) {
+        setShowMicPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showMicPicker]);
 
   const toggleMic = async () => {
     if (micState === 'recording') {
@@ -2143,7 +2157,7 @@ export default function ChatPanel({
               </div>
             )}
           </div>
-          <div className="voice-btn-wrap">
+          <div className="voice-btn-wrap" ref={micPickerRef}>
             <button
               type="button"
               className={`voice-btn voice-btn--${micState === 'recording' ? 'listening' : micState === 'transcribing' || micState === 'warming' ? 'activated' : 'idle'}`}
