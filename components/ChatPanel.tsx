@@ -302,6 +302,7 @@ export default function ChatPanel({
   const [micDevices, setMicDevices] = useState<MediaDeviceInfo[]>([]);
   const [showMicPicker, setShowMicPicker] = useState(false);
   const [mobileInputOpen, setMobileInputOpen] = useState(false);
+  const [studioBannerDismissed, setStudioBannerDismissed] = useState(false);
   const mobileTextareaRef = useRef<HTMLTextAreaElement>(null);
   const recordingStartRef = useRef<number>(0);
   const stopRecordingRef = useRef<boolean>(false);
@@ -1428,6 +1429,16 @@ export default function ChatPanel({
     );
   }
 
+  const EDIT_INTENT_BANNER_RE =
+    /\b(darken|brighten|lighten|darker|brighter|crop|filter|rotate|flip|blur|sharpen|resize|adjust|enhance|edit|retouch|remove\s+background|color|saturate|exposure)\b/i;
+  // Reset dismissed state whenever the triggering conditions are no longer met,
+  // so the banner re-appears if the user re-adds an image with edit keywords
+  const editIntentActive = pendingImages.length > 0 && EDIT_INTENT_BANNER_RE.test(input);
+  useEffect(() => {
+    if (!editIntentActive) setStudioBannerDismissed(false);
+  }, [editIntentActive]);
+  const showStudioBanner = !studioBannerDismissed && editIntentActive;
+
   const genLeft = 10 - Math.min(generationsUsed ?? 0, 10);
 
   return (
@@ -1621,6 +1632,31 @@ export default function ChatPanel({
         <div ref={bottomRef} />
       </div>
       <div className="chat-input-area">
+        <AnimatePresence>
+          {showStudioBanner && (
+            <motion.div
+              className="studio-tip-banner"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            >
+              <span className="studio-tip-text">
+                ◈ Want to edit directly?{' '}
+                <button className="studio-tip-link" onClick={() => onPanelSwitch?.('image')}>
+                  Open Image Studio →
+                </button>
+              </span>
+              <button
+                className="studio-tip-dismiss"
+                onClick={() => setStudioBannerDismissed(true)}
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <AnimatePresence>
           {showSupportNudge && (
             <motion.div

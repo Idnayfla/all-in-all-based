@@ -1176,6 +1176,19 @@ function sanitizeHTML(html: string): string {
       : NULL_GUARD + html;
   }
 
+  // Wrap inline <script> content in try-catch so a JS error in one block
+  // doesn't crash the whole preview. External scripts (src="...") are skipped.
+  html = html.replace(/<script(\b[^>]*)>([\s\S]*?)<\/script>/gi, (match, attrs, body) => {
+    // Skip if this is an external script (has src=), or already empty, or already a safety-net script
+    if (/\bsrc\s*=/i.test(attrs)) return match;
+    const trimmed = body.trim();
+    if (!trimmed) return match;
+    // Skip if already wrapped (avoid double-wrapping)
+    if (/^\s*try\s*\{/.test(trimmed)) return match;
+    const wrapped = `try {\n${trimmed}\n} catch(e) { console.error('Based generated code error:', e); }`;
+    return `<script${attrs}>${wrapped}</script>`;
+  });
+
   return html.includes('</body>')
     ? html.replace('</body>', safetyNet + '\n</body>')
     : html + '\n' + safetyNet;
@@ -1563,6 +1576,15 @@ export async function POST(req: NextRequest) {
             },
           }))
       : [];
+
+    // Edit-intent detection: append Image Studio tip when image + edit keyword
+    const EDIT_INTENT_RE =
+      /\b(darken|brighten|lighten|darker|brighter|crop|filter|rotate|flip|blur|sharpen|resize|adjust|enhance|edit|retouch|remove\s+background|color|saturate|exposure)\b/i;
+    const hasEditIntent = EDIT_INTENT_RE.test(lastUserMessage);
+    const imageStudioTip =
+      hasImage && hasEditIntent
+        ? '\n\n◈ Tip: For direct photo editing without building an app, switch to the **Image Studio** tab.'
+        : '';
 
     const context = existingFiles?.length
       ? `\n\nCurrent project files:\n${(existingFiles as ProjectFile[]).map(f => `--- ${f.name} (${f.language}) ---\n${f.content}`).join('\n\n')}`
@@ -2026,7 +2048,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             }
             const files = parseFiles(fullText);
             const projectType = parseType(fullText);
-            const reply = stripTags(fullText);
+            const reply = stripTags(fullText) + imageStudioTip;
             controller.enqueue(
               encoder.encode(
                 `data: ${JSON.stringify({ done: true, reply, files, projectType })}\n\n`
@@ -2203,13 +2225,14 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
             'You are Based. Reply with 1-2 plain sentences describing what was just built. No code, no forge tags, no lists.';
           const summaryPrompt = `User asked: "${lastUserMessage}"\nFiles generated: ${generatedFiles.map(f => f.name).join(', ')}\n\nDescribe what was built in 1-2 sentences.`;
           const reply =
-            (await callModel(
+            ((await callModel(
               summaryPrompt,
               summarySystem,
               'summary',
               usingFreeModel ? 'free' : 'based'
             )) ||
-            `Built ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}`;
+              `Built ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}`) +
+            imageStudioTip;
 
           let suggestions: string[] = [];
           try {

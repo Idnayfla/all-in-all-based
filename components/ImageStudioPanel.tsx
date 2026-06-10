@@ -396,7 +396,15 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
     });
     const l = mkLayer(name);
     const oc = getOffscreen(l.id);
-    oc.getContext('2d')!.drawImage(img, 0, 0, W, H);
+    const octx = oc.getContext('2d')!;
+    // Contain: scale image to fit within W×H while preserving aspect ratio
+    const scale = Math.min(W / img.naturalWidth, H / img.naturalHeight);
+    const dw = img.naturalWidth * scale;
+    const dh = img.naturalHeight * scale;
+    const dx = (W - dw) / 2;
+    const dy = (H - dh) / 2;
+    octx.clearRect(0, 0, W, H);
+    octx.drawImage(img, dx, dy, dw, dh);
     setLayers(prev => {
       const next = [...prev, l];
       composite(next, false);
