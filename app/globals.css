@@ -15959,13 +15959,16 @@ body:has(.legal-page) {
 /* ── Quick-chat overlay ─────────────────────────────────────────────────── */
 .quick-chat-overlay {
   position: fixed;
-  inset: 0;
+  top: calc(56px + env(safe-area-inset-top) + 48px);
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 9999;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(0, 0, 0, 0.97);
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 80px 16px 0;
+  padding: 16px;
 }
 .quick-chat-modal {
   width: 90%;
