@@ -72,6 +72,7 @@ interface Msg {
   content: string;
   captureThumb?: string;
   shareable?: boolean;
+  hidden?: boolean;
 }
 
 const SCREEN_INTENT =
@@ -135,6 +136,7 @@ export default function CompanionOverlayPage() {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const lastSpokenRef = useRef('');
+  const greetingFiredRef = useRef(false);
 
   const [panelWidth, setPanelWidth] = useState<number>(WIDTH_DEFAULT);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -490,6 +492,154 @@ export default function CompanionOverlayPage() {
     setPendingCapture({ source: dataUrl, thumb: dataUrl });
   };
 
+  const sendGreeting = useCallback(async () => {
+    if (greetingFiredRef.current || isGenerating) return;
+    greetingFiredRef.current = true;
+
+    const token = authToken;
+    if (!token) return;
+
+    const triggerMsg: Msg = { role: 'user', content: '.', hidden: true };
+    setMessages([triggerMsg, { role: 'assistant', content: '' }]);
+    setIsGenerating(true);
+    setSlowWarning(false);
+
+    slowWarningTimerRef.current = setTimeout(() => setSlowWarning(true), 15000);
+    hardResetTimerRef.current = setTimeout(() => {
+      setIsGenerating(false);
+      setMessages(prev => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last?.role === 'assistant' && !last.content?.trim()) {
+          next[next.length - 1] = { ...last, content: '✕ Request timed out. Please try again.' };
+        }
+        return next;
+      });
+    }, 45000);
+
+    const abortController = new AbortController();
+    const fetchTimeoutId = setTimeout(() => abortController.abort(), 30000);
+
+    try {
+      const res = await fetch('/api/companion', {
+        method: 'POST',
+        signal: abortController.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: '.' }],
+          ...(sessionMemoryRef.current ? { memory: sessionMemoryRef.current } : {}),
+        }),
+      });
+
+      if (!res.ok || !res.body) {
+        setMessages(prev => {
+          const next = [...prev];
+          next[next.length - 1] = { ...next[next.length - 1], content: '' };
+          return next;
+        });
+        return;
+      }
+
+      nextResponseIsShareableRef.current = res.headers.get('X-Based-Shareable') === '1';
+      const daysHeader = res.headers.get('X-Based-Days');
+      if (daysHeader !== null) daysSinceFirstRef.current = parseInt(daysHeader, 10) || 0;
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      let streamDone = false;
+      let streamError: string | null = null;
+      let assembledText = '';
+
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6).trim();
+          if (raw === '[DONE]') {
+            streamDone = true;
+            break;
+          }
+          try {
+            const parsed = JSON.parse(raw) as { text?: string; error?: string };
+            if (parsed.error) {
+              streamError = parsed.error;
+            } else if (parsed.text) {
+              assembledText += parsed.text;
+              setMessages(prev => {
+                const next = [...prev];
+                next[next.length - 1] = {
+                  ...next[next.length - 1],
+                  content: next[next.length - 1].content + parsed.text,
+                };
+                return next;
+              });
+            }
+          } catch {
+            /* skip */
+          }
+        }
+      }
+
+      if (nextResponseIsShareableRef.current && !streamError) {
+        nextResponseIsShareableRef.current = false;
+        setMessages(prev => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last?.role === 'assistant' && last.content?.trim()) {
+            next[next.length - 1] = { ...last, shareable: true };
+          }
+          return next;
+        });
+      }
+
+      if (voiceEnabled && !streamError && assembledText.trim()) {
+        void speak(assembledText);
+      }
+
+      if (streamError) {
+        setMessages(prev => {
+          const next = [...prev];
+          next[next.length - 1] = { ...next[next.length - 1], content: '' };
+          return next;
+        });
+      }
+    } catch {
+      setMessages(prev => {
+        const next = [...prev];
+        next[next.length - 1] = { ...next[next.length - 1], content: '' };
+        return next;
+      });
+    } finally {
+      clearTimeout(fetchTimeoutId);
+      if (slowWarningTimerRef.current) {
+        clearTimeout(slowWarningTimerRef.current);
+        slowWarningTimerRef.current = null;
+      }
+      if (hardResetTimerRef.current) {
+        clearTimeout(hardResetTimerRef.current);
+        hardResetTimerRef.current = null;
+      }
+      setSlowWarning(false);
+      setIsGenerating(false);
+    }
+  }, [authToken, isGenerating, voiceEnabled, speak]);
+
+  useEffect(() => {
+    if (authReady && authToken && !greetingFiredRef.current) {
+      // Small delay so the UI has rendered before Based starts streaming
+      const t = setTimeout(() => void sendGreeting(), 600);
+      return () => clearTimeout(t);
+    }
+  }, [authReady, authToken, sendGreeting]);
+
   const send = async () => {
     const text = input.trim();
     if (!text || isGenerating) return;
@@ -806,48 +956,50 @@ export default function CompanionOverlayPage() {
             ◈ Sign in to Based first, then open the companion.
           </div>
         )}
-        {messages.length === 0 && (
+        {messages.filter(m => !m.hidden).length === 0 && !isGenerating && (
           <div className="companion-overlay-empty">
             <span style={{ fontSize: '2rem' }}>⬡</span>
             <p>i&apos;m here.</p>
             <p>tell me what you&apos;re building.</p>
           </div>
         )}
-        {messages.map((msg, i) => (
-          <div key={i}>
-            {msg.captureThumb && (
-              <div className="companion-capture-card">
-                <div className="companion-capture-label">◉ Screen captured</div>
-                <img className="companion-capture-thumb" src={msg.captureThumb} alt="capture" />
-                <div className="companion-scan-line" />
+        {messages.map((msg, i) =>
+          msg.hidden ? null : (
+            <div key={i}>
+              {msg.captureThumb && (
+                <div className="companion-capture-card">
+                  <div className="companion-capture-label">◉ Screen captured</div>
+                  <img className="companion-capture-thumb" src={msg.captureThumb} alt="capture" />
+                  <div className="companion-scan-line" />
+                </div>
+              )}
+              <div className={`companion-bubble companion-bubble--${msg.role}`}>
+                <span>{msg.content}</span>
+                {msg.role === 'assistant' && isGenerating && i === messages.length - 1 && (
+                  <span className="companion-cursor" />
+                )}
               </div>
-            )}
-            <div className={`companion-bubble companion-bubble--${msg.role}`}>
-              <span>{msg.content}</span>
-              {msg.role === 'assistant' && isGenerating && i === messages.length - 1 && (
-                <span className="companion-cursor" />
-              )}
+              {/* Share chip -- shown for shareable reads once streaming is complete */}
+              {msg.role === 'assistant' &&
+                msg.shareable &&
+                !(isGenerating && i === messages.length - 1) && (
+                  <button
+                    className="companion-share-chip"
+                    onClick={() => handleShare(msg.content, i)}
+                  >
+                    {copiedIdx === i ? '◈ Copied!' : '◈ Share this read'}
+                  </button>
+                )}
+              {/* Fix F: slow warning shown after 15 s */}
+              {msg.role === 'assistant' &&
+                isGenerating &&
+                i === messages.length - 1 &&
+                slowWarning && (
+                  <div className="slow-warning">◈ Taking longer than usual — still working...</div>
+                )}
             </div>
-            {/* Share chip -- shown for shareable reads once streaming is complete */}
-            {msg.role === 'assistant' &&
-              msg.shareable &&
-              !(isGenerating && i === messages.length - 1) && (
-                <button
-                  className="companion-share-chip"
-                  onClick={() => handleShare(msg.content, i)}
-                >
-                  {copiedIdx === i ? '◈ Copied!' : '◈ Share this read'}
-                </button>
-              )}
-            {/* Fix F: slow warning shown after 15 s */}
-            {msg.role === 'assistant' &&
-              isGenerating &&
-              i === messages.length - 1 &&
-              slowWarning && (
-                <div className="slow-warning">◈ Taking longer than usual — still working...</div>
-              )}
-          </div>
-        ))}
+          )
+        )}
         <div ref={bottomRef} />
       </div>
 
