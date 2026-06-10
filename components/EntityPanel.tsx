@@ -94,7 +94,16 @@ export default function EntityPanel({ authToken }: { authToken?: string }) {
       return;
     }
     fetchEntities();
-  }, [authToken, fetchEntities]);
+    // Poll every 30s so entity updates from Based's tool calls appear without a refresh
+    const interval = setInterval(() => fetchEntities(search, typeFilter), 30_000);
+    // Also re-fetch instantly when Based calls upsert_entity via tool
+    const onEntityUpdated = () => fetchEntities(search, typeFilter);
+    window.addEventListener('based:entity-updated', onEntityUpdated);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('based:entity-updated', onEntityUpdated);
+    };
+  }, [authToken, fetchEntities]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounce search
   useEffect(() => {

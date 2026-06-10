@@ -1966,6 +1966,57 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             }
           }
 
+          // ── Task-management shortcut ────────────────────────────────────
+          // Detect task/brain management phrases BEFORE the planner so they are
+          // always routed to the chat/tool path (runChatWithTools) and never
+          // sent to the file-generator pipeline by mistake.
+          const TASK_MGMT_RE =
+            /\b(add\s+a?\s*task|create\s+a?\s*task|new\s+task|remind\s+me\s+to|add\s+to\s+(my\s+)?tasks?|what(?:'?s|\s+is)?\s+(due|on my|my)\s+(today|list|tasks?)|what\s+do\s+i\s+have\s+due|list\s+(my\s+)?tasks?|show\s+(my\s+)?tasks?|mark\s+.{0,40}\s+as\s+done|complete\s+task|finish\s+task|task\s+done)\b/i;
+          if (TASK_MGMT_RE.test(lastUserMessage)) {
+            let fullText = '';
+            if (!usingFreeModel && HAS_ANTHROPIC_KEY) {
+              fullText = await runChatWithTools(
+                userId,
+                systemBlocks,
+                anthropicMessages,
+                lastUserMessage,
+                t =>
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+                tool => controller.enqueue(encoder.encode(`data: ${JSON.stringify({ tool })}\n\n`))
+              );
+            } else {
+              const sysText =
+                'You are Based — a sharp, direct AI assistant. The user wants to manage tasks. Answer helpfully and concisely.';
+              const msgs = [
+                { role: 'system', content: sysText },
+                ...anthropicMessages.map((m: { role: string; content: unknown }) => ({
+                  role: m.role,
+                  content: typeof m.content === 'string' ? m.content : lastUserMessage,
+                })),
+              ];
+              fullText = await streamText(
+                msgs,
+                8000,
+                t =>
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+                () =>
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)
+                  ),
+                usingFreeModel ? 'free' : 'based'
+              );
+            }
+            const files = parseFiles(fullText);
+            const projectType = parseType(fullText);
+            const reply = stripTags(fullText);
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({ done: true, reply, files, projectType })}\n\n`
+              )
+            );
+            return;
+          }
+
           // ── Inline code review shortcut ────────────────────────────────
           // If the user pastes raw source code AND uses an improvement keyword,
           // skip the planner/file pipeline and return improved code directly.

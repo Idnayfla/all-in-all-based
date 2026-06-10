@@ -92,11 +92,8 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
   );
 
   // ── Fetch tasks ────────────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!authToken) {
-      setLoading(false);
-      return;
-    }
+  const fetchTasks = useCallback(() => {
+    if (!authToken) return;
     fetch('/api/tasks', { headers: headers() })
       .then(r => r.json())
       .then((data: Task[]) => {
@@ -104,6 +101,23 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
       })
       .finally(() => setLoading(false));
   }, [authToken, headers]);
+
+  useEffect(() => {
+    if (!authToken) {
+      setLoading(false);
+      return;
+    }
+    fetchTasks();
+    // Poll every 30s so task changes from Based's tool calls appear without a refresh
+    const interval = setInterval(fetchTasks, 30_000);
+    // Also re-fetch instantly when Based creates/completes a task via tool
+    const onTaskUpdated = () => fetchTasks();
+    window.addEventListener('based:task-updated', onTaskUpdated);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('based:task-updated', onTaskUpdated);
+    };
+  }, [authToken, fetchTasks]);
 
   // ── Add task ───────────────────────────────────────────────────────────────
   const addTask = async () => {
