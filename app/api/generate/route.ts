@@ -2060,6 +2060,64 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             return;
           }
 
+          // ── File-analysis shortcut ─────────────────────────────────────
+          // If the last user message contains an attached-file marker AND the
+          // plain-text part is a short analysis request, skip the planner and
+          // return an inline markdown response. This prevents analysis verbs like
+          // "refactor" or "explain" from triggering the full app-builder pipeline.
+          const FILE_ANALYSIS_RE =
+            /^\s*(refactor|rewrite|explain|review|summarise|summarize|analyse|analyze|what does|what is|how does|how do|find (bugs?|issues?|errors?|problems?)|check (for|this)|look at|read (this|through)|critique|improve|clean ?up|optimise|optimize|describe|document|audit)\b/i;
+          const lastUserContent = lastUserMsg?.content;
+          const hasFileMarker =
+            Array.isArray(lastUserContent) &&
+            (lastUserContent as ApiContentBlock[]).some(
+              b =>
+                b.type === 'text' &&
+                /^---\s.+\s---/.test((b as { type: 'text'; text: string }).text.trim())
+            );
+          if (hasFileMarker) {
+            const plainTextBlocks = Array.isArray(lastUserContent)
+              ? (lastUserContent as ApiContentBlock[])
+                  .filter(
+                    b =>
+                      b.type === 'text' &&
+                      !/^---\s.+\s---/.test((b as { type: 'text'; text: string }).text.trim())
+                  )
+                  .map(b => (b as { type: 'text'; text: string }).text)
+                  .join(' ')
+                  .trim()
+              : '';
+            if (plainTextBlocks.length <= 120 && FILE_ANALYSIS_RE.test(plainTextBlocks)) {
+              const fileAnalysisSystem =
+                'You are Based, a personal AI assistant. The user has attached files for you to analyse. Respond with clear, helpful markdown — no code generation pipeline, no HTML apps. Just answer their question about the files.';
+              const msgs = [
+                { role: 'system', content: fileAnalysisSystem },
+                ...anthropicMessages.map((m: { role: string; content: unknown }) => ({
+                  role: m.role,
+                  content: typeof m.content === 'string' ? m.content : lastUserMessage,
+                })),
+              ];
+              let fullText = '';
+              fullText = await streamText(
+                msgs,
+                8000,
+                t =>
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)),
+                () =>
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)
+                  ),
+                usingFreeModel ? 'free' : 'based'
+              );
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({ done: true, reply: fullText, files: [], projectType: 'html' })}\n\n`
+                )
+              );
+              return;
+            }
+          }
+
           // Step 1: Planner classifies intent and plans files
           const existingFilesContext = existingFiles?.length
             ? `\n\nExisting files (read before deciding which files to include):\n${(existingFiles as ProjectFile[]).map(f => `--- ${f.name} ---\n${f.content.slice(0, 200).replace(/\n/g, ' ')}`).join('\n')}`

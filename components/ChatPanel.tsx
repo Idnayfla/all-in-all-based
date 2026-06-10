@@ -663,7 +663,6 @@ export default function ChatPanel({
     '.dart',
     '.lua',
     '.r',
-    '.env',
     '.gitignore',
     '.prettierrc',
     '.eslintrc',
