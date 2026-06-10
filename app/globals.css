@@ -242,6 +242,7 @@ body {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   flex-shrink: 0;
+  position: relative;
   z-index: 10000;
 }
 
