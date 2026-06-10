@@ -1047,17 +1047,47 @@ const FILE_GENERATOR_SYSTEM_BLOCKS = [
 const IMAGE_SRC_PLACEHOLDER = '__BASED_IMAGE_SRC__';
 
 /**
+ * Pre-sanitises common AI encoding mistakes in JS code.
+ * Replaces curly/smart quotes, em-dashes, and invisible Unicode characters
+ * with their ASCII equivalents. Applied BEFORE vm.Script validation and
+ * also applied inside sanitizeHTML to all script blocks as a last-resort defence.
+ */
+function sanitiseJSEncoding(code: string): string {
+  return (
+    code
+      // Smart/curly double quotes → straight double quote
+      .replace(/[“”]/g, '"')
+      // Smart/curly single quotes and apostrophes → straight single quote
+      .replace(/[‘’]/g, "'")
+      // Em-dash → double hyphen (safe in JS comments and string content)
+      .replace(/—/g, '--')
+      // En-dash → single hyphen
+      .replace(/–/g, '-')
+      // Non-breaking space → regular space
+      .replace(/ /g, ' ')
+      // Zero-width space and BOM → empty string
+      .replace(/[​﻿]/g, '')
+  );
+}
+
+/**
  * Extracts all inline <script> contents from an HTML string (skips src= scripts).
+ * Uses a robust regex that handles multiline content, type attributes, and
+ * avoids false matches on nested tag-like content.
  * Returns an array of { content, index } so callers can identify which block failed.
  */
 function extractInlineScripts(html: string): { content: string; index: number }[] {
   const results: { content: string; index: number }[] = [];
-  const re = /<script(\b[^>]*)>([\s\S]*?)<\/script>/gi;
+  // Robust regex: handles type="module", other attributes, and multiline script bodies.
+  // The inner pattern matches any character that is NOT the start of </script>.
+  const re = /<script(?:\s+[^>]*)?>([^<]*(?:(?!<\/script>)<[^<]*)*)<\/script>/gi;
   let m;
   let idx = 0;
   while ((m = re.exec(html)) !== null) {
-    if (/\bsrc\s*=/i.test(m[1])) continue; // skip external scripts
-    const body = m[2].trim();
+    // m[0] is the full match — check for src= in the opening tag portion
+    const openTag = m[0].slice(0, m[0].indexOf('>') + 1);
+    if (/\bsrc\s*=/i.test(openTag)) continue; // skip external scripts
+    const body = m[1].trim();
     if (body) results.push({ content: body, index: idx++ });
   }
   return results;
@@ -1079,20 +1109,23 @@ function checkJSSyntax(code: string): SyntaxError | null {
 
 /**
  * Server-side syntax validation for a generated file's content.
+ * Pre-sanitises encoding issues first (curly quotes, em-dashes, invisible chars),
+ * then checks syntax. Returns the first SyntaxError on the pre-sanitised content,
+ * or null if all scripts are valid.
  * For HTML files: extracts all inline <script> blocks and validates each.
  * For JS files: validates the entire content directly.
- * Returns the first SyntaxError found, or null if all scripts are valid.
  */
 function findSyntaxError(content: string, language: string): SyntaxError | null {
   if (language === 'html') {
     for (const { content: script } of extractInlineScripts(content)) {
-      const err = checkJSSyntax(script);
+      // Pre-sanitise encoding before vm.Script so curly-quote errors are auto-fixed
+      const err = checkJSSyntax(sanitiseJSEncoding(script));
       if (err) return err;
     }
     return null;
   }
   if (language === 'javascript' || language === 'js') {
-    return checkJSSyntax(content);
+    return checkJSSyntax(sanitiseJSEncoding(content));
   }
   return null;
 }
@@ -1227,6 +1260,20 @@ function sanitizeHTML(html: string): string {
       ? html.replace('<body>', '<body>' + NULL_GUARD)
       : NULL_GUARD + html;
   }
+
+  // Final defence: sanitise encoding in all inline <script> blocks.
+  // Replaces curly/smart quotes, em-dashes, and invisible Unicode characters
+  // that the model may have emitted. This is the last line of defence before
+  // the content reaches the browser and triggers a SyntaxError.
+  html = html.replace(
+    /<script(?:\s+[^>]*)?>([^<]*(?:(?!<\/script>)<[^<]*)*)<\/script>/gi,
+    (match: string, body: string) => {
+      const openTag = match.slice(0, match.indexOf('>') + 1);
+      if (/\bsrc\s*=/i.test(openTag)) return match; // skip external scripts
+      if (!body.trim()) return match;
+      return match.replace(body, sanitiseJSEncoding(body));
+    }
+  );
 
   // Wrap inline <script> content in try-catch so a JS error in one block
   // doesn't crash the whole preview. External scripts (src="...") are skipped.
@@ -2245,17 +2292,35 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
                   ];
 
             // ── Server-side JS syntax validation ──────────────────────────
-            // Check each generated file for inline JS syntax errors before
-            // adding it to generatedFiles. If a SyntaxError is found, retry
-            // that file's generation once with the error details appended.
+            // For each generated file:
+            //   1. Pre-sanitise encoding (curly quotes, em-dashes, zero-width chars).
+            //   2. Check syntax with vm.Script on the sanitised content.
+            //   3. If still broken, retry once with a detailed error prompt.
             const validatedFiles: typeof filesToAdd = [];
             for (const f of filesToAdd) {
-              const syntaxErr = findSyntaxError(f.content, f.language);
+              // Step 1: pre-sanitise encoding mistakes in script blocks before validation.
+              // This silently fixes curly quotes and invisible chars without needing a retry.
+              let sanitisedContent = f.content;
+              if (f.language === 'html') {
+                sanitisedContent = f.content.replace(
+                  /<script(?:\s+[^>]*)?>([^<]*(?:(?!<\/script>)<[^<]*)*)<\/script>/gi,
+                  (match: string, body: string) => {
+                    const openTag = match.slice(0, match.indexOf('>') + 1);
+                    if (/\bsrc\s*=/i.test(openTag)) return match; // skip external
+                    return match.replace(body, sanitiseJSEncoding(body));
+                  }
+                );
+              } else if (f.language === 'javascript' || f.language === 'js') {
+                sanitisedContent = sanitiseJSEncoding(f.content);
+              }
+              const fSanitised = { ...f, content: sanitisedContent };
+
+              const syntaxErr = findSyntaxError(sanitisedContent, f.language);
               if (syntaxErr) {
                 console.warn(
                   `[Based] SyntaxError in generated ${f.name}: ${syntaxErr.message} — retrying once`
                 );
-                const retryNote = `\n\n[IMPORTANT: The previous attempt had a JavaScript SyntaxError: "${syntaxErr.message}". This was likely caused by: unterminated template literals (check backtick pairs), invalid regex syntax, missing closing brackets/braces/parens, or trailing commas in wrong places. Generate clean, valid JavaScript only.]`;
+                const retryNote = `\n\n[SYNTAX ERROR DETECTED on server: "${syntaxErr.message}" — The JavaScript you generated had a syntax error. Common causes:\n- Unclosed template literal backticks\n- Mismatched brackets, braces, or parentheses\n- Invalid characters in strings (curly quotes “”‘’, em-dashes —)\n- Trailing commas before closing brackets\n- Missing semicolons in specific contexts\nRegenerate this file with syntactically valid JavaScript only. Do not use smart quotes or curly quotes. Use only standard ASCII characters in code.]`;
                 const retryFilePrompt = filePrompt + retryNote;
                 let retryText = '';
                 try {
@@ -2317,14 +2382,34 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
                               retryText.trim(),
                           },
                         ];
-                  validatedFiles.push(...retryFiles);
+                  // Apply encoding sanitisation to retried files too
+                  const sanitisedRetryFiles = retryFiles.map(rf => {
+                    if (rf.language === 'html') {
+                      return {
+                        ...rf,
+                        content: rf.content.replace(
+                          /<script(?:\s+[^>]*)?>([^<]*(?:(?!<\/script>)<[^<]*)*)<\/script>/gi,
+                          (match: string, body: string) => {
+                            const openTag = match.slice(0, match.indexOf('>') + 1);
+                            if (/\bsrc\s*=/i.test(openTag)) return match;
+                            return match.replace(body, sanitiseJSEncoding(body));
+                          }
+                        ),
+                      };
+                    } else if (rf.language === 'javascript' || rf.language === 'js') {
+                      return { ...rf, content: sanitiseJSEncoding(rf.content) };
+                    }
+                    return rf;
+                  });
+                  validatedFiles.push(...sanitisedRetryFiles);
                 } catch (retryErr) {
                   console.error('[Based] Syntax-error retry failed:', retryErr);
-                  // Fall back to the original file rather than dropping it
-                  validatedFiles.push(f);
+                  // Fall back to the pre-sanitised file rather than the broken original
+                  validatedFiles.push(fSanitised);
                 }
               } else {
-                validatedFiles.push(f);
+                // No syntax error — use the pre-sanitised version
+                validatedFiles.push(fSanitised);
               }
             }
             filesToAdd = validatedFiles;
