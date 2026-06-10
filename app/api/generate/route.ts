@@ -1479,7 +1479,8 @@ export async function POST(req: NextRequest) {
     const alwaysPro = process.env.ALWAYS_PRO === 'true' || !!process.env.BETA_ACCESS_CODE;
     // userId is already verified by the auth guard above
     const supabaseUserId: string = userId;
-    if (!alwaysPro) {
+    // Free AI (Groq/Cerebras) bypasses the usage gate — only gate Based AI (Claude)
+    if (!alwaysPro && aiModel !== 'free') {
       try {
         const { data: s } = await supabaseAdmin
           .from('user_settings')
