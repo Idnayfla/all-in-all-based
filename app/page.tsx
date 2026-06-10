@@ -1404,41 +1404,9 @@ export default function Home() {
                   : 'Temp chat — no memory saved'
               }
             >
-              ◉
+              {incognito ? '⊙ Incognito' : '⊙'}
             </button>
             <GetAppButton className="companion-header-btn" />
-            <a
-              href="/vote"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="whats-new-header-btn"
-              title="Vote on features"
-            >
-              ⬡ Vote
-            </a>
-            <a
-              href="/changelog"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="whats-new-header-btn"
-              title="What's new in Based"
-              onClick={() => {
-                try {
-                  localStorage.setItem('based_changelog_seen', LATEST_CHANGELOG);
-                  setHasNewChangelog(false);
-                } catch {}
-              }}
-            >
-              {hasNewChangelog && <span className="whats-new-dot" />}
-              What&apos;s New
-            </a>
-            <button
-              className="feedback-header-btn"
-              onClick={() => setShowFeedback(true)}
-              title="Send feedback"
-            >
-              ⬡ Feedback
-            </button>
             {user && subscription.tier === 'free' && (
               <button
                 className={`gen-counter-badge${subscription.generationsUsed >= 9 ? ' gen-counter--danger' : subscription.generationsUsed >= 7 ? ' gen-counter--warn' : ''}`}
@@ -1655,6 +1623,10 @@ export default function Home() {
           })()}
         </div>
       </div>
+
+      {incognito && (
+        <div className="incognito-banner">⊙ Incognito — no memory saved this session</div>
+      )}
 
       {/* Due-task banner — shown once per session when tasks are due today */}
       {dueBanner && (
@@ -2253,6 +2225,41 @@ export default function Home() {
                     </a>
                   </div>
                 </div>
+                <div className="settings-section">
+                  <div className="settings-label">Links</div>
+                  <a
+                    href="/vote"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="settings-link-row"
+                  >
+                    ⬡ Vote on features
+                  </a>
+                  <a
+                    href="/changelog"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="settings-link-row"
+                    onClick={() => {
+                      try {
+                        localStorage.setItem('based_changelog_seen', LATEST_CHANGELOG);
+                        setHasNewChangelog(false);
+                      } catch {}
+                    }}
+                  >
+                    {hasNewChangelog ? "◈ What's New ●" : "◈ What's New"}
+                  </a>
+                  <button
+                    className="settings-link-row"
+                    onClick={() => {
+                      setShowFeedback(true);
+                      setShowSettings(false);
+                    }}
+                  >
+                    ⬡ Send Feedback
+                  </button>
+                </div>
+
                 <div className="settings-section settings-credits">
                   <label className="settings-label">Credits</label>
                   <div className="credit-row">

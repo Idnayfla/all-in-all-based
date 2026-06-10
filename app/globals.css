@@ -502,9 +502,13 @@ body {
   animation: breathe 2s ease-in-out infinite;
 }
 .icon-btn.incognito-active {
-  border-color: var(--danger);
-  color: var(--danger);
-  animation: pulse 1.5s ease-in-out infinite;
+  background: rgba(139, 118, 255, 0.15) !important;
+  color: #b39dff !important;
+  border: 1px solid rgba(139, 118, 255, 0.4) !important;
+  border-radius: 20px !important;
+  padding: 4px 10px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
 }
 .header-upgrade-btn {
   padding: 5px 12px;
@@ -2480,6 +2484,26 @@ body {
   font-weight: 700;
   color: var(--text);
 }
+.settings-link-row {
+  display: block;
+  width: 100%;
+  padding: 10px 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-decoration: none;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  text-align: left;
+  transition: color 0.15s;
+}
+.settings-link-row:last-child {
+  border-bottom: none;
+}
+.settings-link-row:hover {
+  color: var(--text);
+}
 .settings-section {
   display: flex;
   flex-direction: column;
@@ -3517,13 +3541,14 @@ body {
 }
 
 .incognito-banner {
-  background: rgba(255, 107, 107, 0.1);
-  border-bottom: 1px solid rgba(255, 107, 107, 0.3);
-  color: var(--danger);
+  background: rgba(139, 118, 255, 0.08);
+  border-bottom: 1px solid rgba(139, 118, 255, 0.25);
+  color: #9d8cdf;
   font-size: 11px;
-  letter-spacing: 1px;
-  padding: 8px 20px;
+  font-weight: 500;
   text-align: center;
+  padding: 4px 16px;
+  letter-spacing: 0.02em;
   flex-shrink: 0;
 }
 
@@ -15981,7 +16006,7 @@ body:has(.legal-page) {
     0 0 40px rgba(100, 60, 255, 0.2),
     0 24px 64px rgba(0, 0, 0, 0.9);
   animation: fadeSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
-  margin-top: calc(56px + env(safe-area-inset-top) + 48px);
+  margin-top: calc(56px +env(safe-area-inset-top) + 150px);
 }
 .quick-chat-header {
   display: flex;
