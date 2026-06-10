@@ -486,8 +486,12 @@ export default function ChatPanel({
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    if (files.length > 1) {
+      console.warn(`[Based] ${files.length} images selected — only the first will be attached.`);
+    }
+    const file = files[0];
     const reader = new FileReader();
     reader.onload = ev => {
       const dataUrl = ev.target?.result as string;
@@ -1037,7 +1041,20 @@ export default function ChatPanel({
                 setGenProgress(null);
                 setMessages(prev => [
                   ...prev.slice(0, -1),
-                  { role: 'assistant', content: [{ type: 'error' as const, message: data.error }] },
+                  {
+                    role: 'assistant',
+                    content: [
+                      {
+                        type: 'error' as const,
+                        message:
+                          typeof data.error === 'string'
+                            ? data.error
+                            : data.error?.message
+                              ? String(data.error.message)
+                              : JSON.stringify(data.error),
+                      },
+                    ],
+                  },
                 ]);
               }
 
@@ -1658,7 +1675,7 @@ export default function ChatPanel({
           )}
         </AnimatePresence>
         <AnimatePresence>
-          {pendingImage && (
+          {pendingImage && pendingImage.previewUrl && (
             <motion.div
               className="chat-image-preview"
               initial={{ opacity: 0, scale: 0.9 }}
@@ -1678,6 +1695,7 @@ export default function ChatPanel({
           <input
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"
+            multiple
             ref={fileInputRef}
             style={{ display: 'none' }}
             onChange={handleFileChange}
