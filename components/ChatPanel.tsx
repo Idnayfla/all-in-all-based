@@ -268,12 +268,18 @@ export default function ChatPanel({
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const textFileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const locationRef = useRef<{ lat: number; lon: number } | null>(null);
 
   const discardGeneration = () => {
     abortRef.current?.abort();
   };
+  const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<
+    Array<{ name: string; relativePath: string; content: string }>
+  >([]);
   const [pendingImages, setPendingImages] = useState<
     Array<{
       data: string;
@@ -598,7 +604,7 @@ export default function ChatPanel({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const MAX_IMAGES = 4;
+    const MAX_IMAGES = 20;
     const selected = Array.from(files).slice(0, MAX_IMAGES);
     Promise.all(selected.map(processImageFile))
       .then(results => {
@@ -612,6 +618,130 @@ export default function ChatPanel({
     setPendingImages(prev => prev.filter((_, i) => i !== index));
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
+
+  const TEXT_EXTS = new Set([
+    '.ts',
+    '.tsx',
+    '.js',
+    '.jsx',
+    '.mjs',
+    '.cjs',
+    '.py',
+    '.html',
+    '.htm',
+    '.css',
+    '.scss',
+    '.sass',
+    '.less',
+    '.json',
+    '.jsonc',
+    '.md',
+    '.mdx',
+    '.txt',
+    '.sh',
+    '.bash',
+    '.zsh',
+    '.yaml',
+    '.yml',
+    '.toml',
+    '.sql',
+    '.graphql',
+    '.gql',
+    '.vue',
+    '.svelte',
+    '.rs',
+    '.go',
+    '.java',
+    '.rb',
+    '.php',
+    '.c',
+    '.cpp',
+    '.h',
+    '.hpp',
+    '.swift',
+    '.kt',
+    '.dart',
+    '.lua',
+    '.r',
+    '.env',
+    '.gitignore',
+    '.prettierrc',
+    '.eslintrc',
+    '.dockerfile',
+  ]);
+  const IGNORED_DIRS = new Set([
+    'node_modules',
+    '.git',
+    'dist',
+    '.next',
+    'build',
+    'coverage',
+    '.cache',
+    '__pycache__',
+    '.vercel',
+    'out',
+    '.nuxt',
+    'vendor',
+  ]);
+  const MAX_FILES = 50;
+  const MAX_TOTAL_FILE_CHARS = 150_000;
+
+  const isTextFile = (filename: string) => {
+    const lower = filename.toLowerCase();
+    if (['dockerfile', 'makefile', 'gemfile', '.gitignore', '.env.example'].includes(lower))
+      return true;
+    const dot = lower.lastIndexOf('.');
+    return dot !== -1 && TEXT_EXTS.has(lower.slice(dot));
+  };
+
+  const isIgnoredPath = (rp: string) => rp.split('/').some(p => IGNORED_DIRS.has(p));
+
+  const processTextFile = (
+    file: File
+  ): Promise<{ name: string; relativePath: string; content: string }> =>
+    new Promise((resolve, reject) => {
+      const relativePath =
+        (file as unknown as { webkitRelativePath?: string }).webkitRelativePath || file.name;
+      const reader = new FileReader();
+      reader.onload = e =>
+        resolve({ name: file.name, relativePath, content: (e.target?.result as string) || '' });
+      reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+      reader.readAsText(file);
+    });
+
+  const handleFilesOrFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setShowAttachMenu(false);
+    const eligible = Array.from(files)
+      .filter(f => {
+        const rp = (f as unknown as { webkitRelativePath?: string }).webkitRelativePath || f.name;
+        return !isIgnoredPath(rp) && isTextFile(f.name) && f.size < 500_000;
+      })
+      .slice(0, MAX_FILES);
+    try {
+      const results = await Promise.all(eligible.map(processTextFile));
+      let budget = MAX_TOTAL_FILE_CHARS;
+      const trimmedResults = results.reduce<typeof results>((acc, f) => {
+        if (budget <= 0) return acc;
+        if (f.content.length <= budget) {
+          budget -= f.content.length;
+          acc.push(f);
+        } else {
+          acc.push({ ...f, content: f.content.slice(0, budget) + '\n... [truncated]' });
+          budget = 0;
+        }
+        return acc;
+      }, []);
+      setPendingFiles(prev => [...prev, ...trimmedResults].slice(0, MAX_FILES));
+    } catch (err) {
+      console.error('[Based] file processing failed:', err);
+    }
+    e.target.value = '';
+  };
+
+  const clearPendingFile = (index: number) =>
+    setPendingFiles(prev => prev.filter((_, i) => i !== index));
 
   const parseForgeFiles = (text: string) => {
     const forgeFiles: { name: string; language: string; content: string }[] = [];
@@ -807,7 +937,7 @@ export default function ChatPanel({
 
   const send = async (text?: string) => {
     const trimmed = (text ?? input).trim();
-    if (!trimmed && pendingImages.length === 0) return;
+    if (!trimmed && pendingImages.length === 0 && pendingFiles.length === 0) return;
     if (isGenerating) return;
 
     // Client-side pre-check so limit modal shows even if server count is stale
@@ -817,20 +947,29 @@ export default function ChatPanel({
       return;
     }
 
+    const fileBlocks = pendingFiles.map(f => ({
+      type: 'file' as const,
+      name: f.name,
+      relativePath: f.relativePath,
+      content: f.content,
+    }));
+
     const messageContent: Message['content'] =
-      pendingImages.length > 0
+      pendingImages.length > 0 || fileBlocks.length > 0
         ? [
             ...pendingImages.map(img => ({
               type: 'image' as const,
               mediaType: img.mediaType,
               data: img.data,
             })),
+            ...fileBlocks,
             ...(trimmed ? [{ type: 'text' as const, text: trimmed }] : []),
           ]
         : trimmed;
 
     setInput('');
     setPendingImages([]);
+    setPendingFiles([]);
     setGenProgress(null);
     setLastSuggestions([]);
 
@@ -865,24 +1004,35 @@ export default function ChatPanel({
 
       // Strip base64 image data from all but the most recent image-bearing message.
       // The server only uses the last image anyway — keeping old ones re-sends MBs each turn.
+      // File blocks are converted to fenced code blocks for the API.
       const msgsForApi = (() => {
-        let kept = false;
+        let imageKept = false;
         return [...newMessages]
           .reverse()
           .map(msg => {
             if (!Array.isArray(msg.content)) return msg;
-            const hasImg = (msg.content as Array<{ type: string }>).some(b => b.type === 'image');
-            if (!hasImg) return msg;
-            if (!kept) {
-              kept = true;
-              return msg;
-            } // keep most recent image intact
-            return {
-              ...msg,
-              content: (msg.content as Array<{ type: string; text?: string }>).map(b =>
-                b.type === 'image' ? { type: 'text' as const, text: '[reference image]' } : b
-              ),
-            };
+            const blocks = msg.content as ContentBlock[];
+            const hasImg = blocks.some(b => b.type === 'image');
+            const hasFile = blocks.some(b => b.type === 'file');
+            if (!hasImg && !hasFile) return msg;
+            const converted = blocks.map(b => {
+              if (b.type === 'file') {
+                const ext = b.name.split('.').pop() || '';
+                return {
+                  type: 'text' as const,
+                  text: `--- ${b.relativePath} ---\n\`\`\`${ext}\n${b.content}\n\`\`\``,
+                };
+              }
+              if (b.type === 'image') {
+                if (!imageKept) {
+                  imageKept = true;
+                  return b;
+                }
+                return { type: 'text' as const, text: '[reference image]' };
+              }
+              return b;
+            });
+            return { ...msg, content: converted };
           })
           .reverse();
       })();
@@ -1351,6 +1501,14 @@ export default function ChatPanel({
                 src={`data:${block.mediaType};base64,${block.data}`}
                 alt="uploaded image"
               />
+            );
+          }
+          if (block.type === 'file') {
+            return (
+              <div key={i} className="chat-file-pill-msg">
+                <span className="chat-file-pill-icon">⊙</span>
+                <span className="chat-file-pill-path">{block.relativePath}</span>
+              </div>
             );
           }
           if (block.type === 'generated-image') {
@@ -1851,6 +2009,25 @@ export default function ChatPanel({
             </motion.div>
           )}
         </AnimatePresence>
+        {pendingFiles.length > 0 && (
+          <div className="chat-pending-files">
+            <span className="chat-pending-files-meta">
+              ⊙ {pendingFiles.length} file{pendingFiles.length !== 1 ? 's' : ''} attached
+            </span>
+            {pendingFiles.map((f, idx) => (
+              <div key={idx} className="chat-file-pending-pill">
+                <span className="chat-file-pending-name">{f.relativePath}</span>
+                <button
+                  className="chat-file-pending-remove"
+                  onClick={() => clearPendingFile(idx)}
+                  title="Remove file"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="chat-input-row">
           <input
             type="file"
@@ -1860,6 +2037,23 @@ export default function ChatPanel({
             style={{ display: 'none' }}
             onChange={handleFileChange}
           />
+          <input
+            type="file"
+            ref={textFileInputRef}
+            style={{ display: 'none' }}
+            multiple
+            accept=".ts,.tsx,.js,.jsx,.mjs,.cjs,.py,.html,.htm,.css,.scss,.sass,.less,.json,.md,.mdx,.txt,.sh,.yaml,.yml,.toml,.sql,.graphql,.vue,.svelte,.rs,.go,.java,.rb,.php,.c,.cpp,.h,.swift,.kt,.dart,.lua"
+            onChange={handleFilesOrFolderSelect}
+          />
+          <input
+            type="file"
+            ref={folderInputRef}
+            style={{ display: 'none' }}
+            // @ts-expect-error webkitdirectory is non-standard
+            webkitdirectory=""
+            multiple
+            onChange={handleFilesOrFolderSelect}
+          />
           <button
             className="upload-btn"
             onClick={() => fileInputRef.current?.click()}
@@ -1868,6 +2062,45 @@ export default function ChatPanel({
           >
             ◆
           </button>
+          <div className="attach-files-wrap" style={{ position: 'relative' }}>
+            <button
+              className="upload-btn"
+              disabled={isGenerating}
+              title="Attach files or folder"
+              onClick={() => setShowAttachMenu(prev => !prev)}
+              onBlur={e => {
+                if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node)) {
+                  setTimeout(() => setShowAttachMenu(false), 150);
+                }
+              }}
+            >
+              ⊙
+            </button>
+            {showAttachMenu && (
+              <div className="attach-menu">
+                <button
+                  className="attach-menu-item"
+                  onMouseDown={e => {
+                    e.preventDefault();
+                    textFileInputRef.current?.click();
+                    setShowAttachMenu(false);
+                  }}
+                >
+                  Files
+                </button>
+                <button
+                  className="attach-menu-item"
+                  onMouseDown={e => {
+                    e.preventDefault();
+                    folderInputRef.current?.click();
+                    setShowAttachMenu(false);
+                  }}
+                >
+                  Folder
+                </button>
+              </div>
+            )}
+          </div>
           <ModeDropdown
             mode={generationMode}
             onChange={setGenerationMode}
@@ -1994,7 +2227,9 @@ export default function ChatPanel({
             className={`send-btn${generationMode !== 'chat' ? ' send-btn-image' : ''}`}
             onClick={handleSend}
             disabled={
-              isGenerating || isGeneratingMedia || (!input.trim() && pendingImages.length === 0)
+              isGenerating ||
+              isGeneratingMedia ||
+              (!input.trim() && pendingImages.length === 0 && pendingFiles.length === 0)
             }
             whileTap={{ scale: 0.95 }}
           >
@@ -2077,7 +2312,9 @@ export default function ChatPanel({
                 </button>
                 <button
                   className="mobile-input-send"
-                  disabled={!input.trim() && pendingImages.length === 0}
+                  disabled={
+                    !input.trim() && pendingImages.length === 0 && pendingFiles.length === 0
+                  }
                   onClick={() => {
                     setMobileInputOpen(false);
                     handleSend();
