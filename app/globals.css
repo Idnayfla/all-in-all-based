@@ -14834,3 +14834,53 @@ body:has(.legal-page) {
 .gen-warning-upgrade:hover {
   opacity: 1;
 }
+
+/* ── Image Studio tip banner (chat input area) ─────────────────────────────── */
+.studio-tip-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 0 8px;
+  padding: 7px 12px;
+  background: rgba(160, 130, 255, 0.07);
+  border: 1px solid rgba(160, 130, 255, 0.18);
+  border-radius: var(--r-md);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+.studio-tip-text {
+  color: var(--text2);
+  flex: 1;
+  min-width: 0;
+}
+.studio-tip-link {
+  background: none;
+  border: none;
+  color: #c4a7ff;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  transition: color 0.15s;
+}
+.studio-tip-link:hover {
+  color: #d4baff;
+}
+.studio-tip-dismiss {
+  background: none;
+  border: none;
+  color: var(--text3);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 3px 5px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+.studio-tip-dismiss:hover {
+  color: var(--text2);
+}
