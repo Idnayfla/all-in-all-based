@@ -453,7 +453,8 @@ async function checkForNewModels() {
       let msg = '**New Anthropic model detected**\n';
       if (added.length > 0) msg += `+ Added: \`${added.join('`, `')}\`\n`;
       if (removed.length > 0) msg += `- Removed: \`${removed.join('`, `')}\`\n`;
-      msg += '\nConsider updating `MODEL_OPUS` / `MODEL_SONNET` in `lib/models.ts` and Vercel env vars.';
+      msg +=
+        '\nConsider updating `MODEL_OPUS` / `MODEL_SONNET` in `lib/models.ts` and Vercel env vars.';
       console.log(`[model-monitor] ${msg}`);
       await postToCouncil(msg, 'ai-engineer');
     } else {
