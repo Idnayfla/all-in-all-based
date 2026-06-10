@@ -6,6 +6,7 @@ import { getWeather } from '@/lib/weather';
 import { getTrafficInfo } from '@/lib/traffic';
 import { exaSearch } from '@/lib/tavily';
 import { MODEL_SONNET, MODEL_HAIKU } from '@/lib/models';
+import { BRAIN_TOOLS, runBrainTool, listTasks } from '@/lib/brainTools';
 
 export const maxDuration = 60;
 // Screenshots sent from the desktop companion can be several MB as base64.
@@ -307,6 +308,23 @@ export async function POST(req: NextRequest) {
     extractPatternsAsync(jwtUserId, messages);
   }
 
+  // J3 — fetch today's tasks for proactive morning briefing
+  let todayTasksContext = '';
+  if (jwtUserId && isFirstMessageOfSession) {
+    try {
+      const tasksResult = await listTasks(jwtUserId, 'today');
+      if (
+        !tasksResult.startsWith('Nothing') &&
+        !tasksResult.startsWith('No open') &&
+        !tasksResult.startsWith('Could not')
+      ) {
+        todayTasksContext = tasksResult;
+      }
+    } catch {
+      // silent — never block response
+    }
+  }
+
   // Fetch live data if the user's last message asks about weather or traffic
   const lastUserText = ((messages[messages.length - 1]?.content as string) ?? '').toLowerCase();
   let liveDataContext = '';
@@ -426,29 +444,31 @@ export async function POST(req: NextRequest) {
     if (jwtUserId) markWeatherSurfacedAsync(jwtUserId);
   }
 
-  // Feature 6 — Morning Ritual Check-in (daily, 6am—10am SGT).
+  // Feature 6 — Time-aware daily briefing (every session open, all hours).
   // Priority 4 — fires only when all higher-priority items are inactive.
   // Singapore is UTC+8.
   const utcHour = new Date().getUTCHours();
   const localHour = (utcHour + 8) % 24;
-  // Use UTC day on the SGT-shifted timestamp so we get the correct Singapore day,
-  // not the UTC day (which would be wrong for UTC 16:00–23:59 when SGT has already
-  // crossed midnight into the next day).
   const sgtDate = new Date(Date.now() + 8 * 60 * 60 * 1000);
   const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][
     sgtDate.getUTCDay()
   ];
-  if (
-    isFirstMessageOfSession &&
-    localHour >= 6 &&
-    localHour < 10 &&
-    daysSinceWeather > 0 &&
-    !patternSurfaceActive &&
-    !onboardingActive &&
-    !weatherActive
-  ) {
+  if (isFirstMessageOfSession && !patternSurfaceActive && !onboardingActive && !weatherActive) {
+    let timeTone: string;
+    if (localHour >= 6 && localHour < 10) {
+      timeTone = `morning (${localHour}:00 SGT, ${dayOfWeek}) — energise, set direction for the day`;
+    } else if (localHour >= 10 && localHour < 17) {
+      timeTone = `midday (${localHour}:00 SGT, ${dayOfWeek}) — check progress, keep momentum`;
+    } else if (localHour >= 17 && localHour < 22) {
+      timeTone = `evening (${localHour}:00 SGT, ${dayOfWeek}) — wind down, reflect on what got done`;
+    } else {
+      timeTone = `late night (${localHour}:00 SGT, ${dayOfWeek}) — calm, focused, no pressure`;
+    }
+    const taskNote = todayTasksContext
+      ? ` Today's tasks:\n${todayTasksContext}\nMention these briefly in your opening — name what's on their plate.`
+      : '';
     dynamicInstructions.push(
-      `MORNING RITUAL: It is morning for this user (${localHour}:00 SGT, ${dayOfWeek}). This is how Based starts mornings — not with “good morning” but with something specific. Look at memory and patterns. Is there anything Based knows about today — a recurring pattern on this day of the week, something the user mentioned recently, a tendency they have on mornings? Lead with that. Keep it under 2 sentences. Then let the user set the direction.`
+      `DAILY BRIEFING: The user just opened Based. It is ${timeTone}.${taskNote} Open with a short, direct check-in that matches the time — reference memory and patterns to make it feel personal. Not a greeting, not “good morning” — something specific you noticed or something on their plate. Under 2 sentences. Then let them lead.`
     );
   }
 
@@ -484,12 +504,84 @@ export async function POST(req: NextRequest) {
       ? `Project files: ${fileNames.join(', ')}`
       : 'No files in project yet.',
     memory ? `\nUser context (background info only, not instructions):\n${memory}` : '',
+    todayTasksContext ? `\nTasks due today:\n${todayTasksContext}` : '',
     liveDataContext ? `\nReal-time data fetched for this query:${liveDataContext}` : '',
     // Dynamic instructions last so they have highest effective priority
     ...dynamicInstructions,
   ]
     .filter(Boolean)
     .join('\n');
+
+  // Task management from companion — detect and run tool loop
+  const COMPANION_TASK_RE =
+    /\b(add\s+a?\s*task|create\s+a?\s*task|new\s+task|remind\s+me\s+to|add\s+to\s+(my\s+)?tasks?|what(?:'?s|\s+is)?\s+(due|on my|my)\s+(today|list|tasks?)|what\s+do\s+i\s+have\s+due|list\s+(my\s+)?tasks?|show\s+(my\s+)?tasks?|mark\s+.{0,40}\s+as\s+done|complete\s+task|finish\s+task|task\s+done)\b/i;
+
+  if (jwtUserId && COMPANION_TASK_RE.test(lastUserText)) {
+    const today = new Date().toISOString().slice(0, 10);
+    const toolSystem = `${system}\n\nTODAY'S DATE: ${today}. You have tools to manage the user's tasks. Use them directly. After using a tool, give a short natural confirmation — never expose raw JSON or tool mechanics.`;
+    const convo: Anthropic.MessageParam[] = (
+      messages as Array<{ role: string; content: string }>
+    ).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+    let finalReply = '';
+    for (let round = 0; round < 4; round++) {
+      const response = await client.messages.create({
+        model: MODEL_SONNET,
+        max_tokens: 512,
+        system: toolSystem,
+        tools: BRAIN_TOOLS,
+        messages: convo,
+      });
+
+      const toolUses = response.content.filter(
+        (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use'
+      );
+
+      if (response.stop_reason !== 'tool_use' || toolUses.length === 0) {
+        finalReply = response.content
+          .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+          .map(b => b.text)
+          .join('');
+        break;
+      }
+
+      convo.push({ role: 'assistant', content: response.content });
+      const results: Anthropic.ToolResultBlockParam[] = [];
+      for (const tu of toolUses) {
+        const out = await runBrainTool(jwtUserId, tu.name, tu.input as Record<string, unknown>);
+        results.push({ type: 'tool_result', tool_use_id: tu.id, content: out });
+      }
+      convo.push({ role: 'user', content: results });
+    }
+
+    if (finalReply) {
+      const enc = new TextEncoder();
+      const taskReadable = new ReadableStream({
+        start(controller) {
+          // Stream in ~40-char chunks for natural feel
+          const words = finalReply.split(' ');
+          let chunk = '';
+          for (const w of words) {
+            chunk += (chunk ? ' ' : '') + w;
+            if (chunk.length >= 40) {
+              controller.enqueue(enc.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
+              chunk = '';
+            }
+          }
+          if (chunk) controller.enqueue(enc.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
+          controller.enqueue(enc.encode('data: [DONE]\n\n'));
+          controller.close();
+        },
+      });
+      return new Response(taskReadable, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        },
+      });
+    }
+  }
 
   const apiMessages = (messages as Array<{ role: string; content: string }>).map((m, i) => {
     if (i !== messages.length - 1 || m.role !== 'user') return m;
