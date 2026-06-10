@@ -1526,9 +1526,8 @@ export default function Home() {
             onClick={() => {
               if (!incognito) {
                 startChat();
-              } else {
-                setActivePanel('chat');
               }
+              setActivePanel('chat');
               setShowSettings(false);
               setShowStudioMenu(false);
               setShowToolsMenu(false);
