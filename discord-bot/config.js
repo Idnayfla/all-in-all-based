@@ -15,7 +15,7 @@ module.exports = {
   PROJECT_ROOT: config.project_root || path.join(__dirname, '..'),
   AGENTS_DIR: config.agents_dir || path.join(__dirname, '..', '.claude', 'agents'),
   PROVIDER: config.provider || 'auto',
-  MODEL_OPUS: config.model_opus || 'claude-opus-4-8',
+  MODEL_OPUS: config.model_opus || 'claude-fable-5',
   MODEL_SONNET: config.model_sonnet || 'claude-sonnet-4-6',
   MODEL_GROQ: config.model_groq || 'llama-3.3-70b-versatile',
   MODEL_OLLAMA: config.model_ollama || 'llama3.1:8b',
