@@ -2386,18 +2386,6 @@ export default function Home() {
                     />
                   )}
                 </AnimatePresence>
-                <div className="no-project-examples">
-                  {[
-                    'Build a snake game',
-                    'Sales dashboard with charts',
-                    'Scientific calculator',
-                    'Portfolio website',
-                  ].map(p => (
-                    <span key={p} onClick={() => quickProject(p)}>
-                      {p}
-                    </span>
-                  ))}
-                </div>
                 <div className="no-project-hint">Sign in free · Projects save to your account</div>
                 <div className="memory-pitch">
                   <span className="memory-pitch-icon">◉</span>
@@ -2485,6 +2473,70 @@ export default function Home() {
                 </div>
               </>
             ))}
+
+          {/* Quick-chat overlay — dims only the content area (sits below the tab bar) */}
+          <AnimatePresence>
+            {showQuickChat && (
+              <motion.div
+                className="quick-chat-overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                onClick={e => {
+                  if (e.target === e.currentTarget) setShowQuickChat(false);
+                }}
+              >
+                <div className="quick-chat-modal" onClick={e => e.stopPropagation()}>
+                  <div className="quick-chat-header">
+                    <span className="quick-chat-title">
+                      <span className="quick-chat-logo">B&gt;</span> ASK BASED ANYTHING
+                    </span>
+                    <button
+                      className="quick-chat-close"
+                      onClick={() => setShowQuickChat(false)}
+                      aria-label="Close"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="quick-chat-body">
+                    <textarea
+                      ref={quickChatTextareaRef}
+                      className="quick-chat-textarea"
+                      value={quickChatInput}
+                      onChange={e => setQuickChatInput(e.target.value)}
+                      placeholder="Ask Based anything..."
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey && quickChatInput.trim()) {
+                          e.preventDefault();
+                          quickProject(quickChatInput.trim());
+                          setShowQuickChat(false);
+                        }
+                        if (e.key === 'Escape') setShowQuickChat(false);
+                      }}
+                    />
+                  </div>
+                  <div className="quick-chat-footer">
+                    <button className="quick-chat-cancel" onClick={() => setShowQuickChat(false)}>
+                      Cancel
+                    </button>
+                    <button
+                      className="quick-chat-send"
+                      disabled={!quickChatInput.trim()}
+                      onClick={() => {
+                        if (!quickChatInput.trim()) return;
+                        quickProject(quickChatInput.trim());
+                        setShowQuickChat(false);
+                      }}
+                    >
+                      → Send
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </main>
       </div>
 
@@ -2609,77 +2661,6 @@ export default function Home() {
               <button className="pro-welcome-btn" onClick={() => setShowProWelcome(false)}>
                 Start building →
               </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Quick-chat overlay — shown when tapping the B> logo or Chat tab with no active project */}
-      <AnimatePresence>
-        {showQuickChat && (
-          <motion.div
-            className="quick-chat-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            onClick={e => {
-              if (e.target === e.currentTarget) setShowQuickChat(false);
-            }}
-          >
-            <motion.div
-              className="quick-chat-modal"
-              initial={{ y: -16, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -16, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 380, damping: 32 }}
-              onClick={e => e.stopPropagation()}
-            >
-              <div className="quick-chat-header">
-                <span className="quick-chat-title">
-                  <span className="quick-chat-logo">B&gt;</span> ASK BASED ANYTHING
-                </span>
-                <button
-                  className="quick-chat-close"
-                  onClick={() => setShowQuickChat(false)}
-                  aria-label="Close"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="quick-chat-body">
-                <textarea
-                  ref={quickChatTextareaRef}
-                  className="quick-chat-textarea"
-                  value={quickChatInput}
-                  onChange={e => setQuickChatInput(e.target.value)}
-                  placeholder="Ask Based anything..."
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey && quickChatInput.trim()) {
-                      e.preventDefault();
-                      quickProject(quickChatInput.trim());
-                      setShowQuickChat(false);
-                    }
-                    if (e.key === 'Escape') setShowQuickChat(false);
-                  }}
-                />
-              </div>
-              <div className="quick-chat-footer">
-                <button className="quick-chat-cancel" onClick={() => setShowQuickChat(false)}>
-                  Cancel
-                </button>
-                <button
-                  className="quick-chat-send"
-                  disabled={!quickChatInput.trim()}
-                  onClick={() => {
-                    if (!quickChatInput.trim()) return;
-                    quickProject(quickChatInput.trim());
-                    setShowQuickChat(false);
-                  }}
-                >
-                  → Send
-                </button>
-              </div>
             </motion.div>
           </motion.div>
         )}

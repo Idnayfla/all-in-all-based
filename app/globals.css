@@ -15956,27 +15956,30 @@ body:has(.legal-page) {
 }
 
 /* ── Quick-chat overlay modal ── */
+/* Rendered inside .main-content (position: relative) so the dim covers only the
+   content area below the fixed header + tab bar — never the header or tab rows. */
 .quick-chat-overlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: 600;
-  background: rgba(0, 0, 0, 0.65);
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.75);
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 80px 16px 0;
+  padding: 32px 16px 0;
 }
 
 .quick-chat-modal {
+  width: 90%;
+  max-width: 480px;
   background: var(--surface2, var(--bg2));
   border: 1px solid var(--border);
-  border-radius: var(--r-lg, 16px);
-  width: 100%;
-  max-width: 480px;
+  border-radius: 16px;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  animation: fadeSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .quick-chat-header {
