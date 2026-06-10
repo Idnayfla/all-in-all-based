@@ -235,6 +235,7 @@ export default function ChatPanel({
   onGenerationComplete,
   persona = 'based',
   onPanelSwitch,
+  onAutoName,
 }: {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -256,6 +257,7 @@ export default function ChatPanel({
   onGenerationComplete?: () => void;
   persona?: PersonaKey;
   onPanelSwitch?: (panel: string) => void;
+  onAutoName?: (firstPrompt: string) => void;
 }) {
   const [input, setInput] = useState(prefillMessage ?? '');
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
@@ -989,6 +991,11 @@ export default function ChatPanel({
     const userMsg: Message = { role: 'user', content: messageContent };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
+
+    if (messages.length === 0 && onAutoName && trimmed) {
+      onAutoName(trimmed);
+    }
+
     setIsGenerating(true);
     setSlowWarning(false);
     slowWarningTimerRef.current = setTimeout(() => setSlowWarning(true), 15000);

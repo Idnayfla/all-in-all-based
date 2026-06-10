@@ -891,6 +891,24 @@ body {
   gap: 14px;
   color: var(--text3);
 }
+.chat-empty-logo-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  transition:
+    transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+    filter 0.2s ease;
+  animation: fadeSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.chat-empty-logo-btn:hover {
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 16px var(--accent-glow));
+}
+.chat-empty-logo-btn:active {
+  transform: scale(0.95);
+}
 .chat-empty-logo {
   width: 80px;
   height: 80px;
@@ -2305,6 +2323,25 @@ body {
   width: 100%;
   padding: 24px;
   animation: fadeSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.no-project-tap-hint {
+  font-size: 13px;
+  font-family: var(--font-pixel);
+  color: var(--text3);
+  text-align: center;
+  letter-spacing: 0.3px;
+  animation:
+    fadeSlideUp 0.5s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both,
+    tapHintPulse 2.8s 0.8s ease-in-out infinite;
+}
+@keyframes tapHintPulse {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 .no-project-title {
   font-family: var(--font-brand);
@@ -4720,9 +4757,9 @@ body {
 
 .splash-tap-hint {
   position: absolute;
-  bottom: calc(var(--safe-bottom) + 32px);
+  bottom: calc(var(--safe-bottom) + 200px);
   font-family: var(--font-pixel);
-  font-size: 15px;
+  font-size: 21px;
   letter-spacing: 0.1em;
   color: rgba(237, 232, 208, 0.3);
   opacity: 0;

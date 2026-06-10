@@ -1091,6 +1091,31 @@ export default function Home() {
     createProject(name);
   };
 
+  const startChat = () => {
+    const isBetaEnv =
+      process.env.NEXT_PUBLIC_BUILD_ENV === 'beta' ||
+      (typeof window !== 'undefined' && window.location.hostname === 'beta.getbased.dev');
+    if (!isBetaEnv && subscription.tier === 'free' && projects.length >= 3) {
+      setPricingReason('projects');
+      setShowPricing(true);
+      return;
+    }
+    createProject('New chat');
+  };
+
+  const handleAutoName = async (projectId: string, firstPrompt: string) => {
+    try {
+      const res = await fetch('/api/autoname', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: firstPrompt }),
+      });
+      if (!res.ok) return;
+      const { name } = await res.json();
+      if (name) renameProject(projectId, name);
+    } catch {}
+  };
+
   const createProject = async (name: string) => {
     setProjectModal(false);
 
@@ -1488,7 +1513,11 @@ export default function Home() {
           <button
             className={`tab-btn ${activePanel === 'chat' ? 'active' : ''}`}
             onClick={() => {
-              setActivePanel('chat');
+              if (!currentProject && !incognito) {
+                startChat();
+              } else {
+                setActivePanel('chat');
+              }
               setShowSettings(false);
               setShowStudioMenu(false);
               setShowToolsMenu(false);
@@ -2294,19 +2323,21 @@ export default function Home() {
               </div>
             ) : !currentProject ? (
               <div className="no-project">
-                <NextImage
-                  src="/brand-icon-loop.svg"
-                  className="chat-empty-logo"
-                  alt="Based"
-                  width={80}
-                  height={80}
-                />
+                <div className="no-project-tap-hint">Tap me to start chatting.</div>
+                <button
+                  className="chat-empty-logo-btn"
+                  onClick={startChat}
+                  aria-label="Start chatting"
+                >
+                  <NextImage
+                    src="/brand-icon-loop.svg"
+                    className="chat-empty-logo"
+                    alt="Based"
+                    width={80}
+                    height={80}
+                  />
+                </button>
                 <div className="no-project-title">BASED</div>
-                <div className="no-project-sub">You describe it. Based builds it.</div>
-                <div className="no-project-features">
-                  HTML &nbsp;·&nbsp; Canvas games &nbsp;·&nbsp; Web apps &nbsp;·&nbsp; Tools
-                  &nbsp;·&nbsp; Dashboards
-                </div>
                 <AnimatePresence>
                   {checkin && (
                     <ProactiveCheckin
@@ -2314,19 +2345,16 @@ export default function Home() {
                       fromDevice={checkin.fromDevice}
                       error={checkin.error}
                       onContinue={async () => {
-                        // 1. Check in-memory state (already loaded)
                         const inState = projects.find(p => p.id === checkin.id);
                         if (inState) {
                           loadProject(inState);
                           return;
                         }
-                        // 2. Check localStorage cache (available before cloud load)
                         const cached = loadProjectsCache().find(p => p.id === checkin.id);
                         if (cached) {
                           loadProject(cached);
                           return;
                         }
-                        // 3. Live fetch — cloud may not have loaded yet when checkin fired
                         try {
                           const headers = await getHeaders();
                           const res = await fetch(`/api/projects/${checkin.id}`, { headers });
@@ -2338,7 +2366,6 @@ export default function Home() {
                             }
                           }
                         } catch {}
-                        // 4. Project is truly gone — show error instead of silently dismissing
                         setCheckin(prev =>
                           prev ? { ...prev, error: 'That project was deleted.' } : null
                         );
@@ -2347,9 +2374,6 @@ export default function Home() {
                     />
                   )}
                 </AnimatePresence>
-                <button className="new-project-btn-large" onClick={newProject}>
-                  + New Project
-                </button>
                 <div className="no-project-examples">
                   {[
                     'Build a snake game',
@@ -2422,6 +2446,11 @@ export default function Home() {
                           | 'tasks'
                           | 'brain'
                       )
+                    }
+                    onAutoName={
+                      currentProject
+                        ? (prompt: string) => handleAutoName(currentProject.id, prompt)
+                        : undefined
                     }
                   />
                 </div>
