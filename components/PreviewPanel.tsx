@@ -8,11 +8,13 @@ export default function PreviewPanel({
   projectType,
   subscriptionTier,
   onProRequired,
+  onRequestRetry,
 }: {
   files: FileNode[];
   projectType: string;
   subscriptionTier?: 'free' | 'pro';
   onProRequired?: () => void;
+  onRequestRetry?: (note: string) => void;
 }) {
   const [output, setOutput] = useState('');
   const [stderr, setStderr] = useState('');
@@ -22,6 +24,41 @@ export default function PreviewPanel({
   const [cropData, setCropData] = useState<{ url: string; format: 'png' | 'jpg' } | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const retryCount = useRef(0);
+  const [syntaxErrorMsg, setSyntaxErrorMsg] = useState<string | null>(null);
+
+  // Listen for BASED_PREVIEW_ERROR messages from the iframe. When the error is a
+  // SyntaxError and we haven't exhausted retries, ask the parent to re-run
+  // generation with a note about the bad line so the model can self-correct.
+  useEffect(() => {
+    const MAX_RETRIES = 2;
+    const handler = (e: MessageEvent) => {
+      if (!e.data || e.data.type !== 'BASED_PREVIEW_ERROR') return;
+      if (!e.data.isSyntax) return;
+      if (retryCount.current >= MAX_RETRIES) return;
+      retryCount.current += 1;
+      const line: number = e.data.line ?? 0;
+      setSyntaxErrorMsg('◈ Syntax error detected — auto-retrying...');
+      const note = `[Note: previous generation had a JS syntax error${line ? ` on line ${line}` : ''}. Check all bracket pairs, string quotes, and trailing commas.]`;
+      // Notify via prop (if wired) and via custom event (picked up by ChatPanel)
+      onRequestRetry?.(note);
+      window.dispatchEvent(new CustomEvent('based:preview-retry', { detail: note }));
+    };
+    window.addEventListener('message', handler);
+    return () => window.removeEventListener('message', handler);
+  }, [onRequestRetry]);
+
+  // Reset retry counter and clear any syntax error banner whenever new files arrive.
+  const prevHtmlContentRef = useRef<string | null>(null);
+  useEffect(() => {
+    const htmlContent = files.find(f => f.language === 'html')?.content ?? null;
+    if (htmlContent !== prevHtmlContentRef.current) {
+      prevHtmlContentRef.current = htmlContent;
+      retryCount.current = 0;
+      setSyntaxErrorMsg(null);
+    }
+  }, [files]);
+
   // Match the renderable web entry point. Icon/logo/avatar requests can come
   // back as a standalone SVG file (language "svg" or a *.svg name) instead of
   // an HTML wrapper — those render fine in the iframe, so treat them as the
@@ -508,6 +545,26 @@ export default function PreviewPanel({
         srcDoc={previewHtml ?? ''}
         onClick={() => setShowExportMenu(false)}
       />
+      {syntaxErrorMsg && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            padding: '6px 14px',
+            background: 'rgba(20,16,40,0.88)',
+            color: '#c4b5fd',
+            fontSize: '11px',
+            fontFamily: 'monospace',
+            letterSpacing: '0.02em',
+            pointerEvents: 'none',
+            zIndex: 10,
+          }}
+        >
+          {syntaxErrorMsg}
+        </div>
+      )}
       {cropData && (
         <ImageCropModal
           url={cropData.url}
