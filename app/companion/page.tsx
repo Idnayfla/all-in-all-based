@@ -137,10 +137,16 @@ export default function CompanionOverlayPage() {
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const lastSpokenRef = useRef('');
   const greetingFiredRef = useRef(false);
+  const voiceEnabledRef = useRef(voiceEnabled);
+  const speakRef = useRef<(text: string) => Promise<void>>(async () => {});
 
   const [panelWidth, setPanelWidth] = useState<number>(WIDTH_DEFAULT);
   const containerRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);
+
+  useEffect(() => {
+    voiceEnabledRef.current = voiceEnabled;
+  }, [voiceEnabled]);
 
   const speak = async (text: string) => {
     if (!voiceEnabled) return;
@@ -215,6 +221,12 @@ export default function CompanionOverlayPage() {
       lastSpokenRef.current = '';
     }
   };
+
+  // Keep speakRef in sync so sendGreeting can call the latest speak without
+  // being listed as a dependency (which would cause perpetual re-renders).
+  useEffect(() => {
+    speakRef.current = speak;
+  }, [speak]);
 
   useEffect(() => {
     const stored = localStorage.getItem('based_companion_voice');
@@ -493,8 +505,7 @@ export default function CompanionOverlayPage() {
   };
 
   const sendGreeting = useCallback(async () => {
-    if (greetingFiredRef.current || isGenerating) return;
-    greetingFiredRef.current = true;
+    if (greetingFiredRef.current) return;
 
     const token = authToken;
     if (!token) return;
@@ -600,8 +611,8 @@ export default function CompanionOverlayPage() {
         });
       }
 
-      if (voiceEnabled && !streamError && assembledText.trim()) {
-        void speak(assembledText);
+      if (voiceEnabledRef.current && !streamError && assembledText.trim()) {
+        void speakRef.current(assembledText);
       }
 
       if (streamError) {
@@ -630,15 +641,16 @@ export default function CompanionOverlayPage() {
       setSlowWarning(false);
       setIsGenerating(false);
     }
-  }, [authToken, isGenerating, voiceEnabled, speak]);
+  }, [authToken]); // voiceEnabled and speak accessed via refs to avoid re-render churn
 
   useEffect(() => {
-    if (authReady && authToken && !greetingFiredRef.current) {
-      // Small delay so the UI has rendered before Based starts streaming
-      const t = setTimeout(() => void sendGreeting(), 600);
-      return () => clearTimeout(t);
-    }
-  }, [authReady, authToken, sendGreeting]);
+    if (!authReady || !authToken) return;
+    if (greetingFiredRef.current) return;
+    greetingFiredRef.current = true;
+    // Small delay so the UI has rendered before Based starts streaming
+    const t = setTimeout(() => void sendGreeting(), 800);
+    return () => clearTimeout(t);
+  }, [authReady, authToken]); // sendGreeting intentionally omitted — ref guards single-fire
 
   const send = async () => {
     const text = input.trim();
