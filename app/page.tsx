@@ -114,6 +114,7 @@ export interface FileNode {
 
 export type ContentBlock =
   | { type: 'text'; text: string }
+  | { type: 'file'; name: string; relativePath: string; content: string }
   | {
       type: 'image';
       mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
