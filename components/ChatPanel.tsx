@@ -2058,6 +2058,18 @@ export default function ChatPanel({
             ))}
           </div>
         )}
+        <div
+          className={`chat-mode-bar${generationMode === 'chat' ? ' chat-mode-bar--default' : ' chat-mode-bar--active'}`}
+        >
+          <ModeDropdown
+            mode={generationMode}
+            onChange={setGenerationMode}
+            subscriptionTier={subscriptionTier}
+            onProRequired={onProRequired}
+            disabled={isGenerating || isGeneratingMedia}
+            onPanelSwitch={onPanelSwitch}
+          />
+        </div>
         <div className="chat-input-row">
           <input
             type="file"
@@ -2131,14 +2143,6 @@ export default function ChatPanel({
               </div>
             )}
           </div>
-          <ModeDropdown
-            mode={generationMode}
-            onChange={setGenerationMode}
-            subscriptionTier={subscriptionTier}
-            onProRequired={onProRequired}
-            disabled={isGenerating || isGeneratingMedia}
-            onPanelSwitch={onPanelSwitch}
-          />
           <div className="voice-btn-wrap">
             <button
               type="button"

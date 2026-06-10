@@ -188,7 +188,8 @@ export default function Home() {
   const [shareUrl, setShareUrl] = useState('');
   const [shareId, setShareId] = useState('');
   const [isSharing, setIsSharing] = useState(false);
-  const [showMoreTabs, setShowMoreTabs] = useState(false);
+  const [showStudioMenu, setShowStudioMenu] = useState(false);
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
   const [showGalleryPublish, setShowGalleryPublish] = useState(false);
   const [galleryAuthorName, setGalleryAuthorName] = useState('');
   const [galleryPublished, setGalleryPublished] = useState(false);
@@ -229,6 +230,20 @@ export default function Home() {
   useEffect(() => {
     track('panel_switched', { panel: activePanel });
   }, [activePanel]);
+
+  // Close group dropdowns when clicking outside them
+  useEffect(() => {
+    if (!showStudioMenu && !showToolsMenu) return;
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Element;
+      if (!target.closest('.tab-group-wrap')) {
+        setShowStudioMenu(false);
+        setShowToolsMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showStudioMenu, showToolsMenu]);
 
   const LATEST_CHANGELOG = '2026-06-02';
   useEffect(() => {
@@ -1305,153 +1320,136 @@ export default function Home() {
         </div>
         <nav className="header-nav">
           <div className="tab-switcher">
-            {/* Primary tabs — always visible */}
+            {/* Chat — always visible */}
             <button
               className={`tab-btn ${activePanel === 'chat' ? 'active' : ''}`}
               onClick={() => {
                 setActivePanel('chat');
                 setShowSettings(false);
-                setShowMoreTabs(false);
+                setShowStudioMenu(false);
+                setShowToolsMenu(false);
               }}
             >
               Chat
             </button>
-            <button
-              className={`tab-btn ${activePanel === 'editor' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('editor');
-                setShowSettings(false);
-                setShowMoreTabs(false);
-              }}
-            >
-              Editor
-            </button>
+            {/* Preview — always visible */}
             <button
               className={`tab-btn ${activePanel === 'preview' ? 'active' : ''}`}
               onClick={() => {
                 setActivePanel('preview');
                 setShowSettings(false);
-                setShowMoreTabs(false);
+                setShowStudioMenu(false);
+                setShowToolsMenu(false);
               }}
             >
               Preview
             </button>
-            {/* Secondary tabs — hidden on mobile, shown in More drawer */}
-            <button
-              className={`tab-btn tab-btn-secondary ${activePanel === 'video' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('video');
-                setShowSettings(false);
-              }}
-            >
-              Video
-            </button>
-            <button
-              className={`tab-btn tab-btn-secondary ${activePanel === 'studio' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('studio');
-                setShowSettings(false);
-              }}
-            >
-              Studio
-            </button>
-            <button
-              className={`tab-btn tab-btn-secondary ${activePanel === 'image' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('image');
-                setShowSettings(false);
-              }}
-            >
-              Image
-            </button>
-            <button
-              className={`tab-btn tab-btn-secondary ${activePanel === 'notes' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('notes');
-                setShowSettings(false);
-              }}
-            >
-              Notes
-            </button>
-            <button
-              className={`tab-btn tab-btn-secondary ${activePanel === '3d' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('3d');
-                setShowSettings(false);
-              }}
-            >
-              3D
-            </button>
-            <button
-              className={`tab-btn tab-btn-secondary ${activePanel === 'spec' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('spec');
-                setShowSettings(false);
-              }}
-            >
-              Spec
-            </button>
-            <button
-              className={`tab-btn tab-btn-secondary ${activePanel === 'tasks' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('tasks');
-                setShowSettings(false);
-              }}
-            >
-              Tasks
-            </button>
-            <button
-              className={`tab-btn tab-btn-secondary ${activePanel === 'brain' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('brain');
-                setShowSettings(false);
-              }}
-            >
-              Brain
-            </button>
-            <button
-              className={`tab-btn tab-btn-debug tab-btn-secondary ${activePanel === 'debug' ? 'active' : ''}`}
-              onClick={() => {
-                setActivePanel('debug');
-                setShowSettings(false);
-              }}
-              title="Debug stream"
-            >
-              ◈
-            </button>
-            {/* More toggle — only visible on mobile */}
-            <button
-              className={`tab-btn tab-btn-more${showMoreTabs ? ' active' : ''}${['video', 'studio', 'image', 'notes', '3d', 'debug', 'spec', 'tasks', 'brain'].includes(activePanel) ? ' tab-btn-more--highlight' : ''}`}
-              onClick={() => setShowMoreTabs(s => !s)}
-              title="More tools"
-            >
-              {[
-                'video',
-                'studio',
-                'image',
-                'notes',
-                '3d',
-                'debug',
-                'spec',
-                'tasks',
-                'brain',
-              ].includes(activePanel)
+            {/* Studio group: Video · Music · Image · 3D · Code (Editor) */}
+            {(() => {
+              const STUDIO_PANELS = ['video', 'studio', 'image', '3d', 'editor'] as const;
+              const studioActive = (STUDIO_PANELS as readonly string[]).includes(activePanel);
+              const activeLabel = studioActive
                 ? ((
                     {
                       video: 'Video',
-                      studio: 'Studio',
+                      studio: 'Music',
                       image: 'Image',
-                      notes: 'Notes',
                       '3d': '3D',
-                      debug: '◈',
-                      spec: 'Spec',
+                      editor: 'Code',
+                    } as Record<string, string>
+                  )[activePanel] ?? 'Studio')
+                : 'Studio';
+              return (
+                <div className="tab-group-wrap">
+                  <button
+                    className={`tab-btn${studioActive ? ' active' : ''}`}
+                    onClick={() => {
+                      setShowStudioMenu(s => !s);
+                      setShowToolsMenu(false);
+                      setShowSettings(false);
+                    }}
+                  >
+                    {activeLabel} ▾
+                  </button>
+                  {showStudioMenu && (
+                    <div className="tab-group-menu">
+                      {(
+                        [
+                          { id: 'video', label: 'Video' },
+                          { id: 'studio', label: 'Music' },
+                          { id: 'image', label: 'Image' },
+                          { id: '3d', label: '3D' },
+                          { id: 'editor', label: 'Code' },
+                        ] as const
+                      ).map(item => (
+                        <button
+                          key={item.id}
+                          className={`tab-group-item${activePanel === item.id ? ' active' : ''}`}
+                          onClick={() => {
+                            setActivePanel(item.id);
+                            setShowStudioMenu(false);
+                            setShowSettings(false);
+                          }}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+            {/* Tools group: Notes · Tasks · Brain */}
+            {(() => {
+              const TOOLS_PANELS = ['notes', 'tasks', 'brain'] as const;
+              const toolsActive = (TOOLS_PANELS as readonly string[]).includes(activePanel);
+              const activeLabel = toolsActive
+                ? ((
+                    {
+                      notes: 'Notes',
                       tasks: 'Tasks',
                       brain: 'Brain',
                     } as Record<string, string>
-                  )[activePanel] ?? 'More')
-                : 'More'}
-              <span className="tab-more-chevron">{showMoreTabs ? '▲' : '▼'}</span>
-            </button>
+                  )[activePanel] ?? 'Tools')
+                : 'Tools';
+              return (
+                <div className="tab-group-wrap">
+                  <button
+                    className={`tab-btn${toolsActive ? ' active' : ''}`}
+                    onClick={() => {
+                      setShowToolsMenu(s => !s);
+                      setShowStudioMenu(false);
+                      setShowSettings(false);
+                    }}
+                  >
+                    {activeLabel} ▾
+                  </button>
+                  {showToolsMenu && (
+                    <div className="tab-group-menu">
+                      {(
+                        [
+                          { id: 'notes', label: 'Notes' },
+                          { id: 'tasks', label: 'Tasks' },
+                          { id: 'brain', label: 'Brain' },
+                        ] as const
+                      ).map(item => (
+                        <button
+                          key={item.id}
+                          className={`tab-group-item${activePanel === item.id ? ' active' : ''}`}
+                          onClick={() => {
+                            setActivePanel(item.id);
+                            setShowToolsMenu(false);
+                            setShowSettings(false);
+                          }}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
           <div className="header-controls">
             {currentProject && files.length > 0 && (
@@ -1642,53 +1640,6 @@ export default function Home() {
           </button>
         </div>
       )}
-
-      {/* More-tabs drawer — mobile only */}
-      {showMoreTabs && (
-        <div className="more-tabs-backdrop" onClick={() => setShowMoreTabs(false)} />
-      )}
-      <div className={`more-tabs-drawer${showMoreTabs ? ' more-tabs-drawer--open' : ''}`}>
-        <div className="more-tabs-header">
-          <span className="more-tabs-title">◈ Tools</span>
-          <button className="more-tabs-close" onClick={() => setShowMoreTabs(false)}>
-            ✕
-          </button>
-        </div>
-        {(
-          [
-            { id: 'video', label: 'Video', icon: '▶', desc: 'Edit & generate clips' },
-            { id: 'studio', label: 'Studio', icon: '⬡', desc: 'AI art generation' },
-            { id: 'image', label: 'Image', icon: '◉', desc: 'Edit & generate images' },
-            { id: 'notes', label: 'Notes', icon: '◈', desc: 'Sync your notes' },
-            { id: '3d', label: '3D Studio', icon: '⊙', desc: 'Three.js scene builder' },
-            { id: 'spec', label: 'Spec', icon: '◈', desc: 'Requirements & SRS generator' },
-            { id: 'tasks', label: 'Tasks', icon: '◈', desc: 'Your to-do list' },
-            {
-              id: 'brain',
-              label: 'Brain',
-              icon: '⬡',
-              desc: 'Entity memory — people, projects, accounts',
-            },
-          ] as const
-        ).map(t => (
-          <button
-            key={t.id}
-            className={`more-tabs-item${activePanel === t.id ? ' active' : ''}`}
-            onClick={() => {
-              setActivePanel(t.id as typeof activePanel);
-              setShowSettings(false);
-              setShowMoreTabs(false);
-            }}
-          >
-            <span className="more-tabs-item-icon">{t.icon}</span>
-            <span className="more-tabs-item-label">
-              <span className="more-tabs-item-name">{t.label}</span>
-              <span className="more-tabs-item-desc">{t.desc}</span>
-            </span>
-            {activePanel === t.id && <span className="more-tabs-item-check">◈</span>}
-          </button>
-        ))}
-      </div>
 
       {/* Tips guide for new users */}
       <TipsGuide />

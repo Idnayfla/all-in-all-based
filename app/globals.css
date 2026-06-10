@@ -2949,6 +2949,66 @@ body {
   margin-left: 1px;
 }
 
+/* -- Grouped tab dropdowns ------------------------------------------ */
+.tab-group-wrap {
+  position: relative;
+}
+
+.tab-group-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--surface-1, #1a1a1f);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  z-index: 300;
+  min-width: 140px;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.5);
+}
+
+.tab-group-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text-primary, #fff);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.tab-group-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+.tab-group-item.active {
+  color: var(--accent, #7c6ff7);
+  font-weight: 500;
+}
+.tab-group-item.active::after {
+  content: ' \25C8';
+  opacity: 0.6;
+}
+
+/* -- Mode bar (above chat input) ------------------------------------ */
+.chat-mode-bar {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px 0;
+}
+
+.chat-mode-bar--default {
+  opacity: 0.45;
+}
+
+.chat-mode-bar--active {
+  opacity: 1;
+}
+
 /* â”€â”€ Tips Guide â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .tips-guide {
   position: fixed;
