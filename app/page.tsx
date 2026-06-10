@@ -317,17 +317,7 @@ export default function Home() {
   const [wallpaperBlur, setWallpaperBlur] = useState(0);
   const [cropperSrc, setCropperSrc] = useState<string | null>(null);
   const wallpaperInputRef = useRef<HTMLInputElement>(null);
-  const [showQuickChat, setShowQuickChat] = useState(false);
-  const [quickChatInput, setQuickChatInput] = useState('');
-  const quickChatTextareaRef = useRef<HTMLTextAreaElement>(null);
-
-  // ── Auto-focus quick-chat textarea when modal opens ──────────────────────
-  useEffect(() => {
-    if (showQuickChat) {
-      const t = setTimeout(() => quickChatTextareaRef.current?.focus(), 60);
-      return () => clearTimeout(t);
-    }
-  }, [showQuickChat]);
+  const [chatInputTrigger, setChatInputTrigger] = useState(0);
 
   // ── Project cache helpers (localStorage) ────────────────────────────────
   const PROJECTS_CACHE_KEY = 'based_projects_cache';
@@ -1111,8 +1101,10 @@ export default function Home() {
       setShowPricing(true);
       return;
     }
-    setQuickChatInput('');
-    setShowQuickChat(true);
+    if (!currentProject && !incognito) {
+      createProject('New chat');
+    }
+    setChatInputTrigger(t => t + 1);
   };
 
   const handleAutoName = async (projectId: string, firstPrompt: string) => {
@@ -2460,6 +2452,7 @@ export default function Home() {
                         : undefined
                     }
                     onLogoClick={startChat}
+                    openInputTrigger={chatInputTrigger}
                   />
                 </div>
                 <div className={`panel ${activePanel === 'editor' ? 'panel-active' : ''}`}>
@@ -2483,70 +2476,6 @@ export default function Home() {
             ))}
         </main>
       </div>
-
-      {/* Quick-chat overlay — fixed below the tab bar, rendered at app-root so no parent overflow clips it */}
-      <AnimatePresence>
-        {showQuickChat && (
-          <motion.div
-            className="quick-chat-overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            onClick={e => {
-              if (e.target === e.currentTarget) setShowQuickChat(false);
-            }}
-          >
-            <div className="quick-chat-modal" onClick={e => e.stopPropagation()}>
-              <div className="quick-chat-header">
-                <span className="quick-chat-title">
-                  <span className="quick-chat-logo">B&gt;</span> ASK BASED ANYTHING
-                </span>
-                <button
-                  className="quick-chat-close"
-                  onClick={() => setShowQuickChat(false)}
-                  aria-label="Close"
-                >
-                  ×
-                </button>
-              </div>
-              <div className="quick-chat-body">
-                <textarea
-                  ref={quickChatTextareaRef}
-                  className="quick-chat-textarea"
-                  value={quickChatInput}
-                  onChange={e => setQuickChatInput(e.target.value)}
-                  placeholder="Ask Based anything..."
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey && quickChatInput.trim()) {
-                      e.preventDefault();
-                      quickProject(quickChatInput.trim());
-                      setShowQuickChat(false);
-                    }
-                    if (e.key === 'Escape') setShowQuickChat(false);
-                  }}
-                />
-              </div>
-              <div className="quick-chat-footer">
-                <button className="quick-chat-cancel" onClick={() => setShowQuickChat(false)}>
-                  Cancel
-                </button>
-                <button
-                  className="quick-chat-send"
-                  disabled={!quickChatInput.trim()}
-                  onClick={() => {
-                    if (!quickChatInput.trim()) return;
-                    quickProject(quickChatInput.trim());
-                    setShowQuickChat(false);
-                  }}
-                >
-                  → Send
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {projectModal && (

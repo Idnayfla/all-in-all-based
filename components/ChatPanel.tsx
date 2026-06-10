@@ -237,6 +237,7 @@ export default function ChatPanel({
   onPanelSwitch,
   onAutoName,
   onLogoClick,
+  openInputTrigger,
 }: {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -260,6 +261,7 @@ export default function ChatPanel({
   onPanelSwitch?: (panel: string) => void;
   onAutoName?: (firstPrompt: string) => void;
   onLogoClick?: () => void;
+  openInputTrigger?: number;
 }) {
   const [input, setInput] = useState(prefillMessage ?? '');
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
@@ -321,6 +323,13 @@ export default function ChatPanel({
   const recordingStartRef = useRef<number>(0);
   const stopRecordingRef = useRef<boolean>(false);
   const { t, locale } = useTranslation();
+
+  useEffect(() => {
+    if (openInputTrigger) {
+      setMobileInputOpen(true);
+      setTimeout(() => mobileTextareaRef.current?.focus(), 50);
+    }
+  }, [openInputTrigger]);
 
   const submitFlag = async (msgIdx: number, _msgContent: string, _userPrompt: string) => {
     if (flagSending) return;
