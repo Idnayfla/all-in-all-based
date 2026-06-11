@@ -273,15 +273,6 @@ function utcToLocalTime(date: Date, tzOffset: string): string {
   return `${String(local.getUTCHours()).padStart(2, '0')}:${String(local.getUTCMinutes()).padStart(2, '0')}`;
 }
 
-// Convert a UTC Date to a local YYYY-MM-DD using a UTC offset string like "+08:00"
-function utcToLocalDate(date: Date, tzOffset: string): string {
-  const sign = tzOffset.startsWith('-') ? -1 : 1;
-  const parts = tzOffset.slice(1).split(':');
-  const offsetMs = sign * (Number(parts[0]) * 60 + Number(parts[1])) * 60_000;
-  const local = new Date(date.getTime() + offsetMs);
-  return local.toISOString().slice(0, 10);
-}
-
 export async function checkFreebusy(
   accessToken: string,
   date: string, // YYYY-MM-DD
@@ -427,34 +418,54 @@ export async function listEventsInRange(
 ): Promise<CalEvent[]> {
   const timeMin = `${dateFrom}T00:00:00Z`;
   const timeMax = `${dateTo}T23:59:59Z`;
-  const params = new URLSearchParams({
-    timeMin,
-    timeMax,
-    singleEvents: 'true',
-    orderBy: 'startTime',
-    maxResults: '250',
-  });
-  const res = await fetch(`${CAL_BASE}/primary/events?${params}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) throw new Error(`List failed: ${res.status}`);
-  const data = (await res.json()) as {
-    items?: Array<{
-      id: string;
-      summary?: string;
-      start: { dateTime?: string; date?: string };
-      end: { dateTime?: string; date?: string };
-      htmlLink?: string;
-    }>;
-  };
-  return (data.items ?? []).map(item => ({
-    id: item.id,
-    title: item.summary ?? '(no title)',
-    start: item.start.dateTime ?? item.start.date ?? '',
-    end: item.end.dateTime ?? item.end.date ?? '',
-    url: item.htmlLink ?? '',
-    allDay: !item.start.dateTime,
-  }));
+  const calIds = await getCalendarIds(accessToken);
+  const results = await Promise.all(
+    calIds.map(async calId => {
+      const params = new URLSearchParams({
+        timeMin,
+        timeMax,
+        singleEvents: 'true',
+        orderBy: 'startTime',
+        maxResults: '250',
+      });
+      try {
+        const res = await fetch(
+          `${CAL_BASE}/${encodeURIComponent(calId)}/events?${params}`,
+          { headers: { Authorization: `Bearer ${accessToken}` } }
+        );
+        if (!res.ok) return [] as CalEvent[];
+        const data = (await res.json()) as {
+          items?: Array<{
+            id: string;
+            summary?: string;
+            start: { dateTime?: string; date?: string };
+            end: { dateTime?: string; date?: string };
+            htmlLink?: string;
+          }>;
+        };
+        return (data.items ?? []).map(item => ({
+          id: item.id,
+          title: item.summary ?? '(no title)',
+          start: item.start.dateTime ?? item.start.date ?? '',
+          end: item.end.dateTime ?? item.end.date ?? '',
+          url: item.htmlLink ?? '',
+          allDay: !item.start.dateTime,
+        }));
+      } catch {
+        return [] as CalEvent[];
+      }
+    })
+  );
+  // Dedupe by event id
+  const seen = new Set<string>();
+  const events: CalEvent[] = [];
+  for (const e of results.flat()) {
+    if (seen.has(e.id)) continue;
+    seen.add(e.id);
+    events.push(e);
+  }
+  events.sort((a, b) => a.start.localeCompare(b.start));
+  return events;
 }
 
 export async function moveEventsByTitle(
@@ -474,36 +485,58 @@ export async function moveEventsByTitle(
     ? `${opts.dateTo}T23:59:59Z`
     : new Date(Date.now() + 30 * 86_400_000).toISOString();
 
-  const params = new URLSearchParams({
-    timeMin,
-    timeMax,
-    singleEvents: 'true',
-    maxResults: '2500',
-    q: titleKeyword,
-  });
-  const listRes = await fetch(`${CAL_BASE}/primary/events?${params}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!listRes.ok) throw new Error(`Search failed: ${listRes.status}`);
+  const calIds = await getCalendarIds(accessToken);
 
-  type GCalItem = {
+  type FoundEvent = {
     id: string;
+    calendarId: string;
     summary?: string;
     description?: string;
     start: { dateTime?: string; date?: string };
     end: { dateTime?: string; date?: string };
   };
-  const data = (await listRes.json()) as { items?: GCalItem[] };
-  const items = (data.items ?? []).filter(e =>
-    e.summary?.toLowerCase().includes(titleKeyword.toLowerCase())
-  );
+
+  // Search all calendars
+  const allItems: FoundEvent[] = [];
+  for (const calId of calIds) {
+    const params = new URLSearchParams({
+      timeMin,
+      timeMax,
+      singleEvents: 'true',
+      maxResults: '500',
+      q: titleKeyword,
+    });
+    try {
+      const res = await fetch(
+        `${CAL_BASE}/${encodeURIComponent(calId)}/events?${params}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (!res.ok) continue;
+      const data = (await res.json()) as { items?: FoundEvent[] };
+      for (const item of data.items ?? []) {
+        if (item.summary?.toLowerCase().includes(titleKeyword.toLowerCase())) {
+          allItems.push({ ...item, calendarId: calId });
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  // Dedupe by id
+  const seen = new Set<string>();
+  const items = allItems.filter(e => {
+    if (seen.has(e.id)) return false;
+    seen.add(e.id);
+    return true;
+  });
 
   let moved = 0;
   let failed = 0;
   const conflicts: Array<{ title: string; newStart: string }> = [];
-  // Resolve calendar IDs once if we're going to run conflict checks
-  const tz = opts.tzOffset ?? '+08:00';
-  const calendarIds = opts.checkConflicts ? await getCalendarIds(accessToken) : [];
+
+  const tzOffset = opts.tzOffset ?? '+08:00';
+
   for (const item of items) {
     try {
       let newStart: Record<string, string>;
@@ -516,44 +549,44 @@ export async function moveEventsByTitle(
         let newStartMs = startMs + (opts.shiftDays ?? 0) * 86_400_000;
         if (opts.newTime) {
           const dateStr = new Date(newStartMs).toISOString().slice(0, 10);
-          newStartMs = new Date(`${dateStr}T${opts.newTime}:00${tz}`).getTime();
+          newStartMs = new Date(`${dateStr}T${opts.newTime}:00${tzOffset}`).getTime();
         }
-        newStart = { dateTime: new Date(newStartMs).toISOString() };
-        newEnd = { dateTime: new Date(newStartMs + duration).toISOString() };
 
-        // Conflict check: is the destination slot already busy?
+        // Conflict check
         if (opts.checkConflicts) {
-          const destDate = utcToLocalDate(new Date(newStartMs), tz);
-          const destTime = utcToLocalTime(new Date(newStartMs), tz);
-          const durMin = Math.max(1, Math.round(duration / 60_000));
-          // Exclude this event's own current slot is unnecessary — we're moving
-          // it to a different time, so the freebusy of the destination day shows
-          // whatever else occupies the target window.
-          const busy = await checkFreebusy(accessToken, destDate, tz, calendarIds);
-          // Filter out the event's own busy block (it still sits at its old slot
-          // until we patch) so we don't flag a self-conflict when shifting time
-          // within the same day.
-          const others = busy.filter(
-            b => !(new Date(b.start).getTime() === startMs && new Date(b.end).getTime() === endMs)
-          );
-          const slot = findFreeSlot(others, destDate, destTime, durMin, tz);
-          if (slot.conflict) {
-            conflicts.push({ title: item.summary ?? '(no title)', newStart: newStart.dateTime });
+          const destDate = new Date(newStartMs).toISOString().slice(0, 10);
+          const destTimeLocal = utcToLocalTime(new Date(newStartMs), tzOffset);
+          const durationMin = Math.round(duration / 60_000);
+          const busySlots = await checkFreebusy(accessToken, destDate, tzOffset, calIds);
+          // Exclude the event's own current slot from busy check
+          const filteredBusy = busySlots.filter(b => {
+            const bStart = new Date(b.start).getTime();
+            const bEnd = new Date(b.end).getTime();
+            return !(bStart === startMs && bEnd === startMs + duration);
+          });
+          const result = findFreeSlot(filteredBusy, destDate, destTimeLocal, durationMin, tzOffset);
+          if (result.conflict) {
+            conflicts.push({
+              title: item.summary ?? '(no title)',
+              newStart: `${destDate} ${destTimeLocal}`,
+            });
             continue;
           }
         }
+
+        newStart = { dateTime: new Date(newStartMs).toISOString() };
+        newEnd = { dateTime: new Date(newStartMs + duration).toISOString() };
       } else {
         const shiftMs = (opts.shiftDays ?? 0) * 86_400_000;
-        const newStartDate = new Date(
-          new Date(item.start.date! + 'T00:00:00Z').getTime() + shiftMs
-        );
-        const newEndDate = new Date(new Date(item.end.date! + 'T00:00:00Z').getTime() + shiftMs);
-        newStart = { date: newStartDate.toISOString().slice(0, 10) };
-        newEnd = { date: newEndDate.toISOString().slice(0, 10) };
+        const newSD = new Date(new Date(item.start.date! + 'T00:00:00Z').getTime() + shiftMs);
+        const newED = new Date(new Date(item.end.date! + 'T00:00:00Z').getTime() + shiftMs);
+        newStart = { date: newSD.toISOString().slice(0, 10) };
+        newEnd = { date: newED.toISOString().slice(0, 10) };
       }
 
+      // PATCH using the calendar where the event was found
       const patchRes = await fetch(
-        `${CAL_BASE}/primary/events/${encodeURIComponent(item.id)}`,
+        `${CAL_BASE}/${encodeURIComponent(item.calendarId)}/events/${encodeURIComponent(item.id)}`,
         {
           method: 'PATCH',
           headers: {
@@ -568,12 +601,16 @@ export async function moveEventsByTitle(
           }),
         }
       );
-      if (!patchRes.ok) throw new Error(`Patch failed: ${patchRes.status}`);
+      if (!patchRes.ok) {
+        const errBody = (await patchRes.text()).slice(0, 200);
+        throw new Error(`Patch failed ${patchRes.status}: ${errBody}`);
+      }
       moved++;
     } catch {
       failed++;
     }
   }
+
   return { moved, failed, conflicts };
 }
 
@@ -584,26 +621,49 @@ export async function deleteEventsByTitle(
 ): Promise<{ deleted: number; failed: number }> {
   const timeMin = new Date().toISOString();
   const timeMax = new Date(Date.now() + days * 86_400_000).toISOString();
-  const params = new URLSearchParams({
-    timeMin,
-    timeMax,
-    singleEvents: 'true',
-    maxResults: '2500',
-    q: titleKeyword,
+  const calIds = await getCalendarIds(accessToken);
+
+  type FoundEvent = { id: string; calendarId: string; summary?: string };
+  const allItems: FoundEvent[] = [];
+
+  for (const calId of calIds) {
+    const params = new URLSearchParams({
+      timeMin,
+      timeMax,
+      singleEvents: 'true',
+      maxResults: '2500',
+      q: titleKeyword,
+    });
+    try {
+      const res = await fetch(
+        `${CAL_BASE}/${encodeURIComponent(calId)}/events?${params}`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (!res.ok) continue;
+      const data = (await res.json()) as { items?: FoundEvent[] };
+      for (const item of data.items ?? []) {
+        if (item.summary?.toLowerCase().includes(titleKeyword.toLowerCase())) {
+          allItems.push({ ...item, calendarId: calId });
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  // Dedupe
+  const seen = new Set<string>();
+  const items = allItems.filter(e => {
+    if (seen.has(e.id)) return false;
+    seen.add(e.id);
+    return true;
   });
-  const res = await fetch(`${CAL_BASE}/primary/events?${params}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) throw new Error(`Search failed: ${res.status}`);
-  const data = (await res.json()) as { items?: Array<{ id: string; summary?: string }> };
-  const items = (data.items ?? []).filter(e =>
-    e.summary?.toLowerCase().includes(titleKeyword.toLowerCase())
-  );
+
   let deleted = 0;
   let failed = 0;
   for (const item of items) {
     try {
-      await deleteEvent(accessToken, item.id);
+      await deleteEvent(accessToken, item.id, item.calendarId);
       deleted++;
     } catch {
       failed++;
@@ -612,11 +672,18 @@ export async function deleteEventsByTitle(
   return { deleted, failed };
 }
 
-export async function deleteEvent(accessToken: string, eventId: string): Promise<void> {
-  const res = await fetch(`${CAL_BASE}/primary/events/${encodeURIComponent(eventId)}`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
+export async function deleteEvent(
+  accessToken: string,
+  eventId: string,
+  calendarId = 'primary'
+): Promise<void> {
+  const res = await fetch(
+    `${CAL_BASE}/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
   if (!res.ok && res.status !== 404 && res.status !== 410) {
     throw new Error(`Delete event failed: ${res.status}`);
   }

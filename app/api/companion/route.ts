@@ -603,6 +603,7 @@ export async function POST(req: NextRequest) {
       `- Due times go as HH:MM 24h in due_time. Duration in minutes goes in duration_minutes.`,
       `- After create_task succeeds (no [CONFLICT] prefix in result): immediately tell the user BOTH what was booked AND the exact calendar status from the tool result ("Added to Google Calendar" OR the error message). Never say "Done" or "Booked" without including the calendar result.`,
       `- CRITICAL: You CANNOT say a task was created, booked, added, or scheduled unless you called create_task in THIS response and received a non-[CONFLICT] result. If you did not call create_task, do NOT claim anything was booked.`,
+      `- CRITICAL: You CANNOT say events were moved or shifted unless move_calendar_events returned a moved count > 0 in its result. If moved is 0, tell the user exactly what happened (no matches found, all conflicted, etc.).`,
       `- For brain/memory cleanup, call rewrite_memory with the cleaned list.`,
       schedPrefsContext,
     ]
