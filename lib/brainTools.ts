@@ -252,11 +252,14 @@ export async function createTask(
     .single();
   if (error) return `Could not create task: ${error.message}`;
 
-  // Fire-and-forget Google Calendar sync
+  // Synchronous Google Calendar sync — errors surface in the tool result
+  let calResult = '';
   if (data.due_date) {
-    getValidAccessToken(userId)
-      .then(async accessToken => {
-        if (!accessToken) return;
+    try {
+      const accessToken = await getValidAccessToken(userId);
+      if (!accessToken) {
+        calResult = ' (Google Calendar not connected — task saved without calendar event.)';
+      } else {
         const prefs = await getSchedulingPrefs(userId).catch(() => null);
         const tzOffset = prefs?.timezone ?? '+08:00';
         const event = await createEvent(
@@ -271,14 +274,17 @@ export async function createTask(
           }
         );
         await supabaseAdmin.from('tasks').update({ google_event_id: event.id }).eq('id', data.id);
-      })
-      .catch(() => {});
+        calResult = ' Added to Google Calendar.';
+      }
+    } catch (e) {
+      calResult = ` (Calendar sync failed: ${e instanceof Error ? e.message : String(e)})`;
+    }
   }
 
   const due = data.due_date ? ` (due ${new Date(data.due_date).toLocaleDateString()})` : '';
   const time = data.due_time ? ` at ${data.due_time}` : '';
   const dur = data.duration_minutes ? ` for ${data.duration_minutes}min` : '';
-  return `Created task: "${data.title}"${due}${time}${dur} [${data.priority}]`;
+  return `Created task: "${data.title}"${due}${time}${dur} [${data.priority}]${calResult}`;
 }
 
 export async function listTasks(
