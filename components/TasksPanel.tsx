@@ -156,6 +156,46 @@ function getRecommendations(tasks: Task[]): string[] {
   return recs.slice(0, 2);
 }
 
+// ── Calendar event type ────────────────────────────────────────────────────────
+interface CalEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  url: string;
+  allDay: boolean;
+}
+
+function formatCalTime(dateStr: string, allDay: boolean): string {
+  if (allDay)
+    return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return new Date(dateStr).toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+function isCalToday(event: CalEvent): boolean {
+  const d = new Date(event.start);
+  const today = new Date();
+  return (
+    d.getFullYear() === today.getFullYear() &&
+    d.getMonth() === today.getMonth() &&
+    d.getDate() === today.getDate()
+  );
+}
+
+function isCalUpcoming(event: CalEvent): boolean {
+  const start = new Date(event.start);
+  const tomorrow = new Date();
+  tomorrow.setHours(0, 0, 0, 0);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return start >= tomorrow;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function TasksPanel({ authToken }: { authToken?: string }) {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -165,6 +205,14 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
 
   // Entities for the entity-link selector
   const [entities, setEntities] = useState<EntityRef[]>([]);
+
+  // Google Calendar state
+  const [calEnabled, setCalEnabled] = useState(false);
+  const [calConnected, setCalConnected] = useState(false);
+  const [calEmail, setCalEmail] = useState('');
+  const [calEvents, setCalEvents] = useState<CalEvent[]>([]);
+  const [calLoading, setCalLoading] = useState(false);
+  const [addingToCalId, setAddingToCalId] = useState<string | null>(null);
 
   // Add-task form state
   const [newTitle, setNewTitle] = useState('');
@@ -191,6 +239,69 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     }),
     [authToken]
   );
+
+  // ── Fetch calendar data ────────────────────────────────────────────────────
+  const fetchCalendar = useCallback(() => {
+    if (!authToken) return;
+    setCalLoading(true);
+    fetch('/api/calendar/events', { headers: headers() })
+      .then(r => r.json())
+      .then(
+        (data: { enabled?: boolean; connected?: boolean; email?: string; events?: CalEvent[] }) => {
+          setCalEnabled(data.enabled ?? false);
+          setCalConnected(data.connected ?? false);
+          setCalEmail(data.email ?? '');
+          setCalEvents(Array.isArray(data.events) ? data.events : []);
+        }
+      )
+      .catch(() => {})
+      .finally(() => setCalLoading(false));
+  }, [authToken, headers]);
+
+  // On mount: check for ?calendar=connected redirect, fetch calendar
+  useEffect(() => {
+    if (!authToken || typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const calParam = params.get('calendar');
+    if (calParam) {
+      history.replaceState({}, '', window.location.pathname);
+    }
+    fetchCalendar();
+  }, [authToken, fetchCalendar]);
+
+  const connectCalendar = async () => {
+    if (!authToken) return;
+    try {
+      const res = await fetch('/api/calendar/auth', { headers: headers() });
+      const data = (await res.json()) as { url?: string };
+      if (data.url) window.location.href = data.url;
+    } catch {}
+  };
+
+  const disconnectCalendar = async () => {
+    if (!authToken) return;
+    try {
+      await fetch('/api/calendar/auth', { method: 'DELETE', headers: headers() });
+      setCalConnected(false);
+      setCalEmail('');
+      setCalEvents([]);
+    } catch {}
+  };
+
+  const addTaskToCalendar = async (task: Task) => {
+    if (!task.due_date || addingToCalId) return;
+    setAddingToCalId(task.id);
+    try {
+      const res = await fetch('/api/calendar/events', {
+        method: 'POST',
+        headers: headers(),
+        body: JSON.stringify({ title: task.title, due_date: task.due_date, notes: task.notes }),
+      });
+      const data = (await res.json()) as { url?: string };
+      if (data.url) window.open(data.url, '_blank', 'noopener');
+    } catch {}
+    setTimeout(() => setAddingToCalId(null), 2000);
+  };
 
   // ── Fetch tasks ────────────────────────────────────────────────────────────
   const fetchTasks = useCallback(() => {
@@ -484,6 +595,25 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
                     ))}
                   </select>
                 )}
+                {calConnected && editDue && (
+                  <button
+                    className="tasks-edit-cal-btn"
+                    type="button"
+                    onClick={() => {
+                      const task = tasks.find(t => t.id === editingId);
+                      if (task)
+                        addTaskToCalendar({
+                          ...task,
+                          due_date: editDue,
+                          title: editTitle,
+                          notes: editNotes || null,
+                        });
+                    }}
+                    disabled={addingToCalId === editingId}
+                  >
+                    {addingToCalId === editingId ? '✓ Added' : '⊙ Add to Google Calendar'}
+                  </button>
+                )}
                 <textarea
                   className="tasks-edit-notes"
                   value={editNotes}
@@ -776,6 +906,26 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
             {filterCounts[f] > 0 && <span className="tasks-filter-count">{filterCounts[f]}</span>}
           </button>
         ))}
+        {authToken &&
+          calEnabled &&
+          (calConnected ? (
+            <button
+              className="tasks-cal-btn tasks-cal-btn--connected"
+              onClick={disconnectCalendar}
+              title={`Disconnect ${calEmail}`}
+            >
+              ⊙ {calEmail ? calEmail.split('@')[0] : 'Calendar'}
+            </button>
+          ) : (
+            <button
+              className="tasks-cal-btn"
+              onClick={connectCalendar}
+              disabled={calLoading}
+              title="Connect Google Calendar"
+            >
+              ⊙ Calendar
+            </button>
+          ))}
       </div>
 
       {/* Task list */}
@@ -812,6 +962,42 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
             {renderGroup('Cancelled', visibleCancelled, 'var(--text3)')}
           </>
         )}
+
+        {/* Calendar events section */}
+        {!loading &&
+          authToken &&
+          calConnected &&
+          filter !== 'done' &&
+          (() => {
+            const visible =
+              filter === 'today'
+                ? calEvents.filter(isCalToday)
+                : filter === 'upcoming'
+                  ? calEvents.filter(isCalUpcoming)
+                  : calEvents; // 'all' — next 30d
+            if (visible.length === 0) return null;
+            return (
+              <div className="tasks-cal-section">
+                <div className="tasks-cal-section-label">⊙ Calendar</div>
+                {visible.map(ev => (
+                  <a
+                    key={ev.id}
+                    href={ev.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="tasks-cal-event"
+                  >
+                    <span className="tasks-cal-event-icon">⊙</span>
+                    <span className="tasks-cal-event-title">{ev.title}</span>
+                    <span className="tasks-cal-event-time">
+                      {formatCalTime(ev.start, ev.allDay)}
+                    </span>
+                    <span className="tasks-cal-event-arrow">→</span>
+                  </a>
+                ))}
+              </div>
+            );
+          })()}
       </div>
     </div>
   );

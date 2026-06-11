@@ -15376,6 +15376,144 @@ body:has(.legal-page) {
   color: var(--bg);
 }
 
+/* ── Calendar connect button in filter bar ──────────────────────────────── */
+.tasks-cal-btn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  padding: 4px 10px;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+  white-space: nowrap;
+}
+.tasks-cal-btn:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-muted);
+}
+.tasks-cal-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.tasks-cal-btn--connected {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.35);
+  background: rgba(74, 222, 128, 0.08);
+}
+.tasks-cal-btn--connected:hover {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+/* ── Add to Calendar button in edit form ─────────────────────────────────── */
+.tasks-edit-cal-btn {
+  width: 100%;
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 7px 10px;
+  text-align: left;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+.tasks-edit-cal-btn:hover:not(:disabled) {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.4);
+  background: rgba(74, 222, 128, 0.06);
+}
+.tasks-edit-cal-btn:disabled {
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.4);
+  border-style: solid;
+  cursor: default;
+}
+
+/* ── Calendar events section in task list ────────────────────────────────── */
+.tasks-cal-section {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.tasks-cal-section-label {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text3);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.tasks-cal-event {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.1s;
+  cursor: pointer;
+}
+.tasks-cal-event:last-child {
+  border-bottom: none;
+}
+.tasks-cal-event:hover .tasks-cal-event-title {
+  color: var(--accent);
+}
+
+.tasks-cal-event-icon {
+  color: #4ade80;
+  font-size: 13px;
+  flex-shrink: 0;
+  width: 18px;
+  text-align: center;
+}
+
+.tasks-cal-event-title {
+  flex: 1;
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+
+.tasks-cal-event-time {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text3);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.tasks-cal-event-arrow {
+  font-size: 12px;
+  color: var(--text3);
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.tasks-cal-event:hover .tasks-cal-event-arrow {
+  opacity: 1;
+}
+
 .tasks-list {
   flex: 1;
   overflow-y: auto;
@@ -16304,6 +16442,12 @@ body:has(.legal-page) {
   padding: 2px 8px;
 }
 
+.entity-card-header-actions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
 .entity-card-del {
   background: none;
   border: none;
@@ -16319,6 +16463,299 @@ body:has(.legal-page) {
 }
 .entity-card-del:hover {
   color: #ef4444 !important;
+}
+
+/* ── Entity card edit button ────────────────────────────────── */
+.entity-card-edit {
+  background: none;
+  border: none;
+  color: transparent;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: color 0.15s;
+  line-height: 1;
+}
+.entity-card:hover .entity-card-edit {
+  color: var(--text3);
+}
+.entity-card-edit:hover {
+  color: var(--accent) !important;
+}
+
+/* ── Inline entity edit form ─────────────────────────────────── */
+.entity-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.entity-edit-name {
+  background: var(--bg3);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--text1);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  padding: 6px 8px;
+  width: 100%;
+  outline: none;
+  box-sizing: border-box;
+}
+.entity-edit-row2 {
+  display: flex;
+  gap: 6px;
+}
+.entity-edit-type {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text1);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  padding: 5px 8px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.entity-edit-type:focus {
+  border-color: var(--accent);
+}
+.entity-edit-summary,
+.entity-edit-notes {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text1);
+  font-size: 12px;
+  padding: 6px 8px;
+  width: 100%;
+  outline: none;
+  resize: none;
+  transition: border-color 0.15s;
+  font-family: inherit;
+  line-height: 1.5;
+  box-sizing: border-box;
+}
+.entity-edit-summary:focus,
+.entity-edit-notes:focus {
+  border-color: var(--accent);
+}
+.entity-edit-summary::placeholder,
+.entity-edit-notes::placeholder {
+  color: var(--text3);
+}
+
+/* ── Facts section in edit form ──────────────────────────────── */
+.entity-edit-facts-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.entity-edit-facts-label {
+  font-size: 10px;
+  color: var(--text3);
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+.entity-edit-fact-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.entity-edit-fact-key {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text3);
+  width: 70px;
+  min-width: 70px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.entity-edit-fact-val {
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text1);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  padding: 3px 6px;
+  outline: none;
+  transition: border-color 0.15s;
+  min-width: 0;
+}
+.entity-edit-fact-val:focus {
+  border-color: var(--accent);
+}
+.entity-edit-fact-del {
+  background: none;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 2px 3px;
+  flex-shrink: 0;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.entity-edit-fact-del:hover {
+  color: #ef4444;
+}
+.entity-edit-fact-add {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  margin-top: 2px;
+}
+.entity-edit-fact-key-input,
+.entity-edit-fact-val-input {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text1);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  padding: 4px 6px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.entity-edit-fact-key-input {
+  width: 70px;
+  flex-shrink: 0;
+}
+.entity-edit-fact-val-input {
+  flex: 1;
+  min-width: 0;
+}
+.entity-edit-fact-key-input:focus,
+.entity-edit-fact-val-input:focus {
+  border-color: var(--accent);
+}
+.entity-edit-fact-key-input::placeholder,
+.entity-edit-fact-val-input::placeholder {
+  color: var(--text3);
+}
+.entity-edit-fact-add-btn {
+  background: var(--accent-muted);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+  line-height: 1.3;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.entity-edit-fact-add-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--bg);
+}
+.entity-edit-fact-add-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Entity edit action buttons ──────────────────────────────── */
+.entity-edit-actions {
+  display: flex;
+  gap: 8px;
+  padding-top: 2px;
+}
+.entity-edit-save {
+  background: var(--accent-muted);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 6px 14px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.03em;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.entity-edit-save:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--bg);
+}
+.entity-edit-save:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.entity-edit-cancel {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 6px 14px;
+  font-family: var(--font-mono);
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.entity-edit-cancel:hover {
+  color: var(--text2);
+  border-color: var(--text3);
+}
+
+/* ── Quick-add task from entity card ─────────────────────────── */
+.entity-task-add {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  align-items: center;
+}
+.entity-task-add-input {
+  flex: 1;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text1);
+  font-size: 12px;
+  padding: 5px 8px;
+  outline: none;
+  transition: border-color 0.15s;
+  min-width: 0;
+}
+.entity-task-add-input:focus {
+  border-color: var(--accent);
+}
+.entity-task-add-input::placeholder {
+  color: var(--text3);
+}
+.entity-task-add-btn {
+  background: var(--accent-muted);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 3px 10px;
+  flex-shrink: 0;
+  line-height: 1;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+.entity-task-add-btn:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--bg);
+}
+.entity-task-add-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .entity-card-name {
@@ -16395,6 +16832,253 @@ body:has(.legal-page) {
 
 .entity-card-meta {
   margin-top: 6px;
+  font-size: 11px;
+  color: var(--text3);
+  font-family: var(--font-mono);
+}
+
+/* ── Full-screen entity overlay ─────────────────────────────────────────── */
+.entity-fullscreen-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  z-index: 5000;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  animation: entityOverlayIn 0.18s ease;
+}
+
+@keyframes entityOverlayIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (min-width: 640px) {
+  .entity-fullscreen-overlay {
+    align-items: center;
+  }
+}
+
+.entity-fullscreen-panel {
+  background: var(--bg2);
+  border: 1px solid var(--accent);
+  border-radius: 16px 16px 0 0;
+  width: 100%;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: entityPanelIn 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes entityPanelIn {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (min-width: 640px) {
+  .entity-fullscreen-panel {
+    border-radius: 12px;
+    max-width: 580px;
+    max-height: 82vh;
+    animation: entityPanelInDesktop 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}
+
+@keyframes entityPanelInDesktop {
+  from {
+    transform: translateY(16px) scale(0.97);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.entity-fullscreen-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.entity-fullscreen-chip {
+  flex-shrink: 0;
+}
+
+.entity-fullscreen-title {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entity-fullscreen-header-actions {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.entity-fullscreen-edit-btn {
+  background: var(--accent-muted);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 5px 10px;
+  transition:
+    background 0.15s,
+    color 0.15s;
+  white-space: nowrap;
+}
+.entity-fullscreen-edit-btn:hover {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.entity-fullscreen-del-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 5px 7px;
+  line-height: 1;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+}
+.entity-fullscreen-del-btn:hover {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+.entity-fullscreen-close {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 8px;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+  line-height: 1;
+}
+.entity-fullscreen-close:hover {
+  color: var(--text1);
+  border-color: var(--accent);
+  background: var(--accent-muted);
+}
+
+.entity-fullscreen-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.entity-fullscreen-summary {
+  font-size: 14px;
+  color: var(--text2);
+  font-family: var(--font-mono);
+  line-height: 1.65;
+  margin: 0;
+}
+
+.entity-fullscreen-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.entity-fullscreen-section-label {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text3);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.entity-fullscreen-facts-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.entity-fullscreen-fact-row {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.entity-fullscreen-fact-row:last-child {
+  border-bottom: none;
+}
+
+.entity-fullscreen-fact-key {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--text3);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 80px;
+}
+.entity-fullscreen-fact-key::after {
+  content: ':';
+}
+
+.entity-fullscreen-fact-val {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  color: var(--text1);
+  word-break: break-word;
+}
+
+.entity-fullscreen-notes-text {
+  font-size: 13px;
+  color: var(--text2);
+  font-family: var(--font-mono);
+  line-height: 1.65;
+  white-space: pre-wrap;
+  background: var(--bg3);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.entity-fullscreen-meta {
   font-size: 11px;
   color: var(--text3);
   font-family: var(--font-mono);
