@@ -8,6 +8,7 @@ import { exaSearch } from '@/lib/tavily';
 import { MODEL_OPUS, MODEL_SONNET, MODEL_HAIKU } from '@/lib/models';
 import { BRAIN_TOOLS, runBrainTool, listTasks } from '@/lib/brainTools';
 import { getSchedulingPrefs } from '@/lib/schedulingPrefs';
+import { getEffectiveTier, TIER_LIMITS } from '@/lib/tiers';
 
 export const maxDuration = 60;
 // Screenshots sent from the desktop companion can be several MB as base64.
@@ -31,23 +32,6 @@ const client = new Anthropic({
 // companion_last_seen      timestamptz
 // companion_first_seen     timestamptz
 // companion_patterns_surfaced  boolean  default false
-
-const FREE_DAILY_LIMIT = 5;
-
-async function getEffectiveTier(userId: string): Promise<'free' | 'pro'> {
-  const { data } = await supabaseAdmin
-    .from('user_settings')
-    .select('subscription_tier, subscription_status, pro_bonus_expires_at')
-    .eq('user_id', userId)
-    .single();
-  const paidTier = (data?.subscription_tier ?? 'free') as 'free' | 'pro';
-  const subStatus = data?.subscription_status ?? 'active';
-  const isCanceled = subStatus === 'canceled' || subStatus === 'cancelled';
-  const bonusExpiresAt = data?.pro_bonus_expires_at as string | null;
-  const hasBonusPro = !!bonusExpiresAt && new Date(bonusExpiresAt) > new Date();
-  const alwaysPro = process.env.ALWAYS_PRO === 'true' || !!process.env.BETA_ACCESS_CODE;
-  return alwaysPro || (paidTier === 'pro' && !isCanceled) || hasBonusPro ? 'pro' : 'free';
-}
 
 // Fire-and-forget: mark companion_weather_last_surfaced = now
 function markWeatherSurfacedAsync(userId: string): void {
@@ -213,11 +197,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Free-tier daily gate for JWT users
+  // Per-tier daily companion gate for JWT users.
+  // free = 5/day, beta = 20/day, pro = unlimited.
   if (jwtUserId) {
     try {
       const tier = await getEffectiveTier(jwtUserId);
-      if (tier === 'free') {
+      const companionDailyLimit = tier === 'pro' ? Infinity : TIER_LIMITS[tier].companionPerDay;
+      if (companionDailyLimit !== Infinity) {
         const todayStart = new Date();
         todayStart.setUTCHours(0, 0, 0, 0);
         const { count } = await supabaseAdmin
@@ -225,9 +211,9 @@ export async function POST(req: NextRequest) {
           .select('*', { count: 'exact', head: true })
           .eq('user_id', jwtUserId)
           .gte('created_at', todayStart.toISOString());
-        if ((count ?? 0) >= FREE_DAILY_LIMIT) {
+        if ((count ?? 0) >= companionDailyLimit) {
           return NextResponse.json(
-            { error: 'free_limit_reached', limit: FREE_DAILY_LIMIT },
+            { error: 'free_limit_reached', limit: companionDailyLimit, tier },
             { status: 429 }
           );
         }

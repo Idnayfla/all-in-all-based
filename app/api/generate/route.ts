@@ -10,6 +10,7 @@ import { getTrafficInfo } from '@/lib/traffic';
 import { createLangfuseClient } from '@/lib/langfuse';
 import { MODEL_OPUS, MODEL_SONNET, MODEL_HAIKU, MODEL_GROQ, MODEL_CEREBRAS } from '@/lib/models';
 import { BRAIN_TOOLS, runBrainTool } from '@/lib/brainTools';
+import { checkAndIncrementGeneration } from '@/lib/tiers';
 
 export const maxDuration = 300;
 
@@ -1557,7 +1558,7 @@ async function runChatWithTools(
     ...systemBlocks,
     {
       type: 'text' as const,
-      text: `\nTODAY'S DATE: ${today}. When creating tasks with relative due dates (tomorrow, next week), resolve them to an absolute ISO date. You have tools to manage the user's tasks and personal knowledge base (entities). Use search_entities to pull context when the user references something specific from their life before answering. Use upsert_entity when they share a new fact about a project, person, account, or topic. After using a tool, give a short natural confirmation — never expose raw JSON or tool mechanics.`,
+      text: `\nTODAY'S DATE: ${today}. When creating tasks with relative due dates (tomorrow, next week), resolve them to an absolute ISO date (YYYY-MM-DD). If the user specifies a time (e.g. "at 3pm", "14:00"), set due_time in HH:MM 24h format. If they specify a duration (e.g. "for 1 hour", "30 minutes"), set duration_minutes. You have tools to manage the user's tasks and personal knowledge base (entities). Use search_entities to pull context when the user references something specific from their life before answering. Use upsert_entity when they share a new fact about a project, person, account, or topic. After using a tool, give a short natural confirmation — never expose raw JSON or tool mechanics.`,
     },
   ];
 
@@ -1675,53 +1676,26 @@ export async function POST(req: NextRequest) {
     };
     const usingFreeModel = aiModel === 'free' && !!process.env.GROQ_API_KEY;
 
-    // Free tier generation gate — fail open so DB issues never block users
-    // ALWAYS_PRO=true bypasses all tier checks (set on beta deployment).
-    // BETA_ACCESS_CODE being set is also treated as ALWAYS_PRO — if the beta gate is
-    // active this is beta.getbased.dev and all authenticated users get full access.
-    const alwaysPro = process.env.ALWAYS_PRO === 'true' || !!process.env.BETA_ACCESS_CODE;
+    // ALWAYS_PRO=true bypasses all tier checks (owner testing only).
+    const alwaysPro = process.env.ALWAYS_PRO === 'true';
     // userId is already verified by the auth guard above
     const supabaseUserId: string = userId;
-    // Free AI (Groq/Cerebras) bypasses the usage gate — only gate Based AI (Claude)
+
+    // Generation limit gate — applies to all tiers except ALWAYS_PRO.
+    // Free AI (Groq/Cerebras) bypasses — only Claude (Based AI) is gated.
+    // checkAndIncrementGeneration fails open so DB issues never block users.
     if (!alwaysPro && aiModel !== 'free') {
-      try {
-        const { data: s } = await supabaseAdmin
-          .from('user_settings')
-          .select('subscription_tier, generations_used, generations_reset_at, pro_bonus_expires_at')
-          .eq('user_id', userId)
-          .single();
-
-        const hasBonusPro =
-          !!s?.pro_bonus_expires_at && new Date(s.pro_bonus_expires_at) > new Date();
-        const effectiveTier = s?.subscription_tier === 'pro' || hasBonusPro ? 'pro' : 'free';
-
-        if (effectiveTier === 'free') {
-          const now = new Date();
-          const needsReset =
-            !s?.generations_reset_at ||
-            new Date(s.generations_reset_at).getMonth() !== now.getMonth() ||
-            new Date(s.generations_reset_at).getFullYear() !== now.getFullYear();
-          const used = needsReset ? 0 : (s?.generations_used ?? 0);
-
-          if (used >= 10) {
-            return NextResponse.json({ error: 'generation_limit_reached' }, { status: 402 });
-          }
-
-          void (async () => {
-            try {
-              await supabaseAdmin.from('user_settings').upsert(
-                {
-                  user_id: userId,
-                  generations_used: used + 1,
-                  generations_reset_at: needsReset ? now.toISOString() : s.generations_reset_at,
-                },
-                { onConflict: 'user_id' }
-              );
-            } catch {}
-          })();
-        }
-      } catch {
-        /* fail open */
+      const limitResult = await checkAndIncrementGeneration(userId);
+      if (limitResult) {
+        return NextResponse.json(
+          {
+            error: limitResult.error,
+            tier: limitResult.tier,
+            limit: limitResult.limit,
+            used: limitResult.used,
+          },
+          { status: 402 }
+        );
       }
     }
 
