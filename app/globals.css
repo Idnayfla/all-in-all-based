@@ -4731,8 +4731,8 @@ body {
 }
 
 .splash-mark {
-  width: 96px;
-  height: 96px;
+  width: 128px;
+  height: 128px;
   opacity: 0;
   transform: scale(0.85);
   transition:
@@ -4748,8 +4748,8 @@ body {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 120px;
-  height: 120px;
+  width: 160px;
+  height: 160px;
   border-radius: 50%;
   border: 1px solid rgba(201, 168, 124, 0.25);
   opacity: 0;
@@ -4771,12 +4771,15 @@ body {
 
 .splash-tagline {
   font-family: var(--font-brand);
-  font-size: 37px;
+  font-size: clamp(48px, 10vw, 72px);
   font-weight: 900;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: rgba(201, 168, 124, 0.7);
-  margin-top: -5px;
+  background: linear-gradient(140deg, #ede8d0 20%, #c9a87c 60%, #e8d5b0 90%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-top: 8px;
   margin-left: 16px;
   opacity: 0;
   transform: translateY(8px);
@@ -4785,43 +4788,54 @@ body {
     transform 0.6s ease 0.1s;
 }
 .splash-tagline.visible {
-  opacity: 3;
+  opacity: 1;
   transform: translateY(0);
 }
 
 .splash-sub {
   font-family: var(--font-pixel);
-  font-size: 16px;
+  font-size: clamp(16px, 3vw, 22px);
   letter-spacing: 0.06em;
-  color: rgba(237, 232, 208, 0.55);
-  margin-top: 10px;
+  color: rgba(237, 232, 208, 0.85);
+  margin-top: 14px;
   text-align: center;
-  max-width: 280px;
-  line-height: 1.5;
+  max-width: 380px;
+  line-height: 1.6;
   opacity: 0;
-  text-align: center;
   transform: translateY(6px);
   transition:
     opacity 0.7s ease,
     transform 0.7s ease;
 }
 .splash-sub.visible {
-  opacity: 0.8;
+  opacity: 1;
   transform: translateY(0);
 }
 
 .splash-tap-hint {
   position: absolute;
-  bottom: calc(var(--safe-bottom) + 200px);
+  bottom: calc(var(--safe-bottom) + 48px);
   font-family: var(--font-pixel);
-  font-size: 21px;
-  letter-spacing: 0.1em;
-  color: rgba(237, 232, 208, 0.3);
+  font-size: clamp(13px, 2vw, 16px);
+  letter-spacing: 0.12em;
+  color: rgba(237, 232, 208, 0.65);
   opacity: 0;
   transition: opacity 1s ease;
+  animation: tapHintBreathe 2.4s ease-in-out infinite;
+  animation-play-state: paused;
 }
 .splash-tap-hint.visible {
   opacity: 1;
+  animation-play-state: running;
+}
+@keyframes tapHintBreathe {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .splash-ripple {
