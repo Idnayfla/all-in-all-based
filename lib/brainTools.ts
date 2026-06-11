@@ -7,6 +7,14 @@
 import { supabaseAdmin } from '@/app/api/_auth';
 import Anthropic from '@anthropic-ai/sdk';
 import { MODEL_HAIKU } from '@/lib/models';
+import {
+  getValidAccessToken,
+  checkFreebusy,
+  findFreeSlot,
+  getCalendarIds,
+  createEvent,
+} from '@/lib/googleCalendar';
+import { getSchedulingPrefs, upsertSchedulingPrefs } from '@/lib/schedulingPrefs';
 
 const ENTITY_TYPES = ['project', 'person', 'topic', 'account', 'place', 'other'];
 const PRIORITIES = ['urgent', 'high', 'normal', 'low'];
@@ -26,7 +34,17 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
         due_date: {
           type: 'string',
           description:
-            'ISO 8601 date or datetime the task is due (e.g. 2026-06-11 or 2026-06-11T17:00:00Z). Resolve relative dates like "tomorrow" yourself based on the current date.',
+            'ISO 8601 date the task is due, e.g. "2026-06-11". Resolve relative dates like "tomorrow" using the current date.',
+        },
+        due_time: {
+          type: 'string',
+          description:
+            'Local time for the task in HH:MM 24h format, e.g. "14:00". Only set when the user specifies a time.',
+        },
+        duration_minutes: {
+          type: 'number',
+          description:
+            'How long the task takes in minutes, e.g. 60. Only set when the user specifies a duration.',
         },
         priority: {
           type: 'string',
@@ -123,12 +141,81 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
       required: ['new_memory'],
     },
   },
+  {
+    name: 'check_schedule',
+    description:
+      "Check if a date + time is free on the user's Google Calendar before scheduling a task. Always call this when the user specifies a time. If a conflict is found, report the suggested free slot and ask the user for confirmation before creating the task.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        date: {
+          type: 'string',
+          description: 'Date to check in YYYY-MM-DD format.',
+        },
+        time: {
+          type: 'string',
+          description: 'Preferred local time in HH:MM 24h format, e.g. "15:00".',
+        },
+        duration_minutes: {
+          type: 'number',
+          description: 'Duration of the task in minutes. Default 60.',
+        },
+      },
+      required: ['date', 'time'],
+    },
+  },
+  {
+    name: 'upsert_scheduling_prefs',
+    description:
+      "Store or update the user's scheduling preferences — timezone, typical work hours, travel windows, or a freeform habit note. Use when the user mentions patterns like 'I'm usually free Tuesday mornings', 'I'll be in Japan May 1-7', or 'I work 9-5'. Always confirm with the user before saving travel windows.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        timezone: {
+          type: 'string',
+          description: 'UTC offset in ±HH:MM format, e.g. "+08:00".',
+        },
+        work_hours_start: {
+          type: 'string',
+          description: 'Start of typical work day, HH:MM, e.g. "09:00".',
+        },
+        work_hours_end: {
+          type: 'string',
+          description: 'End of typical work day, HH:MM, e.g. "18:00".',
+        },
+        patterns_note: {
+          type: 'string',
+          description:
+            'A freeform sentence about a scheduling habit to remember, e.g. "Free Tuesday mornings".',
+        },
+        travel_destination: {
+          type: 'string',
+          description: 'Destination name for a travel window, e.g. "Japan".',
+        },
+        travel_start: {
+          type: 'string',
+          description: 'Start date of travel in YYYY-MM-DD format.',
+        },
+        travel_end: {
+          type: 'string',
+          description: 'End date of travel in YYYY-MM-DD format.',
+        },
+      },
+    },
+  },
 ];
 
 // ── Task helpers ──────────────────────────────────────────────────────────────
 export async function createTask(
   userId: string,
-  input: { title: string; due_date?: string; priority?: string; notes?: string }
+  input: {
+    title: string;
+    due_date?: string;
+    due_time?: string;
+    duration_minutes?: number;
+    priority?: string;
+    notes?: string;
+  }
 ): Promise<string> {
   const priority = PRIORITIES.includes(input.priority ?? '') ? input.priority : 'normal';
   const { data, error } = await supabaseAdmin
@@ -137,14 +224,42 @@ export async function createTask(
       user_id: userId,
       title: input.title.slice(0, 500),
       due_date: input.due_date ?? null,
+      due_time: input.due_time ?? null,
+      duration_minutes: input.duration_minutes ?? null,
       priority,
       notes: input.notes ?? null,
     })
-    .select('id, title, due_date, priority')
+    .select('id, title, due_date, due_time, duration_minutes, priority')
     .single();
   if (error) return `Could not create task: ${error.message}`;
+
+  // Fire-and-forget Google Calendar sync
+  if (data.due_date) {
+    getValidAccessToken(userId)
+      .then(async accessToken => {
+        if (!accessToken) return;
+        const prefs = await getSchedulingPrefs(userId).catch(() => null);
+        const tzOffset = prefs?.timezone ?? '+08:00';
+        const event = await createEvent(
+          accessToken,
+          data.title,
+          data.due_date!,
+          input.notes ?? null,
+          {
+            dueTime: data.due_time ?? null,
+            durationMinutes: data.duration_minutes ?? null,
+            tzOffset,
+          }
+        );
+        await supabaseAdmin.from('tasks').update({ google_event_id: event.id }).eq('id', data.id);
+      })
+      .catch(() => {});
+  }
+
   const due = data.due_date ? ` (due ${new Date(data.due_date).toLocaleDateString()})` : '';
-  return `Created task: "${data.title}"${due} [${data.priority}]`;
+  const time = data.due_time ? ` at ${data.due_time}` : '';
+  const dur = data.duration_minutes ? ` for ${data.duration_minutes}min` : '';
+  return `Created task: "${data.title}"${due}${time}${dur} [${data.priority}]`;
 }
 
 export async function listTasks(
@@ -306,6 +421,9 @@ export async function runBrainTool(
         return await createTask(userId, {
           title: String(input.title ?? ''),
           due_date: input.due_date ? String(input.due_date) : undefined,
+          due_time: input.due_time ? String(input.due_time) : undefined,
+          duration_minutes:
+            typeof input.duration_minutes === 'number' ? input.duration_minutes : undefined,
           priority: input.priority ? String(input.priority) : undefined,
           notes: input.notes ? String(input.notes) : undefined,
         });
@@ -325,12 +443,65 @@ export async function runBrainTool(
         });
       case 'rewrite_memory':
         return await rewriteMemory(userId, String(input.new_memory ?? ''));
+      case 'check_schedule':
+        return await checkSchedule(
+          userId,
+          String(input.date ?? ''),
+          String(input.time ?? ''),
+          typeof input.duration_minutes === 'number' ? input.duration_minutes : 60
+        );
+      case 'upsert_scheduling_prefs':
+        return await upsertSchedulingPrefs(userId, {
+          timezone: input.timezone ? String(input.timezone) : undefined,
+          work_hours_start: input.work_hours_start ? String(input.work_hours_start) : undefined,
+          work_hours_end: input.work_hours_end ? String(input.work_hours_end) : undefined,
+          patterns_note: input.patterns_note ? String(input.patterns_note) : undefined,
+          travel_destination: input.travel_destination
+            ? String(input.travel_destination)
+            : undefined,
+          travel_start: input.travel_start ? String(input.travel_start) : undefined,
+          travel_end: input.travel_end ? String(input.travel_end) : undefined,
+        });
       default:
         return `Unknown tool: ${name}`;
     }
   } catch (err) {
     return `Tool ${name} failed: ${err instanceof Error ? err.message : String(err)}`;
   }
+}
+
+// ── Scheduling helpers ────────────────────────────────────────────────────────
+async function checkSchedule(
+  userId: string,
+  date: string,
+  time: string,
+  durationMinutes: number
+): Promise<string> {
+  if (!date || !time) return 'Date and time are required to check the schedule.';
+  const accessToken = await getValidAccessToken(userId);
+  if (!accessToken) return 'Calendar not connected — proceeding without conflict check.';
+
+  const prefs = await getSchedulingPrefs(userId);
+  const tzOffset = prefs?.timezone ?? '+08:00';
+
+  // Alert if date falls within a known travel window
+  if (prefs?.travel_windows) {
+    for (const w of prefs.travel_windows) {
+      if (date >= w.start && date <= w.end) {
+        return `Note: you have a travel window to ${w.destination} (${w.start}–${w.end}) covering this date. Are you still available?`;
+      }
+    }
+  }
+
+  const calIds = await getCalendarIds(accessToken);
+  const busySlots = await checkFreebusy(accessToken, date, tzOffset, calIds);
+  const result = findFreeSlot(busySlots, date, time, durationMinutes, tzOffset);
+
+  if (!result.conflict) return `${time} is free on ${date}.`;
+  if (result.suggested) {
+    return `Conflict at ${time} on ${date} — next free slot: ${result.suggested}. Want me to schedule it at ${result.suggested} instead?`;
+  }
+  return `Conflict at ${time} on ${date} — no free slot found for the rest of the day.`;
 }
 
 // ── Memory rewrite helper ─────────────────────────────────────────────────────

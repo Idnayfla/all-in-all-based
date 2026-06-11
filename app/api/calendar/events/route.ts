@@ -5,6 +5,8 @@ import {
   getValidAccessToken,
   listEvents,
   createEvent,
+  type CalEvent,
+  type CalDebugInfo,
 } from '@/lib/googleCalendar';
 
 // GET — returns { enabled, connected, email?, events[] }
@@ -22,8 +24,38 @@ export async function GET(req: NextRequest) {
     if (!accessToken) {
       return NextResponse.json({ enabled: true, connected: false, events: [] });
     }
-    const events = await listEvents(accessToken, 30);
-    return NextResponse.json({ enabled: true, connected: true, email: tokens.email, events });
+    // Catch listEvents separately — even if the Calendar API fails, the user is still connected.
+    let events: CalEvent[] = [];
+    let debug: CalDebugInfo | null = null;
+    let eventsError: string | null = null;
+    try {
+      const result = await listEvents(accessToken, 90);
+      events = result.events;
+      debug = result.debug;
+    } catch (e) {
+      eventsError = e instanceof Error ? e.message : String(e);
+    }
+    // Surface per-calendar failures (formerly swallowed) as eventsError too
+    if (!eventsError && debug) {
+      const failed = debug.perCalendar.find(c => c.error);
+      if (debug.calendarListError) {
+        eventsError = `calendarList ${debug.calendarListStatus}: ${debug.calendarListError}`;
+      } else if (failed && debug.totalEvents === 0) {
+        eventsError = `calendar "${failed.id}" ${failed.status}: ${failed.error}`;
+      }
+    }
+    return NextResponse.json({
+      enabled: true,
+      connected: true,
+      email: tokens.email,
+      events,
+      ...(eventsError ? { eventsError } : {}),
+      // Temporary debug payload — visible in the browser Network tab / console
+      _debug: {
+        ...(debug ?? {}),
+        ...(eventsError ? { eventsError } : {}),
+      },
+    });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg === 'Unauthorized')

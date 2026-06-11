@@ -15376,41 +15376,61 @@ body:has(.legal-page) {
   color: var(--bg);
 }
 
-/* ── Calendar connect button in filter bar ──────────────────────────────── */
-.tasks-cal-btn {
-  margin-left: auto;
+/* ── Google Calendar status bar (below filter tabs) ─────────────────────── */
+.tasks-cal-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 16px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+}
+
+.tasks-cal-bar-status {
+  font-size: 12px;
+  font-family: var(--font-mono);
+  color: #4ade80;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+
+.tasks-cal-bar-disconnect {
   background: none;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text3);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: 5px;
+  color: #f87171;
   cursor: pointer;
   font-size: 11px;
   font-family: var(--font-mono);
-  padding: 4px 10px;
-  transition:
-    color 0.15s,
-    border-color 0.15s,
-    background 0.15s;
-  white-space: nowrap;
+  padding: 3px 9px;
+  flex-shrink: 0;
+  transition: background 0.15s;
 }
-.tasks-cal-btn:hover:not(:disabled) {
+.tasks-cal-bar-disconnect:hover {
+  background: rgba(248, 113, 113, 0.1);
+}
+
+.tasks-cal-bar-connect {
+  background: none;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 0;
+  text-align: left;
+  transition: color 0.15s;
+  width: 100%;
+}
+.tasks-cal-bar-connect:hover:not(:disabled) {
   color: var(--accent);
-  border-color: var(--accent);
-  background: var(--accent-muted);
 }
-.tasks-cal-btn:disabled {
+.tasks-cal-bar-connect:disabled {
   opacity: 0.4;
   cursor: not-allowed;
-}
-.tasks-cal-btn--connected {
-  color: #4ade80;
-  border-color: rgba(74, 222, 128, 0.35);
-  background: rgba(74, 222, 128, 0.08);
-}
-.tasks-cal-btn--connected:hover {
-  color: #f87171;
-  border-color: rgba(248, 113, 113, 0.35);
-  background: rgba(248, 113, 113, 0.08);
 }
 
 /* ── Add to Calendar button in edit form ─────────────────────────────────── */
@@ -15456,6 +15476,13 @@ body:has(.legal-page) {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   margin-bottom: 6px;
+}
+
+.tasks-cal-empty {
+  font-size: 12px;
+  color: var(--text3);
+  padding: 8px 0 4px;
+  font-family: var(--font-mono);
 }
 
 .tasks-cal-event {
@@ -15731,6 +15758,88 @@ body:has(.legal-page) {
 }
 .tasks-edit-priority:focus {
   border-color: var(--accent);
+}
+
+.tasks-edit-time {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text2);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 6px 8px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  flex: 1;
+}
+.tasks-edit-time:focus {
+  border-color: var(--accent);
+}
+.tasks-edit-time::-webkit-calendar-picker-indicator {
+  filter: invert(0.6);
+  cursor: pointer;
+}
+
+.tasks-edit-duration {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text2);
+  font-size: 12px;
+  font-family: var(--font-mono);
+  padding: 6px 8px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.tasks-edit-duration:focus {
+  border-color: var(--accent);
+}
+
+.tasks-sched-notice {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  padding: 5px 8px;
+  border-radius: 5px;
+  border: 1px solid;
+}
+.tasks-sched-free {
+  color: #22c55e;
+  border-color: #22c55e33;
+  background: #22c55e0d;
+}
+.tasks-sched-conflict {
+  color: #f59e0b;
+  border-color: #f59e0b33;
+  background: #f59e0b0d;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.tasks-time-sep {
+  color: var(--text3);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+  align-self: center;
+}
+.tasks-sched-use-slot {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #f59e0b66;
+  background: #f59e0b1a;
+  color: #f59e0b;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.tasks-sched-use-slot:hover {
+  background: #f59e0b33;
 }
 
 .tasks-edit-notes {
