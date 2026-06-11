@@ -1815,14 +1815,11 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder();
 
     const lf = createLangfuseClient();
-    if (!lf) console.warn('[LangFuse] client is null — keys missing');
-    else console.log('[LangFuse] client ready');
     const trace = lf?.trace({
       name: 'generate',
       input: { message: lastUserMessage.slice(0, 500), aiModel, hasImage },
       userId: supabaseUserId,
     });
-    if (trace) console.log('[LangFuse] trace:', trace.id);
 
     const startMs = Date.now();
 
@@ -2096,7 +2093,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
           if (hasCodeIntentKeyword && looksLikeCode) {
             const codeReviewSystem =
               'The user has shared code and wants it improved or reviewed. Return ONLY the improved code in a markdown code block with the language tag, followed by a short bulleted list of what changed. Do not create files. Do not generate an app.';
-            const sysText = usingFreeModel ? codeReviewSystem : codeReviewSystem;
+            const sysText = codeReviewSystem;
             const msgs = [
               { role: 'system', content: sysText },
               ...anthropicMessages.map((m: { role: string; content: unknown }) => ({

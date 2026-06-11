@@ -1,6 +1,6 @@
 'use strict';
 const { AGENTS, dispatchAgent, anthropic } = require('./agents');
-const { MODEL_SONNET } = require('./config');
+const { MODEL_SONNET, MODEL_OPUS } = require('./config');
 const { sendAsAgent, sendAsOrchestrator, sendAsAgentWithFiles } = require('./messenger');
 const { getAgentClient } = require('./clients');
 const { searchGifUrl } = require('./tools');
@@ -155,7 +155,7 @@ async function getRouting(task) {
   if (!anthropic) throw new Error('Anthropic required for routing.');
 
   const res = await anthropic.messages.create({
-    model: MODEL_SONNET,
+    model: MODEL_OPUS,
     max_tokens: 512,
     system: ROUTING_SYSTEM,
     messages: [{ role: 'user', content: task }],
@@ -211,7 +211,7 @@ async function councilReply(slug, message) {
   const { loadSystemPrompt } = require('./agents');
   const system = loadSystemPrompt(slug);
   const res = await anthropic.messages.create({
-    model: MODEL_SONNET,
+    model: MODEL_OPUS,
     max_tokens: 300,
     system,
     messages: [{ role: 'user', content: message }],

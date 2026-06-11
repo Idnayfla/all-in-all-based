@@ -171,11 +171,19 @@ body {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--accent) 0%, var(--accent3) 50%, var(--accent) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0%,
+    rgba(139, 118, 255, 0.8) 25%,
+    var(--accent3) 50%,
+    rgba(139, 118, 255, 0.8) 75%,
+    var(--accent) 100%
+  );
   background-size: 200% 100%;
-  animation: crownShimmer 4s linear infinite;
+  animation: crownShimmer 3.5s linear infinite;
   z-index: 9999;
   pointer-events: none;
+  box-shadow: 0 0 12px rgba(201, 168, 124, 0.35);
 }
 @keyframes crownShimmer {
   0% {
@@ -311,8 +319,9 @@ body {
   transform: scale(0.94);
 }
 .tab-btn.active {
-  background: var(--accent);
-  color: #fff;
+  background: linear-gradient(135deg, var(--accent) 0%, #d4b280 100%);
+  color: var(--bg);
+  box-shadow: 0 2px 10px rgba(201, 168, 124, 0.28);
 }
 
 /* â”€â”€ Tab bar row â”€â”€ dedicated row below the header (never shares the header row) */
@@ -808,9 +817,12 @@ body {
   color: var(--text);
 }
 .file-item.active {
-  background: var(--accent3-muted);
+  background: linear-gradient(90deg, var(--accent3-muted) 0%, transparent 100%);
   color: var(--accent3);
   border-left-color: var(--accent3);
+  box-shadow:
+    inset 0 0 0 0 transparent,
+    0 0 0 0 transparent;
 }
 .file-item:hover .file-download-btn,
 .file-item.active .file-download-btn {
@@ -909,7 +921,7 @@ body {
 }
 .chat-empty-logo-btn:hover {
   transform: scale(1.1);
-  filter: drop-shadow(0 0 16px var(--accent-glow));
+  filter: drop-shadow(0 0 20px var(--accent-glow)) drop-shadow(0 0 40px rgba(201, 168, 124, 0.2));
 }
 .chat-empty-logo-btn:active {
   transform: scale(0.95);
@@ -960,11 +972,17 @@ body {
   font-size: 12px;
   cursor: pointer;
   border-radius: var(--r-full);
-  transition: all 0.15s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .suggestion-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
+  background: var(--accent-muted);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(201, 168, 124, 0.15);
+}
+.suggestion-btn:active {
+  transform: translateY(0) scale(0.97);
 }
 
 .message {
@@ -978,12 +996,14 @@ body {
   border: 1px solid transparent;
 }
 .message.user {
-  background: rgba(139, 118, 255, 0.08);
-  border-color: rgba(139, 118, 255, 0.18);
+  background: linear-gradient(135deg, rgba(139, 118, 255, 0.11) 0%, rgba(100, 80, 220, 0.06) 100%);
+  border-color: rgba(139, 118, 255, 0.24);
+  border-left: 2px solid rgba(139, 118, 255, 0.5);
 }
 .message.assistant {
-  background: rgba(94, 245, 192, 0.05);
-  border-color: rgba(94, 245, 192, 0.12);
+  background: linear-gradient(135deg, rgba(94, 245, 192, 0.07) 0%, rgba(0, 140, 95, 0.03) 100%);
+  border-color: rgba(94, 245, 192, 0.16);
+  border-left: 2px solid rgba(94, 245, 192, 0.35);
 }
 .message-role {
   font-size: var(--fs-xl);
@@ -1106,7 +1126,9 @@ body {
 }
 .chat-textarea:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(139, 118, 255, 0.15);
+  box-shadow:
+    0 0 0 3px rgba(201, 168, 124, 0.2),
+    0 2px 16px rgba(201, 168, 124, 0.08);
 }
 .chat-textarea::placeholder {
   color: var(--text3);
@@ -1114,24 +1136,24 @@ body {
 .send-btn {
   height: 44px;
   padding: 0 20px;
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent-hover) 0%, var(--accent) 60%, #b8925c 100%);
   border: none;
-  color: white;
+  color: var(--bg);
   font-family: var(--font-pixel);
   font-size: 12px;
   letter-spacing: 1px;
   cursor: pointer;
   border-radius: var(--r-lg);
-  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
   flex-shrink: 0;
   text-transform: uppercase;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 0 0 rgba(201, 168, 124, 0);
+  box-shadow: 0 2px 10px rgba(201, 168, 124, 0.2);
 }
 .send-btn:hover {
-  background: var(--accent-hover);
+  background: linear-gradient(135deg, #f0cfa0 0%, var(--accent-hover) 60%, var(--accent) 100%);
 }
 .send-btn:disabled {
   opacity: 0.4;
@@ -3305,19 +3327,21 @@ body {
 /* Message animations */
 @keyframes messageIn {
   from {
-    transform: translateY(12px);
+    transform: translateY(10px) scale(0.99);
     opacity: 0;
   }
   to {
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
     opacity: 1;
   }
 }
 
 /* Button polish */
 .send-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 20px var(--accent-glow);
+  transform: translateY(-2px);
+  box-shadow:
+    0 6px 28px var(--accent-glow),
+    0 2px 8px rgba(201, 168, 124, 0.2);
 }
 .send-btn:active:not(:disabled) {
   transform: translateY(0px) scale(0.98);
@@ -3765,9 +3789,10 @@ body {
 
 .gen-progress-bar-fill {
   height: 100%;
-  background: var(--accent3);
+  background: linear-gradient(90deg, var(--accent3) 0%, rgba(94, 245, 192, 0.7) 100%);
   border-radius: var(--r-xs);
   transition: width 0.6s ease-out;
+  box-shadow: 0 0 8px rgba(94, 245, 192, 0.4);
 }
 
 .gen-progress-bar-scanning {
@@ -3812,6 +3837,8 @@ body {
 .gen-file-chip.active {
   border-color: var(--accent3);
   color: var(--accent3);
+  background: var(--accent3-muted);
+  box-shadow: 0 0 8px rgba(94, 245, 192, 0.2);
   background: var(--accent3-subtle);
 }
 

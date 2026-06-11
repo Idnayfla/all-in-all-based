@@ -5,7 +5,7 @@ import { getUserIdFromApiKey, ApiRateLimitError } from '../_apiKeyAuth';
 import { getWeather } from '@/lib/weather';
 import { getTrafficInfo } from '@/lib/traffic';
 import { exaSearch } from '@/lib/tavily';
-import { MODEL_SONNET, MODEL_HAIKU } from '@/lib/models';
+import { MODEL_OPUS, MODEL_SONNET, MODEL_HAIKU } from '@/lib/models';
 import { BRAIN_TOOLS, runBrainTool, listTasks } from '@/lib/brainTools';
 
 export const maxDuration = 60;
@@ -627,7 +627,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       try {
         const stream = await client.messages.stream({
-          model: MODEL_SONNET,
+          model: MODEL_OPUS,
           max_tokens: 1024,
           system,
           messages: apiMessages as Parameters<typeof client.messages.stream>[0]['messages'],
