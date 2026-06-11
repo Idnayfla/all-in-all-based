@@ -521,16 +521,17 @@ export async function POST(req: NextRequest) {
   const COMPANION_TASK_RE =
     /\b(add\s+a?\s*(task|meeting|call|appointment|event|reminder)|create\s+a?\s*(task|meeting|call|appointment|event)|new\s+(task|meeting|call|appointment)|book\s+(a\s+)?(meeting|call|slot|appointment|time)|set\s+(up\s+)?(a\s+)?(meeting|call|appointment)|put\s+.{0,30}(in|on|into)\s+(my\s+)?(calendar|schedule)|block\s+(out|off)|remind\s+me\s+to|add\s+to\s+(my\s+)?tasks?|what(?:'?s|\s+is)?\s+(due|on my|my)\s+(today|list|tasks?)|what\s+do\s+i\s+have\s+due|list\s+(my\s+)?tasks?|show\s+(my\s+)?tasks?|mark\s+.{0,40}\s+as\s+done|complete\s+task|finish\s+task|task\s+done|clean\s+(up\s+)?(my\s+)?(brain|memory)|fix\s+(my\s+)?(brain|memory)|revamp\s+(my\s+)?(brain|memory)|reorgani[sz]e\s+(my\s+)?(brain|memory)|rewrite\s+(my\s+)?(brain|memory)|update\s+(my\s+)?(brain|memory)|my\s+(brain|memory)\s+(is\s+)?(wrong|messy|broken|off|outdated|incorrect)|schedule\s+(a\s+)?(meeting|call|task|session|appointment)|i('?m|\s+am)\s+(usually\s+free|busy|available|not\s+available)|i('?ll|\s+will)\s+be\s+in\s+\w|i\s+work\s+(from\s+)?\d|going\s+to\s+\w+\s+(from|on)|i\s+won't\s+be\s+(around|available)|my\s+timezone|i('?m|\s+am)\s+in\s+\w+\s+time)\b/i;
 
-  // Also re-trigger the tool loop when the user gives a short affirmative reply to
-  // a scheduling proposal the assistant just made (e.g. "yes" after "want me to book 6pm?")
+  // Re-trigger the tool loop when the user is mid-scheduling-negotiation.
+  // Catches short affirmatives, time picks, and rescheduling words.
   const SCHED_CONFIRM_RE =
-    /^(yes|yeah|yep|yup|sure|ok|okay|alright|sounds good|perfect|go ahead|proceed|do it|add it|book it|set it up|please|please do|definitely|correct|confirmed|confirm)\b/i;
+    /^(yes|yeah|yep|yup|sure|ok|okay|alright|sounds good|perfect|go ahead|proceed|do it|add it|book it|set it up|please|please do|definitely|correct|confirmed|confirm|rebook|reschedule|use that|use it|go with|that works|move it|change it|just\s+(do|book|use|add|rebook|reschedule)|maybe\s+\d|try\s+\d|how about\s+\d|what about\s+\d|\d{1,2}(:\d{2})?\s*(am|pm)|^\d{1,2}$)\b/i;
   const lastAssistantContent =
     [...(messages as Array<{ role: string; content: string }>)]
       .reverse()
       .find(m => m.role === 'assistant')?.content ?? '';
+  // Detect if assistant is mid-negotiation: mentioned conflict, a time slot, or asked a question
   const assistantProposedSomething =
-    /\b(conflict|free slot|instead|want me to|shall i|should i|want me to add|want me to create|want me to schedule|want me to book|want me to save|note.*travel|save.*travel|remember.*travel)\b/i.test(
+    /\b(conflict|free slot|instead|want me to|shall i|should i|want me to add|want me to create|want me to schedule|want me to book|want me to save|note.*travel|save.*travel|remember.*travel|is (free|clear|open|available)|is taken|want that|want one|which (time|slot)|different time|\d{1,2}(:\d{2})?\s*(am|pm))\b/i.test(
       lastAssistantContent
     );
 
@@ -576,10 +577,12 @@ export async function POST(req: NextRequest) {
       `TODAY'S DATE: ${today}.`,
       `RULES:`,
       `- "Add a meeting", "book a call", "schedule X", "put X on my calendar" → call create_task with due_date + due_time + duration_minutes. Do NOT say you can't access the calendar.`,
+      `- If create_task returns [CONFLICT — task NOT created], report the conflict and suggested slot to the user. Do NOT say the task was added.`,
+      `- If the user picks a different time or says "rebook", "just do it", "maybe 2pm" etc. → call create_task again with the new time and confirmed_slot: true to skip the conflict check.`,
       `- "I'll be in Japan May 1-7" or any travel mention → confirm with user first, then call upsert_scheduling_prefs.`,
       `- Resolve relative dates (today/tomorrow/next Monday) to YYYY-MM-DD using today's date above.`,
       `- Due times go as HH:MM 24h in due_time. Duration in minutes goes in duration_minutes.`,
-      `- After a tool call, give a short natural confirmation. Never expose JSON or tool names.`,
+      `- After a successful create_task (no CONFLICT prefix), tell the user what was booked and whether it hit Google Calendar.`,
       `- For brain/memory cleanup, call rewrite_memory with the cleaned list.`,
       schedPrefsContext,
     ]
@@ -590,7 +593,7 @@ export async function POST(req: NextRequest) {
     ).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
     let finalReply = '';
-    for (let round = 0; round < 4; round++) {
+    for (let round = 0; round < 6; round++) {
       const response = await client.messages.create({
         model: MODEL_SONNET,
         max_tokens: 512,
