@@ -117,7 +117,7 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
   {
     name: 'move_calendar_events',
     description:
-      'Find Google Calendar events by title and shift their date by N days OR change their time. Use for "shift X 3 days ahead", "move my lesson to 4pm", "push my meeting back 1 hour", "reschedule VR class to tomorrow". Works on native calendar events, not just Based tasks.',
+      'Find Google Calendar events by title and shift their date by N days, shift their time by N hours, OR set an absolute time. Use for "shift X 3 days ahead", "make it 2 hours earlier", "move my lesson to 4pm", "push my meeting back 1 hour", "reschedule VR class to tomorrow". Use shift_hours for relative hour shifts (never guess absolute times when the user says "earlier"/"later"). Works on native calendar events, not just Based tasks.',
     input_schema: {
       type: 'object',
       properties: {
@@ -129,6 +129,11 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
           type: 'number',
           description:
             'Days to shift: positive = forward, negative = backward. e.g. 3 = 3 days ahead, -1 = yesterday.',
+        },
+        shift_hours: {
+          type: 'number',
+          description:
+            'Hours to shift each event: negative = earlier, positive = later. e.g. -2 = 2 hours earlier, 1 = 1 hour later. Applied to each event\'s existing time, so morning and afternoon sessions both shift correctly with one call.',
         },
         new_time: {
           type: 'string',
@@ -470,6 +475,7 @@ export async function moveCalendarEvents(
   input: {
     title_keyword: string;
     shift_days?: number;
+    shift_hours?: number;
     new_time?: string;
     date_from?: string;
     date_to?: string;
@@ -483,6 +489,7 @@ export async function moveCalendarEvents(
   try {
     const { moved, failed, conflicts } = await moveEventsByTitle(accessToken, input.title_keyword, {
       shiftDays: input.shift_days,
+      shiftHours: input.shift_hours,
       newTime: input.new_time,
       tzOffset,
       dateFrom: input.date_from,
@@ -497,9 +504,11 @@ export async function moveCalendarEvents(
         : '';
     const action = input.shift_days
       ? `shifted ${input.shift_days > 0 ? input.shift_days + ' day(s) forward' : Math.abs(input.shift_days) + ' day(s) back'}`
-      : input.new_time
-        ? `moved to ${input.new_time}`
-        : 'updated';
+      : input.shift_hours
+        ? `shifted ${Math.abs(input.shift_hours)} hour(s) ${input.shift_hours < 0 ? 'earlier' : 'later'}`
+        : input.new_time
+          ? `moved to ${input.new_time}`
+          : 'updated';
     const failNote = failed > 0 ? ` (${failed} failed)` : '';
     const movedNote =
       moved > 0
@@ -718,6 +727,7 @@ export async function runBrainTool(
         return await moveCalendarEvents(userId, {
           title_keyword: String(input.title_keyword ?? ''),
           shift_days: typeof input.shift_days === 'number' ? input.shift_days : undefined,
+          shift_hours: typeof input.shift_hours === 'number' ? input.shift_hours : undefined,
           new_time: input.new_time ? String(input.new_time) : undefined,
           date_from: input.date_from ? String(input.date_from) : undefined,
           date_to: input.date_to ? String(input.date_to) : undefined,

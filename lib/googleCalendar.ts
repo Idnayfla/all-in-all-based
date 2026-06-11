@@ -473,6 +473,7 @@ export async function moveEventsByTitle(
   titleKeyword: string,
   opts: {
     shiftDays?: number; // +ve = forward, -ve = backward
+    shiftHours?: number; // +ve = later, -ve = earlier — applied to each event's existing time
     newTime?: string; // HH:MM 24h local — change time, keep date
     tzOffset?: string; // e.g. "+08:00"
     dateFrom?: string; // YYYY-MM-DD, default today
@@ -546,7 +547,8 @@ export async function moveEventsByTitle(
         const startMs = new Date(item.start.dateTime).getTime();
         const endMs = new Date(item.end.dateTime!).getTime();
         const duration = endMs - startMs;
-        let newStartMs = startMs + (opts.shiftDays ?? 0) * 86_400_000;
+        let newStartMs =
+          startMs + (opts.shiftDays ?? 0) * 86_400_000 + (opts.shiftHours ?? 0) * 3_600_000;
         if (opts.newTime) {
           const dateStr = new Date(newStartMs).toISOString().slice(0, 10);
           newStartMs = new Date(`${dateStr}T${opts.newTime}:00${tzOffset}`).getTime();

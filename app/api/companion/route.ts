@@ -596,7 +596,7 @@ export async function POST(req: NextRequest) {
       `- If create_task returns [CONFLICT — task NOT created], report the conflict and suggested slot to the user. Do NOT say the task was added.`,
       `- If the user picks a different time or says "rebook", "just do it", "maybe 2pm" etc. → call create_task again with the new time and confirmed_slot: true to skip the conflict check.`,
       `- "I'll be in Japan May 1-7" or any travel mention → confirm with user first, then call upsert_scheduling_prefs.`,
-      `- "shift X 3 days", "move my lesson to 4pm", "push X back 1 hour" → call move_calendar_events with title_keyword + shift_days (for day shifts) or new_time (for time changes).`,
+      `- "shift X 3 days", "move my lesson to 4pm", "push X back 1 hour", "make it 2 hours earlier" → call move_calendar_events. Use shift_days for day shifts, shift_hours for hour shifts (negative = earlier, e.g. "2 hours earlier" → shift_hours: -2), new_time only when user gives an absolute target time. Never guess absolute times for hour shifts — always use shift_hours.`,
       `- Before moving events if the user uses a vague title like "my lesson" or "my class": call list_calendar_events first for the relevant date range to identify the actual event title, then call move_calendar_events with the exact title.`,
       `- When move_calendar_events returns [CONFLICTS]: report each conflict with the destination time, ask the user to confirm, then call move_calendar_events again with confirmed: true.`,
       `- Resolve relative dates (today/tomorrow/next Monday) to YYYY-MM-DD using today's date above.`,
