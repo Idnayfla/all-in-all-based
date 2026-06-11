@@ -411,6 +411,41 @@ export async function updateEvent(
   if (!res.ok) throw new Error(`Update event failed: ${res.status}`);
 }
 
+export async function deleteEventsByTitle(
+  accessToken: string,
+  titleKeyword: string,
+  days = 365
+): Promise<{ deleted: number; failed: number }> {
+  const timeMin = new Date().toISOString();
+  const timeMax = new Date(Date.now() + days * 86_400_000).toISOString();
+  const params = new URLSearchParams({
+    timeMin,
+    timeMax,
+    singleEvents: 'true',
+    maxResults: '2500',
+    q: titleKeyword,
+  });
+  const res = await fetch(`${CAL_BASE}/primary/events?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`Search failed: ${res.status}`);
+  const data = (await res.json()) as { items?: Array<{ id: string; summary?: string }> };
+  const items = (data.items ?? []).filter(e =>
+    e.summary?.toLowerCase().includes(titleKeyword.toLowerCase())
+  );
+  let deleted = 0;
+  let failed = 0;
+  for (const item of items) {
+    try {
+      await deleteEvent(accessToken, item.id);
+      deleted++;
+    } catch {
+      failed++;
+    }
+  }
+  return { deleted, failed };
+}
+
 export async function deleteEvent(accessToken: string, eventId: string): Promise<void> {
   const res = await fetch(`${CAL_BASE}/primary/events/${encodeURIComponent(eventId)}`, {
     method: 'DELETE',

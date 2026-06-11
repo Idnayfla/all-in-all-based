@@ -14,6 +14,7 @@ import {
   getCalendarIds,
   createEvent,
   deleteEvent,
+  deleteEventsByTitle,
 } from '@/lib/googleCalendar';
 import { getSchedulingPrefs, upsertSchedulingPrefs } from '@/lib/schedulingPrefs';
 
@@ -90,6 +91,25 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ['task_id_or_title'],
+    },
+  },
+  {
+    name: 'remove_calendar_events',
+    description:
+      'Search Google Calendar by event title keyword and delete all matching future events. Use when the user asks to remove or delete recurring or native calendar events by name — e.g. "remove all Decompress events", "delete all VR classes from my calendar". Does NOT require a Based task entry.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title_keyword: {
+          type: 'string',
+          description: 'Keyword to match against event titles (case-insensitive). e.g. "Decompress".',
+        },
+        days_ahead: {
+          type: 'number',
+          description: 'How many days ahead to search and delete. Default 365.',
+        },
+      },
+      required: ['title_keyword'],
     },
   },
   {
@@ -372,6 +392,20 @@ export async function completeTask(userId: string, idOrTitle: string): Promise<s
   return `Marked done: "${data.title}"`;
 }
 
+export async function removeCalendarEvents(
+  userId: string,
+  titleKeyword: string,
+  daysAhead = 365
+): Promise<string> {
+  const accessToken = await getValidAccessToken(userId);
+  if (!accessToken) return 'Google Calendar not connected — cannot remove events.';
+  const { deleted, failed } = await deleteEventsByTitle(accessToken, titleKeyword, daysAhead);
+  if (deleted === 0 && failed === 0)
+    return `No upcoming events found matching "${titleKeyword}".`;
+  const failNote = failed > 0 ? ` (${failed} could not be deleted)` : '';
+  return `Removed ${deleted} event${deleted !== 1 ? 's' : ''} matching "${titleKeyword}" from Google Calendar.${failNote}`;
+}
+
 export async function cancelTask(userId: string, idOrTitle: string): Promise<string> {
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrTitle);
 
@@ -517,6 +551,12 @@ export async function runBrainTool(
         return await completeTask(userId, String(input.task_id_or_title ?? ''));
       case 'cancel_task':
         return await cancelTask(userId, String(input.task_id_or_title ?? ''));
+      case 'remove_calendar_events':
+        return await removeCalendarEvents(
+          userId,
+          String(input.title_keyword ?? ''),
+          typeof input.days_ahead === 'number' ? input.days_ahead : 365
+        );
       case 'search_entities':
         return await searchEntities(userId, String(input.query ?? ''));
       case 'upsert_entity':
