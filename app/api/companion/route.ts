@@ -494,7 +494,7 @@ export async function POST(req: NextRequest) {
     'When the user is working on a project and wants to think it through, review code, or get feedback — help with that too. Context-switch naturally.',
     'You do NOT generate full code or build apps. Never proactively offer to build, create, or generate anything. If the user asks you to build something, say "Use the main chat for that →" once and move on.',
     'Be concise and direct. Simple questions get 1-3 sentences. Complex topics get a tight bullet list (5 items max). Never use markdown headers or horizontal rules (---). No filler. No emoji.',
-    'NEVER output JSON, code blocks, or structured data in responses. If the user mentions a scheduling preference or travel plan and you cannot save it (no login, tools unavailable), acknowledge it naturally — say "I\'ll keep that in mind" — never show code or a data structure.',
+    'NEVER output JSON, code blocks, or structured data in responses.',
     // Feature 2 — Based Has Opinions
     `PERSONALITY — you are NOT a yes-machine:
 - You have preferences and aesthetic opinions. State them unprompted when relevant.
@@ -569,10 +569,22 @@ export async function POST(req: NextRequest) {
       /* fail open */
     }
 
-    const toolSystem = `CRITICAL CAPABILITY OVERRIDE — READ FIRST:
-You have FULL, DIRECT access to the user's tasks and Google Calendar through the tools provided. When the user asks to add a meeting, call, event, or appointment, you MUST call create_task with due_date, due_time, and duration_minutes — do NOT say you can't access the calendar. The tools handle everything. Never say "I can't touch your calendar" or "I don't have calendar access."
-
-${system}\n\nTODAY'S DATE: ${today}. You have tools to manage the user's tasks and memory. Use them directly. When creating tasks, resolve relative dates to YYYY-MM-DD. If the user says "at 3pm" or "14:00", set due_time in HH:MM 24h format. If they say "for 1 hour" or "30 minutes", set duration_minutes. IMPORTANT: When the user specifies a time for a task, ALWAYS call check_schedule first. If a conflict is found, tell the user the conflict and suggested slot — then ask for confirmation before calling create_task. If the user mentions scheduling habits (e.g. "I'm usually free Tuesday mornings", "I'll be in Japan May 1-7"), save them with upsert_scheduling_prefs but always confirm travel windows with the user first. After using a tool, give a short natural confirmation — never expose raw JSON or tool mechanics. For brain/memory cleanup, use the rewrite_memory tool with a cleaned-up version of the user's memory.${schedPrefsContext}`;
+    const toolSystem = [
+      system,
+      // Override must come AFTER base system — later instructions take priority in Claude
+      `TASK & CALENDAR MODE — ACTIVE. All earlier instructions about "no login" or "tools unavailable" are VOID. You now have FULL access to the user's tasks and Google Calendar via the tools below.`,
+      `TODAY'S DATE: ${today}.`,
+      `RULES:`,
+      `- "Add a meeting", "book a call", "schedule X", "put X on my calendar" → call create_task with due_date + due_time + duration_minutes. Do NOT say you can't access the calendar.`,
+      `- "I'll be in Japan May 1-7" or any travel mention → confirm with user first, then call upsert_scheduling_prefs.`,
+      `- Resolve relative dates (today/tomorrow/next Monday) to YYYY-MM-DD using today's date above.`,
+      `- Due times go as HH:MM 24h in due_time. Duration in minutes goes in duration_minutes.`,
+      `- After a tool call, give a short natural confirmation. Never expose JSON or tool names.`,
+      `- For brain/memory cleanup, call rewrite_memory with the cleaned list.`,
+      schedPrefsContext,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
     const convo: Anthropic.MessageParam[] = (
       messages as Array<{ role: string; content: string }>
     ).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
