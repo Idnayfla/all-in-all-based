@@ -9739,9 +9739,9 @@ body:has(.beta-banner) .app-root {
   gap: 14px;
 }
 .gal-hero-badge {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
@@ -9898,7 +9898,7 @@ body:has(.beta-banner) .app-root {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text3);
 }
 .gal-card-remixes {
@@ -10392,7 +10392,7 @@ body:has(.beta-banner) .app-root {
 }
 
 .landing-gal-card-meta {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text3);
   font-family: var(--font-mono);
 }
@@ -13244,7 +13244,7 @@ body:has(.beta-banner) .app-root {
 
 .companion-speaking-indicator {
   margin-left: auto;
-  font-size: 11px;
+  font-size: 12px;
   color: #c9a87c;
   opacity: 1;
   animation: companion-speaking-pulse 1s ease-in-out infinite;
@@ -15369,7 +15369,7 @@ body:has(.legal-page) {
   color: var(--accent);
   border-radius: 10px;
   padding: 1px 6px;
-  font-size: 10px;
+  font-size: 11px;
 }
 .tasks-filter-tab.active .tasks-filter-count {
   background: var(--accent);
@@ -15391,7 +15391,7 @@ body:has(.legal-page) {
   align-items: center;
   gap: 8px;
   color: var(--text3);
-  font-size: 11px;
+  font-size: 12px;
   font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -15405,7 +15405,7 @@ body:has(.legal-page) {
   color: var(--text3);
   border-radius: 10px;
   padding: 0 6px;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 .tasks-row {
@@ -15452,7 +15452,7 @@ body:has(.legal-page) {
 }
 
 .tasks-row-due {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text3);
   font-family: var(--font-mono);
   white-space: nowrap;
@@ -15470,7 +15470,7 @@ body:has(.legal-page) {
   background: none;
   border: none;
   color: transparent;
-  font-size: 10px;
+  font-size: 11px;
   cursor: pointer;
   padding: 2px 4px;
   border-radius: 3px;
@@ -15526,7 +15526,7 @@ body:has(.legal-page) {
 
 .tasks-callout-empty {
   color: var(--text3);
-  font-size: 12px;
+  font-size: 13px;
   font-family: var(--font-mono);
   padding: 6px 0 8px;
   line-height: 1.5;
@@ -15549,7 +15549,7 @@ body:has(.legal-page) {
 }
 
 .tasks-nextup-label {
-  font-size: 10px;
+  font-size: 11px;
   font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -15557,7 +15557,7 @@ body:has(.legal-page) {
 }
 
 .tasks-nextup-badge {
-  font-size: 10px;
+  font-size: 11px;
   font-family: var(--font-mono);
   border: 1px solid currentColor;
   border-radius: 4px;
@@ -15576,7 +15576,7 @@ body:has(.legal-page) {
 }
 
 .tasks-nextup-due {
-  font-size: 11px;
+  font-size: 12px;
   font-family: var(--font-mono);
   color: var(--text3);
 }
@@ -15615,7 +15615,7 @@ body:has(.legal-page) {
 }
 
 .tasks-rec-item {
-  font-size: 11px;
+  font-size: 12px;
   font-family: var(--font-mono);
   color: var(--text3);
   line-height: 1.5;
