@@ -54,6 +54,26 @@ if (!user) {
   process.exit(1);
 }
 
+// Check current tier — never downgrade a paying Pro user
+const { data: existing } = await supabase
+  .from('user_settings')
+  .select('subscription_tier, subscription_status')
+  .eq('user_id', user.id)
+  .single();
+
+const currentTier = existing?.subscription_tier ?? 'free';
+const subStatus = existing?.subscription_status ?? 'active';
+const isActivePro =
+  currentTier === 'pro' &&
+  subStatus !== 'canceled' &&
+  subStatus !== 'cancelled';
+
+if (isActivePro) {
+  console.log(`SKIPPED — ${email} is already a paying Pro user. Beta would be a downgrade.`);
+  console.log(`If you want to give them a longer trial, extend their pro_bonus_expires_at instead.`);
+  process.exit(0);
+}
+
 const betaExpiry = new Date(Date.now() + days * 86_400_000).toISOString();
 
 const { error } = await supabase
@@ -68,4 +88,5 @@ if (error) {
   process.exit(1);
 }
 
-console.log(`OK ${email} -> beta tier, expires ${betaExpiry} (${days} days)`);
+const prev = currentTier === 'free' ? 'free' : `beta (was ${currentTier})`;
+console.log(`OK ${email} -> beta tier (from ${prev}), expires ${betaExpiry} (${days} days)`);
