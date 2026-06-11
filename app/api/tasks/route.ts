@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get('status');
     const dueToday = searchParams.get('due_today') === 'true';
+    const entityId = searchParams.get('entity_id');
 
     let query = supabaseAdmin
       .from('tasks')
@@ -43,6 +44,9 @@ export async function GET(req: NextRequest) {
 
     if (status && STATUSES.includes(status)) {
       query = query.eq('status', status);
+    }
+    if (entityId) {
+      query = query.eq('entity_id', entityId);
     }
     if (dueToday) {
       // End of today (local server time approximation in ISO) — anything due now or
