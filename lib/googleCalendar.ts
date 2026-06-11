@@ -411,6 +411,100 @@ export async function updateEvent(
   if (!res.ok) throw new Error(`Update event failed: ${res.status}`);
 }
 
+export async function moveEventsByTitle(
+  accessToken: string,
+  titleKeyword: string,
+  opts: {
+    shiftDays?: number; // +ve = forward, -ve = backward
+    newTime?: string; // HH:MM 24h local — change time, keep date
+    tzOffset?: string; // e.g. "+08:00"
+    dateFrom?: string; // YYYY-MM-DD, default today
+    dateTo?: string; // YYYY-MM-DD, default today+30
+  }
+): Promise<{ moved: number; failed: number }> {
+  const timeMin = opts.dateFrom ? `${opts.dateFrom}T00:00:00Z` : new Date().toISOString();
+  const timeMax = opts.dateTo
+    ? `${opts.dateTo}T23:59:59Z`
+    : new Date(Date.now() + 30 * 86_400_000).toISOString();
+
+  const params = new URLSearchParams({
+    timeMin,
+    timeMax,
+    singleEvents: 'true',
+    maxResults: '2500',
+    q: titleKeyword,
+  });
+  const listRes = await fetch(`${CAL_BASE}/primary/events?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!listRes.ok) throw new Error(`Search failed: ${listRes.status}`);
+
+  type GCalItem = {
+    id: string;
+    summary?: string;
+    description?: string;
+    start: { dateTime?: string; date?: string };
+    end: { dateTime?: string; date?: string };
+  };
+  const data = (await listRes.json()) as { items?: GCalItem[] };
+  const items = (data.items ?? []).filter(e =>
+    e.summary?.toLowerCase().includes(titleKeyword.toLowerCase())
+  );
+
+  let moved = 0;
+  let failed = 0;
+  for (const item of items) {
+    try {
+      let newStart: Record<string, string>;
+      let newEnd: Record<string, string>;
+
+      if (item.start.dateTime) {
+        const startMs = new Date(item.start.dateTime).getTime();
+        const endMs = new Date(item.end.dateTime!).getTime();
+        const duration = endMs - startMs;
+        let newStartMs = startMs + (opts.shiftDays ?? 0) * 86_400_000;
+        if (opts.newTime) {
+          const tz = opts.tzOffset ?? '+08:00';
+          const dateStr = new Date(newStartMs).toISOString().slice(0, 10);
+          newStartMs = new Date(`${dateStr}T${opts.newTime}:00${tz}`).getTime();
+        }
+        newStart = { dateTime: new Date(newStartMs).toISOString() };
+        newEnd = { dateTime: new Date(newStartMs + duration).toISOString() };
+      } else {
+        const shiftMs = (opts.shiftDays ?? 0) * 86_400_000;
+        const newStartDate = new Date(
+          new Date(item.start.date! + 'T00:00:00Z').getTime() + shiftMs
+        );
+        const newEndDate = new Date(new Date(item.end.date! + 'T00:00:00Z').getTime() + shiftMs);
+        newStart = { date: newStartDate.toISOString().slice(0, 10) };
+        newEnd = { date: newEndDate.toISOString().slice(0, 10) };
+      }
+
+      const patchRes = await fetch(
+        `${CAL_BASE}/primary/events/${encodeURIComponent(item.id)}`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            summary: item.summary,
+            description: item.description ?? '',
+            start: newStart,
+            end: newEnd,
+          }),
+        }
+      );
+      if (!patchRes.ok) throw new Error(`Patch failed: ${patchRes.status}`);
+      moved++;
+    } catch {
+      failed++;
+    }
+  }
+  return { moved, failed };
+}
+
 export async function deleteEventsByTitle(
   accessToken: string,
   titleKeyword: string,
