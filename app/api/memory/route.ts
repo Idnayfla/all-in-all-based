@@ -70,6 +70,9 @@ Return ONLY a plain numbered list. Max 20 items. Format exactly like:
 2) Works primarily in TypeScript
 3) Building a SaaS product [from: SaaS pricing discussion]
 
+CRITICAL — DO NOT EXTRACT TASKS:
+If the conversation is about creating tasks, adding to-dos, listing tasks, completing tasks, or setting reminders — do NOT add any of those items as memory facts. Tasks are ephemeral. Memory is for permanent long-term facts: skills, ongoing projects, preferences, relationships, recurring patterns, goals.
+
 STRICT RULES:
 - Never start a fact with "User" — write the fact directly as a statement or preference
 - No headers, no bold text, no asterisks, no markdown whatsoever

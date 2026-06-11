@@ -404,6 +404,9 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
                       {formatDueCallout(nextTask.due_date)}
                     </div>
                   )}
+                  <button className="tasks-nextup-done-btn" onClick={() => toggleDone(nextTask)}>
+                    ◈ Done
+                  </button>
                 </div>
               )}
               {recommendations.length > 0 && (
