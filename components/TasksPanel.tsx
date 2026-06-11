@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Priority = 'urgent' | 'high' | 'normal' | 'low';
@@ -90,6 +90,12 @@ function formatDueCallout(dateStr: string): string {
   return `Due ${new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
 }
 
+// ISO date string (YYYY-MM-DD) from a timestamptz for date inputs
+function toDateInputValue(dateStr: string | null): string {
+  if (!dateStr) return '';
+  return dateStr.slice(0, 10);
+}
+
 function getNextTask(tasks: Task[]): Task | null {
   const active = tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled');
   if (active.length === 0) return null;
@@ -144,6 +150,15 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
   const [newPriority, setNewPriority] = useState<Priority>('normal');
   const [adding, setAdding] = useState(false);
 
+  // Inline edit state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDue, setEditDue] = useState('');
+  const [editPriority, setEditPriority] = useState<Priority>('normal');
+  const [editNotes, setEditNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const editTitleRef = useRef<HTMLInputElement>(null);
+
   const headers = useCallback(
     () => ({
       'Content-Type': 'application/json',
@@ -169,9 +184,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
       return;
     }
     fetchTasks();
-    // Poll every 30s so task changes from Based's tool calls appear without a refresh
     const interval = setInterval(fetchTasks, 30_000);
-    // Also re-fetch instantly when Based creates/completes a task via tool
     const onTaskUpdated = () => fetchTasks();
     window.addEventListener('based:task-updated', onTaskUpdated);
     return () => {
@@ -185,7 +198,6 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     const title = newTitle.trim();
     if (!title || adding) return;
     setAdding(true);
-    // Optimistic insert
     const tempId = `temp-${Date.now()}`;
     const optimistic: Task = {
       id: tempId,
@@ -221,7 +233,6 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
   // ── Toggle done ────────────────────────────────────────────────────────────
   const toggleDone = async (task: Task) => {
     const newStatus: Status = task.status === 'done' ? 'todo' : 'done';
-    // Optimistic update
     setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, status: newStatus } : t)));
     try {
       await fetch('/api/tasks', {
@@ -230,18 +241,73 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
         body: JSON.stringify({ id: task.id, status: newStatus }),
       });
     } catch {
-      // Revert on failure
       setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, status: task.status } : t)));
+    }
+  };
+
+  // ── Inline edit helpers ────────────────────────────────────────────────────
+  const startEdit = (task: Task) => {
+    setEditingId(task.id);
+    setEditTitle(task.title);
+    setEditDue(toDateInputValue(task.due_date));
+    setEditPriority(task.priority);
+    setEditNotes(task.notes ?? '');
+    // Focus title input on next tick
+    setTimeout(() => editTitleRef.current?.focus(), 0);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+  };
+
+  const saveEdit = async () => {
+    const title = editTitle.trim();
+    if (!title || !editingId || saving) return;
+    setSaving(true);
+
+    const original = tasks.find(t => t.id === editingId);
+    const updated = {
+      ...original!,
+      title,
+      due_date: editDue || null,
+      priority: editPriority,
+      notes: editNotes.trim() || null,
+    };
+
+    // Optimistic update
+    setTasks(prev => prev.map(t => (t.id === editingId ? updated : t)));
+    setEditingId(null);
+
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'PATCH',
+        headers: headers(),
+        body: JSON.stringify({
+          id: editingId,
+          title,
+          due_date: editDue || null,
+          priority: editPriority,
+          notes: editNotes.trim() || null,
+        }),
+      });
+      const saved: Task = await res.json();
+      setTasks(prev => prev.map(t => (t.id === saved.id ? saved : t)));
+    } catch {
+      // Revert on failure
+      if (original) setTasks(prev => prev.map(t => (t.id === original.id ? original : t)));
+    } finally {
+      setSaving(false);
     }
   };
 
   // ── Delete task ────────────────────────────────────────────────────────────
   const deleteTask = async (id: string) => {
+    if (editingId === id) setEditingId(null);
     setTasks(prev => prev.filter(t => t.id !== id));
     try {
       await fetch(`/api/tasks?id=${id}`, { method: 'DELETE', headers: headers() });
     } catch {
-      // Silent fail — task is already removed optimistically
+      // Silent fail
     }
   };
 
@@ -253,7 +319,6 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
   );
   const done = tasks.filter(t => t.status === 'done');
 
-  // Remove duplicates in upcoming — tasks already in overdue/dueToday shouldn't show again
   const overdueIds = new Set(overdue.map(t => t.id));
   const todayIds = new Set(dueToday.map(t => t.id));
   const upcomingClean = upcoming.filter(t => !overdueIds.has(t.id) && !todayIds.has(t.id));
@@ -273,41 +338,115 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
           {label}
           <span className="tasks-group-count">{items.length}</span>
         </div>
-        {items.map(task => (
-          <div
-            key={task.id}
-            className={`tasks-row${task.status === 'done' ? ' tasks-row--done' : ''}`}
-          >
-            <button
-              className={`tasks-checkbox${task.status === 'done' ? ' checked' : ''}`}
-              onClick={() => toggleDone(task)}
-              title={task.status === 'done' ? 'Mark incomplete' : 'Mark done'}
+        {items.map(task => {
+          const isEditing = editingId === task.id;
+
+          if (isEditing) {
+            return (
+              <div key={task.id} className="tasks-edit-form">
+                <input
+                  ref={editTitleRef}
+                  className="tasks-edit-title"
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') saveEdit();
+                    if (e.key === 'Escape') cancelEdit();
+                  }}
+                  placeholder="Task title"
+                />
+                <div className="tasks-edit-row2">
+                  <input
+                    type="date"
+                    className="tasks-edit-date"
+                    value={editDue}
+                    onChange={e => setEditDue(e.target.value)}
+                  />
+                  <select
+                    className="tasks-edit-priority"
+                    value={editPriority}
+                    onChange={e => setEditPriority(e.target.value as Priority)}
+                  >
+                    <option value="urgent">Urgent</option>
+                    <option value="high">High</option>
+                    <option value="normal">Normal</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+                <textarea
+                  className="tasks-edit-notes"
+                  value={editNotes}
+                  onChange={e => setEditNotes(e.target.value)}
+                  placeholder="Notes (optional)"
+                  rows={2}
+                />
+                <div className="tasks-edit-actions">
+                  <button
+                    className="tasks-edit-save"
+                    onClick={saveEdit}
+                    disabled={!editTitle.trim() || saving}
+                  >
+                    ◈ Save
+                  </button>
+                  <button className="tasks-edit-cancel" onClick={cancelEdit}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div
+              key={task.id}
+              className={`tasks-row${task.status === 'done' ? ' tasks-row--done' : ''}`}
             >
-              {task.status === 'done' ? '◈' : '◻'}
-            </button>
-            <span className="tasks-row-title">{task.title}</span>
-            {task.due_date && (
-              <span
-                className="tasks-row-due"
-                style={isOverdue(task) ? { color: '#ef4444' } : undefined}
+              <button
+                className={`tasks-checkbox${task.status === 'done' ? ' checked' : ''}`}
+                onClick={() => toggleDone(task)}
+                title={task.status === 'done' ? 'Mark incomplete' : 'Mark done'}
               >
-                {formatDue(task.due_date)}
-              </span>
-            )}
-            <span
-              className="tasks-priority-dot"
-              style={{ background: PRIORITY_COLORS[task.priority] }}
-              title={PRIORITY_LABELS[task.priority]}
-            />
-            <button
-              className="tasks-row-del"
-              onClick={() => deleteTask(task.id)}
-              title="Delete task"
-            >
-              ✕
-            </button>
-          </div>
-        ))}
+                {task.status === 'done' ? '◈' : '◻'}
+              </button>
+              <div
+                className="tasks-row-body"
+                onClick={() => task.status !== 'done' && startEdit(task)}
+              >
+                <span className="tasks-row-title">{task.title}</span>
+                {task.notes && <span className="tasks-row-notes">{task.notes}</span>}
+              </div>
+              {task.due_date && (
+                <span
+                  className="tasks-row-due"
+                  style={isOverdue(task) ? { color: '#ef4444' } : undefined}
+                >
+                  {formatDue(task.due_date)}
+                </span>
+              )}
+              <span
+                className="tasks-priority-dot"
+                style={{ background: PRIORITY_COLORS[task.priority] }}
+                title={PRIORITY_LABELS[task.priority]}
+              />
+              {task.status !== 'done' && (
+                <button
+                  className="tasks-row-edit"
+                  onClick={() => startEdit(task)}
+                  title="Edit task"
+                >
+                  ✎
+                </button>
+              )}
+              <button
+                className="tasks-row-del"
+                onClick={() => deleteTask(task.id)}
+                title="Delete task"
+              >
+                ✕
+              </button>
+            </div>
+          );
+        })}
       </div>
     );
   };
@@ -324,7 +463,6 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     visibleUpcoming.length === 0 &&
     visibleDone.length === 0;
 
-  // Next Up callout data
   const nextTask = !loading && authToken ? getNextTask(tasks) : null;
   const recommendations =
     !loading && authToken && tasks.length > 0 ? getRecommendations(tasks) : [];
@@ -404,6 +542,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
                       {formatDueCallout(nextTask.due_date)}
                     </div>
                   )}
+                  {nextTask.notes && <div className="tasks-nextup-notes">{nextTask.notes}</div>}
                   <button className="tasks-nextup-done-btn" onClick={() => toggleDone(nextTask)}>
                     ◈ Done
                   </button>
