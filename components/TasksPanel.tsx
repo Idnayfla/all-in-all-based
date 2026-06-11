@@ -100,6 +100,9 @@ function getNextTask(tasks: Task[]): Task | null {
   const active = tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled');
   if (active.length === 0) return null;
   return active.slice().sort((a, b) => {
+    // In-progress tasks float to the top
+    if (a.status === 'in_progress' && b.status !== 'in_progress') return -1;
+    if (b.status === 'in_progress' && a.status !== 'in_progress') return 1;
     const po = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
     if (po !== 0) return po;
     if (a.due_date && b.due_date)
@@ -156,6 +159,8 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
   const [editDue, setEditDue] = useState('');
   const [editPriority, setEditPriority] = useState<Priority>('normal');
   const [editNotes, setEditNotes] = useState('');
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [editTagInput, setEditTagInput] = useState('');
   const [saving, setSaving] = useState(false);
   const editTitleRef = useRef<HTMLInputElement>(null);
 
@@ -230,9 +235,10 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     }
   };
 
-  // ── Toggle done ────────────────────────────────────────────────────────────
-  const toggleDone = async (task: Task) => {
-    const newStatus: Status = task.status === 'done' ? 'todo' : 'done';
+  // ── Cycle status: todo → in_progress → done → todo ────────────────────────
+  const cycleStatus = async (task: Task) => {
+    const newStatus: Status =
+      task.status === 'todo' ? 'in_progress' : task.status === 'in_progress' ? 'done' : 'todo';
     setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, status: newStatus } : t)));
     try {
       await fetch('/api/tasks', {
@@ -252,13 +258,27 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     setEditDue(toDateInputValue(task.due_date));
     setEditPriority(task.priority);
     setEditNotes(task.notes ?? '');
-    // Focus title input on next tick
+    setEditTags(task.tags ?? []);
+    setEditTagInput('');
     setTimeout(() => editTitleRef.current?.focus(), 0);
   };
 
   const cancelEdit = () => {
     setEditingId(null);
+    setEditTagInput('');
   };
+
+  const addEditTag = () => {
+    const tag = editTagInput.trim().toLowerCase().replace(/\s+/g, '-');
+    if (!tag || editTags.includes(tag)) {
+      setEditTagInput('');
+      return;
+    }
+    setEditTags(prev => [...prev, tag]);
+    setEditTagInput('');
+  };
+
+  const removeEditTag = (tag: string) => setEditTags(prev => prev.filter(t => t !== tag));
 
   const saveEdit = async () => {
     const title = editTitle.trim();
@@ -272,11 +292,12 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
       due_date: editDue || null,
       priority: editPriority,
       notes: editNotes.trim() || null,
+      tags: editTags,
     };
 
-    // Optimistic update
     setTasks(prev => prev.map(t => (t.id === editingId ? updated : t)));
     setEditingId(null);
+    setEditTagInput('');
 
     try {
       const res = await fetch('/api/tasks', {
@@ -288,12 +309,12 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
           due_date: editDue || null,
           priority: editPriority,
           notes: editNotes.trim() || null,
+          tags: editTags,
         }),
       });
       const saved: Task = await res.json();
       setTasks(prev => prev.map(t => (t.id === saved.id ? saved : t)));
     } catch {
-      // Revert on failure
       if (original) setTasks(prev => prev.map(t => (t.id === original.id ? original : t)));
     } finally {
       setSaving(false);
@@ -328,6 +349,23 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     today: dueToday.length + overdue.length,
     upcoming: upcomingClean.length,
     done: done.length,
+  };
+
+  // Checkbox glyph + CSS class for 3-state status
+  const checkboxGlyph = (status: Status) => {
+    if (status === 'done') return '◈';
+    if (status === 'in_progress') return '◉';
+    return '◻';
+  };
+  const checkboxClass = (status: Status) => {
+    if (status === 'done') return 'tasks-checkbox checked';
+    if (status === 'in_progress') return 'tasks-checkbox in-progress';
+    return 'tasks-checkbox';
+  };
+  const checkboxTitle = (status: Status) => {
+    if (status === 'done') return 'Mark incomplete';
+    if (status === 'in_progress') return 'Mark done';
+    return 'Start task';
   };
 
   const renderGroup = (label: string, items: Task[], labelColor?: string) => {
@@ -380,6 +418,38 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
                   placeholder="Notes (optional)"
                   rows={2}
                 />
+                {/* Tags */}
+                <div className="tasks-edit-tags-area">
+                  {editTags.length > 0 && (
+                    <div className="tasks-edit-tags-chips">
+                      {editTags.map(tag => (
+                        <span key={tag} className="tasks-edit-tag">
+                          {tag}
+                          <button
+                            className="tasks-edit-tag-del"
+                            onClick={() => removeEditTag(tag)}
+                            title="Remove tag"
+                          >
+                            ✕
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <input
+                    className="tasks-edit-tag-input"
+                    value={editTagInput}
+                    onChange={e => setEditTagInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        addEditTag();
+                      }
+                      if (e.key === 'Escape') cancelEdit();
+                    }}
+                    placeholder="Add tag, press Enter…"
+                  />
+                </div>
                 <div className="tasks-edit-actions">
                   <button
                     className="tasks-edit-save"
@@ -399,14 +469,14 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
           return (
             <div
               key={task.id}
-              className={`tasks-row${task.status === 'done' ? ' tasks-row--done' : ''}`}
+              className={`tasks-row${task.status === 'done' ? ' tasks-row--done' : ''}${isOverdue(task) ? ' tasks-row--overdue' : ''}${task.status === 'in_progress' ? ' tasks-row--in-progress' : ''}`}
             >
               <button
-                className={`tasks-checkbox${task.status === 'done' ? ' checked' : ''}`}
-                onClick={() => toggleDone(task)}
-                title={task.status === 'done' ? 'Mark incomplete' : 'Mark done'}
+                className={checkboxClass(task.status)}
+                onClick={() => cycleStatus(task)}
+                title={checkboxTitle(task.status)}
               >
-                {task.status === 'done' ? '◈' : '◻'}
+                {checkboxGlyph(task.status)}
               </button>
               <div
                 className="tasks-row-body"
@@ -414,6 +484,15 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
               >
                 <span className="tasks-row-title">{task.title}</span>
                 {task.notes && <span className="tasks-row-notes">{task.notes}</span>}
+                {task.tags && task.tags.length > 0 && (
+                  <div className="tasks-tags-row">
+                    {task.tags.map(tag => (
+                      <span key={tag} className="tasks-tag">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
               {task.due_date && (
                 <span
@@ -522,7 +601,9 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
                   style={{ borderLeftColor: PRIORITY_COLORS[nextTask.priority] }}
                 >
                   <div className="tasks-nextup-header">
-                    <span className="tasks-nextup-label">Next Up</span>
+                    <span className="tasks-nextup-label">
+                      {nextTask.status === 'in_progress' ? 'In Progress' : 'Next Up'}
+                    </span>
                     <span
                       className="tasks-nextup-badge"
                       style={{
@@ -543,8 +624,17 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
                     </div>
                   )}
                   {nextTask.notes && <div className="tasks-nextup-notes">{nextTask.notes}</div>}
-                  <button className="tasks-nextup-done-btn" onClick={() => toggleDone(nextTask)}>
-                    ◈ Done
+                  {nextTask.tags && nextTask.tags.length > 0 && (
+                    <div className="tasks-tags-row" style={{ marginTop: 6 }}>
+                      {nextTask.tags.map(tag => (
+                        <span key={tag} className="tasks-tag">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <button className="tasks-nextup-done-btn" onClick={() => cycleStatus(nextTask)}>
+                    {nextTask.status === 'in_progress' ? '◈ Done' : '◉ Start'}
                   </button>
                 </div>
               )}
