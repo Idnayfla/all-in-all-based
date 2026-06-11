@@ -524,7 +524,7 @@ export async function POST(req: NextRequest) {
   // Re-trigger the tool loop when the user is mid-scheduling-negotiation.
   // Catches short affirmatives, time picks, and rescheduling words.
   const SCHED_CONFIRM_RE =
-    /^(yes|yeah|yep|yup|sure|ok|okay|alright|sounds good|perfect|go ahead|proceed|do it|add it|book it|set it up|please|please do|definitely|correct|confirmed|confirm|rebook|reschedule|use that|use it|go with|that works|move it|change it|just\s+(do|book|use|add|rebook|reschedule)|maybe\s+\d|try\s+\d|how about\s+\d|what about\s+\d|\d{1,2}(:\d{2})?\s*(am|pm)|^\d{1,2}$)\b/i;
+    /^(yes|yeah|yep|yup|sure|ok|okay|alright|sounds good|perfect|go ahead|proceed|do it|add it|book it|set it up|please|please do|definitely|correct|confirmed|confirm|rebook|reschedule|overwrite|replace|change to|move to|meant|use that|use it|go with|that works|move it|change it|just\s+(do|book|use|add|rebook|reschedule)|maybe\s+\d|try\s+\d|how about\s+\d|what about\s+\d|\d{1,2}(:\d{2})?\s*(am|pm)|^\d{1,2}$)\b/i;
   const lastAssistantContent =
     [...(messages as Array<{ role: string; content: string }>)]
       .reverse()
@@ -535,10 +535,22 @@ export async function POST(req: NextRequest) {
       lastAssistantContent
     );
 
+  const recentMessages = (messages as Array<{ role: string; content: string }>).slice(-4);
+  const recentSchedulingContext =
+    /\b(\d{1,2}(:\d{2})?\s*(am|pm)|conflict|free slot|meeting|appointment|calendar|schedule|booked|slot)\b/i.test(
+      recentMessages.map(m => m.content).join(' ')
+    );
+  const isSchedulingFollowUp =
+    recentSchedulingContext &&
+    /\b(meant|overwrite|replace|change|move|update|instead|rebook|different|other|that one|use that|go with|try|how about|what about|just|cancel|remove|delete)\b/i.test(
+      lastUserText
+    );
+
   const shouldRunToolLoop =
     jwtUserId &&
     (COMPANION_TASK_RE.test(lastUserText) ||
-      (SCHED_CONFIRM_RE.test(lastUserText.trim()) && assistantProposedSomething));
+      (SCHED_CONFIRM_RE.test(lastUserText.trim()) && assistantProposedSomething) ||
+      isSchedulingFollowUp);
 
   if (shouldRunToolLoop) {
     // Use SGT date — Vercel servers run UTC, SGT is UTC+8, so new Date() alone gives wrong "tomorrow"
@@ -582,7 +594,7 @@ export async function POST(req: NextRequest) {
       `- "I'll be in Japan May 1-7" or any travel mention → confirm with user first, then call upsert_scheduling_prefs.`,
       `- Resolve relative dates (today/tomorrow/next Monday) to YYYY-MM-DD using today's date above.`,
       `- Due times go as HH:MM 24h in due_time. Duration in minutes goes in duration_minutes.`,
-      `- After a successful create_task (no CONFLICT prefix), tell the user what was booked and whether it hit Google Calendar.`,
+      `- After create_task succeeds (no [CONFLICT] prefix in result): immediately tell the user BOTH what was booked AND the exact calendar status from the tool result ("Added to Google Calendar" OR the error message). Never say "Done" or "Booked" without including the calendar result.`,
       `- For brain/memory cleanup, call rewrite_memory with the cleaned list.`,
       schedPrefsContext,
     ]

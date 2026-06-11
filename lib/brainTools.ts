@@ -277,7 +277,13 @@ export async function createTask(
         calResult = ' Added to Google Calendar.';
       }
     } catch (e) {
-      calResult = ` (Calendar sync failed: ${e instanceof Error ? e.message : String(e)})`;
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('403')) {
+        calResult =
+          ' (Calendar sync failed: Google Calendar needs to be reconnected — the stored token is missing write permission. Tell the user to go to Settings → Google Calendar → Disconnect and reconnect.)';
+      } else {
+        calResult = ` (Calendar sync failed: ${msg})`;
+      }
     }
   }
 
