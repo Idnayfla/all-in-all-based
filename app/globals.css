@@ -15771,6 +15771,150 @@ body:has(.legal-page) {
   color: var(--text3);
 }
 
+/* ── Entity selector in edit form ────────────────────────────────────────── */
+.tasks-edit-entity {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text1);
+  font-size: 12px;
+  padding: 6px 8px;
+  width: 100%;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  font-family: var(--font-mono);
+}
+.tasks-edit-entity:focus {
+  border-color: var(--accent);
+}
+
+/* ── Entity badge on rows ─────────────────────────────────────────────────── */
+.tasks-row-entity {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: #c9a87c;
+  background: rgba(201, 168, 124, 0.1);
+  border: 1px solid rgba(201, 168, 124, 0.25);
+  border-radius: 3px;
+  padding: 1px 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Cancelled rows ──────────────────────────────────────────────────────── */
+.tasks-row--cancelled .tasks-row-title {
+  text-decoration: line-through;
+  color: var(--text3);
+  opacity: 0.6;
+}
+.tasks-checkbox.cancelled {
+  color: var(--text3);
+  opacity: 0.5;
+}
+.tasks-row-cancel {
+  background: none;
+  border: none;
+  color: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 2px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+  line-height: 1;
+}
+.tasks-row:hover .tasks-row-cancel {
+  color: var(--text3);
+}
+.tasks-row-cancel:hover {
+  color: #f59e0b !important;
+}
+
+/* ── Task search ─────────────────────────────────────────────────────────── */
+.tasks-search-wrap {
+  padding: 0 0 8px;
+}
+.tasks-search {
+  width: 100%;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text1);
+  font-size: 13px;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.tasks-search:focus {
+  border-color: var(--accent);
+}
+.tasks-search::placeholder {
+  color: var(--text3);
+}
+
+/* ── Entity card task list ────────────────────────────────────────────────── */
+.entity-tasks-section {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+}
+.entity-tasks-label {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text3);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.entity-task-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.entity-task-item:last-child {
+  border-bottom: none;
+}
+.entity-task-status {
+  font-size: 11px;
+  flex-shrink: 0;
+  width: 14px;
+  text-align: center;
+  color: var(--text3);
+}
+.entity-task-title {
+  font-size: 12px;
+  color: var(--text2);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.entity-task-title--done {
+  text-decoration: line-through;
+  color: var(--text3);
+}
+.entity-task-due {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--text3);
+  flex-shrink: 0;
+}
+.entity-task-due--overdue {
+  color: #ef4444;
+}
+.entity-tasks-empty {
+  font-size: 11px;
+  color: var(--text3);
+  font-style: italic;
+  font-family: var(--font-mono);
+}
+
 .tasks-empty {
   color: var(--text3);
   font-size: 13px;

@@ -5,6 +5,25 @@ import { useCallback, useEffect, useState } from 'react';
 type EntityType = 'project' | 'person' | 'topic' | 'account' | 'place' | 'other';
 type TypeFilter = 'all' | EntityType;
 
+interface LinkedTask {
+  id: string;
+  title: string;
+  status: string;
+  due_date: string | null;
+  priority: string;
+}
+
+function formatTaskDue(dateStr: string): string {
+  const d = new Date(dateStr);
+  const today = new Date();
+  const diff = Math.round((d.setHours(0, 0, 0, 0) - today.setHours(0, 0, 0, 0)) / 86400000);
+  if (diff === 0) return 'Today';
+  if (diff === 1) return 'Tomorrow';
+  if (diff < 0) return `${Math.abs(diff)}d ago`;
+  if (diff < 7) return `In ${diff}d`;
+  return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
 interface Entity {
   id: string;
   name: string;
@@ -55,6 +74,8 @@ export default function EntityPanel({ authToken }: { authToken?: string }) {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [entityTasks, setEntityTasks] = useState<LinkedTask[]>([]);
+  const [entityTasksLoading, setEntityTasksLoading] = useState(false);
 
   // Add-entity form
   const [showAdd, setShowAdd] = useState(false);
@@ -136,6 +157,21 @@ export default function EntityPanel({ authToken }: { authToken?: string }) {
       setAdding(false);
     }
   };
+
+  // ── Fetch tasks for expanded entity ───────────────────────────────────────
+  useEffect(() => {
+    if (!expandedId || !authToken) {
+      setEntityTasks([]);
+      return;
+    }
+    setEntityTasksLoading(true);
+    fetch(`/api/tasks?entity_id=${expandedId}`, { headers: headers() })
+      .then(r => r.json())
+      .then((data: LinkedTask[]) => {
+        if (Array.isArray(data)) setEntityTasks(data);
+      })
+      .finally(() => setEntityTasksLoading(false));
+  }, [expandedId, authToken, headers]);
 
   // ── Delete entity ──────────────────────────────────────────────────────────
   const deleteEntity = async (id: string) => {
@@ -330,6 +366,51 @@ export default function EntityPanel({ authToken }: { authToken?: string }) {
                               month: 'short',
                               year: 'numeric',
                             })}
+                          </div>
+                        )}
+                        {isExpanded && (
+                          <div className="entity-tasks-section">
+                            <div className="entity-tasks-label">Tasks</div>
+                            {entityTasksLoading ? (
+                              <div className="entity-tasks-empty">Loading…</div>
+                            ) : entityTasks.length === 0 ? (
+                              <div className="entity-tasks-empty">No linked tasks</div>
+                            ) : (
+                              entityTasks.map(task => {
+                                const isTaskDone =
+                                  task.status === 'done' || task.status === 'cancelled';
+                                const taskGlyph =
+                                  task.status === 'done'
+                                    ? '◈'
+                                    : task.status === 'in_progress'
+                                      ? '◉'
+                                      : task.status === 'cancelled'
+                                        ? '⊘'
+                                        : '◻';
+                                const taskOverdue =
+                                  task.due_date &&
+                                  !isTaskDone &&
+                                  new Date(task.due_date) <
+                                    new Date(new Date().setHours(0, 0, 0, 0));
+                                return (
+                                  <div key={task.id} className="entity-task-item">
+                                    <span className="entity-task-status">{taskGlyph}</span>
+                                    <span
+                                      className={`entity-task-title${isTaskDone ? ' entity-task-title--done' : ''}`}
+                                    >
+                                      {task.title}
+                                    </span>
+                                    {task.due_date && (
+                                      <span
+                                        className={`entity-task-due${taskOverdue ? ' entity-task-due--overdue' : ''}`}
+                                      >
+                                        {formatTaskDue(task.due_date)}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })
+                            )}
                           </div>
                         )}
                       </div>

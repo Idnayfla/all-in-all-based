@@ -14,8 +14,15 @@ interface Task {
   priority: Priority;
   status: Status;
   tags: string[];
+  entity_id: string | null;
   created_at: string;
   updated_at: string;
+}
+
+interface EntityRef {
+  id: string;
+  name: string;
+  type: string;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -90,17 +97,25 @@ function formatDueCallout(dateStr: string): string {
   return `Due ${new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`;
 }
 
-// ISO date string (YYYY-MM-DD) from a timestamptz for date inputs
 function toDateInputValue(dateStr: string | null): string {
   if (!dateStr) return '';
   return dateStr.slice(0, 10);
+}
+
+function matchesSearch(task: Task, term: string): boolean {
+  if (!term) return true;
+  const t = term.toLowerCase();
+  return (
+    task.title.toLowerCase().includes(t) ||
+    (task.notes?.toLowerCase().includes(t) ?? false) ||
+    (task.tags?.some(tag => tag.toLowerCase().includes(t)) ?? false)
+  );
 }
 
 function getNextTask(tasks: Task[]): Task | null {
   const active = tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled');
   if (active.length === 0) return null;
   return active.slice().sort((a, b) => {
-    // In-progress tasks float to the top
     if (a.status === 'in_progress' && b.status !== 'in_progress') return -1;
     if (b.status === 'in_progress' && a.status !== 'in_progress') return 1;
     const po = PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
@@ -146,6 +161,10 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterTab>('all');
+  const [search, setSearch] = useState('');
+
+  // Entities for the entity-link selector
+  const [entities, setEntities] = useState<EntityRef[]>([]);
 
   // Add-task form state
   const [newTitle, setNewTitle] = useState('');
@@ -161,6 +180,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
   const [editNotes, setEditNotes] = useState('');
   const [editTags, setEditTags] = useState<string[]>([]);
   const [editTagInput, setEditTagInput] = useState('');
+  const [editEntityId, setEditEntityId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const editTitleRef = useRef<HTMLInputElement>(null);
 
@@ -198,6 +218,16 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     };
   }, [authToken, fetchTasks]);
 
+  // ── Fetch entities for selector ────────────────────────────────────────────
+  useEffect(() => {
+    if (!authToken) return;
+    fetch('/api/entities', { headers: headers() })
+      .then(r => r.json())
+      .then((data: EntityRef[]) => {
+        if (Array.isArray(data)) setEntities(data);
+      });
+  }, [authToken, headers]);
+
   // ── Add task ───────────────────────────────────────────────────────────────
   const addTask = async () => {
     const title = newTitle.trim();
@@ -212,6 +242,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
       priority: newPriority,
       status: 'todo',
       tags: [],
+      entity_id: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -236,6 +267,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
   };
 
   // ── Cycle status: todo → in_progress → done → todo ────────────────────────
+  // Cancelled tasks re-enter the cycle from todo.
   const cycleStatus = async (task: Task) => {
     const newStatus: Status =
       task.status === 'todo' ? 'in_progress' : task.status === 'in_progress' ? 'done' : 'todo';
@@ -251,6 +283,21 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     }
   };
 
+  // ── Cancel task ────────────────────────────────────────────────────────────
+  const cancelTask = async (id: string) => {
+    const original = tasks.find(t => t.id === id);
+    setTasks(prev => prev.map(t => (t.id === id ? { ...t, status: 'cancelled' } : t)));
+    try {
+      await fetch('/api/tasks', {
+        method: 'PATCH',
+        headers: headers(),
+        body: JSON.stringify({ id, status: 'cancelled' }),
+      });
+    } catch {
+      if (original) setTasks(prev => prev.map(t => (t.id === id ? original : t)));
+    }
+  };
+
   // ── Inline edit helpers ────────────────────────────────────────────────────
   const startEdit = (task: Task) => {
     setEditingId(task.id);
@@ -260,6 +307,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     setEditNotes(task.notes ?? '');
     setEditTags(task.tags ?? []);
     setEditTagInput('');
+    setEditEntityId(task.entity_id ?? null);
     setTimeout(() => editTitleRef.current?.focus(), 0);
   };
 
@@ -293,6 +341,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
       priority: editPriority,
       notes: editNotes.trim() || null,
       tags: editTags,
+      entity_id: editEntityId,
     };
 
     setTasks(prev => prev.map(t => (t.id === editingId ? updated : t)));
@@ -310,6 +359,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
           priority: editPriority,
           notes: editNotes.trim() || null,
           tags: editTags,
+          entity_id: editEntityId,
         }),
       });
       const saved: Task = await res.json();
@@ -332,6 +382,9 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     }
   };
 
+  // ── Entity lookup map ──────────────────────────────────────────────────────
+  const entityMap = new Map(entities.map(e => [e.id, e]));
+
   // ── Group tasks ────────────────────────────────────────────────────────────
   const overdue = tasks.filter(isOverdue);
   const dueToday = tasks.filter(isDueToday);
@@ -339,6 +392,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     t => isUpcoming(t) || (!t.due_date && t.status !== 'done' && t.status !== 'cancelled')
   );
   const done = tasks.filter(t => t.status === 'done');
+  const cancelled = tasks.filter(t => t.status === 'cancelled');
 
   const overdueIds = new Set(overdue.map(t => t.id));
   const todayIds = new Set(dueToday.map(t => t.id));
@@ -348,36 +402,41 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     all: tasks.filter(t => t.status !== 'done' && t.status !== 'cancelled').length,
     today: dueToday.length + overdue.length,
     upcoming: upcomingClean.length,
-    done: done.length,
+    done: done.length + cancelled.length,
   };
 
-  // Checkbox glyph + CSS class for 3-state status
+  // Checkbox glyph + CSS class for status
   const checkboxGlyph = (status: Status) => {
     if (status === 'done') return '◈';
     if (status === 'in_progress') return '◉';
+    if (status === 'cancelled') return '⊘';
     return '◻';
   };
   const checkboxClass = (status: Status) => {
     if (status === 'done') return 'tasks-checkbox checked';
     if (status === 'in_progress') return 'tasks-checkbox in-progress';
+    if (status === 'cancelled') return 'tasks-checkbox cancelled';
     return 'tasks-checkbox';
   };
   const checkboxTitle = (status: Status) => {
     if (status === 'done') return 'Mark incomplete';
     if (status === 'in_progress') return 'Mark done';
+    if (status === 'cancelled') return 'Restore task';
     return 'Start task';
   };
 
   const renderGroup = (label: string, items: Task[], labelColor?: string) => {
-    if (items.length === 0) return null;
+    const filtered = search ? items.filter(t => matchesSearch(t, search)) : items;
+    if (filtered.length === 0) return null;
     return (
       <div className="tasks-group" key={label}>
         <div className="tasks-group-label" style={labelColor ? { color: labelColor } : undefined}>
           {label}
-          <span className="tasks-group-count">{items.length}</span>
+          <span className="tasks-group-count">{filtered.length}</span>
         </div>
-        {items.map(task => {
+        {filtered.map(task => {
           const isEditing = editingId === task.id;
+          const linkedEntity = task.entity_id ? entityMap.get(task.entity_id) : null;
 
           if (isEditing) {
             return (
@@ -411,6 +470,20 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
                     <option value="low">Low</option>
                   </select>
                 </div>
+                {entities.length > 0 && (
+                  <select
+                    className="tasks-edit-entity"
+                    value={editEntityId ?? ''}
+                    onChange={e => setEditEntityId(e.target.value || null)}
+                  >
+                    <option value="">— No entity —</option>
+                    {entities.map(e => (
+                      <option key={e.id} value={e.id}>
+                        {e.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <textarea
                   className="tasks-edit-notes"
                   value={editNotes}
@@ -418,7 +491,6 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
                   placeholder="Notes (optional)"
                   rows={2}
                 />
-                {/* Tags */}
                 <div className="tasks-edit-tags-area">
                   {editTags.length > 0 && (
                     <div className="tasks-edit-tags-chips">
@@ -469,7 +541,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
           return (
             <div
               key={task.id}
-              className={`tasks-row${task.status === 'done' ? ' tasks-row--done' : ''}${isOverdue(task) ? ' tasks-row--overdue' : ''}${task.status === 'in_progress' ? ' tasks-row--in-progress' : ''}`}
+              className={`tasks-row${task.status === 'done' ? ' tasks-row--done' : ''}${task.status === 'cancelled' ? ' tasks-row--cancelled' : ''}${isOverdue(task) ? ' tasks-row--overdue' : ''}${task.status === 'in_progress' ? ' tasks-row--in-progress' : ''}`}
             >
               <button
                 className={checkboxClass(task.status)}
@@ -480,7 +552,9 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
               </button>
               <div
                 className="tasks-row-body"
-                onClick={() => task.status !== 'done' && startEdit(task)}
+                onClick={() =>
+                  task.status !== 'done' && task.status !== 'cancelled' && startEdit(task)
+                }
               >
                 <span className="tasks-row-title">{task.title}</span>
                 {task.notes && <span className="tasks-row-notes">{task.notes}</span>}
@@ -494,6 +568,11 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
                   </div>
                 )}
               </div>
+              {linkedEntity && (
+                <span className="tasks-row-entity" title={linkedEntity.name}>
+                  {linkedEntity.name}
+                </span>
+              )}
               {task.due_date && (
                 <span
                   className="tasks-row-due"
@@ -507,14 +586,23 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
                 style={{ background: PRIORITY_COLORS[task.priority] }}
                 title={PRIORITY_LABELS[task.priority]}
               />
-              {task.status !== 'done' && (
-                <button
-                  className="tasks-row-edit"
-                  onClick={() => startEdit(task)}
-                  title="Edit task"
-                >
-                  ✎
-                </button>
+              {task.status !== 'done' && task.status !== 'cancelled' && (
+                <>
+                  <button
+                    className="tasks-row-edit"
+                    onClick={() => startEdit(task)}
+                    title="Edit task"
+                  >
+                    ✎
+                  </button>
+                  <button
+                    className="tasks-row-cancel"
+                    onClick={() => cancelTask(task.id)}
+                    title="Cancel task"
+                  >
+                    ⊘
+                  </button>
+                </>
               )}
               <button
                 className="tasks-row-del"
@@ -532,15 +620,27 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
 
   const visibleOverdue = filter === 'all' || filter === 'today' ? overdue : [];
   const visibleToday = filter === 'all' || filter === 'today' ? dueToday : [];
-  const visibleUpcoming =
-    filter === 'all' || filter === 'upcoming' ? upcomingClean : filter === 'today' ? [] : [];
+  const visibleUpcoming = filter === 'all' || filter === 'upcoming' ? upcomingClean : [];
   const visibleDone = filter === 'done' ? done : [];
+  const visibleCancelled = filter === 'done' ? cancelled : [];
 
   const isEmpty =
     visibleOverdue.length === 0 &&
     visibleToday.length === 0 &&
     visibleUpcoming.length === 0 &&
-    visibleDone.length === 0;
+    visibleDone.length === 0 &&
+    visibleCancelled.length === 0;
+
+  // If searching and all filtered groups are empty, show empty state
+  const isSearchEmpty =
+    search !== '' &&
+    [
+      ...visibleOverdue,
+      ...visibleToday,
+      ...visibleUpcoming,
+      ...visibleDone,
+      ...visibleCancelled,
+    ].filter(t => matchesSearch(t, search)).length === 0;
 
   const nextTask = !loading && authToken ? getNextTask(tasks) : null;
   const recommendations =
@@ -652,6 +752,18 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
         </div>
       )}
 
+      {/* Search */}
+      {authToken && tasks.length > 0 && (
+        <div className="tasks-search-wrap">
+          <input
+            className="tasks-search"
+            placeholder="Search tasks…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+      )}
+
       {/* Filter tabs */}
       <div className="tasks-filter-tabs">
         {(['all', 'today', 'upcoming', 'done'] as FilterTab[]).map(f => (
@@ -676,25 +788,28 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
             <div className="tasks-empty-sub">Sign in to track what you need to do</div>
           </div>
         )}
-        {!loading && authToken && isEmpty && (
+        {!loading && authToken && (isEmpty || isSearchEmpty) && (
           <div className="tasks-empty-state">
             <div className="tasks-empty-icon">◉</div>
             <div className="tasks-empty-title">
-              {filter === 'done' ? 'Nothing done yet' : 'All clear'}
+              {search ? 'No matches' : filter === 'done' ? 'Nothing done yet' : 'All clear'}
             </div>
             <div className="tasks-empty-sub">
-              {filter === 'done'
-                ? 'Completed tasks will appear here'
-                : 'Add a task above or ask Based to create one'}
+              {search
+                ? `No tasks matching "${search}"`
+                : filter === 'done'
+                  ? 'Completed and cancelled tasks will appear here'
+                  : 'Add a task above or ask Based to create one'}
             </div>
           </div>
         )}
-        {!loading && authToken && (
+        {!loading && authToken && !isSearchEmpty && (
           <>
             {renderGroup('Overdue', visibleOverdue, '#ef4444')}
             {renderGroup('Due Today', visibleToday, '#f97316')}
             {filter !== 'done' && renderGroup('Upcoming', visibleUpcoming)}
             {renderGroup('Done', visibleDone)}
+            {renderGroup('Cancelled', visibleCancelled, 'var(--text3)')}
           </>
         )}
       </div>
