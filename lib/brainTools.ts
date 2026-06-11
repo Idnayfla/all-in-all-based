@@ -16,6 +16,7 @@ import {
   deleteEvent,
   deleteEventsByTitle,
   moveEventsByTitle,
+  listEventsInRange,
 } from '@/lib/googleCalendar';
 import { getSchedulingPrefs, upsertSchedulingPrefs } from '@/lib/schedulingPrefs';
 
@@ -95,6 +96,25 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
     },
   },
   {
+    name: 'list_calendar_events',
+    description:
+      "List all events on the user's Google Calendar for a given date range. Use when the user asks what's on a specific day, or before moving events to identify actual event titles. Returns event names, times, and dates.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        date_from: {
+          type: 'string',
+          description: 'Start date YYYY-MM-DD.',
+        },
+        date_to: {
+          type: 'string',
+          description: 'End date YYYY-MM-DD inclusive. Defaults to date_from if omitted.',
+        },
+      },
+      required: ['date_from'],
+    },
+  },
+  {
     name: 'move_calendar_events',
     description:
       'Find Google Calendar events by title and shift their date by N days OR change their time. Use for "shift X 3 days ahead", "move my lesson to 4pm", "push my meeting back 1 hour", "reschedule VR class to tomorrow". Works on native calendar events, not just Based tasks.',
@@ -122,6 +142,11 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
         date_to: {
           type: 'string',
           description: 'Only affect events on or before this YYYY-MM-DD. Defaults to today + 30 days.',
+        },
+        confirmed: {
+          type: 'boolean',
+          description:
+            'Set to true to force the move even if destination slots have conflicts. Only use after reporting conflicts to the user and getting explicit confirmation.',
         },
       },
       required: ['title_keyword'],
@@ -448,6 +473,7 @@ export async function moveCalendarEvents(
     new_time?: string;
     date_from?: string;
     date_to?: string;
+    confirmed?: boolean;
   }
 ): Promise<string> {
   const accessToken = await getValidAccessToken(userId);
@@ -455,24 +481,87 @@ export async function moveCalendarEvents(
   const prefs = await getSchedulingPrefs(userId).catch(() => null);
   const tzOffset = prefs?.timezone ?? '+08:00';
   try {
-    const { moved, failed } = await moveEventsByTitle(accessToken, input.title_keyword, {
+    const { moved, failed, conflicts } = await moveEventsByTitle(accessToken, input.title_keyword, {
       shiftDays: input.shift_days,
       newTime: input.new_time,
       tzOffset,
       dateFrom: input.date_from,
       dateTo: input.date_to,
+      checkConflicts: !input.confirmed,
     });
-    if (moved === 0 && failed === 0)
+    if (moved === 0 && failed === 0 && conflicts.length === 0)
       return `No upcoming events found matching "${input.title_keyword}".`;
+    const conflictNote =
+      conflicts.length > 0
+        ? `\n[CONFLICTS — ${conflicts.length} event(s) NOT moved due to destination conflicts:\n${conflicts.map(c => `  · "${c.title}" → ${c.newStart}`).join('\n')}\nCall move_calendar_events again with confirmed: true to force the move.]`
+        : '';
     const action = input.shift_days
       ? `shifted ${input.shift_days > 0 ? input.shift_days + ' day(s) forward' : Math.abs(input.shift_days) + ' day(s) back'}`
       : input.new_time
         ? `moved to ${input.new_time}`
         : 'updated';
     const failNote = failed > 0 ? ` (${failed} failed)` : '';
-    return `${moved} event${moved !== 1 ? 's' : ''} matching "${input.title_keyword}" ${action} in Google Calendar.${failNote}`;
+    const movedNote =
+      moved > 0
+        ? `${moved} event${moved !== 1 ? 's' : ''} matching "${input.title_keyword}" ${action} in Google Calendar.${failNote}`
+        : '';
+    return (
+      (movedNote + conflictNote).trim() ||
+      `All matching events had conflicts — use confirmed: true to force.`
+    );
   } catch (e) {
     return `Failed to move events: ${e instanceof Error ? e.message : String(e)}`;
+  }
+}
+
+export async function listCalendarEvents(
+  userId: string,
+  dateFrom: string,
+  dateTo?: string
+): Promise<string> {
+  const accessToken = await getValidAccessToken(userId);
+  if (!accessToken) return 'Google Calendar not connected.';
+  const to = dateTo ?? dateFrom;
+  try {
+    const events = await listEventsInRange(accessToken, dateFrom, to);
+    if (events.length === 0) return `No events found between ${dateFrom} and ${to}.`;
+    // Group by date
+    const byDate = new Map<string, typeof events>();
+    for (const e of events) {
+      const day = e.start.slice(0, 10);
+      if (!byDate.has(day)) byDate.set(day, []);
+      byDate.get(day)!.push(e);
+    }
+    const lines: string[] = [];
+    for (const [day, dayEvents] of [...byDate.entries()].sort()) {
+      const date = new Date(day + 'T00:00:00Z');
+      const label = date.toLocaleDateString('en-SG', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        timeZone: 'UTC',
+      });
+      const evtLines = dayEvents.map(e => {
+        if (e.allDay) return `  · ${e.title} (all day)`;
+        const s = new Date(e.start).toLocaleTimeString('en-SG', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: 'Asia/Singapore',
+        });
+        const en = new Date(e.end).toLocaleTimeString('en-SG', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: 'Asia/Singapore',
+        });
+        return `  · ${e.title} ${s}–${en}`;
+      });
+      lines.push(`${label}:\n${evtLines.join('\n')}`);
+    }
+    return lines.join('\n');
+  } catch (e) {
+    return `Failed to list events: ${e instanceof Error ? e.message : String(e)}`;
   }
 }
 
@@ -619,6 +708,12 @@ export async function runBrainTool(
         return await listTasks(userId, (input.filter as 'today' | 'urgent' | 'all') ?? 'all');
       case 'complete_task':
         return await completeTask(userId, String(input.task_id_or_title ?? ''));
+      case 'list_calendar_events':
+        return await listCalendarEvents(
+          userId,
+          String(input.date_from ?? ''),
+          input.date_to ? String(input.date_to) : undefined
+        );
       case 'move_calendar_events':
         return await moveCalendarEvents(userId, {
           title_keyword: String(input.title_keyword ?? ''),
@@ -626,6 +721,7 @@ export async function runBrainTool(
           new_time: input.new_time ? String(input.new_time) : undefined,
           date_from: input.date_from ? String(input.date_from) : undefined,
           date_to: input.date_to ? String(input.date_to) : undefined,
+          confirmed: input.confirmed === true,
         });
       case 'cancel_task':
         return await cancelTask(userId, String(input.task_id_or_title ?? ''));

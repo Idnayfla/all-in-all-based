@@ -273,6 +273,15 @@ function utcToLocalTime(date: Date, tzOffset: string): string {
   return `${String(local.getUTCHours()).padStart(2, '0')}:${String(local.getUTCMinutes()).padStart(2, '0')}`;
 }
 
+// Convert a UTC Date to a local YYYY-MM-DD using a UTC offset string like "+08:00"
+function utcToLocalDate(date: Date, tzOffset: string): string {
+  const sign = tzOffset.startsWith('-') ? -1 : 1;
+  const parts = tzOffset.slice(1).split(':');
+  const offsetMs = sign * (Number(parts[0]) * 60 + Number(parts[1])) * 60_000;
+  const local = new Date(date.getTime() + offsetMs);
+  return local.toISOString().slice(0, 10);
+}
+
 export async function checkFreebusy(
   accessToken: string,
   date: string, // YYYY-MM-DD
@@ -411,6 +420,43 @@ export async function updateEvent(
   if (!res.ok) throw new Error(`Update event failed: ${res.status}`);
 }
 
+export async function listEventsInRange(
+  accessToken: string,
+  dateFrom: string, // YYYY-MM-DD
+  dateTo: string // YYYY-MM-DD inclusive
+): Promise<CalEvent[]> {
+  const timeMin = `${dateFrom}T00:00:00Z`;
+  const timeMax = `${dateTo}T23:59:59Z`;
+  const params = new URLSearchParams({
+    timeMin,
+    timeMax,
+    singleEvents: 'true',
+    orderBy: 'startTime',
+    maxResults: '250',
+  });
+  const res = await fetch(`${CAL_BASE}/primary/events?${params}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) throw new Error(`List failed: ${res.status}`);
+  const data = (await res.json()) as {
+    items?: Array<{
+      id: string;
+      summary?: string;
+      start: { dateTime?: string; date?: string };
+      end: { dateTime?: string; date?: string };
+      htmlLink?: string;
+    }>;
+  };
+  return (data.items ?? []).map(item => ({
+    id: item.id,
+    title: item.summary ?? '(no title)',
+    start: item.start.dateTime ?? item.start.date ?? '',
+    end: item.end.dateTime ?? item.end.date ?? '',
+    url: item.htmlLink ?? '',
+    allDay: !item.start.dateTime,
+  }));
+}
+
 export async function moveEventsByTitle(
   accessToken: string,
   titleKeyword: string,
@@ -420,8 +466,9 @@ export async function moveEventsByTitle(
     tzOffset?: string; // e.g. "+08:00"
     dateFrom?: string; // YYYY-MM-DD, default today
     dateTo?: string; // YYYY-MM-DD, default today+30
+    checkConflicts?: boolean; // skip moves whose destination slot is busy
   }
-): Promise<{ moved: number; failed: number }> {
+): Promise<{ moved: number; failed: number; conflicts: Array<{ title: string; newStart: string }> }> {
   const timeMin = opts.dateFrom ? `${opts.dateFrom}T00:00:00Z` : new Date().toISOString();
   const timeMax = opts.dateTo
     ? `${opts.dateTo}T23:59:59Z`
@@ -453,6 +500,10 @@ export async function moveEventsByTitle(
 
   let moved = 0;
   let failed = 0;
+  const conflicts: Array<{ title: string; newStart: string }> = [];
+  // Resolve calendar IDs once if we're going to run conflict checks
+  const tz = opts.tzOffset ?? '+08:00';
+  const calendarIds = opts.checkConflicts ? await getCalendarIds(accessToken) : [];
   for (const item of items) {
     try {
       let newStart: Record<string, string>;
@@ -464,12 +515,33 @@ export async function moveEventsByTitle(
         const duration = endMs - startMs;
         let newStartMs = startMs + (opts.shiftDays ?? 0) * 86_400_000;
         if (opts.newTime) {
-          const tz = opts.tzOffset ?? '+08:00';
           const dateStr = new Date(newStartMs).toISOString().slice(0, 10);
           newStartMs = new Date(`${dateStr}T${opts.newTime}:00${tz}`).getTime();
         }
         newStart = { dateTime: new Date(newStartMs).toISOString() };
         newEnd = { dateTime: new Date(newStartMs + duration).toISOString() };
+
+        // Conflict check: is the destination slot already busy?
+        if (opts.checkConflicts) {
+          const destDate = utcToLocalDate(new Date(newStartMs), tz);
+          const destTime = utcToLocalTime(new Date(newStartMs), tz);
+          const durMin = Math.max(1, Math.round(duration / 60_000));
+          // Exclude this event's own current slot is unnecessary — we're moving
+          // it to a different time, so the freebusy of the destination day shows
+          // whatever else occupies the target window.
+          const busy = await checkFreebusy(accessToken, destDate, tz, calendarIds);
+          // Filter out the event's own busy block (it still sits at its old slot
+          // until we patch) so we don't flag a self-conflict when shifting time
+          // within the same day.
+          const others = busy.filter(
+            b => !(new Date(b.start).getTime() === startMs && new Date(b.end).getTime() === endMs)
+          );
+          const slot = findFreeSlot(others, destDate, destTime, durMin, tz);
+          if (slot.conflict) {
+            conflicts.push({ title: item.summary ?? '(no title)', newStart: newStart.dateTime });
+            continue;
+          }
+        }
       } else {
         const shiftMs = (opts.shiftDays ?? 0) * 86_400_000;
         const newStartDate = new Date(
@@ -502,7 +574,7 @@ export async function moveEventsByTitle(
       failed++;
     }
   }
-  return { moved, failed };
+  return { moved, failed, conflicts };
 }
 
 export async function deleteEventsByTitle(
