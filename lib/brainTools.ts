@@ -223,11 +223,16 @@ export async function createTask(
     confirmed_slot?: boolean;
   }
 ): Promise<string> {
+  // If a time is given without a date, default to today in SGT (UTC+8).
+  // Vercel runs UTC — offset manually so "today" is correct for Singapore users.
+  const sgtToday = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const effectiveDueDate = input.due_date ?? (input.due_time ? sgtToday : null);
+
   // Auto conflict check — runs whenever due_time is set and user hasn't already confirmed
-  if (input.due_date && input.due_time && !input.confirmed_slot) {
+  if (effectiveDueDate && input.due_time && !input.confirmed_slot) {
     const conflictMsg = await checkSchedule(
       userId,
-      input.due_date,
+      effectiveDueDate,
       input.due_time,
       input.duration_minutes ?? 30
     );
@@ -242,7 +247,7 @@ export async function createTask(
     .insert({
       user_id: userId,
       title: input.title.slice(0, 500),
-      due_date: input.due_date ?? null,
+      due_date: effectiveDueDate,
       due_time: input.due_time ?? null,
       duration_minutes: input.duration_minutes ?? null,
       priority,
@@ -254,7 +259,8 @@ export async function createTask(
 
   // Synchronous Google Calendar sync — errors surface in the tool result
   let calResult = '';
-  if (data.due_date) {
+  const syncDate = data.due_date ?? effectiveDueDate;
+  if (syncDate) {
     try {
       const accessToken = await getValidAccessToken(userId);
       if (!accessToken) {
@@ -262,17 +268,11 @@ export async function createTask(
       } else {
         const prefs = await getSchedulingPrefs(userId).catch(() => null);
         const tzOffset = prefs?.timezone ?? '+08:00';
-        const event = await createEvent(
-          accessToken,
-          data.title,
-          data.due_date!,
-          input.notes ?? null,
-          {
-            dueTime: data.due_time ?? null,
-            durationMinutes: data.duration_minutes ?? null,
-            tzOffset,
-          }
-        );
+        const event = await createEvent(accessToken, data.title, syncDate, input.notes ?? null, {
+          dueTime: data.due_time ?? null,
+          durationMinutes: data.duration_minutes ?? null,
+          tzOffset,
+        });
         await supabaseAdmin.from('tasks').update({ google_event_id: event.id }).eq('id', data.id);
         calResult = ' Added to Google Calendar.';
       }
