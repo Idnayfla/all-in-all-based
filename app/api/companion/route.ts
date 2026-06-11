@@ -546,11 +546,15 @@ export async function POST(req: NextRequest) {
       lastUserText
     );
 
+  // Also fire when assistant proposed something + recent messages have scheduling context.
+  // This catches natural follow-ups like "is 1pm okay?", "what about 3?", "how about 2pm?"
+  // where the user's phrasing doesn't start with a confirm/reschedule keyword.
   const shouldRunToolLoop =
     jwtUserId &&
     (COMPANION_TASK_RE.test(lastUserText) ||
       (SCHED_CONFIRM_RE.test(lastUserText.trim()) && assistantProposedSomething) ||
-      isSchedulingFollowUp);
+      isSchedulingFollowUp ||
+      (recentSchedulingContext && assistantProposedSomething));
 
   if (shouldRunToolLoop) {
     // Use SGT date — Vercel servers run UTC, SGT is UTC+8, so new Date() alone gives wrong "tomorrow"
@@ -595,6 +599,7 @@ export async function POST(req: NextRequest) {
       `- Resolve relative dates (today/tomorrow/next Monday) to YYYY-MM-DD using today's date above.`,
       `- Due times go as HH:MM 24h in due_time. Duration in minutes goes in duration_minutes.`,
       `- After create_task succeeds (no [CONFLICT] prefix in result): immediately tell the user BOTH what was booked AND the exact calendar status from the tool result ("Added to Google Calendar" OR the error message). Never say "Done" or "Booked" without including the calendar result.`,
+      `- CRITICAL: You CANNOT say a task was created, booked, added, or scheduled unless you called create_task in THIS response and received a non-[CONFLICT] result. If you did not call create_task, do NOT claim anything was booked.`,
       `- For brain/memory cleanup, call rewrite_memory with the cleaned list.`,
       schedPrefsContext,
     ]
