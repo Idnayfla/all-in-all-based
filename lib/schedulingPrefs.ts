@@ -102,6 +102,7 @@ export async function upsertSchedulingPrefs(
       : opts.patterns_note;
   }
 
+  let calendarResult = '';
   if (opts.travel_destination && opts.travel_start && opts.travel_end) {
     const win: TravelWindow = {
       destination: opts.travel_destination,
@@ -116,27 +117,37 @@ export async function upsertSchedulingPrefs(
     if (!alreadyExists) {
       content.travel_windows = [...(content.travel_windows ?? []), win];
 
-      // Sync to Google Calendar (fire-and-forget, exclusive end date = day after travel ends)
-      const endExclusive = new Date(new Date(opts.travel_end).getTime() + 86_400_000)
-        .toISOString()
-        .slice(0, 10);
-      getValidAccessToken(userId)
-        .then(async accessToken => {
-          if (!accessToken) return;
+      // Synchronous calendar sync so errors surface in the tool result
+      try {
+        const accessToken = await getValidAccessToken(userId);
+        if (accessToken) {
+          // Google all-day multi-day: end date is exclusive (day after last travel day)
+          const endExclusive = new Date(new Date(opts.travel_end).getTime() + 86_400_000)
+            .toISOString()
+            .slice(0, 10);
           await createEvent(
             accessToken,
             `Travel: ${opts.travel_destination}`,
-            opts.travel_start!,
+            opts.travel_start,
             null,
-            { endDate: endExclusive }
+            {
+              endDate: endExclusive,
+            }
           );
-        })
-        .catch(() => {});
+          calendarResult = ` Google Calendar event added (${opts.travel_start} – ${opts.travel_end}).`;
+        } else {
+          calendarResult = ' (Google Calendar not connected — saved to Brain only.)';
+        }
+      } catch (e) {
+        calendarResult = ` (Calendar sync failed: ${e instanceof Error ? e.message : String(e)})`;
+      }
+    } else {
+      calendarResult = ' (Travel window already saved.)';
     }
   }
 
   await writePrefs(userId, content);
-  return 'Scheduling preferences updated.';
+  return `Scheduling preferences updated.${calendarResult}`;
 }
 
 // Records that the user accepted a suggested slot, incrementing the counter

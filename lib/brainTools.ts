@@ -26,7 +26,7 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
   {
     name: 'create_task',
     description:
-      'Create a to-do task for the user. Use when the user asks to remember, add, schedule, or be reminded of something they need to do.',
+      'Create a to-do task for the user. Use when the user asks to remember, add, schedule, or be reminded of something they need to do. When due_time is provided, a conflict check runs automatically — if there is a conflict the task will NOT be created and you must report the conflict to the user.',
     input_schema: {
       type: 'object',
       properties: {
@@ -52,6 +52,11 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
           description: 'Task priority. Default normal.',
         },
         notes: { type: 'string', description: 'Optional extra detail about the task.' },
+        confirmed_slot: {
+          type: 'boolean',
+          description:
+            'Set to true ONLY when the user has already been shown a conflict and explicitly confirmed the time to use. Skips the automatic conflict check.',
+        },
       },
       required: ['title'],
     },
@@ -215,8 +220,22 @@ export async function createTask(
     duration_minutes?: number;
     priority?: string;
     notes?: string;
+    confirmed_slot?: boolean;
   }
 ): Promise<string> {
+  // Auto conflict check — runs whenever due_time is set and user hasn't already confirmed
+  if (input.due_date && input.due_time && !input.confirmed_slot) {
+    const conflictMsg = await checkSchedule(
+      userId,
+      input.due_date,
+      input.due_time,
+      input.duration_minutes ?? 30
+    );
+    if (conflictMsg.startsWith('Conflict')) {
+      return `[CONFLICT — task NOT created] ${conflictMsg} Ask the user to confirm the suggested time, then call create_task again with that time and confirmed_slot: true.`;
+    }
+  }
+
   const priority = PRIORITIES.includes(input.priority ?? '') ? input.priority : 'normal';
   const { data, error } = await supabaseAdmin
     .from('tasks')
@@ -426,6 +445,7 @@ export async function runBrainTool(
             typeof input.duration_minutes === 'number' ? input.duration_minutes : undefined,
           priority: input.priority ? String(input.priority) : undefined,
           notes: input.notes ? String(input.notes) : undefined,
+          confirmed_slot: input.confirmed_slot === true,
         });
       case 'list_tasks':
         return await listTasks(userId, (input.filter as 'today' | 'urgent' | 'all') ?? 'all');
