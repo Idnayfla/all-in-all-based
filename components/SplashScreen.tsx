@@ -132,8 +132,8 @@ export default function SplashScreen({ onDone }: Props) {
             src="/brand-icon-animated.svg"
             className={`splash-mark${logoIn ? ' visible' : ''}`}
             alt="Based"
-            width={96}
-            height={96}
+            width={128}
+            height={128}
           />
         </div>
         <div className={`splash-tagline${taglineIn ? ' visible' : ''}`}>based</div>

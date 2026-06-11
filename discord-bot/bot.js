@@ -47,11 +47,11 @@ process.on('exit', () => {
     fs.unlinkSync(pidFile);
   } catch {}
 });
-const { config, COUNCIL_CHANNEL, OLLAMA_BASE_URL, MODEL_OLLAMA } = require('./config');
+const { config, COUNCIL_CHANNEL, OLLAMA_BASE_URL, MODEL_OLLAMA, MODEL_HAIKU } = require('./config');
 const { AGENTS, dispatchAgent, anthropic, groq } = require('./agents');
 const { DEFINITIONS } = require('./tools');
 const { runCouncil, quickReply } = require('./council');
-const { sendAsAgent, sendAsAgentBurst, splitMessage } = require('./messenger');
+const { sendAsAgent, sendAsAgentBurst, sendAsOrchestrator, splitMessage } = require('./messenger');
 const {
   initAgentClients,
   registerMainClient,
@@ -375,12 +375,7 @@ discord.on('messageCreate', async message => {
     pushHistory(channelId, 'assistant', reply);
 
     // Extract memory in background — non-blocking
-    extractMemory(
-      slug,
-      getHistory(channelId),
-      anthropic,
-      config.model_sonnet || 'claude-sonnet-4-6'
-    ).catch(() => {});
+    extractMemory(slug, getHistory(channelId), anthropic, MODEL_HAIKU).catch(() => {});
 
     // 12% chance: agent sends a quick self-correction
     if (Math.random() < 0.12) {

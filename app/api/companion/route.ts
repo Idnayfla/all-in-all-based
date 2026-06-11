@@ -5,7 +5,7 @@ import { getUserIdFromApiKey, ApiRateLimitError } from '../_apiKeyAuth';
 import { getWeather } from '@/lib/weather';
 import { getTrafficInfo } from '@/lib/traffic';
 import { exaSearch } from '@/lib/tavily';
-import { MODEL_SONNET, MODEL_HAIKU } from '@/lib/models';
+import { MODEL_OPUS, MODEL_SONNET, MODEL_HAIKU } from '@/lib/models';
 import { BRAIN_TOOLS, runBrainTool, listTasks } from '@/lib/brainTools';
 
 export const maxDuration = 60;
@@ -148,6 +148,9 @@ Return ONLY a plain numbered list. Max 20 items. Format exactly like:
 1) Prefers dark mode interfaces [from: dark mode UI project]
 2) Works primarily in TypeScript
 3) Building a SaaS product [from: SaaS pricing discussion]
+
+CRITICAL — DO NOT EXTRACT TASKS:
+If the conversation is about creating tasks, adding to-dos, listing tasks, completing tasks, or setting reminders — do NOT add any of those items as memory facts. Tasks are ephemeral. Memory is for permanent long-term facts: skills, ongoing projects, preferences, relationships, recurring patterns, goals.
 
 STRICT RULES:
 - Never start a fact with “User” — write the fact directly as a statement or preference
@@ -512,13 +515,13 @@ export async function POST(req: NextRequest) {
     .filter(Boolean)
     .join('\n');
 
-  // Task management from companion — detect and run tool loop
+  // Task management + brain cleanup from companion — detect and run tool loop
   const COMPANION_TASK_RE =
-    /\b(add\s+a?\s*task|create\s+a?\s*task|new\s+task|remind\s+me\s+to|add\s+to\s+(my\s+)?tasks?|what(?:'?s|\s+is)?\s+(due|on my|my)\s+(today|list|tasks?)|what\s+do\s+i\s+have\s+due|list\s+(my\s+)?tasks?|show\s+(my\s+)?tasks?|mark\s+.{0,40}\s+as\s+done|complete\s+task|finish\s+task|task\s+done)\b/i;
+    /\b(add\s+a?\s*task|create\s+a?\s*task|new\s+task|remind\s+me\s+to|add\s+to\s+(my\s+)?tasks?|what(?:'?s|\s+is)?\s+(due|on my|my)\s+(today|list|tasks?)|what\s+do\s+i\s+have\s+due|list\s+(my\s+)?tasks?|show\s+(my\s+)?tasks?|mark\s+.{0,40}\s+as\s+done|complete\s+task|finish\s+task|task\s+done|clean\s+(up\s+)?(my\s+)?(brain|memory)|fix\s+(my\s+)?(brain|memory)|revamp\s+(my\s+)?(brain|memory)|reorgani[sz]e\s+(my\s+)?(brain|memory)|rewrite\s+(my\s+)?(brain|memory)|update\s+(my\s+)?(brain|memory)|my\s+(brain|memory)\s+(is\s+)?(wrong|messy|broken|off|outdated|incorrect))\b/i;
 
   if (jwtUserId && COMPANION_TASK_RE.test(lastUserText)) {
     const today = new Date().toISOString().slice(0, 10);
-    const toolSystem = `${system}\n\nTODAY'S DATE: ${today}. You have tools to manage the user's tasks. Use them directly. After using a tool, give a short natural confirmation — never expose raw JSON or tool mechanics.`;
+    const toolSystem = `${system}\n\nTODAY'S DATE: ${today}. You have tools to manage the user's tasks and memory. Use them directly. After using a tool, give a short natural confirmation — never expose raw JSON or tool mechanics. For brain/memory cleanup, use the rewrite_memory tool with a cleaned-up version of the user's memory.`;
     const convo: Anthropic.MessageParam[] = (
       messages as Array<{ role: string; content: string }>
     ).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
@@ -627,7 +630,7 @@ export async function POST(req: NextRequest) {
     async start(controller) {
       try {
         const stream = await client.messages.stream({
-          model: MODEL_SONNET,
+          model: MODEL_OPUS,
           max_tokens: 1024,
           system,
           messages: apiMessages as Parameters<typeof client.messages.stream>[0]['messages'],

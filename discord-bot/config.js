@@ -17,6 +17,7 @@ module.exports = {
   PROVIDER: config.provider || 'auto',
   MODEL_OPUS: config.model_opus || 'claude-fable-5',
   MODEL_SONNET: config.model_sonnet || 'claude-sonnet-4-6',
+  MODEL_HAIKU: config.model_haiku || 'claude-haiku-4-5',
   MODEL_GROQ: config.model_groq || 'llama-3.3-70b-versatile',
   MODEL_OLLAMA: config.model_ollama || 'llama3.1:8b',
   OLLAMA_BASE_URL: config.ollama_base_url || 'http://localhost:11434',

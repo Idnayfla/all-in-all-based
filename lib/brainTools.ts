@@ -107,6 +107,22 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
       required: ['name', 'type'],
     },
   },
+  {
+    name: 'rewrite_memory',
+    description:
+      "Rewrite and clean up the user's global memory (their 'brain'). Use when the user asks you to clean, fix, reorganize, or revamp their brain or memory. The current memory is visible in your system context above. Write a cleaner version that: removes duplicates, fixes wrong or stale facts (especially if the user just corrected one), removes task requests that snuck in, and merges related items. Keep all [from: source] annotations. Format as a plain numbered list — max 20 items.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        new_memory: {
+          type: 'string',
+          description:
+            "The cleaned-up memory as a plain numbered list. Example: '1) Works in TypeScript [from: project setup]\\n2) Building Based [from: product pitch]'. Max 20 items.",
+        },
+      },
+      required: ['new_memory'],
+    },
+  },
 ];
 
 // ── Task helpers ──────────────────────────────────────────────────────────────
@@ -307,12 +323,25 @@ export async function runBrainTool(
           content: (input.content as Record<string, unknown>) ?? undefined,
           notes: input.notes ? String(input.notes) : undefined,
         });
+      case 'rewrite_memory':
+        return await rewriteMemory(userId, String(input.new_memory ?? ''));
       default:
         return `Unknown tool: ${name}`;
     }
   } catch (err) {
     return `Tool ${name} failed: ${err instanceof Error ? err.message : String(err)}`;
   }
+}
+
+// ── Memory rewrite helper ─────────────────────────────────────────────────────
+export async function rewriteMemory(userId: string, newMemory: string): Promise<string> {
+  const cleaned = newMemory.trim().slice(0, 5000);
+  if (!cleaned) return 'No new memory provided — nothing changed.';
+  const { error } = await supabaseAdmin
+    .from('user_settings')
+    .upsert({ user_id: userId, global_memory: cleaned }, { onConflict: 'user_id' });
+  if (error) return `Could not save memory: ${error.message}`;
+  return 'Brain updated. Your memory has been cleaned up.';
 }
 
 // ── Background entity extraction (used by memory route) ───────────────────────

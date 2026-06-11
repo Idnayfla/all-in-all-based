@@ -1550,6 +1550,7 @@ async function runChatWithTools(
     complete_task: 'Completing task',
     search_entities: 'Recalling context',
     upsert_entity: 'Updating memory',
+    rewrite_memory: 'Cleaning up brain',
   };
   const today = new Date().toISOString().slice(0, 10);
   const system = [
@@ -1815,14 +1816,11 @@ export async function POST(req: NextRequest) {
     const encoder = new TextEncoder();
 
     const lf = createLangfuseClient();
-    if (!lf) console.warn('[LangFuse] client is null — keys missing');
-    else console.log('[LangFuse] client ready');
     const trace = lf?.trace({
       name: 'generate',
       input: { message: lastUserMessage.slice(0, 500), aiModel, hasImage },
       userId: supabaseUserId,
     });
-    if (trace) console.log('[LangFuse] trace:', trace.id);
 
     const startMs = Date.now();
 
@@ -2034,7 +2032,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
           // always routed to the chat/tool path (runChatWithTools) and never
           // sent to the file-generator pipeline by mistake.
           const TASK_MGMT_RE =
-            /\b(add\s+a?\s*task|create\s+a?\s*task|new\s+task|remind\s+me\s+to|add\s+to\s+(my\s+)?tasks?|what(?:'?s|\s+is)?\s+(due|on my|my)\s+(today|list|tasks?)|what\s+do\s+i\s+have\s+due|list\s+(my\s+)?tasks?|show\s+(my\s+)?tasks?|mark\s+.{0,40}\s+as\s+done|complete\s+task|finish\s+task|task\s+done)\b/i;
+            /\b(add\s+a?\s*task|create\s+a?\s*task|new\s+task|remind\s+me\s+to|add\s+to\s+(my\s+)?tasks?|what(?:'?s|\s+is)?\s+(due|on my|my)\s+(today|list|tasks?)|what\s+do\s+i\s+have\s+due|list\s+(my\s+)?tasks?|show\s+(my\s+)?tasks?|mark\s+.{0,40}\s+as\s+done|complete\s+task|finish\s+task|task\s+done|clean\s+(up\s+)?(my\s+)?(brain|memory)|fix\s+(my\s+)?(brain|memory)|revamp\s+(my\s+)?(brain|memory)|reorgani[sz]e\s+(my\s+)?(brain|memory)|rewrite\s+(my\s+)?(brain|memory)|update\s+(my\s+)?(brain|memory)|my\s+(brain|memory)\s+(is\s+)?(wrong|messy|broken|off|outdated|incorrect))\b/i;
           if (TASK_MGMT_RE.test(lastUserMessage)) {
             let fullText = '';
             if (!usingFreeModel && HAS_ANTHROPIC_KEY) {
@@ -2096,7 +2094,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
           if (hasCodeIntentKeyword && looksLikeCode) {
             const codeReviewSystem =
               'The user has shared code and wants it improved or reviewed. Return ONLY the improved code in a markdown code block with the language tag, followed by a short bulleted list of what changed. Do not create files. Do not generate an app.';
-            const sysText = usingFreeModel ? codeReviewSystem : codeReviewSystem;
+            const sysText = codeReviewSystem;
             const msgs = [
               { role: 'system', content: sysText },
               ...anthropicMessages.map((m: { role: string; content: unknown }) => ({
