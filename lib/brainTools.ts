@@ -13,6 +13,7 @@ import {
   findFreeSlot,
   getCalendarIds,
   createEvent,
+  deleteEvent,
 } from '@/lib/googleCalendar';
 import { getSchedulingPrefs, upsertSchedulingPrefs } from '@/lib/schedulingPrefs';
 
@@ -80,6 +81,21 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
   {
     name: 'complete_task',
     description: 'Mark a task as done. Identify it by its id or by a fuzzy match on its title.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        task_id_or_title: {
+          type: 'string',
+          description: 'The task id (uuid) or a substring of the task title to match.',
+        },
+      },
+      required: ['task_id_or_title'],
+    },
+  },
+  {
+    name: 'cancel_task',
+    description:
+      'Cancel or delete a task and remove its Google Calendar event. Use when the user asks to remove, delete, or cancel a task or meeting. Identify by id or a fuzzy match on title.',
     input_schema: {
       type: 'object',
       properties: {
@@ -356,6 +372,42 @@ export async function completeTask(userId: string, idOrTitle: string): Promise<s
   return `Marked done: "${data.title}"`;
 }
 
+export async function cancelTask(userId: string, idOrTitle: string): Promise<string> {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrTitle);
+
+  let query = supabaseAdmin
+    .from('tasks')
+    .select('id, title, google_event_id')
+    .eq('user_id', userId);
+  query = isUuid ? query.eq('id', idOrTitle) : query.ilike('title', `%${idOrTitle}%`);
+
+  const { data: rows } = await query.limit(1);
+  if (!rows || rows.length === 0) return `No matching task found for: ${idOrTitle}`;
+  const task = rows[0];
+
+  let calMsg = ' (No calendar event linked.)';
+  if (task.google_event_id) {
+    try {
+      const accessToken = await getValidAccessToken(userId);
+      if (!accessToken) {
+        calMsg = ' (Calendar event removal failed: Google Calendar not connected.)';
+      } else {
+        await deleteEvent(accessToken, task.google_event_id);
+        calMsg = ' and removed from Google Calendar.';
+      }
+    } catch (e) {
+      calMsg = ` (Calendar event removal failed: ${e instanceof Error ? e.message : String(e)})`;
+    }
+  }
+
+  await supabaseAdmin.from('tasks').delete().eq('id', task.id).eq('user_id', userId);
+
+  if (calMsg === ' and removed from Google Calendar.') {
+    return `Cancelled task: "${task.title}"${calMsg}`;
+  }
+  return `Cancelled task: "${task.title}".${calMsg}`;
+}
+
 // ── Entity helpers ────────────────────────────────────────────────────────────
 export async function searchEntities(userId: string, query: string): Promise<string> {
   const term = `%${query.trim()}%`;
@@ -463,6 +515,8 @@ export async function runBrainTool(
         return await listTasks(userId, (input.filter as 'today' | 'urgent' | 'all') ?? 'all');
       case 'complete_task':
         return await completeTask(userId, String(input.task_id_or_title ?? ''));
+      case 'cancel_task':
+        return await cancelTask(userId, String(input.task_id_or_title ?? ''));
       case 'search_entities':
         return await searchEntities(userId, String(input.query ?? ''));
       case 'upsert_entity':
