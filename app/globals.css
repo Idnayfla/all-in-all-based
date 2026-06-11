@@ -84,15 +84,15 @@ body {
   /* â”€â”€ Surface layers â”€â”€ */
   --surface2: rgba(255, 255, 255, 0.05);
   /* â”€â”€ Typography scale â”€â”€ */
-  --fs-2xs: 9px;
-  --fs-xs: 10px;
-  --fs-sm: 11px;
-  --fs-base: 12px;
-  --fs-md: 13px;
-  --fs-lg: 14px;
-  --fs-xl: 16px;
-  --fs-2xl: 18px;
-  --fs-3xl: 22px;
+  --fs-2xs: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 13px;
+  --fs-base: 14px;
+  --fs-md: 15px;
+  --fs-lg: 16px;
+  --fs-xl: 18px;
+  --fs-2xl: 20px;
+  --fs-3xl: 26px;
   --fs-hero: 72px;
   /* â”€â”€ Spacing scale â”€â”€ */
   --sp-1: 4px;
@@ -299,20 +299,20 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 5px 8px;
+  padding: 7px 12px;
   background: transparent;
   border: none;
-  color: var(--text2);
+  color: var(--text3);
   font-family: var(--font-pixel);
-  font-size: 11px;
-  letter-spacing: 1px;
+  font-size: 13px;
+  letter-spacing: 0.8px;
   cursor: pointer;
   border-radius: var(--r-md);
   transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .tab-btn:hover:not(.active) {
   color: var(--text);
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.07);
   transform: translateY(-1px);
 }
 .tab-btn:active {
@@ -321,7 +321,8 @@ body {
 .tab-btn.active {
   background: linear-gradient(135deg, var(--accent) 0%, #d4b280 100%);
   color: var(--bg);
-  box-shadow: 0 2px 10px rgba(201, 168, 124, 0.28);
+  font-weight: 700;
+  box-shadow: 0 2px 12px rgba(201, 168, 124, 0.35);
 }
 
 /* â”€â”€ Tab bar row â”€â”€ dedicated row below the header (never shares the header row) */
@@ -964,12 +965,12 @@ body {
   margin-top: 4px;
 }
 .suggestion-btn {
-  padding: 7px 16px;
+  padding: 9px 18px;
   background: var(--accent-subtle);
   border: 1px solid var(--border);
   color: var(--text2);
   font-family: var(--font-pixel);
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
   border-radius: var(--r-full);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
@@ -988,9 +989,9 @@ body {
 .message {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   max-width: 100%;
-  padding: 14px 18px;
+  padding: 16px 20px;
   border-radius: var(--r-xl);
   animation: messageIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   border: 1px solid transparent;
@@ -1112,16 +1113,16 @@ body {
   border: 1px solid var(--border);
   color: var(--text);
   font-family: var(--font-pixel);
-  font-size: 13px;
-  padding: 12px 14px;
+  font-size: 15px;
+  padding: 13px 16px;
   border-radius: var(--r-lg);
   resize: none;
   outline: none;
   transition:
     border-color 0.2s,
     box-shadow 0.2s;
-  line-height: 1.5;
-  min-height: 44px;
+  line-height: 1.55;
+  min-height: 50px;
   max-height: 200px;
 }
 .chat-textarea:focus {
@@ -1131,16 +1132,16 @@ body {
     0 2px 16px rgba(201, 168, 124, 0.08);
 }
 .chat-textarea::placeholder {
-  color: var(--text3);
+  color: var(--text2);
 }
 .send-btn {
-  height: 44px;
-  padding: 0 20px;
+  height: 50px;
+  padding: 0 24px;
   background: linear-gradient(135deg, var(--accent-hover) 0%, var(--accent) 60%, #b8925c 100%);
   border: none;
   color: var(--bg);
   font-family: var(--font-pixel);
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 1px;
   cursor: pointer;
   border-radius: var(--r-lg);
@@ -2104,9 +2105,9 @@ body {
   padding: 18px 16px 8px;
 }
 .sidebar-header {
-  font-size: var(--fs-2xs);
-  letter-spacing: 2px;
-  color: var(--text3);
+  font-size: var(--fs-xs);
+  letter-spacing: 1.5px;
+  color: var(--text2);
   text-transform: uppercase;
   font-weight: 600;
   font-family: var(--font-mono);
@@ -2114,12 +2115,12 @@ body {
 .sidebar-new-btn {
   background: transparent;
   border: 1px solid var(--border);
-  color: var(--text3);
-  width: 22px;
-  height: 22px;
+  color: var(--text2);
+  width: 28px;
+  height: 28px;
   border-radius: var(--r-sm);
   cursor: pointer;
-  font-size: 15px;
+  font-size: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2146,9 +2147,9 @@ body {
   display: none;
 }
 .project-item {
-  padding: 8px 10px 8px 8px;
+  padding: 10px 12px 10px 10px;
   border-radius: var(--r-md);
-  font-size: var(--fs-base);
+  font-size: var(--fs-md);
   cursor: pointer;
   color: var(--text2);
   display: flex;
@@ -2187,7 +2188,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: var(--fs-base);
+  font-size: var(--fs-md);
 }
 .project-actions {
   display: flex;
@@ -2209,10 +2210,10 @@ body {
   border: none;
   color: var(--text3);
   cursor: pointer;
-  font-size: 11px;
+  font-size: 13px;
   padding: 0;
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   border-radius: var(--r-sm);
   display: flex;
   align-items: center;
@@ -2744,8 +2745,8 @@ body {
     display: none;
   }
   .tab-btn {
-    padding: 5px 10px;
-    font-size: 10px;
+    padding: 7px 10px;
+    font-size: 12px;
   }
 
   /* Prevent iOS Safari auto-zoom on input focus (triggered when font-size < 16px) */
@@ -2842,8 +2843,8 @@ body {
   /* Primary tabs flex evenly */
   .tab-btn {
     flex: 1;
-    padding: 6px 4px;
-    font-size: 10px;
+    padding: 8px 6px;
+    font-size: 12px;
     letter-spacing: 0.4px;
     min-width: 0;
   }
@@ -2858,8 +2859,8 @@ body {
     justify-content: center;
     gap: 3px;
     flex: 1;
-    padding: 6px 4px;
-    font-size: 10px;
+    padding: 8px 6px;
+    font-size: 12px;
     letter-spacing: 0.4px;
     min-width: 0;
   }
@@ -6863,8 +6864,8 @@ body {
 }
 .image-panel-tab {
   flex: 1;
-  padding: 8px 4px;
-  font-size: 10px;
+  padding: 10px 6px;
+  font-size: 13px;
   background: none;
   border: none;
   color: var(--text3);
