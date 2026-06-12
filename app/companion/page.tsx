@@ -392,14 +392,15 @@ export default function CompanionOverlayPage() {
       };
 
       recog.onend = () => {
-        // Do NOT clear wakeListening here — the session is about to restart
-        // immediately and toggling false→true causes the visible flicker.
-        // wakeListening stays true until the feature is disabled or errors.
-        if (wakeWordEnabledRef.current && wakeStateRef.current === 'idle') {
-          setTimeout(startWake, 150);
-        } else {
+        if (!wakeWordEnabledRef.current) {
+          // Feature was toggled off — clear visual state
           setWakeListening(false);
+        } else if (wakeStateRef.current === 'idle') {
+          // Normal session end (mobile stops after silence) — restart, keep ◉ lit
+          setTimeout(startWake, 150);
         }
+        // wakeState === 'listening' | 'processing': we just detected the wake word
+        // and switched to command capture. Keep wakeListening true — no flicker.
       };
 
       recog.onerror = (e: SpeechRecognitionErrorEvent) => {
