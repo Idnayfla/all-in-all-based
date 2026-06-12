@@ -6,7 +6,7 @@ import { getWeather } from '@/lib/weather';
 import { getTrafficInfo } from '@/lib/traffic';
 import { exaSearch } from '@/lib/tavily';
 import { MODEL_OPUS, MODEL_SONNET, MODEL_HAIKU } from '@/lib/models';
-import { BRAIN_TOOLS, runBrainTool, listTasks } from '@/lib/brainTools';
+import { BRAIN_TOOLS, runBrainTool, listTasks, listCalendarEvents } from '@/lib/brainTools';
 import { getSchedulingPrefs } from '@/lib/schedulingPrefs';
 import { getEffectiveTier, TIER_LIMITS } from '@/lib/tiers';
 
@@ -298,20 +298,30 @@ export async function POST(req: NextRequest) {
     extractPatternsAsync(jwtUserId, messages);
   }
 
-  // J3 — fetch today's tasks for proactive morning briefing
+  // J3 — fetch today's tasks + calendar events for proactive briefing
   let todayTasksContext = '';
+  let todayCalendarContext = '';
   if (jwtUserId && isFirstMessageOfSession) {
-    try {
-      const tasksResult = await listTasks(jwtUserId, 'today');
-      if (
-        !tasksResult.startsWith('Nothing') &&
-        !tasksResult.startsWith('No open') &&
-        !tasksResult.startsWith('Could not')
-      ) {
-        todayTasksContext = tasksResult;
+    const sgtTodayStr = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const [tasksResult, calResult] = await Promise.allSettled([
+      listTasks(jwtUserId, 'today'),
+      listCalendarEvents(jwtUserId, sgtTodayStr, sgtTodayStr),
+    ]);
+    if (tasksResult.status === 'fulfilled') {
+      const r = tasksResult.value;
+      if (!r.startsWith('Nothing') && !r.startsWith('No open') && !r.startsWith('Could not')) {
+        todayTasksContext = r;
       }
-    } catch {
-      // silent — never block response
+    }
+    if (calResult.status === 'fulfilled') {
+      const r = calResult.value;
+      if (
+        !r.startsWith('No events') &&
+        !r.startsWith('Google Calendar') &&
+        !r.startsWith('Could not')
+      ) {
+        todayCalendarContext = r;
+      }
     }
   }
 
@@ -455,10 +465,17 @@ export async function POST(req: NextRequest) {
       timeTone = `late night (${localHour}:00 SGT, ${dayOfWeek}) — calm, focused, no pressure`;
     }
     const taskNote = todayTasksContext
-      ? ` Today's tasks:\n${todayTasksContext}\nMention these briefly in your opening — name what's on their plate.`
+      ? `\nToday's tasks:\n${todayTasksContext}`
       : '';
+    const calNote = todayCalendarContext
+      ? `\nToday's calendar:\n${todayCalendarContext}`
+      : '';
+    const contextNote =
+      taskNote || calNote
+        ? ` Here is what's on their plate today:${taskNote}${calNote}\nMention what's most relevant — an upcoming event, a task due soon — naturally, not as a list.`
+        : '';
     dynamicInstructions.push(
-      `DAILY BRIEFING: The user just opened Based. It is ${timeTone}.${taskNote} Open with a short, direct check-in that matches the time — reference memory and patterns to make it feel personal. Not a greeting, not “good morning” — something specific you noticed or something on their plate. Under 2 sentences. Then let them lead.`
+      `DAILY BRIEFING: The user just opened Based. It is ${timeTone}.${contextNote} Open with a short, direct check-in that matches the time — reference memory and patterns to make it feel personal. Not a greeting, not “good morning” — something specific you noticed or something on their plate. Under 2 sentences. Then let them lead.`
     );
   }
 
