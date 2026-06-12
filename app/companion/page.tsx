@@ -359,9 +359,10 @@ export default function CompanionOverlayPage() {
     startWake = () => {
       if (!wakeWordEnabledRef.current) return;
       if (wakeStateRef.current !== 'idle') return;
-      // Throttle: avoid tight restart loops on browsers that end immediately
+      // Throttle: 500ms floor prevents tight restart loops when the speech API
+      // errors immediately (common in Electron where Google speech is unreliable)
       const now = Date.now();
-      if (now - lastStartAt < 150) return;
+      if (now - lastStartAt < 500) return;
       lastStartAt = now;
 
       const recog = new SRClass();
@@ -369,10 +370,12 @@ export default function CompanionOverlayPage() {
       recog.interimResults = true;
       recog.lang = 'en-US';
 
+      // Track whether this session hit a network-class error so onend can
+      // back off longer instead of restarting at 150ms (which would loop).
+      let networkError = false;
+
       // onstart fires once the mic is live — this is the "it's actually working" signal
       recog.onstart = () => {
-        // Once the mic is live, keep showing ◉ even through session restarts.
-        // Don't toggle it off in onend — that causes the visible flicker.
         setWakeListening(true);
       };
 
@@ -393,23 +396,26 @@ export default function CompanionOverlayPage() {
 
       recog.onend = () => {
         if (!wakeWordEnabledRef.current) {
-          // Feature was toggled off — clear visual state
           setWakeListening(false);
         } else if (wakeStateRef.current === 'idle') {
-          // Normal session end (mobile stops after silence) — restart, keep ◉ lit
-          setTimeout(startWake, 150);
+          // Network errors (common in Electron) need a long backoff so we don't
+          // hammer Google's speech servers and flood the Chromium error log.
+          setTimeout(startWake, networkError ? 5000 : 150);
         }
-        // wakeState === 'listening' | 'processing': we just detected the wake word
-        // and switched to command capture. Keep wakeListening true — no flicker.
+        // wakeState === 'listening' | 'processing': keep wakeListening true — no flicker.
       };
 
       recog.onerror = (e: SpeechRecognitionErrorEvent) => {
         if (e.error === 'not-allowed') {
           setWakeListening(false);
           setWakeError('Mic denied — allow microphone in browser settings');
+          return;
         }
-        // 'aborted', 'no-speech', 'audio-capture', 'network': transient.
-        // onend fires next and schedules the restart — don't touch wakeListening.
+        if (e.error === 'network' || e.error === 'service-not-allowed') {
+          networkError = true; // onend will use 5s backoff instead of 150ms
+        }
+        // 'aborted', 'no-speech', 'audio-capture': transient.
+        // onend fires next and handles the restart — don't touch wakeListening.
       };
 
       try {
