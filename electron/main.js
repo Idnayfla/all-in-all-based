@@ -6,6 +6,18 @@ const fs = require('fs');
 // user gesture — required for the auto-greeting in the companion overlay.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
+// Suppress the Web Speech API's internal Chromium log noise.
+// Every speech recognition session teardown produces:
+//   ERROR:chunked_data_pipe_upload_data_stream.cc(218)] OnSizeReceived failed with Error: -2
+// This is cosmetic — it does not affect functionality. Filter it from stderr.
+const _origStderrWrite = process.stderr.write.bind(process.stderr);
+process.stderr.write = function (chunk, ...args) {
+  if (typeof chunk === 'string' && chunk.includes('chunked_data_pipe_upload_data_stream')) {
+    return true;
+  }
+  return _origStderrWrite(chunk, ...args);
+};
+
 const IS_DEV = process.env.ELECTRON_DEV === 'true';
 const APP_URL = IS_DEV ? 'http://localhost:3000' : 'https://www.getbased.dev';
 const OVERLAY_URL = IS_DEV ? 'http://localhost:3000/companion' : 'https://www.getbased.dev/companion';

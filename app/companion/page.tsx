@@ -288,11 +288,9 @@ export default function CompanionOverlayPage() {
   useEffect(() => { isGeneratingRef.current = isGenerating; }, [isGenerating]);
   useEffect(() => { isSpeakingRef.current = isSpeaking; }, [isSpeaking]);
 
-  // Wake word — "Hey Based" using Web Speech API (mobile Chrome / desktop Chrome)
-  // Skipped entirely in Electron: Web Speech API audio uploads to Google cause
-  // Chromium chunked_data_pipe errors on every session cycle.
+  // Wake word — "Hey Based" using Web Speech API
   useEffect(() => {
-    if (typeof window === 'undefined' || !!window.electronAPI) return;
+    if (typeof window === 'undefined') return;
 
     const SRClass =
       (window as unknown as { SpeechRecognition?: new () => SpeechRecognition }).SpeechRecognition ??
@@ -1299,43 +1297,41 @@ export default function CompanionOverlayPage() {
               {voiceGender === 'male' ? '⬡ Male' : '⬡ Female'}
             </button>
           )}
-          {!isElectron && (
-            <button
-              className={`companion-capture-btn${wakeWordEnabled ? ' active' : ''}`}
-              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-              onClick={() => {
-                const next = !wakeWordEnabled;
-                setWakeWordEnabled(next);
-                setWakeError(null);
-                localStorage.setItem('based_companion_wake', String(next));
-              }}
-              title={
-                wakeWordEnabled
-                  ? wakeListening
-                    ? 'Mic active — say "Hey Based"'
-                    : wakeError
-                      ? wakeError
-                      : 'Starting mic...'
-                  : 'Enable wake word — say "Hey Based" to activate'
-              }
-            >
-              {wakeWordEnabled
-                ? wakeState === 'listening'
-                  ? '◉ Listening...'
-                  : wakeState === 'processing'
-                    ? '◈ Processing...'
-                    : wakeListening
-                      ? '◉ Hey Based'
-                      : '⊙ Hey Based'
-                : '⊙ Hey Based'}
-            </button>
-          )}
-          {(captureError || (!isElectron && wakeError)) && (
+          <button
+            className={`companion-capture-btn${wakeWordEnabled ? ' active' : ''}`}
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            onClick={() => {
+              const next = !wakeWordEnabled;
+              setWakeWordEnabled(next);
+              setWakeError(null);
+              localStorage.setItem('based_companion_wake', String(next));
+            }}
+            title={
+              wakeWordEnabled
+                ? wakeListening
+                  ? 'Mic active — say "Hey Based"'
+                  : wakeError
+                    ? wakeError
+                    : 'Starting mic...'
+                : 'Enable wake word — say "Hey Based" to activate'
+            }
+          >
+            {wakeWordEnabled
+              ? wakeState === 'listening'
+                ? '◉ Listening...'
+                : wakeState === 'processing'
+                  ? '◈ Processing...'
+                  : wakeListening
+                    ? '◉ Hey Based'
+                    : '⊙ Hey Based'
+              : '⊙ Hey Based'}
+          </button>
+          {(captureError || wakeError) && (
             <span className="companion-capture-error">{captureError ?? wakeError}</span>
           )}
         </div>
 
-        {!isElectron && wakeWordEnabled && wakeState !== 'idle' && (
+        {wakeWordEnabled && wakeState !== 'idle' && (
           <div className="companion-wake-indicator">
             <span className="companion-wake-pulse" />
             {wakeState === 'listening' ? 'Listening for your command...' : 'Processing...'}
