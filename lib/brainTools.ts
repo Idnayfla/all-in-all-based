@@ -7,6 +7,18 @@
 import { supabaseAdmin } from '@/app/api/_auth';
 import Anthropic from '@anthropic-ai/sdk';
 import { MODEL_HAIKU } from '@/lib/models';
+import {
+  getValidAccessToken,
+  checkFreebusy,
+  findFreeSlot,
+  getCalendarIds,
+  createEvent,
+  deleteEvent,
+  deleteEventsByTitle,
+  moveEventsByTitle,
+  listEventsInRange,
+} from '@/lib/googleCalendar';
+import { getSchedulingPrefs, upsertSchedulingPrefs } from '@/lib/schedulingPrefs';
 
 const ENTITY_TYPES = ['project', 'person', 'topic', 'account', 'place', 'other'];
 const PRIORITIES = ['urgent', 'high', 'normal', 'low'];
@@ -18,7 +30,7 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
   {
     name: 'create_task',
     description:
-      'Create a to-do task for the user. Use when the user asks to remember, add, schedule, or be reminded of something they need to do.',
+      'Create a to-do task for the user. Use when the user asks to remember, add, schedule, or be reminded of something they need to do. When due_time is provided, a conflict check runs automatically — if there is a conflict the task will NOT be created and you must report the conflict to the user.',
     input_schema: {
       type: 'object',
       properties: {
@@ -26,7 +38,17 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
         due_date: {
           type: 'string',
           description:
-            'ISO 8601 date or datetime the task is due (e.g. 2026-06-11 or 2026-06-11T17:00:00Z). Resolve relative dates like "tomorrow" yourself based on the current date.',
+            'ISO 8601 date the task is due, e.g. "2026-06-11". Resolve relative dates like "tomorrow" using the current date.',
+        },
+        due_time: {
+          type: 'string',
+          description:
+            'Local time for the task in HH:MM 24h format, e.g. "14:00". Only set when the user specifies a time.',
+        },
+        duration_minutes: {
+          type: 'number',
+          description:
+            'How long the task takes in minutes, e.g. 60. Only set when the user specifies a duration.',
         },
         priority: {
           type: 'string',
@@ -34,6 +56,11 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
           description: 'Task priority. Default normal.',
         },
         notes: { type: 'string', description: 'Optional extra detail about the task.' },
+        confirmed_slot: {
+          type: 'boolean',
+          description:
+            'Set to true ONLY when the user has already been shown a conflict and explicitly confirmed the time to use. Skips the automatic conflict check.',
+        },
       },
       required: ['title'],
     },
@@ -57,6 +84,104 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
   {
     name: 'complete_task',
     description: 'Mark a task as done. Identify it by its id or by a fuzzy match on its title.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        task_id_or_title: {
+          type: 'string',
+          description: 'The task id (uuid) or a substring of the task title to match.',
+        },
+      },
+      required: ['task_id_or_title'],
+    },
+  },
+  {
+    name: 'list_calendar_events',
+    description:
+      "List all events on the user's Google Calendar for a given date range. Use when the user asks what's on a specific day, or before moving events to identify actual event titles. Returns event names, times, and dates.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        date_from: {
+          type: 'string',
+          description: 'Start date YYYY-MM-DD.',
+        },
+        date_to: {
+          type: 'string',
+          description: 'End date YYYY-MM-DD inclusive. Defaults to date_from if omitted.',
+        },
+      },
+      required: ['date_from'],
+    },
+  },
+  {
+    name: 'move_calendar_events',
+    description:
+      'Find Google Calendar events by title and shift their date by N days, shift their time by N hours, OR set an absolute time. Use for "shift X 3 days ahead", "make it 2 hours earlier", "move my lesson to 4pm", "push my meeting back 1 hour", "reschedule VR class to tomorrow". Use shift_hours for relative hour shifts (never guess absolute times when the user says "earlier"/"later"). Works on native calendar events, not just Based tasks.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title_keyword: {
+          type: 'string',
+          description: 'Keyword matching event titles, e.g. "lesson" or "VR".',
+        },
+        shift_days: {
+          type: 'number',
+          description:
+            'Days to shift: positive = forward, negative = backward. e.g. 3 = 3 days ahead, -1 = yesterday.',
+        },
+        shift_hours: {
+          type: 'number',
+          description:
+            "Hours to shift each event: negative = earlier, positive = later. e.g. -2 = 2 hours earlier, 1 = 1 hour later. Applied to each event's existing time, so morning and afternoon sessions both shift correctly with one call.",
+        },
+        new_time: {
+          type: 'string',
+          description:
+            'New local time in HH:MM 24h. Use when changing only the time, e.g. "16:00".',
+        },
+        date_from: {
+          type: 'string',
+          description: 'Only affect events on or after this YYYY-MM-DD. Defaults to today.',
+        },
+        date_to: {
+          type: 'string',
+          description:
+            'Only affect events on or before this YYYY-MM-DD. Defaults to today + 30 days.',
+        },
+        confirmed: {
+          type: 'boolean',
+          description:
+            'Set to true to force the move even if destination slots have conflicts. Only use after reporting conflicts to the user and getting explicit confirmation.',
+        },
+      },
+      required: ['title_keyword'],
+    },
+  },
+  {
+    name: 'remove_calendar_events',
+    description:
+      'Search Google Calendar by event title keyword and delete all matching future events. Use when the user asks to remove or delete recurring or native calendar events by name — e.g. "remove all Decompress events", "delete all VR classes from my calendar". Does NOT require a Based task entry.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        title_keyword: {
+          type: 'string',
+          description:
+            'Keyword to match against event titles (case-insensitive). e.g. "Decompress".',
+        },
+        days_ahead: {
+          type: 'number',
+          description: 'How many days ahead to search and delete. Default 365.',
+        },
+      },
+      required: ['title_keyword'],
+    },
+  },
+  {
+    name: 'cancel_task',
+    description:
+      'Cancel or delete a task and remove its Google Calendar event. Use when the user asks to remove, delete, or cancel a task or meeting. Identify by id or a fuzzy match on title.',
     input_schema: {
       type: 'object',
       properties: {
@@ -123,28 +248,151 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
       required: ['new_memory'],
     },
   },
+  {
+    name: 'check_schedule',
+    description:
+      "Check if a date + time is free on the user's Google Calendar before scheduling a task. Always call this when the user specifies a time. If a conflict is found, report the suggested free slot and ask the user for confirmation before creating the task.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        date: {
+          type: 'string',
+          description: 'Date to check in YYYY-MM-DD format.',
+        },
+        time: {
+          type: 'string',
+          description: 'Preferred local time in HH:MM 24h format, e.g. "15:00".',
+        },
+        duration_minutes: {
+          type: 'number',
+          description: 'Duration of the task in minutes. Default 60.',
+        },
+      },
+      required: ['date', 'time'],
+    },
+  },
+  {
+    name: 'upsert_scheduling_prefs',
+    description:
+      "Store or update the user's scheduling preferences — timezone, typical work hours, travel windows, or a freeform habit note. Use when the user mentions patterns like 'I'm usually free Tuesday mornings', 'I'll be in Japan May 1-7', or 'I work 9-5'. Always confirm with the user before saving travel windows.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        timezone: {
+          type: 'string',
+          description: 'UTC offset in ±HH:MM format, e.g. "+08:00".',
+        },
+        work_hours_start: {
+          type: 'string',
+          description: 'Start of typical work day, HH:MM, e.g. "09:00".',
+        },
+        work_hours_end: {
+          type: 'string',
+          description: 'End of typical work day, HH:MM, e.g. "18:00".',
+        },
+        patterns_note: {
+          type: 'string',
+          description:
+            'A freeform sentence about a scheduling habit to remember, e.g. "Free Tuesday mornings".',
+        },
+        travel_destination: {
+          type: 'string',
+          description: 'Destination name for a travel window, e.g. "Japan".',
+        },
+        travel_start: {
+          type: 'string',
+          description: 'Start date of travel in YYYY-MM-DD format.',
+        },
+        travel_end: {
+          type: 'string',
+          description: 'End date of travel in YYYY-MM-DD format.',
+        },
+      },
+    },
+  },
 ];
 
 // ── Task helpers ──────────────────────────────────────────────────────────────
 export async function createTask(
   userId: string,
-  input: { title: string; due_date?: string; priority?: string; notes?: string }
+  input: {
+    title: string;
+    due_date?: string;
+    due_time?: string;
+    duration_minutes?: number;
+    priority?: string;
+    notes?: string;
+    confirmed_slot?: boolean;
+  }
 ): Promise<string> {
+  // If a time is given without a date, default to today in SGT (UTC+8).
+  // Vercel runs UTC — offset manually so "today" is correct for Singapore users.
+  const sgtToday = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const effectiveDueDate = input.due_date ?? (input.due_time ? sgtToday : null);
+
+  // Auto conflict check — runs whenever due_time is set and user hasn't already confirmed
+  if (effectiveDueDate && input.due_time && !input.confirmed_slot) {
+    const conflictMsg = await checkSchedule(
+      userId,
+      effectiveDueDate,
+      input.due_time,
+      input.duration_minutes ?? 30
+    );
+    if (conflictMsg.startsWith('Conflict')) {
+      return `[CONFLICT — task NOT created] ${conflictMsg} Ask the user to confirm the suggested time, then call create_task again with that time and confirmed_slot: true.`;
+    }
+  }
+
   const priority = PRIORITIES.includes(input.priority ?? '') ? input.priority : 'normal';
   const { data, error } = await supabaseAdmin
     .from('tasks')
     .insert({
       user_id: userId,
       title: input.title.slice(0, 500),
-      due_date: input.due_date ?? null,
+      due_date: effectiveDueDate,
+      due_time: input.due_time ?? null,
+      duration_minutes: input.duration_minutes ?? null,
       priority,
       notes: input.notes ?? null,
     })
-    .select('id, title, due_date, priority')
+    .select('id, title, due_date, due_time, duration_minutes, priority')
     .single();
   if (error) return `Could not create task: ${error.message}`;
+
+  // Synchronous Google Calendar sync — errors surface in the tool result
+  let calResult = '';
+  const syncDate = data.due_date ?? effectiveDueDate;
+  if (syncDate) {
+    try {
+      const accessToken = await getValidAccessToken(userId);
+      if (!accessToken) {
+        calResult = ' (Google Calendar not connected — task saved without calendar event.)';
+      } else {
+        const prefs = await getSchedulingPrefs(userId).catch(() => null);
+        const tzOffset = prefs?.timezone ?? '+08:00';
+        const event = await createEvent(accessToken, data.title, syncDate, input.notes ?? null, {
+          dueTime: data.due_time ?? null,
+          durationMinutes: data.duration_minutes ?? null,
+          tzOffset,
+        });
+        await supabaseAdmin.from('tasks').update({ google_event_id: event.id }).eq('id', data.id);
+        calResult = ' Added to Google Calendar.';
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('403')) {
+        calResult =
+          ' (Calendar sync failed: Google Calendar needs to be reconnected — the stored token is missing write permission. Tell the user to go to Settings → Google Calendar → Disconnect and reconnect.)';
+      } else {
+        calResult = ` (Calendar sync failed: ${msg})`;
+      }
+    }
+  }
+
   const due = data.due_date ? ` (due ${new Date(data.due_date).toLocaleDateString()})` : '';
-  return `Created task: "${data.title}"${due} [${data.priority}]`;
+  const time = data.due_time ? ` at ${data.due_time}` : '';
+  const dur = data.duration_minutes ? ` for ${data.duration_minutes}min` : '';
+  return `Created task: "${data.title}"${due}${time}${dur} [${data.priority}]${calResult}`;
 }
 
 export async function listTasks(
@@ -208,6 +456,159 @@ export async function completeTask(userId: string, idOrTitle: string): Promise<s
     .single();
   if (error || !data) return `Could not complete that task.`;
   return `Marked done: "${data.title}"`;
+}
+
+export async function removeCalendarEvents(
+  userId: string,
+  titleKeyword: string,
+  daysAhead = 365
+): Promise<string> {
+  const accessToken = await getValidAccessToken(userId);
+  if (!accessToken) return 'Google Calendar not connected — cannot remove events.';
+  const { deleted, failed } = await deleteEventsByTitle(accessToken, titleKeyword, daysAhead);
+  if (deleted === 0 && failed === 0) return `No upcoming events found matching "${titleKeyword}".`;
+  const failNote = failed > 0 ? ` (${failed} could not be deleted)` : '';
+  return `Removed ${deleted} event${deleted !== 1 ? 's' : ''} matching "${titleKeyword}" from Google Calendar.${failNote}`;
+}
+
+export async function moveCalendarEvents(
+  userId: string,
+  input: {
+    title_keyword: string;
+    shift_days?: number;
+    shift_hours?: number;
+    new_time?: string;
+    date_from?: string;
+    date_to?: string;
+    confirmed?: boolean;
+  }
+): Promise<string> {
+  const accessToken = await getValidAccessToken(userId);
+  if (!accessToken) return 'Google Calendar not connected — cannot move events.';
+  const prefs = await getSchedulingPrefs(userId).catch(() => null);
+  const tzOffset = prefs?.timezone ?? '+08:00';
+  try {
+    const { moved, failed, conflicts } = await moveEventsByTitle(accessToken, input.title_keyword, {
+      shiftDays: input.shift_days,
+      shiftHours: input.shift_hours,
+      newTime: input.new_time,
+      tzOffset,
+      dateFrom: input.date_from,
+      dateTo: input.date_to,
+      checkConflicts: !input.confirmed,
+    });
+    if (moved === 0 && failed === 0 && conflicts.length === 0)
+      return `No upcoming events found matching "${input.title_keyword}".`;
+    const conflictNote =
+      conflicts.length > 0
+        ? `\n[CONFLICTS — ${conflicts.length} event(s) NOT moved due to destination conflicts:\n${conflicts.map(c => `  · "${c.title}" → ${c.newStart}`).join('\n')}\nCall move_calendar_events again with confirmed: true to force the move.]`
+        : '';
+    const action = input.shift_days
+      ? `shifted ${input.shift_days > 0 ? input.shift_days + ' day(s) forward' : Math.abs(input.shift_days) + ' day(s) back'}`
+      : input.shift_hours
+        ? `shifted ${Math.abs(input.shift_hours)} hour(s) ${input.shift_hours < 0 ? 'earlier' : 'later'}`
+        : input.new_time
+          ? `moved to ${input.new_time}`
+          : 'updated';
+    const failNote = failed > 0 ? ` (${failed} failed)` : '';
+    const movedNote =
+      moved > 0
+        ? `${moved} event${moved !== 1 ? 's' : ''} matching "${input.title_keyword}" ${action} in Google Calendar.${failNote}`
+        : '';
+    return (
+      (movedNote + conflictNote).trim() ||
+      `All matching events had conflicts — use confirmed: true to force.`
+    );
+  } catch (e) {
+    return `Failed to move events: ${e instanceof Error ? e.message : String(e)}`;
+  }
+}
+
+export async function listCalendarEvents(
+  userId: string,
+  dateFrom: string,
+  dateTo?: string
+): Promise<string> {
+  const accessToken = await getValidAccessToken(userId);
+  if (!accessToken) return 'Google Calendar not connected.';
+  const to = dateTo ?? dateFrom;
+  try {
+    const events = await listEventsInRange(accessToken, dateFrom, to);
+    if (events.length === 0) return `No events found between ${dateFrom} and ${to}.`;
+    // Group by date
+    const byDate = new Map<string, typeof events>();
+    for (const e of events) {
+      const day = e.start.slice(0, 10);
+      if (!byDate.has(day)) byDate.set(day, []);
+      byDate.get(day)!.push(e);
+    }
+    const lines: string[] = [];
+    for (const [day, dayEvents] of [...byDate.entries()].sort()) {
+      const date = new Date(day + 'T00:00:00Z');
+      const label = date.toLocaleDateString('en-SG', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        timeZone: 'UTC',
+      });
+      const evtLines = dayEvents.map(e => {
+        if (e.allDay) return `  · ${e.title} (all day)`;
+        const s = new Date(e.start).toLocaleTimeString('en-SG', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: 'Asia/Singapore',
+        });
+        const en = new Date(e.end).toLocaleTimeString('en-SG', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+          timeZone: 'Asia/Singapore',
+        });
+        return `  · ${e.title} ${s}–${en}`;
+      });
+      lines.push(`${label}:\n${evtLines.join('\n')}`);
+    }
+    return lines.join('\n');
+  } catch (e) {
+    return `Failed to list events: ${e instanceof Error ? e.message : String(e)}`;
+  }
+}
+
+export async function cancelTask(userId: string, idOrTitle: string): Promise<string> {
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrTitle);
+
+  let query = supabaseAdmin
+    .from('tasks')
+    .select('id, title, google_event_id')
+    .eq('user_id', userId);
+  query = isUuid ? query.eq('id', idOrTitle) : query.ilike('title', `%${idOrTitle}%`);
+
+  const { data: rows } = await query.limit(1);
+  if (!rows || rows.length === 0) return `No matching task found for: ${idOrTitle}`;
+  const task = rows[0];
+
+  let calMsg = ' (No calendar event linked.)';
+  if (task.google_event_id) {
+    try {
+      const accessToken = await getValidAccessToken(userId);
+      if (!accessToken) {
+        calMsg = ' (Calendar event removal failed: Google Calendar not connected.)';
+      } else {
+        await deleteEvent(accessToken, task.google_event_id);
+        calMsg = ' and removed from Google Calendar.';
+      }
+    } catch (e) {
+      calMsg = ` (Calendar event removal failed: ${e instanceof Error ? e.message : String(e)})`;
+    }
+  }
+
+  await supabaseAdmin.from('tasks').delete().eq('id', task.id).eq('user_id', userId);
+
+  if (calMsg === ' and removed from Google Calendar.') {
+    return `Cancelled task: "${task.title}"${calMsg}`;
+  }
+  return `Cancelled task: "${task.title}".${calMsg}`;
 }
 
 // ── Entity helpers ────────────────────────────────────────────────────────────
@@ -306,13 +707,41 @@ export async function runBrainTool(
         return await createTask(userId, {
           title: String(input.title ?? ''),
           due_date: input.due_date ? String(input.due_date) : undefined,
+          due_time: input.due_time ? String(input.due_time) : undefined,
+          duration_minutes:
+            typeof input.duration_minutes === 'number' ? input.duration_minutes : undefined,
           priority: input.priority ? String(input.priority) : undefined,
           notes: input.notes ? String(input.notes) : undefined,
+          confirmed_slot: input.confirmed_slot === true,
         });
       case 'list_tasks':
         return await listTasks(userId, (input.filter as 'today' | 'urgent' | 'all') ?? 'all');
       case 'complete_task':
         return await completeTask(userId, String(input.task_id_or_title ?? ''));
+      case 'list_calendar_events':
+        return await listCalendarEvents(
+          userId,
+          String(input.date_from ?? ''),
+          input.date_to ? String(input.date_to) : undefined
+        );
+      case 'move_calendar_events':
+        return await moveCalendarEvents(userId, {
+          title_keyword: String(input.title_keyword ?? ''),
+          shift_days: typeof input.shift_days === 'number' ? input.shift_days : undefined,
+          shift_hours: typeof input.shift_hours === 'number' ? input.shift_hours : undefined,
+          new_time: input.new_time ? String(input.new_time) : undefined,
+          date_from: input.date_from ? String(input.date_from) : undefined,
+          date_to: input.date_to ? String(input.date_to) : undefined,
+          confirmed: input.confirmed === true,
+        });
+      case 'cancel_task':
+        return await cancelTask(userId, String(input.task_id_or_title ?? ''));
+      case 'remove_calendar_events':
+        return await removeCalendarEvents(
+          userId,
+          String(input.title_keyword ?? ''),
+          typeof input.days_ahead === 'number' ? input.days_ahead : 365
+        );
       case 'search_entities':
         return await searchEntities(userId, String(input.query ?? ''));
       case 'upsert_entity':
@@ -325,12 +754,65 @@ export async function runBrainTool(
         });
       case 'rewrite_memory':
         return await rewriteMemory(userId, String(input.new_memory ?? ''));
+      case 'check_schedule':
+        return await checkSchedule(
+          userId,
+          String(input.date ?? ''),
+          String(input.time ?? ''),
+          typeof input.duration_minutes === 'number' ? input.duration_minutes : 60
+        );
+      case 'upsert_scheduling_prefs':
+        return await upsertSchedulingPrefs(userId, {
+          timezone: input.timezone ? String(input.timezone) : undefined,
+          work_hours_start: input.work_hours_start ? String(input.work_hours_start) : undefined,
+          work_hours_end: input.work_hours_end ? String(input.work_hours_end) : undefined,
+          patterns_note: input.patterns_note ? String(input.patterns_note) : undefined,
+          travel_destination: input.travel_destination
+            ? String(input.travel_destination)
+            : undefined,
+          travel_start: input.travel_start ? String(input.travel_start) : undefined,
+          travel_end: input.travel_end ? String(input.travel_end) : undefined,
+        });
       default:
         return `Unknown tool: ${name}`;
     }
   } catch (err) {
     return `Tool ${name} failed: ${err instanceof Error ? err.message : String(err)}`;
   }
+}
+
+// ── Scheduling helpers ────────────────────────────────────────────────────────
+async function checkSchedule(
+  userId: string,
+  date: string,
+  time: string,
+  durationMinutes: number
+): Promise<string> {
+  if (!date || !time) return 'Date and time are required to check the schedule.';
+  const accessToken = await getValidAccessToken(userId);
+  if (!accessToken) return 'Calendar not connected — proceeding without conflict check.';
+
+  const prefs = await getSchedulingPrefs(userId);
+  const tzOffset = prefs?.timezone ?? '+08:00';
+
+  // Alert if date falls within a known travel window
+  if (prefs?.travel_windows) {
+    for (const w of prefs.travel_windows) {
+      if (date >= w.start && date <= w.end) {
+        return `Note: you have a travel window to ${w.destination} (${w.start}–${w.end}) covering this date. Are you still available?`;
+      }
+    }
+  }
+
+  const calIds = await getCalendarIds(accessToken);
+  const busySlots = await checkFreebusy(accessToken, date, tzOffset, calIds);
+  const result = findFreeSlot(busySlots, date, time, durationMinutes, tzOffset);
+
+  if (!result.conflict) return `${time} is free on ${date}.`;
+  if (result.suggested) {
+    return `Conflict at ${time} on ${date} — next free slot: ${result.suggested}. Want me to schedule it at ${result.suggested} instead?`;
+  }
+  return `Conflict at ${time} on ${date} — no free slot found for the rest of the day.`;
 }
 
 // ── Memory rewrite helper ─────────────────────────────────────────────────────

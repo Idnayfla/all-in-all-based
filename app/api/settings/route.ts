@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
     const { data } = await supabaseAdmin
       .from('user_settings')
       .select(
-        'personality, global_memory, theme, subscription_tier, subscription_status, generations_used, generations_reset_at, pro_bonus_expires_at, subscription_period_start, subscription_period_end'
+        'personality, global_memory, theme, subscription_tier, subscription_status, generations_used, generations_reset_at, pro_bonus_expires_at, beta_expires_at, subscription_period_start, subscription_period_end'
       )
       .eq('user_id', userId)
       .single();
@@ -34,19 +34,26 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    const paidTier = (data?.subscription_tier ?? 'free') as 'free' | 'pro';
+    const paidTier = (data?.subscription_tier ?? 'free') as 'free' | 'beta' | 'pro';
     const subStatus = data?.subscription_status ?? 'active';
     // Treat explicitly cancelled subscriptions as free regardless of tier column
     const isCanceled = subStatus === 'canceled' || subStatus === 'cancelled';
     const bonusExpiresAt = data?.pro_bonus_expires_at as string | null;
     const hasBonusPro = !!bonusExpiresAt && new Date(bonusExpiresAt) > new Date();
-    // ALWAYS_PRO=true → set on beta Vercel deployment to give all authenticated users pro access.
-    // BETA_ACCESS_CODE being set is also sufficient: if the gate is active, this is beta.
-    const alwaysPro = process.env.ALWAYS_PRO === 'true' || !!process.env.BETA_ACCESS_CODE;
-    const effectiveTier: 'free' | 'pro' =
-      alwaysPro || (paidTier === 'pro' && !isCanceled) || hasBonusPro ? 'pro' : 'free';
+    const betaExpiry = data?.beta_expires_at as string | null;
+    const isActiveBeta = paidTier === 'beta' && !!betaExpiry && new Date(betaExpiry) > new Date();
+    const alwaysPro = process.env.ALWAYS_PRO === 'true';
+    const effectiveTier: 'free' | 'beta' | 'pro' =
+      alwaysPro || (paidTier === 'pro' && !isCanceled) || hasBonusPro
+        ? 'pro'
+        : isActiveBeta
+          ? 'beta'
+          : 'free';
     const bonusDaysLeft = hasBonusPro
       ? Math.max(0, Math.ceil((new Date(bonusExpiresAt!).getTime() - Date.now()) / 86400000))
+      : 0;
+    const betaDaysLeft = isActiveBeta
+      ? Math.max(0, Math.ceil((new Date(betaExpiry!).getTime() - Date.now()) / 86400000))
       : 0;
 
     return NextResponse.json({
@@ -57,6 +64,7 @@ export async function GET(req: NextRequest) {
       subscriptionStatus: data?.subscription_status ?? 'active',
       generationsUsed,
       bonusDaysLeft,
+      betaDaysLeft,
       subscriptionPeriodStart: data?.subscription_period_start ?? null,
       subscriptionPeriodEnd: data?.subscription_period_end ?? null,
     });

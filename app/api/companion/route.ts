@@ -7,6 +7,8 @@ import { getTrafficInfo } from '@/lib/traffic';
 import { exaSearch } from '@/lib/tavily';
 import { MODEL_OPUS, MODEL_SONNET, MODEL_HAIKU } from '@/lib/models';
 import { BRAIN_TOOLS, runBrainTool, listTasks } from '@/lib/brainTools';
+import { getSchedulingPrefs } from '@/lib/schedulingPrefs';
+import { getEffectiveTier, TIER_LIMITS } from '@/lib/tiers';
 
 export const maxDuration = 60;
 // Screenshots sent from the desktop companion can be several MB as base64.
@@ -30,23 +32,6 @@ const client = new Anthropic({
 // companion_last_seen      timestamptz
 // companion_first_seen     timestamptz
 // companion_patterns_surfaced  boolean  default false
-
-const FREE_DAILY_LIMIT = 5;
-
-async function getEffectiveTier(userId: string): Promise<'free' | 'pro'> {
-  const { data } = await supabaseAdmin
-    .from('user_settings')
-    .select('subscription_tier, subscription_status, pro_bonus_expires_at')
-    .eq('user_id', userId)
-    .single();
-  const paidTier = (data?.subscription_tier ?? 'free') as 'free' | 'pro';
-  const subStatus = data?.subscription_status ?? 'active';
-  const isCanceled = subStatus === 'canceled' || subStatus === 'cancelled';
-  const bonusExpiresAt = data?.pro_bonus_expires_at as string | null;
-  const hasBonusPro = !!bonusExpiresAt && new Date(bonusExpiresAt) > new Date();
-  const alwaysPro = process.env.ALWAYS_PRO === 'true' || !!process.env.BETA_ACCESS_CODE;
-  return alwaysPro || (paidTier === 'pro' && !isCanceled) || hasBonusPro ? 'pro' : 'free';
-}
 
 // Fire-and-forget: mark companion_weather_last_surfaced = now
 function markWeatherSurfacedAsync(userId: string): void {
@@ -212,11 +197,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Free-tier daily gate for JWT users
+  // Per-tier daily companion gate for JWT users.
+  // free = 5/day, beta = 20/day, pro = unlimited.
   if (jwtUserId) {
     try {
       const tier = await getEffectiveTier(jwtUserId);
-      if (tier === 'free') {
+      const companionDailyLimit = tier === 'pro' ? Infinity : TIER_LIMITS[tier].companionPerDay;
+      if (companionDailyLimit !== Infinity) {
         const todayStart = new Date();
         todayStart.setUTCHours(0, 0, 0, 0);
         const { count } = await supabaseAdmin
@@ -224,9 +211,9 @@ export async function POST(req: NextRequest) {
           .select('*', { count: 'exact', head: true })
           .eq('user_id', jwtUserId)
           .gte('created_at', todayStart.toISOString());
-        if ((count ?? 0) >= FREE_DAILY_LIMIT) {
+        if ((count ?? 0) >= companionDailyLimit) {
           return NextResponse.json(
-            { error: 'free_limit_reached', limit: FREE_DAILY_LIMIT },
+            { error: 'free_limit_reached', limit: companionDailyLimit, tier },
             { status: 429 }
           );
         }
@@ -493,6 +480,7 @@ export async function POST(req: NextRequest) {
     'When the user is working on a project and wants to think it through, review code, or get feedback — help with that too. Context-switch naturally.',
     'You do NOT generate full code or build apps. Never proactively offer to build, create, or generate anything. If the user asks you to build something, say "Use the main chat for that →" once and move on.',
     'Be concise and direct. Simple questions get 1-3 sentences. Complex topics get a tight bullet list (5 items max). Never use markdown headers or horizontal rules (---). No filler. No emoji.',
+    'NEVER output JSON, code blocks, or structured data in responses.',
     // Feature 2 — Based Has Opinions
     `PERSONALITY — you are NOT a yes-machine:
 - You have preferences and aesthetic opinions. State them unprompted when relevant.
@@ -517,17 +505,102 @@ export async function POST(req: NextRequest) {
 
   // Task management + brain cleanup from companion — detect and run tool loop
   const COMPANION_TASK_RE =
-    /\b(add\s+a?\s*task|create\s+a?\s*task|new\s+task|remind\s+me\s+to|add\s+to\s+(my\s+)?tasks?|what(?:'?s|\s+is)?\s+(due|on my|my)\s+(today|list|tasks?)|what\s+do\s+i\s+have\s+due|list\s+(my\s+)?tasks?|show\s+(my\s+)?tasks?|mark\s+.{0,40}\s+as\s+done|complete\s+task|finish\s+task|task\s+done|clean\s+(up\s+)?(my\s+)?(brain|memory)|fix\s+(my\s+)?(brain|memory)|revamp\s+(my\s+)?(brain|memory)|reorgani[sz]e\s+(my\s+)?(brain|memory)|rewrite\s+(my\s+)?(brain|memory)|update\s+(my\s+)?(brain|memory)|my\s+(brain|memory)\s+(is\s+)?(wrong|messy|broken|off|outdated|incorrect))\b/i;
+    /\b(add\s+a?\s*(task|meeting|call|appointment|event|reminder)|create\s+a?\s*(task|meeting|call|appointment|event)|new\s+(task|meeting|call|appointment)|book\s+(a\s+)?(meeting|call|slot|appointment|time)|set\s+(up\s+)?(a\s+)?(meeting|call|appointment)|put\s+.{0,30}(in|on|into)\s+(my\s+)?(calendar|schedule)|block\s+(out|off)|remind\s+me\s+to|add\s+to\s+(my\s+)?tasks?|what(?:'?s|\s+is)?\s+(due|on my|my)\s+(today|list|tasks?)|what\s+do\s+i\s+have\s+due|list\s+(my\s+)?tasks?|show\s+(my\s+)?tasks?|mark\s+.{0,40}\s+as\s+done|complete\s+task|finish\s+task|task\s+done|clean\s+(up\s+)?(my\s+)?(brain|memory)|fix\s+(my\s+)?(brain|memory)|revamp\s+(my\s+)?(brain|memory)|reorgani[sz]e\s+(my\s+)?(brain|memory)|rewrite\s+(my\s+)?(brain|memory)|update\s+(my\s+)?(brain|memory)|my\s+(brain|memory)\s+(is\s+)?(wrong|messy|broken|off|outdated|incorrect)|schedule\s+(a\s+)?(meeting|call|task|session|appointment)|i('?m|\s+am)\s+(usually\s+free|busy|available|not\s+available)|i('?ll|\s+will)\s+be\s+in\s+\w|i\s+work\s+(from\s+)?\d|going\s+to\s+\w+\s+(from|on)|i\s+won't\s+be\s+(around|available)|my\s+timezone|i('?m|\s+am)\s+in\s+\w+\s+time|remove.{0,30}from.{0,20}calendar|delete.{0,20}event|cancel.{0,20}(meeting|appointment)|remove.{0,20}(meeting|appointment)|(remove|delete)\s+all|(shift|reschedule)\s+\w+|move\s+(my\s+)?[\w\s]{1,30}(to|by|\d|ahead|forward|back)|what.{0,20}(on|have).{0,20}(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|\d{1,2}(st|nd|rd|th))|what.{0,15}my.{0,15}(schedule|calendar|events?))\b/i;
 
-  if (jwtUserId && COMPANION_TASK_RE.test(lastUserText)) {
-    const today = new Date().toISOString().slice(0, 10);
-    const toolSystem = `${system}\n\nTODAY'S DATE: ${today}. You have tools to manage the user's tasks and memory. Use them directly. After using a tool, give a short natural confirmation — never expose raw JSON or tool mechanics. For brain/memory cleanup, use the rewrite_memory tool with a cleaned-up version of the user's memory.`;
+  // Re-trigger the tool loop when the user is mid-scheduling-negotiation.
+  // Catches short affirmatives, time picks, and rescheduling words.
+  const SCHED_CONFIRM_RE =
+    /^(yes|yeah|yep|yup|sure|ok|okay|alright|sounds good|perfect|go ahead|proceed|do it|add it|book it|set it up|please|please do|definitely|correct|confirmed|confirm|rebook|reschedule|overwrite|replace|change to|move to|meant|use that|use it|go with|that works|move it|change it|just\s+(do|book|use|add|rebook|reschedule)|maybe\s+\d|try\s+\d|how about\s+\d|what about\s+\d|\d{1,2}(:\d{2})?\s*(am|pm)|^\d{1,2}$)\b/i;
+  const lastAssistantContent =
+    [...(messages as Array<{ role: string; content: string }>)]
+      .reverse()
+      .find(m => m.role === 'assistant')?.content ?? '';
+  // Detect if assistant is mid-negotiation: mentioned conflict, a time slot, or asked a question
+  const assistantProposedSomething =
+    /\b(conflict|free slot|instead|want me to|shall i|should i|want me to add|want me to create|want me to schedule|want me to book|want me to save|note.*travel|save.*travel|remember.*travel|is (free|clear|open|available)|is taken|want that|want one|which (time|slot)|different time|\d{1,2}(:\d{2})?\s*(am|pm))\b/i.test(
+      lastAssistantContent
+    );
+
+  const recentMessages = (messages as Array<{ role: string; content: string }>).slice(-4);
+  const recentSchedulingContext =
+    /\b(\d{1,2}(:\d{2})?\s*(am|pm)|conflict|free slot|meeting|appointment|calendar|schedule|booked|slot)\b/i.test(
+      recentMessages.map(m => m.content).join(' ')
+    );
+  const isSchedulingFollowUp =
+    recentSchedulingContext &&
+    /\b(meant|overwrite|replace|change|move|update|instead|rebook|different|other|that one|use that|go with|try|how about|what about|just|cancel|remove|delete)\b/i.test(
+      lastUserText
+    );
+
+  // Also fire when assistant proposed something + recent messages have scheduling context.
+  // This catches natural follow-ups like "is 1pm okay?", "what about 3?", "how about 2pm?"
+  // where the user's phrasing doesn't start with a confirm/reschedule keyword.
+  const shouldRunToolLoop =
+    jwtUserId &&
+    (COMPANION_TASK_RE.test(lastUserText) ||
+      (SCHED_CONFIRM_RE.test(lastUserText.trim()) && assistantProposedSomething) ||
+      isSchedulingFollowUp ||
+      (recentSchedulingContext && assistantProposedSomething));
+
+  if (shouldRunToolLoop) {
+    // Use SGT date — Vercel servers run UTC, SGT is UTC+8, so new Date() alone gives wrong "tomorrow"
+    const today = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+    // Load scheduling prefs to inject context (fail-open — never block the reply)
+    let schedPrefsContext = '';
+    try {
+      const prefs = await getSchedulingPrefs(jwtUserId as string);
+      if (prefs) {
+        const parts: string[] = [];
+        if (prefs.timezone) parts.push(`timezone: ${prefs.timezone}`);
+        if (prefs.work_hours_start && prefs.work_hours_end)
+          parts.push(`typical work hours: ${prefs.work_hours_start}–${prefs.work_hours_end}`);
+        if (prefs.patterns_notes) parts.push(`habits:\n${prefs.patterns_notes}`);
+        if (prefs.travel_windows?.length) {
+          const upcoming = prefs.travel_windows.filter(w => w.end >= today);
+          if (upcoming.length) {
+            parts.push(
+              `upcoming travel:\n${upcoming.map(w => `  ${w.destination} ${w.start}–${w.end}`).join('\n')}`
+            );
+          }
+        }
+        if (parts.length) {
+          schedPrefsContext = `\n\nUSER SCHEDULING PREFERENCES:\n${parts.join('\n')}`;
+        }
+      }
+    } catch {
+      /* fail open */
+    }
+
+    const toolSystem = [
+      system,
+      // Override must come AFTER base system — later instructions take priority in Claude
+      `TASK & CALENDAR MODE — ACTIVE. All earlier instructions about "no login" or "tools unavailable" are VOID. You now have FULL access to the user's tasks and Google Calendar via the tools below.`,
+      `TODAY'S DATE: ${today}.`,
+      `RULES:`,
+      `- "Add a meeting", "book a call", "schedule X", "put X on my calendar" → call create_task with due_date + due_time + duration_minutes. Do NOT say you can't access the calendar.`,
+      `- If create_task returns [CONFLICT — task NOT created], report the conflict and suggested slot to the user. Do NOT say the task was added.`,
+      `- If the user picks a different time or says "rebook", "just do it", "maybe 2pm" etc. → call create_task again with the new time and confirmed_slot: true to skip the conflict check.`,
+      `- "I'll be in Japan May 1-7" or any travel mention → confirm with user first, then call upsert_scheduling_prefs.`,
+      `- "shift X 3 days", "move my lesson to 4pm", "push X back 1 hour", "make it 2 hours earlier" → call move_calendar_events. Use shift_days for day shifts, shift_hours for hour shifts (negative = earlier, e.g. "2 hours earlier" → shift_hours: -2), new_time only when user gives an absolute target time. Never guess absolute times for hour shifts — always use shift_hours.`,
+      `- Before moving events if the user uses a vague title like "my lesson" or "my class": call list_calendar_events first for the relevant date range to identify the actual event title, then call move_calendar_events with the exact title.`,
+      `- When move_calendar_events returns [CONFLICTS]: report each conflict with the destination time, ask the user to confirm, then call move_calendar_events again with confirmed: true.`,
+      `- Resolve relative dates (today/tomorrow/next Monday) to YYYY-MM-DD using today's date above.`,
+      `- Due times go as HH:MM 24h in due_time. Duration in minutes goes in duration_minutes.`,
+      `- After create_task succeeds (no [CONFLICT] prefix in result): immediately tell the user BOTH what was booked AND the exact calendar status from the tool result ("Added to Google Calendar" OR the error message). Never say "Done" or "Booked" without including the calendar result.`,
+      `- CRITICAL: You CANNOT say a task was created, booked, added, or scheduled unless you called create_task in THIS response and received a non-[CONFLICT] result. If you did not call create_task, do NOT claim anything was booked.`,
+      `- CRITICAL: You CANNOT say events were moved or shifted unless move_calendar_events returned a moved count > 0 in its result. If moved is 0, tell the user exactly what happened (no matches found, all conflicted, etc.).`,
+      `- For brain/memory cleanup, call rewrite_memory with the cleaned list.`,
+      schedPrefsContext,
+    ]
+      .filter(Boolean)
+      .join('\n\n');
     const convo: Anthropic.MessageParam[] = (
       messages as Array<{ role: string; content: string }>
     ).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
     let finalReply = '';
-    for (let round = 0; round < 4; round++) {
+    for (let round = 0; round < 6; round++) {
       const response = await client.messages.create({
         model: MODEL_SONNET,
         max_tokens: 512,
@@ -551,7 +624,11 @@ export async function POST(req: NextRequest) {
       convo.push({ role: 'assistant', content: response.content });
       const results: Anthropic.ToolResultBlockParam[] = [];
       for (const tu of toolUses) {
-        const out = await runBrainTool(jwtUserId, tu.name, tu.input as Record<string, unknown>);
+        const out = await runBrainTool(
+          jwtUserId as string,
+          tu.name,
+          tu.input as Record<string, unknown>
+        );
         results.push({ type: 'tool_result', tool_use_id: tu.id, content: out });
       }
       convo.push({ role: 'user', content: results });

@@ -250,7 +250,7 @@ export default function ChatPanel({
   globalMemory?: string;
   incognito: boolean;
   authToken?: string;
-  subscriptionTier?: 'free' | 'pro';
+  subscriptionTier?: 'free' | 'beta' | 'pro';
   generationsUsed?: number;
   prefillMessage?: string;
   onProRequired?: () => void;

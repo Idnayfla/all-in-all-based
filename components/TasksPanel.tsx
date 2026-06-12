@@ -11,10 +11,14 @@ interface Task {
   title: string;
   notes: string | null;
   due_date: string | null;
+  due_time: string | null;
+  duration_minutes: number | null;
+  tz_offset: string | null;
   priority: Priority;
   status: Status;
   tags: string[];
   entity_id: string | null;
+  google_event_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -102,6 +106,27 @@ function toDateInputValue(dateStr: string | null): string {
   return dateStr.slice(0, 10);
 }
 
+function getBrowserTzOffset(): string {
+  const total = -new Date().getTimezoneOffset();
+  const sign = total >= 0 ? '+' : '-';
+  const abs = Math.abs(total);
+  const h = String(Math.floor(abs / 60)).padStart(2, '0');
+  const m = String(abs % 60).padStart(2, '0');
+  return `${sign}${h}:${m}`;
+}
+
+function computeEndTime(startTime: string, durationMinutes: number): string {
+  const [sh, sm] = startTime.split(':').map(Number);
+  const total = sh * 60 + sm + durationMinutes;
+  return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+function computeDuration(startTime: string, endTime: string): number {
+  const [sh, sm] = startTime.split(':').map(Number);
+  const [eh, em] = endTime.split(':').map(Number);
+  return Math.max(0, eh * 60 + em - (sh * 60 + sm));
+}
+
 function matchesSearch(task: Task, term: string): boolean {
   if (!term) return true;
   const t = term.toLowerCase();
@@ -156,6 +181,46 @@ function getRecommendations(tasks: Task[]): string[] {
   return recs.slice(0, 2);
 }
 
+// ── Calendar event type ────────────────────────────────────────────────────────
+interface CalEvent {
+  id: string;
+  title: string;
+  start: string;
+  end: string;
+  url: string;
+  allDay: boolean;
+}
+
+function formatCalTime(dateStr: string, allDay: boolean): string {
+  if (allDay)
+    return new Date(dateStr).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return new Date(dateStr).toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+function isCalToday(event: CalEvent): boolean {
+  const d = new Date(event.start);
+  const today = new Date();
+  return (
+    d.getFullYear() === today.getFullYear() &&
+    d.getMonth() === today.getMonth() &&
+    d.getDate() === today.getDate()
+  );
+}
+
+function isCalUpcoming(event: CalEvent): boolean {
+  const start = new Date(event.start);
+  const tomorrow = new Date();
+  tomorrow.setHours(0, 0, 0, 0);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return start >= tomorrow;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function TasksPanel({ authToken }: { authToken?: string }) {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -165,6 +230,13 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
 
   // Entities for the entity-link selector
   const [entities, setEntities] = useState<EntityRef[]>([]);
+
+  // Google Calendar state — feature flag is set via NEXT_PUBLIC_GOOGLE_CALENDAR_ENABLED
+  const calFeatureEnabled = process.env.NEXT_PUBLIC_GOOGLE_CALENDAR_ENABLED === 'true';
+  const [calConnected, setCalConnected] = useState(false);
+  const [calEmail, setCalEmail] = useState('');
+  const [calEvents, setCalEvents] = useState<CalEvent[]>([]);
+  const [calLoading, setCalLoading] = useState(false);
 
   // Add-task form state
   const [newTitle, setNewTitle] = useState('');
@@ -176,6 +248,8 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editDue, setEditDue] = useState('');
+  const [editDueTime, setEditDueTime] = useState('');
+  const [editEndTime, setEditEndTime] = useState('');
   const [editPriority, setEditPriority] = useState<Priority>('normal');
   const [editNotes, setEditNotes] = useState('');
   const [editTags, setEditTags] = useState<string[]>([]);
@@ -184,6 +258,12 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
   const [saving, setSaving] = useState(false);
   const editTitleRef = useRef<HTMLInputElement>(null);
 
+  // Schedule-check state (conflict detection)
+  const [schedChecking, setSchedChecking] = useState(false);
+  const [schedConflict, setSchedConflict] = useState(false);
+  const [schedSuggested, setSchedSuggested] = useState<string | null>(null);
+  const schedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const headers = useCallback(
     () => ({
       'Content-Type': 'application/json',
@@ -191,6 +271,105 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     }),
     [authToken]
   );
+
+  // ── Schedule check: debounce 600ms when date/time/end-time changes ──────────
+  useEffect(() => {
+    if (!calConnected || !editDue || !editDueTime || !editEndTime) {
+      setSchedConflict(false);
+      setSchedSuggested(null);
+      return;
+    }
+    const duration = computeDuration(editDueTime, editEndTime);
+    if (duration <= 0) {
+      setSchedConflict(false);
+      setSchedSuggested(null);
+      return;
+    }
+    if (schedTimerRef.current) clearTimeout(schedTimerRef.current);
+    schedTimerRef.current = setTimeout(async () => {
+      setSchedChecking(true);
+      try {
+        const tz = getBrowserTzOffset();
+        const params = new URLSearchParams({
+          date: editDue,
+          time: editDueTime,
+          duration: String(duration),
+          tz_offset: tz,
+        });
+        const res = await fetch(`/api/calendar/schedule?${params}`, { headers: headers() });
+        const data = (await res.json()) as {
+          conflict?: boolean;
+          suggested?: string | null;
+          connected?: boolean;
+        };
+        if (data.connected === false) return;
+        setSchedConflict(data.conflict ?? false);
+        setSchedSuggested(data.suggested ?? null);
+      } catch {
+        // silent — schedule check is best-effort
+      } finally {
+        setSchedChecking(false);
+      }
+    }, 600);
+    return () => {
+      if (schedTimerRef.current) clearTimeout(schedTimerRef.current);
+    };
+  }, [calConnected, editDue, editDueTime, editEndTime, headers]);
+
+  // ── Fetch calendar data ────────────────────────────────────────────────────
+  const fetchCalendar = useCallback(() => {
+    if (!authToken) return;
+    setCalLoading(true);
+    fetch('/api/calendar/events', { headers: headers() })
+      .then(r => r.json())
+      .then(
+        (data: {
+          connected?: boolean;
+          email?: string;
+          events?: CalEvent[];
+          eventsError?: string;
+          _debug?: unknown;
+        }) => {
+          setCalConnected(data.connected ?? false);
+          setCalEmail(data.email ?? '');
+          setCalEvents(Array.isArray(data.events) ? data.events : []);
+          if (data.eventsError) console.warn('[Calendar] listEvents error:', data.eventsError);
+          if (data._debug) console.log('[Calendar] debug:', data._debug);
+        }
+      )
+      .catch(err => console.error('[Calendar] fetchCalendar failed:', err))
+      .finally(() => setCalLoading(false));
+  }, [authToken, headers]);
+
+  // On mount: check for ?calendar=connected redirect, fetch calendar
+  useEffect(() => {
+    if (!authToken || typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const calParam = params.get('calendar');
+    if (calParam) {
+      history.replaceState({}, '', window.location.pathname);
+    }
+    fetchCalendar();
+  }, [authToken, fetchCalendar]);
+
+  const connectCalendar = async () => {
+    if (!authToken) return;
+    try {
+      const res = await fetch('/api/calendar/auth', { headers: headers() });
+      const data = (await res.json()) as { url?: string };
+      if (data.url) window.location.href = data.url;
+    } catch {}
+  };
+
+  const disconnectCalendar = async () => {
+    if (!authToken) return;
+    try {
+      await fetch('/api/calendar/auth', { method: 'DELETE', headers: headers() });
+      setCalConnected(false);
+      setCalEmail('');
+      setCalEvents([]);
+    } catch {}
+  };
 
   // ── Fetch tasks ────────────────────────────────────────────────────────────
   const fetchTasks = useCallback(() => {
@@ -239,10 +418,14 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
       title,
       notes: null,
       due_date: newDue || null,
+      due_time: null,
+      duration_minutes: null,
+      tz_offset: null,
       priority: newPriority,
       status: 'todo',
       tags: [],
       entity_id: null,
+      google_event_id: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -303,11 +486,19 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     setEditingId(task.id);
     setEditTitle(task.title);
     setEditDue(toDateInputValue(task.due_date));
+    setEditDueTime(task.due_time ?? '');
+    setEditEndTime(
+      task.due_time && task.duration_minutes
+        ? computeEndTime(task.due_time, task.duration_minutes)
+        : ''
+    );
     setEditPriority(task.priority);
     setEditNotes(task.notes ?? '');
     setEditTags(task.tags ?? []);
     setEditTagInput('');
     setEditEntityId(task.entity_id ?? null);
+    setSchedConflict(false);
+    setSchedSuggested(null);
     setTimeout(() => editTitleRef.current?.focus(), 0);
   };
 
@@ -328,16 +519,23 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
 
   const removeEditTag = (tag: string) => setEditTags(prev => prev.filter(t => t !== tag));
 
-  const saveEdit = async () => {
+  const saveEdit = async (overrideStartTime?: string, overrideEndTime?: string) => {
     const title = editTitle.trim();
     if (!title || !editingId || saving) return;
     setSaving(true);
 
+    const dueTime = overrideStartTime ?? editDueTime;
+    const endTime = overrideEndTime ?? editEndTime;
+    const durationMinutes = dueTime && endTime ? computeDuration(dueTime, endTime) : null;
     const original = tasks.find(t => t.id === editingId);
+    const tzOff = dueTime && durationMinutes ? getBrowserTzOffset() : null;
     const updated = {
       ...original!,
       title,
       due_date: editDue || null,
+      due_time: dueTime || null,
+      duration_minutes: durationMinutes,
+      tz_offset: tzOff,
       priority: editPriority,
       notes: editNotes.trim() || null,
       tags: editTags,
@@ -347,6 +545,8 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     setTasks(prev => prev.map(t => (t.id === editingId ? updated : t)));
     setEditingId(null);
     setEditTagInput('');
+    setSchedConflict(false);
+    setSchedSuggested(null);
 
     try {
       const res = await fetch('/api/tasks', {
@@ -356,6 +556,9 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
           id: editingId,
           title,
           due_date: editDue || null,
+          due_time: dueTime || null,
+          duration_minutes: durationMinutes,
+          tz_offset: tzOff,
           priority: editPriority,
           notes: editNotes.trim() || null,
           tags: editTags,
@@ -369,6 +572,19 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     } finally {
       setSaving(false);
     }
+  };
+
+  const acceptSuggestedSlot = () => {
+    if (!schedSuggested || !editDue || !editDueTime || !editEndTime) return;
+    const duration = computeDuration(editDueTime, editEndTime);
+    const newStart = schedSuggested;
+    const newEnd = computeEndTime(schedSuggested, duration);
+    fetch('/api/scheduling/learn', {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ original_time: editDueTime, accepted_time: newStart, date: editDue }),
+    }).catch(() => {});
+    saveEdit(newStart, newEnd);
   };
 
   // ── Delete task ────────────────────────────────────────────────────────────
@@ -470,6 +686,45 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
                     <option value="low">Low</option>
                   </select>
                 </div>
+                {calConnected && editDue && (
+                  <div className="tasks-edit-row2">
+                    <input
+                      type="time"
+                      className="tasks-edit-time"
+                      value={editDueTime}
+                      onChange={e => setEditDueTime(e.target.value)}
+                    />
+                    <span className="tasks-time-sep">→</span>
+                    <input
+                      type="time"
+                      className="tasks-edit-duration"
+                      value={editEndTime}
+                      onChange={e => setEditEndTime(e.target.value)}
+                    />
+                  </div>
+                )}
+                {calConnected && editDueTime && editEndTime && (
+                  <div
+                    className={`tasks-sched-notice${schedConflict ? ' tasks-sched-conflict' : ' tasks-sched-free'}`}
+                  >
+                    {schedChecking ? (
+                      '⊙ Checking availability…'
+                    ) : schedConflict ? (
+                      schedSuggested ? (
+                        <>
+                          {`⊘ Conflict — next free: ${schedSuggested}`}
+                          <button className="tasks-sched-use-slot" onClick={acceptSuggestedSlot}>
+                            Use this slot
+                          </button>
+                        </>
+                      ) : (
+                        '⊘ Conflict — no free slot found'
+                      )
+                    ) : (
+                      '◈ Time slot is free'
+                    )}
+                  </div>
+                )}
                 {entities.length > 0 && (
                   <select
                     className="tasks-edit-entity"
@@ -525,7 +780,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
                 <div className="tasks-edit-actions">
                   <button
                     className="tasks-edit-save"
-                    onClick={saveEdit}
+                    onClick={() => saveEdit()}
                     disabled={!editTitle.trim() || saving}
                   >
                     ◈ Save
@@ -778,6 +1033,30 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
         ))}
       </div>
 
+      {/* Google Calendar status bar */}
+      {authToken && calFeatureEnabled && (
+        <div className="tasks-cal-bar">
+          {calConnected ? (
+            <>
+              <span className="tasks-cal-bar-status">
+                ⊙ {calEmail || 'Google Calendar'} connected
+              </span>
+              <button className="tasks-cal-bar-disconnect" onClick={disconnectCalendar}>
+                Disconnect
+              </button>
+            </>
+          ) : (
+            <button
+              className="tasks-cal-bar-connect"
+              onClick={connectCalendar}
+              disabled={calLoading}
+            >
+              ⊙ Connect Google Calendar
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Task list */}
       <div className="tasks-list">
         {loading && <div className="tasks-empty">Loading…</div>}
@@ -812,6 +1091,45 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
             {renderGroup('Cancelled', visibleCancelled, 'var(--text3)')}
           </>
         )}
+
+        {/* Calendar events section */}
+        {!loading &&
+          authToken &&
+          calConnected &&
+          filter !== 'done' &&
+          (() => {
+            const visible =
+              filter === 'today'
+                ? calEvents.filter(isCalToday)
+                : filter === 'upcoming'
+                  ? calEvents.filter(isCalUpcoming)
+                  : calEvents; // 'all' — next 90d
+            return (
+              <div className="tasks-cal-section">
+                <div className="tasks-cal-section-label">⊙ Calendar</div>
+                {visible.length === 0 ? (
+                  <div className="tasks-cal-empty">No calendar events in this range</div>
+                ) : (
+                  visible.map(ev => (
+                    <a
+                      key={ev.id}
+                      href={ev.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="tasks-cal-event"
+                    >
+                      <span className="tasks-cal-event-icon">⊙</span>
+                      <span className="tasks-cal-event-title">{ev.title}</span>
+                      <span className="tasks-cal-event-time">
+                        {formatCalTime(ev.start, ev.allDay)}
+                      </span>
+                      <span className="tasks-cal-event-arrow">→</span>
+                    </a>
+                  ))
+                )}
+              </div>
+            );
+          })()}
       </div>
     </div>
   );

@@ -44,6 +44,7 @@ import TipsGuide from '@/components/TipsGuide';
 import SpecPanel from '@/components/SpecPanel';
 import { track, identifyUser } from '@/lib/posthog';
 import { GetAppButton } from '@/components/GetAppButton';
+import InstallPrompt from '@/components/InstallPrompt';
 import { useTranslation, SUPPORTED_LANGUAGES } from '@/lib/i18n';
 
 function uuid(): string {
@@ -270,21 +271,23 @@ export default function Home() {
   const cachedSubTier = (() => {
     try {
       const v = localStorage.getItem('based_sub_tier');
-      return v === 'pro' || v === 'free' ? v : 'free';
+      return v === 'pro' || v === 'beta' || v === 'free' ? v : 'free';
     } catch {
       return 'free' as const;
     }
   })();
   const [subscription, setSubscription] = useState<{
-    tier: 'free' | 'pro';
+    tier: 'free' | 'beta' | 'pro';
     status: string;
     generationsUsed: number;
+    betaDaysLeft: number;
     periodStart: string | null;
     periodEnd: string | null;
   }>({
     tier: cachedSubTier,
     status: 'active',
     generationsUsed: 0,
+    betaDaysLeft: 0,
     periodStart: null,
     periodEnd: null,
   });
@@ -705,6 +708,7 @@ export default function Home() {
         subscriptionTier,
         subscriptionStatus,
         generationsUsed,
+        betaDaysLeft,
         subscriptionPeriodStart,
         subscriptionPeriodEnd,
       } = await settingsRes.json();
@@ -713,6 +717,7 @@ export default function Home() {
         tier,
         status: subscriptionStatus ?? 'active',
         generationsUsed: generationsUsed ?? 0,
+        betaDaysLeft: betaDaysLeft ?? 0,
         periodStart: subscriptionPeriodStart ?? null,
         periodEnd: subscriptionPeriodEnd ?? null,
       });
@@ -897,6 +902,7 @@ export default function Home() {
           tier: 'free',
           status: 'active',
           generationsUsed: 0,
+          betaDaysLeft: 0,
           periodStart: null,
           periodEnd: null,
         });
@@ -1407,19 +1413,20 @@ export default function Home() {
               {incognito ? '⊙ Incognito' : '⊙'}
             </button>
             <GetAppButton className="companion-header-btn" />
-            {user && subscription.tier === 'free' && (
+            {user && subscription.tier !== 'pro' && (
               <button
-                className={`gen-counter-badge${subscription.generationsUsed >= 9 ? ' gen-counter--danger' : subscription.generationsUsed >= 7 ? ' gen-counter--warn' : ''}`}
-                title={`${Math.min(subscription.generationsUsed, 10)} of 10 free generations used this month`}
+                className={`gen-counter-badge${subscription.generationsUsed >= (subscription.tier === 'beta' ? 27 : 9) ? ' gen-counter--danger' : subscription.generationsUsed >= (subscription.tier === 'beta' ? 24 : 7) ? ' gen-counter--warn' : ''}${subscription.tier === 'beta' ? ' gen-counter--beta' : ''}`}
+                title={`${subscription.generationsUsed} of ${subscription.tier === 'beta' ? 30 : 10} generations used this month`}
                 onClick={() => {
                   setPricingReason('upgrade');
                   setShowPricing(true);
                 }}
               >
-                {Math.min(subscription.generationsUsed, 10)}/10
+                {Math.min(subscription.generationsUsed, subscription.tier === 'beta' ? 30 : 10)}/
+                {subscription.tier === 'beta' ? 30 : 10}
               </button>
             )}
-            {subscription.tier === 'free' ? (
+            {subscription.tier !== 'pro' ? (
               <button
                 className="header-upgrade-btn"
                 onClick={() => {
@@ -1664,6 +1671,7 @@ export default function Home() {
 
       {/* Tips guide for new users */}
       <TipsGuide />
+      <InstallPrompt />
 
       <div className="app-body">
         <SidebarTrigger
@@ -1933,14 +1941,28 @@ export default function Home() {
                     <label className="settings-label">Plan</label>
                     <div className="plan-badge-row">
                       <span className={`plan-badge plan-badge--${subscription.tier}`}>
-                        {subscription.tier === 'pro' ? '⬡ Pro' : 'Free'}
+                        {subscription.tier === 'pro'
+                          ? '⬡ Pro'
+                          : subscription.tier === 'beta'
+                            ? '◈ Beta'
+                            : 'Free'}
                       </span>
-                      {subscription.tier === 'free' && (
+                      {subscription.tier !== 'pro' && (
                         <span className="plan-usage">
-                          {Math.min(subscription.generationsUsed, 10)}/10 generations this month
+                          {Math.min(
+                            subscription.generationsUsed,
+                            subscription.tier === 'beta' ? 30 : 10
+                          )}
+                          /{subscription.tier === 'beta' ? 30 : 10} generations this month
                         </span>
                       )}
                     </div>
+                    {subscription.tier === 'beta' && subscription.betaDaysLeft > 0 && (
+                      <div className="plan-beta-expiry">
+                        ◈ Beta access expires in {subscription.betaDaysLeft} day
+                        {subscription.betaDaysLeft !== 1 ? 's' : ''}
+                      </div>
+                    )}
                     {subscription.tier === 'pro' && subscription.periodStart && (
                       <div className="plan-dates">
                         <span>
@@ -1963,7 +1985,7 @@ export default function Home() {
                         )}
                       </div>
                     )}
-                    {subscription.tier === 'free' ? (
+                    {subscription.tier !== 'pro' ? (
                       <button
                         className="plan-upgrade-btn"
                         onClick={() => {
@@ -2005,6 +2027,7 @@ export default function Home() {
                                 subscriptionTier,
                                 subscriptionStatus,
                                 generationsUsed,
+                                betaDaysLeft: bDays,
                                 subscriptionPeriodStart,
                                 subscriptionPeriodEnd,
                               } = await settingsRes.json();
@@ -2013,6 +2036,7 @@ export default function Home() {
                                 tier,
                                 status: subscriptionStatus ?? 'active',
                                 generationsUsed: generationsUsed ?? 0,
+                                betaDaysLeft: bDays ?? 0,
                                 periodStart: subscriptionPeriodStart ?? null,
                                 periodEnd: subscriptionPeriodEnd ?? null,
                               });
