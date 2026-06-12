@@ -1102,12 +1102,14 @@ export default function Home() {
     const isBetaEnv =
       process.env.NEXT_PUBLIC_BUILD_ENV === 'beta' ||
       (typeof window !== 'undefined' && window.location.hostname === 'beta.getbased.dev');
-    if (!isBetaEnv && subscription.tier === 'free' && projects.length >= 3) {
+    const needsNewProject = !currentProject && !incognito;
+    // Projects gate only applies when we actually need to create a new project
+    if (needsNewProject && !isBetaEnv && subscription.tier === 'free' && projects.length >= 3) {
       setPricingReason('projects');
       setShowPricing(true);
       return;
     }
-    if (!currentProject && !incognito) {
+    if (needsNewProject) {
       createProject('New chat');
     }
     setChatInputTrigger(t => t + 1);

@@ -8354,6 +8354,31 @@ html.has-wallpaper .editor-panel {
   margin-left: 4px;
 }
 
+.companion-wake-indicator {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  font-size: 11px;
+  color: rgba(160, 100, 255, 0.9);
+  background: rgba(124, 58, 237, 0.08);
+  border-top: 1px solid rgba(124, 58, 237, 0.15);
+  letter-spacing: 0.02em;
+}
+.companion-wake-pulse {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(160, 100, 255, 0.9);
+  flex-shrink: 0;
+  animation: wake-pulse 1s ease-in-out infinite;
+}
+@keyframes wake-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.65); }
+}
+
 .companion-pending-badge {
   display: flex;
   align-items: center;

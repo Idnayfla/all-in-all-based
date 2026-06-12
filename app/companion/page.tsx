@@ -4,6 +4,25 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { captureScreen, isScreenCaptureSupported } from '@/hooks/useScreenCapture';
 
+// Web Speech API types (not in all TS DOM libs)
+declare interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  start(): void;
+  stop(): void;
+  onresult: ((e: SpeechRecognitionEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: ((e: SpeechRecognitionErrorEvent) => void) | null;
+}
+declare interface SpeechRecognitionEvent extends Event {
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+}
+declare interface SpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+}
+
 const COMPANION_WIDTH_KEY = 'based_companion_width';
 const WIDTH_MIN = 280;
 const WIDTH_MAX = 600;
@@ -141,6 +160,17 @@ export default function CompanionOverlayPage() {
   const speakRef = useRef<(text: string) => Promise<void>>(async () => {});
   const authTokenRef = useRef(authToken);
 
+  // Wake word — "Hey Based"
+  const [wakeWordEnabled, setWakeWordEnabled] = useState(false);
+  const [wakeState, setWakeState] = useState<'idle' | 'listening' | 'processing'>('idle');
+  const wakeStateRef = useRef<'idle' | 'listening' | 'processing'>('idle');
+  const wakeWordEnabledRef = useRef(false);
+  const isGeneratingRef = useRef(false);
+  const isSpeakingRef = useRef(false);
+  const wakeRecogRef = useRef<SpeechRecognition | null>(null);
+  const restartWakeRef = useRef<(() => void) | null>(null);
+  const sendFnRef = useRef<(voiceText?: string) => Promise<void>>(async () => {});
+
   const [panelWidth, setPanelWidth] = useState<number>(WIDTH_DEFAULT);
   const containerRef = useRef<HTMLDivElement>(null);
   const isResizingRef = useRef(false);
@@ -236,11 +266,131 @@ export default function CompanionOverlayPage() {
     speakRef.current = speak;
   }, [speak]);
 
+  useEffect(() => { wakeWordEnabledRef.current = wakeWordEnabled; }, [wakeWordEnabled]);
+  useEffect(() => { isGeneratingRef.current = isGenerating; }, [isGenerating]);
+  useEffect(() => { isSpeakingRef.current = isSpeaking; }, [isSpeaking]);
+
+  // Wake word — "Hey Based" using Web Speech API (Chrome/Electron/Android Chrome)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const SRClass =
+      (window as unknown as { SpeechRecognition?: new () => SpeechRecognition }).SpeechRecognition ??
+      (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognition }).webkitSpeechRecognition;
+
+    if (!SRClass || !wakeWordEnabled) {
+      wakeRecogRef.current?.stop();
+      wakeRecogRef.current = null;
+      wakeStateRef.current = 'idle';
+      setWakeState('idle');
+      return;
+    }
+
+    let startWake: () => void;
+    let startCommand: () => void;
+
+    startCommand = () => {
+      const recog = new SRClass();
+      recog.continuous = false;
+      recog.interimResults = false;
+      recog.lang = 'en-US';
+
+      let handled = false;
+      const timeout = setTimeout(() => {
+        if (!handled) { handled = true; recog.stop(); }
+      }, 8000);
+
+      recog.onresult = (e: SpeechRecognitionEvent) => {
+        handled = true;
+        clearTimeout(timeout);
+        const transcript = e.results[0]?.[0]?.transcript?.trim() ?? '';
+        if (transcript) {
+          wakeStateRef.current = 'processing';
+          setWakeState('processing');
+          void sendFnRef.current(transcript);
+        } else {
+          wakeStateRef.current = 'idle';
+          setWakeState('idle');
+          if (wakeWordEnabledRef.current) startWake();
+        }
+      };
+
+      recog.onend = () => {
+        clearTimeout(timeout);
+        if (!handled || wakeStateRef.current === 'listening') {
+          wakeStateRef.current = 'idle';
+          setWakeState('idle');
+          if (wakeWordEnabledRef.current) startWake();
+        }
+      };
+
+      recog.onerror = () => {
+        clearTimeout(timeout);
+        handled = true;
+        wakeStateRef.current = 'idle';
+        setWakeState('idle');
+        if (wakeWordEnabledRef.current) setTimeout(startWake, 300);
+      };
+
+      try { recog.start(); } catch { /* ignore */ }
+    };
+
+    startWake = () => {
+      if (!wakeWordEnabledRef.current) return;
+      if (wakeStateRef.current !== 'idle') return;
+
+      const recog = new SRClass();
+      recog.continuous = true;
+      recog.interimResults = true;
+      recog.lang = 'en-US';
+
+      recog.onresult = (e: SpeechRecognitionEvent) => {
+        if (isSpeakingRef.current || isGeneratingRef.current) return;
+        if (wakeStateRef.current !== 'idle') return;
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const t = e.results[i][0].transcript.toLowerCase();
+          if (t.includes('hey based') || t.includes('hey, based') || t.includes('hay based')) {
+            wakeStateRef.current = 'listening';
+            setWakeState('listening');
+            recog.stop();
+            startCommand();
+            return;
+          }
+        }
+      };
+
+      recog.onend = () => {
+        if (wakeWordEnabledRef.current && wakeStateRef.current === 'idle') {
+          setTimeout(startWake, 300);
+        }
+      };
+
+      recog.onerror = (e: SpeechRecognitionErrorEvent) => {
+        if (e.error === 'not-allowed') return;
+        if (wakeWordEnabledRef.current && wakeStateRef.current === 'idle') {
+          setTimeout(startWake, 1000);
+        }
+      };
+
+      try { recog.start(); } catch { /* ignore */ }
+      wakeRecogRef.current = recog;
+    };
+
+    restartWakeRef.current = startWake;
+    startWake();
+
+    return () => {
+      wakeRecogRef.current?.stop();
+      wakeRecogRef.current = null;
+    };
+  }, [wakeWordEnabled]);
+
   useEffect(() => {
     const stored = localStorage.getItem('based_companion_voice');
     if (stored === 'true') setVoiceEnabled(true);
     const storedGender = localStorage.getItem('based_companion_voice_gender');
     if (storedGender === 'female') setVoiceGender('female');
+    const storedWake = localStorage.getItem('based_companion_wake');
+    if (storedWake === 'true') setWakeWordEnabled(true);
     // On open: real generation warmup loads the F5-TTS model onto GPU (fires once).
     // Every 4 min: lightweight health ping keeps the container alive without burning GPU credits.
     if (stored === 'true') {
@@ -660,8 +810,8 @@ export default function CompanionOverlayPage() {
     return () => clearTimeout(t);
   }, [authReady, authToken]); // sendGreeting intentionally omitted — ref guards single-fire
 
-  const send = async () => {
-    const text = input.trim();
+  const send = async (voiceText?: string) => {
+    const text = (voiceText !== undefined ? voiceText : input).trim();
     if (!text || isGenerating) return;
 
     let cap = pendingCapture;
@@ -891,8 +1041,20 @@ export default function CompanionOverlayPage() {
       }
       setSlowWarning(false);
       setIsGenerating(false);
+      // Restart passive listener after a voice-triggered command finishes
+      if (wakeStateRef.current === 'processing' && wakeWordEnabledRef.current) {
+        wakeStateRef.current = 'idle';
+        setWakeState('idle');
+        setTimeout(() => restartWakeRef.current?.(), 600);
+      }
     }
   };
+
+  // Keep sendFnRef pointing to the latest send so the wake word handler can
+  // call it from an event callback without a stale closure.
+  useEffect(() => {
+    sendFnRef.current = send;
+  });
 
   const handleShare = (content: string, msgIdx: number) => {
     const sentences = content.split(/(?<=[.!?])\s+/);
@@ -1070,8 +1232,33 @@ export default function CompanionOverlayPage() {
               {voiceGender === 'male' ? '⬡ Male' : '⬡ Female'}
             </button>
           )}
+          <button
+            className={`companion-capture-btn${wakeWordEnabled ? ' active' : ''}`}
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            onClick={() => {
+              const next = !wakeWordEnabled;
+              setWakeWordEnabled(next);
+              localStorage.setItem('based_companion_wake', String(next));
+            }}
+            title={wakeWordEnabled ? 'Wake word on — say "Hey Based"' : 'Wake word off'}
+          >
+            {wakeWordEnabled
+              ? wakeState === 'listening'
+                ? '◉ Listening...'
+                : wakeState === 'processing'
+                  ? '◈ Heard...'
+                  : '⊙ Hey Based'
+              : '⊙ Hey Based'}
+          </button>
           {captureError && <span className="companion-capture-error">{captureError}</span>}
         </div>
+
+        {wakeWordEnabled && wakeState !== 'idle' && (
+          <div className="companion-wake-indicator">
+            <span className="companion-wake-pulse" />
+            {wakeState === 'listening' ? 'Listening for your command...' : 'Processing...'}
+          </div>
+        )}
 
         {pendingCapture && (
           <div className="companion-pending-badge">
