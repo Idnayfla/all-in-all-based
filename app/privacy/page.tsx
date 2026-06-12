@@ -14,7 +14,7 @@ export default function PrivacyPage() {
           ← Based
         </Link>
         <h1 className="legal-title">Privacy Policy</h1>
-        <p className="legal-updated">Last updated: 22 May 2025</p>
+        <p className="legal-updated">Last updated: 12 June 2026</p>
       </header>
 
       <main className="legal-body">
@@ -121,6 +121,11 @@ export default function PrivacyPage() {
                 <td>AI memory storage</td>
                 <td>Memory summaries (if opted in)</td>
               </tr>
+              <tr>
+                <td>Google</td>
+                <td>Google Calendar API</td>
+                <td>Calendar events (only when you connect Google Calendar)</td>
+              </tr>
             </tbody>
           </table>
         </section>
@@ -196,7 +201,37 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2>10. Changes to This Policy</h2>
+          <h2>10. Google Calendar Data</h2>
+          <p>
+            When you connect Google Calendar, Based accesses your calendar events solely to: check
+            for scheduling conflicts before creating tasks, and create, update, or delete events on
+            your behalf when you manage tasks through the companion.
+          </p>
+          <p>
+            Based does not store your calendar event content beyond what is needed to complete the
+            requested action. Calendar data is never used for advertising, never shared with third
+            parties, and never used to train AI models.
+          </p>
+          <p>
+            Based&rsquo;s use of information received from Google APIs adheres to the{' '}
+            <a
+              href="https://developers.google.com/terms/api-services-user-data-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="legal-link"
+            >
+              Google API Services User Data Policy
+            </a>
+            , including the Limited Use requirements.
+          </p>
+          <p>
+            You can disconnect Google Calendar at any time from{' '}
+            <strong>Settings → Google Calendar → Disconnect</strong>.
+          </p>
+        </section>
+
+        <section>
+          <h2>11. Changes to This Policy</h2>
           <p>
             We may update this policy from time to time. Material changes will be communicated by
             email before they take effect.
