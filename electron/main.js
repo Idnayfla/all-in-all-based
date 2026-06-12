@@ -226,6 +226,22 @@ app.whenReady().then(async () => {
   createOverlayWindow();
   createBubbleWindow();
 
+  // Grant microphone + media permissions so Web Speech API (Hey Based wake word)
+  // works without a browser permission prompt. Without this handler, Electron 20+
+  // denies all permission requests by default on named partitions like persist:based.
+  const grantMediaPermission = (_webContents, permission, callback) => {
+    const micPerms = ['media', 'microphone', 'audioCapture', 'audio-capture'];
+    callback(micPerms.includes(permission));
+  };
+  const checkMediaPermission = (_webContents, permission) => {
+    const micPerms = ['media', 'microphone', 'audioCapture', 'audio-capture'];
+    return micPerms.includes(permission);
+  };
+  session.defaultSession.setPermissionRequestHandler(grantMediaPermission);
+  session.defaultSession.setPermissionCheckHandler(checkMediaPermission);
+  basedSession.setPermissionRequestHandler(grantMediaPermission);
+  basedSession.setPermissionCheckHandler(checkMediaPermission);
+
   // Allow getDisplayMedia / screen capture in all sessions (default + named partition).
   // Registered AFTER windows are created so the 'persist:based' session object is fully
   // initialised with its webContents — avoids the handler being lost on first launch.

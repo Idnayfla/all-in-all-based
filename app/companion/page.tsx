@@ -319,7 +319,13 @@ export default function CompanionOverlayPage() {
 
       let handled = false;
       const timeout = setTimeout(() => {
-        if (!handled) { handled = true; recog.stop(); }
+        if (!handled) {
+          handled = true;
+          recog.stop();
+          // Reset wakeState so startWake's idle guard doesn't block future sessions
+          wakeStateRef.current = 'idle';
+          setWakeState('idle');
+        }
       }, 8000);
 
       recog.onresult = (e: SpeechRecognitionEvent) => {
@@ -360,10 +366,13 @@ export default function CompanionOverlayPage() {
     startWake = () => {
       if (!wakeWordEnabledRef.current) return;
       if (wakeStateRef.current !== 'idle') return;
-      // Throttle: 500ms floor prevents tight restart loops when the speech API
-      // errors immediately (common in Electron where Google speech is unreliable)
       const now = Date.now();
-      if (now - lastStartAt < 500) return;
+      const elapsed = now - lastStartAt;
+      if (elapsed < 300) {
+        // Throttled — schedule a retry so the mic never goes permanently silent
+        setTimeout(startWake, 300 - elapsed + 10);
+        return;
+      }
       lastStartAt = now;
 
       const recog = new SRClass();
