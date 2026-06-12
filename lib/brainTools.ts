@@ -13,6 +13,7 @@ import {
   findFreeSlot,
   getCalendarIds,
   createEvent,
+  updateEvent,
   deleteEvent,
   deleteEventsByTitle,
   moveEventsByTitle,
@@ -79,6 +80,31 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
             "'today' = due today or overdue, 'urgent' = urgent/high priority not done, 'all' = every open task. Default all.",
         },
       },
+    },
+  },
+  {
+    name: 'update_task',
+    description:
+      'Update an existing task — change its duration, time, date, title, priority, or notes. Also patches the linked Google Calendar event in place so no duplicate is created. Use when the user says "change it to X hours", "make it 2 hours", "update the time to 3pm", "rename it to", "move the task to Tuesday", "set the duration", or any edit to an existing task.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        task_id_or_title: {
+          type: 'string',
+          description: 'The task id (uuid) or a substring of the task title to match.',
+        },
+        title: { type: 'string', description: 'New title if renaming the task.' },
+        due_date: { type: 'string', description: 'New due date in YYYY-MM-DD.' },
+        due_time: { type: 'string', description: 'New time in HH:MM 24h.' },
+        duration_minutes: { type: 'number', description: 'New duration in minutes.' },
+        priority: {
+          type: 'string',
+          enum: PRIORITIES,
+          description: 'New priority.',
+        },
+        notes: { type: 'string', description: 'New notes.' },
+      },
+      required: ['task_id_or_title'],
     },
   },
   {
@@ -393,6 +419,103 @@ export async function createTask(
   const time = data.due_time ? ` at ${data.due_time}` : '';
   const dur = data.duration_minutes ? ` for ${data.duration_minutes}min` : '';
   return `Created task: "${data.title}"${due}${time}${dur} [${data.priority}]${calResult}`;
+}
+
+export async function updateTask(
+  userId: string,
+  input: {
+    task_id_or_title: string;
+    title?: string;
+    due_date?: string;
+    due_time?: string;
+    duration_minutes?: number;
+    priority?: string;
+    notes?: string;
+  }
+): Promise<string> {
+  const isUuid =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      input.task_id_or_title
+    );
+
+  let query = supabaseAdmin
+    .from('tasks')
+    .select('id, title, due_date, due_time, duration_minutes, priority, notes, google_event_id')
+    .eq('user_id', userId)
+    .in('status', ['todo', 'in_progress']);
+  query = isUuid
+    ? query.eq('id', input.task_id_or_title)
+    : query.ilike('title', `%${input.task_id_or_title}%`);
+
+  const { data: rows } = await query.limit(1);
+  if (!rows || rows.length === 0)
+    return `No matching task found for "${input.task_id_or_title}".`;
+  const task = rows[0];
+
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (input.title !== undefined) updates.title = input.title.slice(0, 500);
+  if (input.due_date !== undefined) updates.due_date = input.due_date;
+  if (input.due_time !== undefined) updates.due_time = input.due_time;
+  if (input.duration_minutes !== undefined) updates.duration_minutes = input.duration_minutes;
+  if (input.priority !== undefined && PRIORITIES.includes(input.priority))
+    updates.priority = input.priority;
+  if (input.notes !== undefined) updates.notes = input.notes;
+
+  const { data: updated, error } = await supabaseAdmin
+    .from('tasks')
+    .update(updates)
+    .eq('id', task.id)
+    .eq('user_id', userId)
+    .select('title, due_date, due_time, duration_minutes')
+    .single();
+  if (error || !updated) return `Could not update task: ${error?.message ?? 'unknown error'}`;
+
+  // Sync to Google Calendar — patch in place, never create a duplicate
+  let calResult = '';
+  const syncDate = ((input.due_date ?? task.due_date) as string | null) ?? null;
+  if (syncDate) {
+    try {
+      const accessToken = await getValidAccessToken(userId);
+      if (!accessToken) {
+        calResult = ' (Calendar not connected — task updated without calendar sync.)';
+      } else {
+        const prefs = await getSchedulingPrefs(userId).catch(() => null);
+        const tzOffset = prefs?.timezone ?? '+08:00';
+        const calTitle = (input.title ?? task.title) as string;
+        const calNotes = (input.notes ?? task.notes) as string | null;
+        const calDueTime = ((input.due_time ?? task.due_time) as string | null) ?? null;
+        const calDuration =
+          ((input.duration_minutes ?? task.duration_minutes) as number | null) ?? null;
+
+        if (task.google_event_id) {
+          await updateEvent(accessToken, task.google_event_id as string, calTitle, syncDate, calNotes, {
+            dueTime: calDueTime,
+            durationMinutes: calDuration,
+            tzOffset,
+          });
+          calResult = ' Google Calendar event updated.';
+        } else {
+          // No prior calendar event — create one now
+          const event = await createEvent(accessToken, calTitle, syncDate, calNotes, {
+            dueTime: calDueTime,
+            durationMinutes: calDuration,
+            tzOffset,
+          });
+          await supabaseAdmin
+            .from('tasks')
+            .update({ google_event_id: event.id })
+            .eq('id', task.id);
+          calResult = ' Added to Google Calendar.';
+        }
+      }
+    } catch (e) {
+      calResult = ` (Calendar sync failed: ${e instanceof Error ? e.message : String(e)})`;
+    }
+  }
+
+  const time = updated.due_time ? ` at ${updated.due_time}` : '';
+  const dur = updated.duration_minutes ? ` for ${updated.duration_minutes}min` : '';
+  return `Updated task: "${updated.title}"${time}${dur}.${calResult}`;
 }
 
 export async function listTasks(
@@ -713,6 +836,17 @@ export async function runBrainTool(
           priority: input.priority ? String(input.priority) : undefined,
           notes: input.notes ? String(input.notes) : undefined,
           confirmed_slot: input.confirmed_slot === true,
+        });
+      case 'update_task':
+        return await updateTask(userId, {
+          task_id_or_title: String(input.task_id_or_title ?? ''),
+          title: input.title ? String(input.title) : undefined,
+          due_date: input.due_date ? String(input.due_date) : undefined,
+          due_time: input.due_time ? String(input.due_time) : undefined,
+          duration_minutes:
+            typeof input.duration_minutes === 'number' ? input.duration_minutes : undefined,
+          priority: input.priority ? String(input.priority) : undefined,
+          notes: input.notes ? String(input.notes) : undefined,
         });
       case 'list_tasks':
         return await listTasks(userId, (input.filter as 'today' | 'urgent' | 'all') ?? 'all');
