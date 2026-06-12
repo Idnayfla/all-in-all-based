@@ -8465,7 +8465,7 @@ html.has-wallpaper .editor-panel {
 .pricing-overlay {
   position: fixed;
   inset: 0;
-  z-index: 2000;
+  z-index: 20001;
   background: rgba(0, 0, 0, 0.72);
   display: flex;
   align-items: center;
@@ -8487,9 +8487,10 @@ html.has-wallpaper .editor-panel {
   margin: auto;
 }
 .pricing-close {
-  position: absolute;
-  top: var(--sp-4);
-  right: var(--sp-4);
+  position: sticky;
+  top: 0;
+  float: right;
+  z-index: 1;
   background: none;
   border: none;
   color: var(--text3);

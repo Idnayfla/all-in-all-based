@@ -2551,7 +2551,7 @@ export default function Home() {
             onClose={() => setShowPricing(false)}
             getHeaders={getHeaders}
             onSwitchToFreeAI={
-              pricingReason === 'generations'
+              subscription.generationsUsed >= 10
                 ? () => {
                     setAiModel('free');
                     setShowPricing(false);
