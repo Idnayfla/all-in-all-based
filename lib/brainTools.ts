@@ -234,7 +234,7 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
   {
     name: 'upsert_entity',
     description:
-      'Create or update an entity in the user knowledge base. Use when the user shares a fact about a project, person, account, place, or topic (e.g. "I just hit 15K followers on TikTok"). Matches existing entities by name.',
+      'Create or update an entity in the user knowledge base. Use when the user shares a fact about a project, person, account, place, or topic (e.g. "I just hit 15K followers on TikTok"). Call search_entities first to find the exact stored name and use that as the name parameter — this prevents accidental duplicates.',
     input_schema: {
       type: 'object',
       properties: {
@@ -771,13 +771,27 @@ export async function upsertEntity(
   }
 ): Promise<string> {
   const type = ENTITY_TYPES.includes(input.type) ? input.type : 'other';
-  // Find an existing entity with the same name (case-insensitive) for this user.
-  const { data: existing } = await supabaseAdmin
+  const trimmedName = input.name.trim();
+
+  // 1. Try exact case-insensitive match first
+  let { data: existing } = await supabaseAdmin
     .from('entities')
     .select('id, content')
     .eq('user_id', userId)
-    .ilike('name', input.name.trim())
+    .ilike('name', trimmedName)
     .limit(1);
+
+  // 2. If no exact match, fall back to partial: stored name contains input or vice-versa.
+  //    This catches "TikTok" stored as "TikTok Channel", or vice-versa.
+  if (!existing || existing.length === 0) {
+    const { data: partial } = await supabaseAdmin
+      .from('entities')
+      .select('id, content')
+      .eq('user_id', userId)
+      .or(`name.ilike.%${trimmedName}%,name.ilike.${trimmedName.split(' ')[0]}%`)
+      .limit(1);
+    if (partial && partial.length > 0) existing = partial;
+  }
 
   const now = new Date().toISOString();
 

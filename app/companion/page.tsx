@@ -371,6 +371,8 @@ export default function CompanionOverlayPage() {
 
       // onstart fires once the mic is live — this is the "it's actually working" signal
       recog.onstart = () => {
+        // Once the mic is live, keep showing ◉ even through session restarts.
+        // Don't toggle it off in onend — that causes the visible flicker.
         setWakeListening(true);
       };
 
@@ -382,7 +384,6 @@ export default function CompanionOverlayPage() {
           if (isWakePhrase(t)) {
             wakeStateRef.current = 'listening';
             setWakeState('listening');
-            setWakeListening(false);
             recog.stop();
             startCommand();
             return;
@@ -391,11 +392,13 @@ export default function CompanionOverlayPage() {
       };
 
       recog.onend = () => {
-        setWakeListening(false);
+        // Do NOT clear wakeListening here — the session is about to restart
+        // immediately and toggling false→true causes the visible flicker.
+        // wakeListening stays true until the feature is disabled or errors.
         if (wakeWordEnabledRef.current && wakeStateRef.current === 'idle') {
-          // Short delay so the browser can release the mic before reclaiming it.
-          // Mobile Chrome ends sessions frequently — keep restarting.
           setTimeout(startWake, 150);
+        } else {
+          setWakeListening(false);
         }
       };
 
@@ -425,7 +428,9 @@ export default function CompanionOverlayPage() {
     return () => {
       wakeRecogRef.current?.stop();
       wakeRecogRef.current = null;
+      // Cleanup or disable — clear the visual state
       setWakeListening(false);
+      setWakeState('idle');
     };
   }, [wakeWordEnabled]);
 

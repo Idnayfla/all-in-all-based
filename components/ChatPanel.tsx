@@ -335,8 +335,12 @@ export default function ChatPanel({
     if (flagSending) return;
     setFlagSending(true);
     const body = [flagReason, flagText.trim()].filter(Boolean).join(' — ') || 'Not what I expected';
-    const recentMsgs = messages.slice(-10);
-    const startIdx = messages.length - recentMsgs.length;
+    // Show a window of messages centred on the flagged message (4 before, 2 after)
+    // so the context is always relevant to the report, not unrelated earlier messages.
+    const windowStart = Math.max(0, msgIdx - 4);
+    const windowEnd = Math.min(messages.length, msgIdx + 2);
+    const recentMsgs = messages.slice(windowStart, windowEnd);
+    const startIdx = windowStart;
     const context =
       recentMsgs.length > 0
         ? recentMsgs
