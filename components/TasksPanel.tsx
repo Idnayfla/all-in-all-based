@@ -314,7 +314,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
     return () => {
       if (schedTimerRef.current) clearTimeout(schedTimerRef.current);
     };
-  }, [calConnected, editDue, editDueTime, editEndTime, headers]);
+  }, [calConnected, editDue, editDueTime, editEndTime, editingId, headers]);
 
   // ── Fetch calendar data ────────────────────────────────────────────────────
   const fetchCalendar = useCallback(() => {
@@ -834,6 +834,16 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
                   style={isOverdue(task) ? { color: '#ef4444' } : undefined}
                 >
                   {formatDue(task.due_date)}
+                  {task.due_time && (
+                    <span className="tasks-row-due-time">
+                      {task.due_time.slice(0, 5)}
+                    </span>
+                  )}
+                </span>
+              )}
+              {task.google_event_id && (
+                <span className="tasks-row-cal-badge" title="Synced to Google Calendar">
+                  ⬡
                 </span>
               )}
               <span
