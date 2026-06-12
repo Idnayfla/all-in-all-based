@@ -1,0 +1,23 @@
+-- Scheduling Preferences are stored as a special entity in the existing `entities` table.
+-- No schema changes are required — the entity system already supports arbitrary JSONB content.
+--
+-- Entity shape written by lib/schedulingPrefs.ts:
+--   name:    "Scheduling Preferences"
+--   type:    "topic"
+--   content: {
+--     timezone?:            string   -- e.g. "+08:00"
+--     work_hours_start?:   string   -- "09:00"
+--     work_hours_end?:     string   -- "18:00"
+--     patterns_notes?:     string   -- newline-separated habit notes
+--     slot_accepts?:       number   -- times user accepted a suggested slot
+--     slot_accepts_last_at?: string -- ISO timestamp of last acceptance
+--     travel_windows?:     Array<{
+--       destination: string
+--       start:       string  -- YYYY-MM-DD
+--       end:         string  -- YYYY-MM-DD
+--       confirmed:   boolean
+--     }>
+--   }
+--
+-- This migration file is intentionally a no-op — kept for audit purposes only.
+SELECT 1;
