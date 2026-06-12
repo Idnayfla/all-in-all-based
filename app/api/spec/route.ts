@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getUserId, supabaseAdmin } from '../_auth';
 import { MODEL_SONNET } from '@/lib/models';
+import { getEffectiveTier } from '@/lib/tiers';
 
 export const maxDuration = 120;
 
@@ -10,21 +11,6 @@ const client = new Anthropic({
 });
 
 const FREE_MONTHLY_LIMIT = 3;
-
-async function getEffectiveTier(userId: string): Promise<'free' | 'pro'> {
-  const { data } = await supabaseAdmin
-    .from('user_settings')
-    .select('subscription_tier, subscription_status, pro_bonus_expires_at')
-    .eq('user_id', userId)
-    .single();
-  const paidTier = (data?.subscription_tier ?? 'free') as 'free' | 'pro';
-  const subStatus = data?.subscription_status ?? 'active';
-  const isCanceled = subStatus === 'canceled' || subStatus === 'cancelled';
-  const bonusExpiresAt = data?.pro_bonus_expires_at as string | null;
-  const hasBonusPro = !!bonusExpiresAt && new Date(bonusExpiresAt) > new Date();
-  const alwaysPro = process.env.ALWAYS_PRO === 'true' || !!process.env.BETA_ACCESS_CODE;
-  return alwaysPro || (paidTier === 'pro' && !isCanceled) || hasBonusPro ? 'pro' : 'free';
-}
 
 const SYSTEM_PROMPT = `You are Based Spec — a senior product engineer and technical analyst. Your job is to turn a plain-language app idea into a complete, accurate Software Requirements Specification (SRS).
 

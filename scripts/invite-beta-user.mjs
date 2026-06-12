@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 // Usage: node scripts/invite-beta-user.mjs user@email.com [days]
-// Sets subscription_tier=beta and beta_expires_at=now+14d for the given email.
 
-import { createClient } from '@supabase/supabase-js';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -14,7 +12,7 @@ if (!email) {
   process.exit(1);
 }
 
-// Load env from .env.local if present
+// Load env from .env.local
 let env = {};
 try {
   const envFile = readFileSync(resolve(process.cwd(), '.env.local'), 'utf8');
@@ -24,69 +22,73 @@ try {
   }
 } catch {}
 
-const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-// Codebase uses SUPABASE_SERVICE_KEY; accept SUPABASE_SERVICE_ROLE_KEY too.
-const supabaseKey =
+const url = env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+const key =
   env.SUPABASE_SERVICE_KEY ||
   process.env.SUPABASE_SERVICE_KEY ||
   env.SUPABASE_SERVICE_ROLE_KEY ||
   process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_KEY');
-  console.error('Add them to .env.local or set as env vars');
+if (!url || !key) {
+  console.error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_KEY in .env.local');
   process.exit(1);
 }
 
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
+const headers = {
+  apikey: key,
+  Authorization: `Bearer ${key}`,
+  'Content-Type': 'application/json',
+};
 
-const { data: users, error: userErr } = await supabase.auth.admin.listUsers();
-if (userErr) {
-  console.error('Error listing users:', userErr.message);
+// List auth users to find by email
+const usersRes = await fetch(`${url}/auth/v1/admin/users?per_page=1000`, { headers });
+if (!usersRes.ok) {
+  console.error('Error listing users:', await usersRes.text());
   process.exit(1);
 }
-
-const user = users.users.find(u => u.email === email);
+const { users } = await usersRes.json();
+const user = users.find(u => u.email === email);
 if (!user) {
   console.error(`No user found with email: ${email}`);
   process.exit(1);
 }
 
-// Check current tier — never downgrade a paying Pro user
-const { data: existing } = await supabase
-  .from('user_settings')
-  .select('subscription_tier, subscription_status')
-  .eq('user_id', user.id)
-  .single();
+// Fetch current settings
+const settingsRes = await fetch(
+  `${url}/rest/v1/user_settings?user_id=eq.${user.id}&select=subscription_tier,subscription_status`,
+  { headers: { ...headers, Accept: 'application/json' } }
+);
+const [existing] = await settingsRes.json();
 
 const currentTier = existing?.subscription_tier ?? 'free';
 const subStatus = existing?.subscription_status ?? 'active';
 const isActivePro =
-  currentTier === 'pro' &&
-  subStatus !== 'canceled' &&
-  subStatus !== 'cancelled';
+  currentTier === 'pro' && subStatus !== 'canceled' && subStatus !== 'cancelled';
 
 if (isActivePro) {
   console.log(`SKIPPED — ${email} is already a paying Pro user. Beta would be a downgrade.`);
-  console.log(`If you want to give them a longer trial, extend their pro_bonus_expires_at instead.`);
   process.exit(0);
 }
 
 const betaExpiry = new Date(Date.now() + days * 86_400_000).toISOString();
 
-const { error } = await supabase
-  .from('user_settings')
-  .upsert(
-    { user_id: user.id, subscription_tier: 'beta', beta_expires_at: betaExpiry },
-    { onConflict: 'user_id' }
-  );
+const upsertRes = await fetch(`${url}/rest/v1/user_settings`, {
+  method: 'POST',
+  headers: {
+    ...headers,
+    Prefer: 'resolution=merge-duplicates',
+  },
+  body: JSON.stringify({
+    user_id: user.id,
+    subscription_tier: 'beta',
+    beta_expires_at: betaExpiry,
+  }),
+});
 
-if (error) {
-  console.error('Error updating user:', error.message);
+if (!upsertRes.ok) {
+  console.error('Error updating user:', await upsertRes.text());
   process.exit(1);
 }
 
-const prev = currentTier === 'free' ? 'free' : `beta (was ${currentTier})`;
+const prev = currentTier === 'free' ? 'free' : currentTier;
 console.log(`OK ${email} -> beta tier (from ${prev}), expires ${betaExpiry} (${days} days)`);
