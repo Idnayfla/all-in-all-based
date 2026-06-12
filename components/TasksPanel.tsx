@@ -712,7 +712,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
                     ) : schedConflict ? (
                       schedSuggested ? (
                         <>
-                          {`⊘ Conflict — next free: ${schedSuggested}`}
+                          {`⊘ Conflict — next free: ${schedSuggested} – ${computeEndTime(schedSuggested, computeDuration(editDueTime, editEndTime))}`}
                           <button className="tasks-sched-use-slot" onClick={acceptSuggestedSlot}>
                             Use this slot
                           </button>
