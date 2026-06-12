@@ -62,8 +62,7 @@ const [existing] = await settingsRes.json();
 
 const currentTier = existing?.subscription_tier ?? 'free';
 const subStatus = existing?.subscription_status ?? 'active';
-const isActivePro =
-  currentTier === 'pro' && subStatus !== 'canceled' && subStatus !== 'cancelled';
+const isActivePro = currentTier === 'pro' && subStatus !== 'canceled' && subStatus !== 'cancelled';
 
 if (isActivePro) {
   console.log(`SKIPPED — ${email} is already a paying Pro user. Beta would be a downgrade.`);

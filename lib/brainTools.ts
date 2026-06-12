@@ -133,7 +133,7 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
         shift_hours: {
           type: 'number',
           description:
-            'Hours to shift each event: negative = earlier, positive = later. e.g. -2 = 2 hours earlier, 1 = 1 hour later. Applied to each event\'s existing time, so morning and afternoon sessions both shift correctly with one call.',
+            "Hours to shift each event: negative = earlier, positive = later. e.g. -2 = 2 hours earlier, 1 = 1 hour later. Applied to each event's existing time, so morning and afternoon sessions both shift correctly with one call.",
         },
         new_time: {
           type: 'string',
@@ -146,7 +146,8 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
         },
         date_to: {
           type: 'string',
-          description: 'Only affect events on or before this YYYY-MM-DD. Defaults to today + 30 days.',
+          description:
+            'Only affect events on or before this YYYY-MM-DD. Defaults to today + 30 days.',
         },
         confirmed: {
           type: 'boolean',
@@ -166,7 +167,8 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
       properties: {
         title_keyword: {
           type: 'string',
-          description: 'Keyword to match against event titles (case-insensitive). e.g. "Decompress".',
+          description:
+            'Keyword to match against event titles (case-insensitive). e.g. "Decompress".',
         },
         days_ahead: {
           type: 'number',
@@ -464,8 +466,7 @@ export async function removeCalendarEvents(
   const accessToken = await getValidAccessToken(userId);
   if (!accessToken) return 'Google Calendar not connected — cannot remove events.';
   const { deleted, failed } = await deleteEventsByTitle(accessToken, titleKeyword, daysAhead);
-  if (deleted === 0 && failed === 0)
-    return `No upcoming events found matching "${titleKeyword}".`;
+  if (deleted === 0 && failed === 0) return `No upcoming events found matching "${titleKeyword}".`;
   const failNote = failed > 0 ? ` (${failed} could not be deleted)` : '';
   return `Removed ${deleted} event${deleted !== 1 ? 's' : ''} matching "${titleKeyword}" from Google Calendar.${failNote}`;
 }

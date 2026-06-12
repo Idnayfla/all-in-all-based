@@ -429,10 +429,9 @@ export async function listEventsInRange(
         maxResults: '250',
       });
       try {
-        const res = await fetch(
-          `${CAL_BASE}/${encodeURIComponent(calId)}/events?${params}`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
+        const res = await fetch(`${CAL_BASE}/${encodeURIComponent(calId)}/events?${params}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
         if (!res.ok) return [] as CalEvent[];
         const data = (await res.json()) as {
           items?: Array<{
@@ -480,7 +479,11 @@ export async function moveEventsByTitle(
     dateTo?: string; // YYYY-MM-DD, default today+30
     checkConflicts?: boolean; // skip moves whose destination slot is busy
   }
-): Promise<{ moved: number; failed: number; conflicts: Array<{ title: string; newStart: string }> }> {
+): Promise<{
+  moved: number;
+  failed: number;
+  conflicts: Array<{ title: string; newStart: string }>;
+}> {
   const timeMin = opts.dateFrom ? `${opts.dateFrom}T00:00:00Z` : new Date().toISOString();
   const timeMax = opts.dateTo
     ? `${opts.dateTo}T23:59:59Z`
@@ -508,10 +511,9 @@ export async function moveEventsByTitle(
       q: titleKeyword,
     });
     try {
-      const res = await fetch(
-        `${CAL_BASE}/${encodeURIComponent(calId)}/events?${params}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
+      const res = await fetch(`${CAL_BASE}/${encodeURIComponent(calId)}/events?${params}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
       if (!res.ok) continue;
       const data = (await res.json()) as { items?: FoundEvent[] };
       for (const item of data.items ?? []) {
@@ -637,10 +639,9 @@ export async function deleteEventsByTitle(
       q: titleKeyword,
     });
     try {
-      const res = await fetch(
-        `${CAL_BASE}/${encodeURIComponent(calId)}/events?${params}`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
+      const res = await fetch(`${CAL_BASE}/${encodeURIComponent(calId)}/events?${params}`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
       if (!res.ok) continue;
       const data = (await res.json()) as { items?: FoundEvent[] };
       for (const item of data.items ?? []) {

@@ -1422,7 +1422,8 @@ export default function Home() {
                   setShowPricing(true);
                 }}
               >
-                {Math.min(subscription.generationsUsed, subscription.tier === 'beta' ? 30 : 10)}/{subscription.tier === 'beta' ? 30 : 10}
+                {Math.min(subscription.generationsUsed, subscription.tier === 'beta' ? 30 : 10)}/
+                {subscription.tier === 'beta' ? 30 : 10}
               </button>
             )}
             {subscription.tier !== 'pro' ? (
@@ -1940,17 +1941,26 @@ export default function Home() {
                     <label className="settings-label">Plan</label>
                     <div className="plan-badge-row">
                       <span className={`plan-badge plan-badge--${subscription.tier}`}>
-                        {subscription.tier === 'pro' ? '⬡ Pro' : subscription.tier === 'beta' ? '◈ Beta' : 'Free'}
+                        {subscription.tier === 'pro'
+                          ? '⬡ Pro'
+                          : subscription.tier === 'beta'
+                            ? '◈ Beta'
+                            : 'Free'}
                       </span>
                       {subscription.tier !== 'pro' && (
                         <span className="plan-usage">
-                          {Math.min(subscription.generationsUsed, subscription.tier === 'beta' ? 30 : 10)}/{subscription.tier === 'beta' ? 30 : 10} generations this month
+                          {Math.min(
+                            subscription.generationsUsed,
+                            subscription.tier === 'beta' ? 30 : 10
+                          )}
+                          /{subscription.tier === 'beta' ? 30 : 10} generations this month
                         </span>
                       )}
                     </div>
                     {subscription.tier === 'beta' && subscription.betaDaysLeft > 0 && (
                       <div className="plan-beta-expiry">
-                        ◈ Beta access expires in {subscription.betaDaysLeft} day{subscription.betaDaysLeft !== 1 ? 's' : ''}
+                        ◈ Beta access expires in {subscription.betaDaysLeft} day
+                        {subscription.betaDaysLeft !== 1 ? 's' : ''}
                       </div>
                     )}
                     {subscription.tier === 'pro' && subscription.periodStart && (
