@@ -307,6 +307,7 @@ export default function CompanionOverlayPage() {
 
     setWakeError(null);
     let lastStartAt = 0;
+    let consecutiveNetworkErrors = 0;
     let startWake: () => void;
     let startCommand: () => void;
 
@@ -374,9 +375,9 @@ export default function CompanionOverlayPage() {
       // back off longer instead of restarting at 150ms (which would loop).
       let networkError = false;
 
-      // onstart fires once the mic is live — this is the "it's actually working" signal
       recog.onstart = () => {
         setWakeListening(true);
+        consecutiveNetworkErrors = 0; // mic is live — reset failure counter
       };
 
       recog.onresult = (e: SpeechRecognitionEvent) => {
@@ -413,6 +414,15 @@ export default function CompanionOverlayPage() {
         }
         if (e.error === 'network' || e.error === 'service-not-allowed') {
           networkError = true; // onend will use 5s backoff instead of 150ms
+          consecutiveNetworkErrors++;
+          if (consecutiveNetworkErrors >= 3) {
+            // Speech service consistently unreachable (common in Electron).
+            // Stop the retry loop — user can re-enable the toggle to try again.
+            wakeWordEnabledRef.current = false;
+            setWakeWordEnabled(false);
+            setWakeListening(false);
+            setWakeError('Speech recognition unavailable — Hey Based works best in Chrome or on mobile');
+          }
         }
         // 'aborted', 'no-speech', 'audio-capture': transient.
         // onend fires next and handles the restart — don't touch wakeListening.
