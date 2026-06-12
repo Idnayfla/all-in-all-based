@@ -17,7 +17,7 @@ interface ModeDropdownProps {
   mode: GenerationMode;
   onChange: (m: GenerationMode) => void;
   disabled: boolean;
-  subscriptionTier?: 'free' | 'pro';
+  subscriptionTier?: 'free' | 'beta' | 'pro';
   onProRequired?: () => void;
   onPanelSwitch?: (panel: string) => void;
 }

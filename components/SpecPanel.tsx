@@ -102,7 +102,7 @@ function condenseSRS(sections: SpecSection[], description: string): string {
 interface Props {
   authToken: string;
   currentProject: Project | null;
-  subscriptionTier: 'free' | 'pro';
+  subscriptionTier: 'free' | 'beta' | 'pro';
   onBuildFromSpec: (prompt: string) => void;
 }
 

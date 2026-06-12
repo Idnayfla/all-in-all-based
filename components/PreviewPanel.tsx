@@ -11,7 +11,7 @@ export default function PreviewPanel({
 }: {
   files: FileNode[];
   projectType: string;
-  subscriptionTier?: 'free' | 'pro';
+  subscriptionTier?: 'free' | 'beta' | 'pro';
   onProRequired?: () => void;
 }) {
   const [output, setOutput] = useState('');

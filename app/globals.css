@@ -8727,6 +8727,17 @@ html.has-wallpaper .editor-panel {
   color: var(--accent);
   border: 1px solid var(--accent);
 }
+.plan-badge--beta {
+  background: rgba(100, 180, 255, 0.12);
+  color: #64b4ff;
+  border: 1px solid rgba(100, 180, 255, 0.35);
+}
+.plan-beta-expiry {
+  font-size: var(--fs-xs);
+  color: #64b4ff;
+  opacity: 0.8;
+  margin-top: 4px;
+}
 .plan-usage {
   font-size: var(--fs-xs);
   color: var(--text3);
@@ -15127,6 +15138,10 @@ body:has(.legal-page) {
 .gen-counter--danger {
   color: var(--danger);
   border-color: rgba(255, 107, 107, 0.35);
+}
+.gen-counter--beta {
+  color: #64b4ff;
+  border-color: rgba(100, 180, 255, 0.35);
 }
 @media (max-width: 768px) {
   .gen-counter-badge {

@@ -424,7 +424,7 @@ export default function StudioPanel({
   subscriptionTier,
 }: {
   authToken?: string;
-  subscriptionTier?: 'free' | 'pro';
+  subscriptionTier?: 'free' | 'beta' | 'pro';
 }) {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [bpm, setBpm] = useState(120);
