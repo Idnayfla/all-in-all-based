@@ -404,15 +404,12 @@ export default function CompanionOverlayPage() {
       };
 
       recog.onerror = (e: SpeechRecognitionErrorEvent) => {
-        setWakeListening(false);
         if (e.error === 'not-allowed') {
+          setWakeListening(false);
           setWakeError('Mic denied — allow microphone in browser settings');
-          return;
         }
-        // 'no-speech', 'audio-capture', etc. — just restart
-        if (wakeWordEnabledRef.current && wakeStateRef.current === 'idle') {
-          setTimeout(startWake, 400);
-        }
+        // 'aborted', 'no-speech', 'audio-capture', 'network': transient.
+        // onend fires next and schedules the restart — don't touch wakeListening.
       };
 
       try {
