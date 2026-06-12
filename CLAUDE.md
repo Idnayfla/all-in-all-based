@@ -49,7 +49,7 @@ Non-code chat uses `sonnet`. `sanitizeHTML()` post-processes all HTML before sen
 
 ## Agent System
 
-Seventeen agents (16 specialists + 1 orchestrator) defined in `.claude/agents/`.
+Eighteen agents (17 specialists + 1 orchestrator) defined in `.claude/agents/`.
 
 ### Single-agent invocation
 
@@ -70,6 +70,7 @@ Seventeen agents (16 specialists + 1 orchestrator) defined in `.claude/agents/`.
 [Agent: Finance]            — MRR, unit economics, Stripe, API cost modelling, pricing
 [Agent: Technical Writer]   — API docs, user guides, error messages, CHANGELOG entries
 [Agent: AI Engineer]        — prompt architecture, model selection, pipeline optimisation
+[Agent: Founder Advisor]    — go/no-go decisions, pricing gut-checks, founder traps, LinkedIn narrative
 ```
 
 ### Multi-agent workflows (Orchestrator coordinates all)
