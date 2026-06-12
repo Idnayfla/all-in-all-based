@@ -288,9 +288,25 @@ export default function CompanionOverlayPage() {
   useEffect(() => { isGeneratingRef.current = isGenerating; }, [isGenerating]);
   useEffect(() => { isSpeakingRef.current = isSpeaking; }, [isSpeaking]);
 
-  // Wake word — "Hey Based" using Web Speech API (Chrome/Electron/Android Chrome)
+  // Wake word — "Hey Based" using Web Speech API (mobile Chrome / desktop Chrome)
+  // NOT supported in Electron: the Web Speech API opens a chunked HTTP audio
+  // upload to Google's servers on every session. In Electron these uploads tear
+  // down uncleanly on each restart, flooding the log with Chromium errors.
+  // Detect Electron via window.electronAPI (exposed by overlay-preload.js).
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    const isElectron = !!(window as unknown as { electronAPI?: unknown }).electronAPI;
+    if (isElectron && wakeWordEnabled) {
+      wakeRecogRef.current?.stop();
+      wakeRecogRef.current = null;
+      wakeStateRef.current = 'idle';
+      setWakeState('idle');
+      setWakeListening(false);
+      setWakeError('Hey Based works in Chrome on mobile — not available in the desktop app');
+      return;
+    }
+
     const SRClass =
       (window as unknown as { SpeechRecognition?: new () => SpeechRecognition }).SpeechRecognition ??
       (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognition }).webkitSpeechRecognition;
