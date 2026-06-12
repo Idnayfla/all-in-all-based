@@ -44,6 +44,7 @@ import TipsGuide from '@/components/TipsGuide';
 import SpecPanel from '@/components/SpecPanel';
 import { track, identifyUser } from '@/lib/posthog';
 import { GetAppButton } from '@/components/GetAppButton';
+import InstallPrompt from '@/components/InstallPrompt';
 import { useTranslation, SUPPORTED_LANGUAGES } from '@/lib/i18n';
 
 function uuid(): string {
@@ -1669,6 +1670,7 @@ export default function Home() {
 
       {/* Tips guide for new users */}
       <TipsGuide />
+      <InstallPrompt />
 
       <div className="app-body">
         <SidebarTrigger
