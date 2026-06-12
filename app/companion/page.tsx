@@ -11,6 +11,7 @@ declare interface SpeechRecognition extends EventTarget {
   lang: string;
   start(): void;
   stop(): void;
+  onstart: (() => void) | null;
   onresult: ((e: SpeechRecognitionEvent) => void) | null;
   onend: (() => void) | null;
   onerror: ((e: SpeechRecognitionErrorEvent) => void) | null;
@@ -21,6 +22,21 @@ declare interface SpeechRecognitionEvent extends Event {
 }
 declare interface SpeechRecognitionErrorEvent extends Event {
   readonly error: string;
+}
+
+// Pure function — lives outside the component so it is referentially stable
+// and never needs to be in a useEffect dependency array.
+function isWakePhrase(raw: string): boolean {
+  const s = raw.toLowerCase().replace(/[,\.!?]/g, '').trim();
+  const direct = [
+    'hey based', 'hey base', 'hay based', 'hay base',
+    'hey baste', 'hey bass', 'hey bays', 'hey paste',
+    'a based', 'a base', 'ok based', 'hi based',
+  ];
+  if (direct.some(w => s.includes(w))) return true;
+  // (hey|hay|ok|hi) followed by anything starting with "bas"
+  if (/\b(hey|hay|ok|hi)\s+bas\w*/i.test(s)) return true;
+  return false;
 }
 
 const COMPANION_WIDTH_KEY = 'based_companion_width';
@@ -163,6 +179,8 @@ export default function CompanionOverlayPage() {
   // Wake word — "Hey Based"
   const [wakeWordEnabled, setWakeWordEnabled] = useState(false);
   const [wakeState, setWakeState] = useState<'idle' | 'listening' | 'processing'>('idle');
+  const [wakeListening, setWakeListening] = useState(false); // mic actually capturing
+  const [wakeError, setWakeError] = useState<string | null>(null);
   const wakeStateRef = useRef<'idle' | 'listening' | 'processing'>('idle');
   const wakeWordEnabledRef = useRef(false);
   const isGeneratingRef = useRef(false);
@@ -282,9 +300,13 @@ export default function CompanionOverlayPage() {
       wakeRecogRef.current = null;
       wakeStateRef.current = 'idle';
       setWakeState('idle');
+      setWakeListening(false);
+      setWakeError(null);
       return;
     }
 
+    setWakeError(null);
+    let lastStartAt = 0;
     let startWake: () => void;
     let startCommand: () => void;
 
@@ -328,29 +350,39 @@ export default function CompanionOverlayPage() {
         handled = true;
         wakeStateRef.current = 'idle';
         setWakeState('idle');
-        if (wakeWordEnabledRef.current) setTimeout(startWake, 300);
+        if (wakeWordEnabledRef.current) setTimeout(startWake, 200);
       };
 
-      try { recog.start(); } catch { /* ignore */ }
+      try { recog.start(); } catch { /* ignore duplicate-start */ }
     };
 
     startWake = () => {
       if (!wakeWordEnabledRef.current) return;
       if (wakeStateRef.current !== 'idle') return;
+      // Throttle: avoid tight restart loops on browsers that end immediately
+      const now = Date.now();
+      if (now - lastStartAt < 150) return;
+      lastStartAt = now;
 
       const recog = new SRClass();
       recog.continuous = true;
       recog.interimResults = true;
       recog.lang = 'en-US';
 
+      // onstart fires once the mic is live — this is the "it's actually working" signal
+      recog.onstart = () => {
+        setWakeListening(true);
+      };
+
       recog.onresult = (e: SpeechRecognitionEvent) => {
         if (isSpeakingRef.current || isGeneratingRef.current) return;
         if (wakeStateRef.current !== 'idle') return;
         for (let i = e.resultIndex; i < e.results.length; i++) {
-          const t = e.results[i][0].transcript.toLowerCase();
-          if (t.includes('hey based') || t.includes('hey, based') || t.includes('hay based')) {
+          const t = e.results[i][0].transcript;
+          if (isWakePhrase(t)) {
             wakeStateRef.current = 'listening';
             setWakeState('listening');
+            setWakeListening(false);
             recog.stop();
             startCommand();
             return;
@@ -359,19 +391,31 @@ export default function CompanionOverlayPage() {
       };
 
       recog.onend = () => {
+        setWakeListening(false);
         if (wakeWordEnabledRef.current && wakeStateRef.current === 'idle') {
-          setTimeout(startWake, 300);
+          // Short delay so the browser can release the mic before reclaiming it.
+          // Mobile Chrome ends sessions frequently — keep restarting.
+          setTimeout(startWake, 150);
         }
       };
 
       recog.onerror = (e: SpeechRecognitionErrorEvent) => {
-        if (e.error === 'not-allowed') return;
+        setWakeListening(false);
+        if (e.error === 'not-allowed') {
+          setWakeError('Mic denied — allow microphone in browser settings');
+          return;
+        }
+        // 'no-speech', 'audio-capture', etc. — just restart
         if (wakeWordEnabledRef.current && wakeStateRef.current === 'idle') {
-          setTimeout(startWake, 1000);
+          setTimeout(startWake, 400);
         }
       };
 
-      try { recog.start(); } catch { /* ignore */ }
+      try {
+        recog.start();
+      } catch {
+        // InvalidStateError: already started — will onend → restart naturally
+      }
       wakeRecogRef.current = recog;
     };
 
@@ -381,6 +425,7 @@ export default function CompanionOverlayPage() {
     return () => {
       wakeRecogRef.current?.stop();
       wakeRecogRef.current = null;
+      setWakeListening(false);
     };
   }, [wakeWordEnabled]);
 
@@ -1238,19 +1283,32 @@ export default function CompanionOverlayPage() {
             onClick={() => {
               const next = !wakeWordEnabled;
               setWakeWordEnabled(next);
+              setWakeError(null);
               localStorage.setItem('based_companion_wake', String(next));
             }}
-            title={wakeWordEnabled ? 'Wake word on — say "Hey Based"' : 'Wake word off'}
+            title={
+              wakeWordEnabled
+                ? wakeListening
+                  ? 'Mic active — say "Hey Based"'
+                  : wakeError
+                    ? wakeError
+                    : 'Starting mic...'
+                : 'Enable wake word — say "Hey Based" to activate'
+            }
           >
             {wakeWordEnabled
               ? wakeState === 'listening'
                 ? '◉ Listening...'
                 : wakeState === 'processing'
-                  ? '◈ Heard...'
-                  : '⊙ Hey Based'
+                  ? '◈ Processing...'
+                  : wakeListening
+                    ? '◉ Hey Based'
+                    : '⊙ Hey Based'
               : '⊙ Hey Based'}
           </button>
-          {captureError && <span className="companion-capture-error">{captureError}</span>}
+          {(captureError || wakeError) && (
+            <span className="companion-capture-error">{captureError ?? wakeError}</span>
+          )}
         </div>
 
         {wakeWordEnabled && wakeState !== 'idle' && (
