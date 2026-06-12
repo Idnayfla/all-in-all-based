@@ -6,7 +6,7 @@ import { getWeather } from '@/lib/weather';
 import { getTrafficInfo } from '@/lib/traffic';
 import { exaSearch } from '@/lib/tavily';
 import { MODEL_OPUS, MODEL_SONNET, MODEL_HAIKU } from '@/lib/models';
-import { BRAIN_TOOLS, runBrainTool, listTasks } from '@/lib/brainTools';
+import { BRAIN_TOOLS, runBrainTool, listTasks, listCalendarEvents } from '@/lib/brainTools';
 import { getSchedulingPrefs } from '@/lib/schedulingPrefs';
 import { getEffectiveTier, TIER_LIMITS } from '@/lib/tiers';
 
@@ -298,20 +298,30 @@ export async function POST(req: NextRequest) {
     extractPatternsAsync(jwtUserId, messages);
   }
 
-  // J3 — fetch today's tasks for proactive morning briefing
+  // J3 — fetch today's tasks + calendar events for proactive briefing
   let todayTasksContext = '';
+  let todayCalendarContext = '';
   if (jwtUserId && isFirstMessageOfSession) {
-    try {
-      const tasksResult = await listTasks(jwtUserId, 'today');
-      if (
-        !tasksResult.startsWith('Nothing') &&
-        !tasksResult.startsWith('No open') &&
-        !tasksResult.startsWith('Could not')
-      ) {
-        todayTasksContext = tasksResult;
+    const sgtTodayStr = new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const [tasksResult, calResult] = await Promise.allSettled([
+      listTasks(jwtUserId, 'today'),
+      listCalendarEvents(jwtUserId, sgtTodayStr, sgtTodayStr),
+    ]);
+    if (tasksResult.status === 'fulfilled') {
+      const r = tasksResult.value;
+      if (!r.startsWith('Nothing') && !r.startsWith('No open') && !r.startsWith('Could not')) {
+        todayTasksContext = r;
       }
-    } catch {
-      // silent — never block response
+    }
+    if (calResult.status === 'fulfilled') {
+      const r = calResult.value;
+      if (
+        !r.startsWith('No events') &&
+        !r.startsWith('Google Calendar') &&
+        !r.startsWith('Could not')
+      ) {
+        todayCalendarContext = r;
+      }
     }
   }
 
@@ -455,10 +465,17 @@ export async function POST(req: NextRequest) {
       timeTone = `late night (${localHour}:00 SGT, ${dayOfWeek}) — calm, focused, no pressure`;
     }
     const taskNote = todayTasksContext
-      ? ` Today's tasks:\n${todayTasksContext}\nMention these briefly in your opening — name what's on their plate.`
+      ? `\nToday's tasks:\n${todayTasksContext}`
       : '';
+    const calNote = todayCalendarContext
+      ? `\nToday's calendar:\n${todayCalendarContext}`
+      : '';
+    const contextNote =
+      taskNote || calNote
+        ? ` Here is what's on their plate today:${taskNote}${calNote}\nMention what's most relevant — an upcoming event, a task due soon — naturally, not as a list.`
+        : '';
     dynamicInstructions.push(
-      `DAILY BRIEFING: The user just opened Based. It is ${timeTone}.${taskNote} Open with a short, direct check-in that matches the time — reference memory and patterns to make it feel personal. Not a greeting, not “good morning” — something specific you noticed or something on their plate. Under 2 sentences. Then let them lead.`
+      `DAILY BRIEFING: The user just opened Based. It is ${timeTone}.${contextNote} Open with a short, direct check-in that matches the time — reference memory and patterns to make it feel personal. Not a greeting, not “good morning” — something specific you noticed or something on their plate. Under 2 sentences. Then let them lead.`
     );
   }
 
@@ -505,7 +522,7 @@ export async function POST(req: NextRequest) {
 
   // Task management + brain cleanup from companion — detect and run tool loop
   const COMPANION_TASK_RE =
-    /\b(add\s+a?\s*(task|meeting|call|appointment|event|reminder)|create\s+a?\s*(task|meeting|call|appointment|event)|new\s+(task|meeting|call|appointment)|book\s+(a\s+)?(meeting|call|slot|appointment|time)|set\s+(up\s+)?(a\s+)?(meeting|call|appointment)|put\s+.{0,30}(in|on|into)\s+(my\s+)?(calendar|schedule)|block\s+(out|off)|remind\s+me\s+to|add\s+to\s+(my\s+)?tasks?|what(?:'?s|\s+is)?\s+(due|on my|my)\s+(today|list|tasks?)|what\s+do\s+i\s+have\s+due|list\s+(my\s+)?tasks?|show\s+(my\s+)?tasks?|mark\s+.{0,40}\s+as\s+done|complete\s+task|finish\s+task|task\s+done|clean\s+(up\s+)?(my\s+)?(brain|memory)|fix\s+(my\s+)?(brain|memory)|revamp\s+(my\s+)?(brain|memory)|reorgani[sz]e\s+(my\s+)?(brain|memory)|rewrite\s+(my\s+)?(brain|memory)|update\s+(my\s+)?(brain|memory)|my\s+(brain|memory)\s+(is\s+)?(wrong|messy|broken|off|outdated|incorrect)|schedule\s+(a\s+)?(meeting|call|task|session|appointment)|i('?m|\s+am)\s+(usually\s+free|busy|available|not\s+available)|i('?ll|\s+will)\s+be\s+in\s+\w|i\s+work\s+(from\s+)?\d|going\s+to\s+\w+\s+(from|on)|i\s+won't\s+be\s+(around|available)|my\s+timezone|i('?m|\s+am)\s+in\s+\w+\s+time|remove.{0,30}from.{0,20}calendar|delete.{0,20}event|cancel.{0,20}(meeting|appointment)|remove.{0,20}(meeting|appointment)|(remove|delete)\s+all|(shift|reschedule)\s+\w+|move\s+(my\s+)?[\w\s]{1,30}(to|by|\d|ahead|forward|back)|what.{0,20}(on|have).{0,20}(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|\d{1,2}(st|nd|rd|th))|what.{0,15}my.{0,15}(schedule|calendar|events?))\b/i;
+    /\b(add\s+a?\s*(task|meeting|call|appointment|event|reminder)|create\s+a?\s*(task|meeting|call|appointment|event)|new\s+(task|meeting|call|appointment)|book\s+(a\s+)?(meeting|call|slot|appointment|time)|set\s+(up\s+)?(a\s+)?(meeting|call|appointment)|put\s+.{0,30}(in|on|into)\s+(my\s+)?(calendar|schedule)|block\s+(out|off)|remind\s+me\s+to|add\s+to\s+(my\s+)?tasks?|what(?:'?s|\s+is)?\s+(due|on my|my)\s+(today|list|tasks?)|what\s+do\s+i\s+have\s+due|list\s+(my\s+)?tasks?|show\s+(my\s+)?tasks?|mark\s+.{0,40}\s+as\s+done|complete\s+task|finish\s+task|task\s+done|clean\s+(up\s+)?(my\s+)?(brain|memory)|fix\s+(my\s+)?(brain|memory)|revamp\s+(my\s+)?(brain|memory)|reorgani[sz]e\s+(my\s+)?(brain|memory)|rewrite\s+(my\s+)?(brain|memory)|update\s+(my\s+)?(brain|memory)|my\s+(brain|memory)\s+(is\s+)?(wrong|messy|broken|off|outdated|incorrect)|schedule\s+(a\s+)?(meeting|call|task|session|appointment)|i('?m|\s+am)\s+(usually\s+free|busy|available|not\s+available)|i('?ll|\s+will)\s+be\s+in\s+\w|i\s+work\s+(from\s+)?\d|going\s+to\s+\w+\s+(from|on)|i\s+won't\s+be\s+(around|available)|my\s+timezone|i('?m|\s+am)\s+in\s+\w+\s+time|remove.{0,30}from.{0,20}calendar|delete.{0,20}event|cancel.{0,20}(meeting|appointment)|remove.{0,20}(meeting|appointment)|(remove|delete)\s+all|(shift|reschedule)\s+\w+|move\s+(my\s+)?[\w\s]{1,30}(to|by|\d|ahead|forward|back)|what.{0,20}(on|have).{0,20}(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|\d{1,2}(st|nd|rd|th))|what.{0,15}my.{0,15}(schedule|calendar|events?)|(?:change|update|edit|rename)\s+(?:the\s+)?(?:task|meeting|event|appointment)|(?:change|set|update)\s+(?:the\s+)?(?:duration|time|date|title|name)|make\s+it\s+\d+\s+(?:hours?|minutes?|mins?|hrs?))\b/i;
 
   // Re-trigger the tool loop when the user is mid-scheduling-negotiation.
   // Catches short affirmatives, time picks, and rescheduling words.
@@ -582,6 +599,7 @@ export async function POST(req: NextRequest) {
       `- If create_task returns [CONFLICT — task NOT created], report the conflict and suggested slot to the user. Do NOT say the task was added.`,
       `- If the user picks a different time or says "rebook", "just do it", "maybe 2pm" etc. → call create_task again with the new time and confirmed_slot: true to skip the conflict check.`,
       `- "I'll be in Japan May 1-7" or any travel mention → confirm with user first, then call upsert_scheduling_prefs.`,
+      `- "change it to 2 hours", "make it 2 hours", "set the duration", "update the time to 3pm", "rename it to", "move the task to Tuesday" → call update_task with the task title and the fields to change. NEVER call create_task for edits to an existing task — that creates a duplicate calendar event.`,
       `- "shift X 3 days", "move my lesson to 4pm", "push X back 1 hour", "make it 2 hours earlier" → call move_calendar_events. Use shift_days for day shifts, shift_hours for hour shifts (negative = earlier, e.g. "2 hours earlier" → shift_hours: -2), new_time only when user gives an absolute target time. Never guess absolute times for hour shifts — always use shift_hours.`,
       `- Before moving events if the user uses a vague title like "my lesson" or "my class": call list_calendar_events first for the relevant date range to identify the actual event title, then call move_calendar_events with the exact title.`,
       `- When move_calendar_events returns [CONFLICTS]: report each conflict with the destination time, ask the user to confirm, then call move_calendar_events again with confirmed: true.`,

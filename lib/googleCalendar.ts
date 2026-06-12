@@ -362,9 +362,10 @@ function buildEventTimes(
   dateOnly: string,
   opts?: EventTimeOpts
 ): { start: Record<string, string>; end: Record<string, string> } {
-  if (opts?.dueTime && opts.durationMinutes && opts.tzOffset) {
+  if (opts?.dueTime && opts.tzOffset) {
+    const duration = opts.durationMinutes && opts.durationMinutes > 0 ? opts.durationMinutes : 60;
     const startDt = `${dateOnly}T${opts.dueTime}:00${opts.tzOffset}`;
-    const endMs = new Date(startDt).getTime() + opts.durationMinutes * 60_000;
+    const endMs = new Date(startDt).getTime() + duration * 60_000;
     return {
       start: { dateTime: startDt },
       end: { dateTime: new Date(endMs).toISOString() },
