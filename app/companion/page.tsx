@@ -26,12 +26,16 @@ declare interface SpeechRecognitionErrorEvent extends Event {
 
 // Pure function — lives outside the component so it is referentially stable
 // and never needs to be in a useEffect dependency array.
-function isWakePhrase(raw: string): boolean {
+// Returns the command portion after the wake phrase, or null if no wake phrase found.
+// e.g. "Hey based, what time is it?" → "what time is it?"
+// e.g. "Hey based" → "" (wake only, await next utterance)
+function extractWakeCommand(raw: string): string | null {
   const s = raw
     .toLowerCase()
     .replace(/[,\.!?]/g, '')
     .trim();
-  const direct = [
+
+  const directPrefixes = [
     'hey based',
     'hey base',
     'hay based',
@@ -44,16 +48,21 @@ function isWakePhrase(raw: string): boolean {
     'a base',
     'ok based',
     'hi based',
+    'best',
+    'baste',
+    'beast', // Whisper collapses "hey based" into one word
   ];
-  if (direct.some(w => s.includes(w))) return true;
-  // Standard: (hey|hay|ok|hi) before anything starting with "bas"
-  if (/\b(hey|hay|ok|hi)\s+bas\w*/i.test(s)) return true;
-  // Whisper commonly mishears "hey" as "and", "the", "i", "in", "a" —
-  // catch those too since "based" stays recognizable
-  if (/\b(and|the|in)\s+bas(ed|e|es)?\b/i.test(s)) return true;
-  // Standalone "based" as the first word (user said only the name)
-  if (/^bas(ed|e)?\b/i.test(s)) return true;
-  return false;
+  for (const prefix of directPrefixes) {
+    if (s.startsWith(prefix)) return s.slice(prefix.length).trim();
+    if (s.includes(prefix)) return ''; // wake phrase mid-sentence, treat as wake-only
+  }
+  // Standard: (hey|hay|ok|hi|and|the|in) before anything starting with "bas"
+  const m =
+    s.match(/^(?:hey|hay|ok|hi|and|the|in|a)\s+bas\w*[,\s]*(.*)$/i) ??
+    s.match(/^bas(?:ed|e)?\s*(.*)$/i);
+  if (m) return m[1]?.trim() ?? '';
+
+  return null; // no wake phrase
 }
 
 const COMPANION_WIDTH_KEY = 'based_companion_width';
@@ -421,10 +430,21 @@ export default function CompanionOverlayPage() {
           wakeStateRef.current = 'idle';
           setWakeState('idle');
         }
-      } else if (isWakePhrase(transcript)) {
-        awaitingCommand = true;
-        wakeStateRef.current = 'listening';
-        setWakeState('listening');
+      } else {
+        const command = extractWakeCommand(transcript);
+        if (command !== null) {
+          if (command) {
+            // Wake phrase + command in one utterance — send immediately
+            wakeStateRef.current = 'processing';
+            setWakeState('processing');
+            await sendFnRef.current(command);
+          } else {
+            // Wake phrase only — wait for next utterance
+            awaitingCommand = true;
+            wakeStateRef.current = 'listening';
+            setWakeState('listening');
+          }
+        }
       }
     };
 
