@@ -271,6 +271,15 @@ app.whenReady().then(async () => {
     overlayWin?.hide();
     bubbleWin?.webContents.send('companion-bubble:state', 'closed');
   });
+
+  ipcMain.on('companion:show', () => {
+    if (!overlayWin) return;
+    overlayWin.setAlwaysOnTop(true, 'screen-saver');
+    overlayWin.show();
+    overlayWin.moveTop();
+    overlayWin.focus();
+    bubbleWin?.webContents.send('companion-bubble:state', 'open');
+  });
   let mainWinWasVisible = false;
   ipcMain.on('companion:hide-for-capture', () => {
     mainWinWasVisible = win?.isVisible() ?? false;

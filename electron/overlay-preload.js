@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   hideCompanion: () => ipcRenderer.send('companion:hide'),
+  showCompanion: () => ipcRenderer.send('companion:show'),
   hideForCapture: () => ipcRenderer.send('companion:hide-for-capture'),
   showAfterCapture: () => ipcRenderer.send('companion:show-after-capture'),
   // Captures the screen entirely in the main process via desktopCapturer.

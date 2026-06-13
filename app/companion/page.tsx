@@ -108,6 +108,7 @@ declare global {
   interface Window {
     electronAPI?: {
       hideCompanion: () => void;
+      showCompanion: () => void;
       hideForCapture: () => void;
       showAfterCapture: () => void;
       captureScreenMain: () => Promise<string | null>;
@@ -433,6 +434,8 @@ export default function CompanionOverlayPage() {
       } else {
         const command = extractWakeCommand(transcript);
         if (command !== null) {
+          // Show the companion window if it was hidden
+          window.electronAPI?.showCompanion?.();
           if (command) {
             // Wake phrase + command in one utterance — send immediately
             wakeStateRef.current = 'processing';
@@ -473,7 +476,7 @@ export default function CompanionOverlayPage() {
           if (stopped) return;
           // Pause VAD during generation so we don't record Based's own TTS
           if (wakeStateRef.current === 'processing' || isSpeakingRef.current) {
-            requestAnimationFrame(tick);
+            setTimeout(tick, 50);
             return;
           }
 
@@ -494,7 +497,9 @@ export default function CompanionOverlayPage() {
             }, delay);
           }
 
-          requestAnimationFrame(tick);
+          // setTimeout keeps the loop alive even when the window is hidden
+          // (requestAnimationFrame pauses for hidden windows)
+          setTimeout(tick, 50);
         };
 
         tick();
