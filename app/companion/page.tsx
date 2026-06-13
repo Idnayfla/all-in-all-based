@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { captureScreen, isScreenCaptureSupported } from '@/hooks/useScreenCapture';
+import type { PorcupineWorker as PorcupineWorkerType } from '@picovoice/porcupine-web';
 
 // Web Speech API types (not in all TS DOM libs)
 declare interface SpeechRecognition extends EventTarget {
@@ -322,7 +323,8 @@ export default function CompanionOverlayPage() {
     isSpeakingRef.current = isSpeaking;
   }, [isSpeaking]);
 
-  // Wake word — "Hey Based" using MediaRecorder + Groq Whisper (works in all browsers/Electron)
+  // Wake word — "Hey Based" using Picovoice Porcupine (local on-device, Siri-grade accuracy)
+  // Porcupine detects the wake word; Groq Whisper transcribes the command after wake fires.
   useEffect(() => {
     if (!wakeWordEnabled) {
       wakeStateRef.current = 'idle';
@@ -336,28 +338,18 @@ export default function CompanionOverlayPage() {
     let stopped = false;
     let micStream: MediaStream | null = null;
     let audioCtx: AudioContext | null = null;
+    let porcupineWorker: PorcupineWorkerType | null = null;
     let mediaRecorder: MediaRecorder | null = null;
-    let silenceTimer: ReturnType<typeof setTimeout> | null = null;
+    let analyserNode: AnalyserNode | null = null;
+    let freqData: Uint8Array<ArrayBuffer> | null = null;
     let chunks: Blob[] = [];
-    let isRecording = false;
-    let awaitingCommand = false;
+    let commandTimer: ReturnType<typeof setTimeout> | null = null;
+    let silenceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const SPEECH_THRESH = 22; // 0–255 average frequency energy
-    const SILENCE_WAKE_MS = 1200;
+    const SPEECH_THRESH = 22;
     const SILENCE_CMD_MS = 2000;
-    // Whisper hallucinates these phrases on silence/background noise — treat as empty
-    const WHISPER_HALLUCINATIONS = new Set([
-      'thank you',
-      'thank you.',
-      'thanks for watching',
-      'thanks for watching.',
-      'thank you for watching',
-      'thank you for watching.',
-      'you',
-      'you.',
-      'bye',
-      'bye.',
-    ]);
+    const CMD_TIMEOUT_MS = 8000;
+    const MIN_CMD_BLOB = 2000;
 
     const transcribe = async (blob: Blob): Promise<string> => {
       try {
@@ -378,8 +370,68 @@ export default function CompanionOverlayPage() {
       }
     };
 
-    const startRec = () => {
-      if (isRecording || !micStream) return;
+    const stopCommand = async () => {
+      if (commandTimer) {
+        clearTimeout(commandTimer);
+        commandTimer = null;
+      }
+      if (silenceTimer) {
+        clearTimeout(silenceTimer);
+        silenceTimer = null;
+      }
+      if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+        wakeStateRef.current = 'idle';
+        setWakeState('idle');
+        return;
+      }
+      await new Promise<void>(resolve => {
+        mediaRecorder!.onstop = () => resolve();
+        try {
+          mediaRecorder!.stop();
+        } catch {
+          resolve();
+        }
+      });
+      mediaRecorder = null;
+
+      const blob = new Blob(chunks, { type: 'audio/webm' });
+      chunks = [];
+      if (stopped) return;
+
+      if (blob.size < MIN_CMD_BLOB) {
+        setWakeDebug(`(too short — ${blob.size}b)`);
+        wakeStateRef.current = 'idle';
+        setWakeState('idle');
+        return;
+      }
+
+      wakeStateRef.current = 'processing';
+      setWakeState('processing');
+
+      const raw = await transcribe(blob);
+      if (stopped) return;
+
+      if (!raw.trim()) {
+        wakeStateRef.current = 'idle';
+        setWakeState('idle');
+        setWakeDebug('(no speech detected)');
+        return;
+      }
+
+      setWakeDebug(`heard: "${raw}"`);
+      await sendFnRef.current(raw);
+    };
+
+    const onWakeDetected = () => {
+      if (stopped || wakeStateRef.current !== 'idle') return;
+
+      window.electronAPI?.showCompanion?.();
+      wakeStateRef.current = 'listening';
+      setWakeState('listening');
+      setWakeDebug('◉ Listening...');
+
+      if (!micStream) return;
+
       chunks = [];
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
@@ -394,115 +446,92 @@ export default function CompanionOverlayPage() {
       };
       mr.start(100);
       mediaRecorder = mr;
-      isRecording = true;
-    };
 
-    const stopAndTranscribe = async () => {
-      if (!isRecording || !mediaRecorder) return;
-      isRecording = false;
-      await new Promise<void>(resolve => {
-        mediaRecorder!.onstop = () => resolve();
-        mediaRecorder!.stop();
-      });
-      mediaRecorder = null;
-
-      const blob = new Blob(chunks, { type: 'audio/webm' });
-      chunks = [];
-      if (stopped) return;
-      if (blob.size < 500) {
-        setWakeDebug(`too short (${blob.size}b)`);
-        return;
-      }
-
-      setWakeDebug(`sending ${blob.size}b…`);
-      const raw = await transcribe(blob);
-      if (stopped) return;
-
-      const transcript = WHISPER_HALLUCINATIONS.has(raw.toLowerCase().trim()) ? '' : raw;
-      setWakeDebug(transcript ? `"${transcript}"` : `(noise, ${blob.size}b)`);
-
-      if (awaitingCommand) {
-        awaitingCommand = false;
-        wakeStateRef.current = 'processing';
-        setWakeState('processing');
-        if (transcript.trim()) {
-          await sendFnRef.current(transcript);
-        } else {
-          wakeStateRef.current = 'idle';
-          setWakeState('idle');
-        }
-      } else {
-        const command = extractWakeCommand(transcript);
-        if (command !== null) {
-          // Show the companion window if it was hidden
-          window.electronAPI?.showCompanion?.();
-          if (command) {
-            // Wake phrase + command in one utterance — send immediately
-            wakeStateRef.current = 'processing';
-            setWakeState('processing');
-            await sendFnRef.current(command);
-          } else {
-            // Wake phrase only — wait for next utterance
-            awaitingCommand = true;
-            wakeStateRef.current = 'listening';
-            setWakeState('listening');
-          }
-        }
-      }
-    };
-
-    const start = async () => {
-      try {
-        micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        audioCtx = new AudioContext();
-        const source = audioCtx.createMediaStreamSource(micStream);
-        const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
-        const freqData = new Uint8Array(analyser.frequencyBinCount);
-
-        setWakeListening(true);
-        setWakeError(null);
-
-        // Let send()'s finally block reset state — VAD loop continues automatically
-        restartWakeRef.current = () => {
-          if (stopped) return;
-          awaitingCommand = false;
-          wakeStateRef.current = 'idle';
-          setWakeState('idle');
-        };
-
-        const tick = () => {
-          if (stopped) return;
-          // Pause VAD during generation so we don't record Based's own TTS
-          if (wakeStateRef.current === 'processing' || isSpeakingRef.current) {
-            setTimeout(tick, 50);
-            return;
-          }
-
-          analyser.getByteFrequencyData(freqData);
+      // VAD tick — stop recording once the user stops speaking
+      const cmdTick = () => {
+        if (stopped || wakeStateRef.current !== 'listening') return;
+        if (analyserNode && freqData) {
+          analyserNode.getByteFrequencyData(freqData);
           const avg = freqData.reduce((a, b) => a + b, 0) / freqData.length;
-
-          if (avg > SPEECH_THRESH) {
+          if (avg < SPEECH_THRESH) {
+            if (!silenceTimer) {
+              silenceTimer = setTimeout(() => {
+                silenceTimer = null;
+                void stopCommand();
+              }, SILENCE_CMD_MS);
+            }
+          } else {
             if (silenceTimer) {
               clearTimeout(silenceTimer);
               silenceTimer = null;
             }
-            if (!isRecording) startRec();
-          } else if (isRecording && !silenceTimer) {
-            const delay = awaitingCommand ? SILENCE_CMD_MS : SILENCE_WAKE_MS;
-            silenceTimer = setTimeout(() => {
-              silenceTimer = null;
-              void stopAndTranscribe();
-            }, delay);
           }
+        }
+        setTimeout(cmdTick, 50);
+      };
+      cmdTick();
 
-          // setTimeout keeps the loop alive even when the window is hidden
-          // (requestAnimationFrame pauses for hidden windows)
-          setTimeout(tick, 50);
+      // Hard cutoff if user never speaks
+      commandTimer = setTimeout(() => void stopCommand(), CMD_TIMEOUT_MS);
+    };
+
+    const start = async () => {
+      try {
+        const accessKey = process.env.NEXT_PUBLIC_PICOVOICE_ACCESS_KEY;
+        if (!accessKey) {
+          setWakeError('Set NEXT_PUBLIC_PICOVOICE_ACCESS_KEY in .env.local');
+          setWakeListening(false);
+          return;
+        }
+
+        const { PorcupineWorker, BuiltInKeyword } = await import('@picovoice/porcupine-web');
+
+        // Once you have trained "hey based" in Picovoice Console and placed hey-based.ppn in
+        // public/porcupine/, set NEXT_PUBLIC_PORCUPINE_HAS_CUSTOM_MODEL=true in .env.local
+        const hasCustomModel = process.env.NEXT_PUBLIC_PORCUPINE_HAS_CUSTOM_MODEL === 'true';
+        const keyword = hasCustomModel
+          ? { label: 'hey-based', publicPath: '/porcupine/hey-based.ppn', sensitivity: 0.7 }
+          : { builtin: BuiltInKeyword.Porcupine, sensitivity: 0.7 };
+
+        porcupineWorker = await PorcupineWorker.create(accessKey, keyword, onWakeDetected, {
+          publicPath: '/porcupine/porcupine_params.pv',
+        });
+
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        audioCtx = new AudioContext({ sampleRate: porcupineWorker.sampleRate });
+        await audioCtx.resume();
+
+        const source = audioCtx.createMediaStreamSource(micStream);
+
+        analyserNode = audioCtx.createAnalyser();
+        analyserNode.fftSize = 256;
+        freqData = new Uint8Array(analyserNode.frequencyBinCount);
+        source.connect(analyserNode);
+
+        const frameLen = porcupineWorker.frameLength;
+        const proc = audioCtx.createScriptProcessor(frameLen, 1, 1);
+        source.connect(proc);
+        proc.connect(audioCtx.destination);
+
+        const pw = porcupineWorker;
+        proc.onaudioprocess = (e: AudioProcessingEvent) => {
+          if (stopped || wakeStateRef.current !== 'idle') return;
+          const float32 = e.inputBuffer.getChannelData(0);
+          const int16 = new Int16Array(new ArrayBuffer(float32.length * 2));
+          for (let i = 0; i < float32.length; i++) {
+            int16[i] = Math.max(-32768, Math.min(32767, float32[i] * 32768));
+          }
+          pw.process(int16);
         };
 
-        tick();
+        setWakeListening(true);
+        setWakeError(null);
+
+        restartWakeRef.current = () => {
+          if (stopped) return;
+          wakeStateRef.current = 'idle';
+          setWakeState('idle');
+        };
       } catch {
         setWakeError('Mic permission denied');
         setWakeListening(false);
@@ -513,8 +542,9 @@ export default function CompanionOverlayPage() {
 
     return () => {
       stopped = true;
+      if (commandTimer) clearTimeout(commandTimer);
       if (silenceTimer) clearTimeout(silenceTimer);
-      if (mediaRecorder && isRecording) {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
         try {
           mediaRecorder.stop();
         } catch {
@@ -523,6 +553,8 @@ export default function CompanionOverlayPage() {
       }
       micStream?.getTracks().forEach(t => t.stop());
       void audioCtx?.close();
+      void porcupineWorker?.release();
+      porcupineWorker?.terminate();
       setWakeListening(false);
       setWakeState('idle');
       wakeStateRef.current = 'idle';
