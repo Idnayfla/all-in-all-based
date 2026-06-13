@@ -99,6 +99,16 @@ const nextConfig: NextConfig = {
           { key: 'Cache-Control', value: 'public, max-age=604800, stale-while-revalidate=86400' },
         ],
       },
+      // ── Cross-origin isolation for /companion ─────────────────
+      // Enables SharedArrayBuffer required by ort-wasm-simd-threaded (Silero VAD).
+      // credentialless COEP allows third-party resources without CORP headers.
+      {
+        source: '/companion',
+        headers: [
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+          { key: 'Cross-Origin-Embedder-Policy', value: 'credentialless' },
+        ],
+      },
       // ── Security headers (all routes) ────────────────────────
       {
         source: '/(.*)',
