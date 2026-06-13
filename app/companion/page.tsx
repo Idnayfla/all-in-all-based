@@ -1310,25 +1310,25 @@ export default function CompanionOverlayPage() {
             </button>
           )}
           <button
-            className="companion-capture-btn"
-            style={
-              {
-                WebkitAppRegion: 'no-drag',
-                opacity: 0.35,
-                cursor: 'not-allowed',
-              } as React.CSSProperties
+            className={`companion-capture-btn${wakeWordEnabled ? ' active' : ''}`}
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            onClick={() => {
+              const next = !wakeWordEnabled;
+              setWakeWordEnabled(next);
+              localStorage.setItem('based_companion_wake', String(next));
+            }}
+            title={
+              wakeWordEnabled ? 'Hey Based active — click to disable' : 'Enable Hey Based wake word'
             }
-            disabled
-            title="Hey Based wake word — coming soon"
           >
-            ⊙ Hey Based
+            {wakeWordEnabled && wakeListening ? '◉ Hey Based' : '⊙ Hey Based'}
           </button>
           {(captureError || wakeError) && (
             <span className="companion-capture-error">{captureError ?? wakeError}</span>
           )}
         </div>
 
-        {false && wakeWordEnabled && wakeState !== 'idle' && (
+        {wakeWordEnabled && wakeState !== 'idle' && (
           <div className="companion-wake-indicator">
             <span className="companion-wake-pulse" />
             {wakeState === 'listening' ? 'Listening for your command...' : 'Processing...'}

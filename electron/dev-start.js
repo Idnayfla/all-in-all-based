@@ -1,6 +1,17 @@
 const { spawnSync } = require('child_process');
 const http = require('http');
+const path = require('path');
+const fs = require('fs');
 const electronPath = require('electron');
+
+// Load .env.local so Electron picks up GOOGLE_API_KEY and other local secrets
+const envFile = path.join(__dirname, '..', '.env.local');
+if (fs.existsSync(envFile)) {
+  for (const line of fs.readFileSync(envFile, 'utf8').split('\n')) {
+    const match = line.match(/^([^#=]+)=(.*)$/);
+    if (match) process.env[match[1].trim()] = match[2].trim();
+  }
+}
 
 process.env.ELECTRON_DEV = 'true';
 
