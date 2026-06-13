@@ -327,9 +327,22 @@ export default function CompanionOverlayPage() {
     let isRecording = false;
     let awaitingCommand = false;
 
-    const SPEECH_THRESH = 12; // 0–255 average frequency energy
+    const SPEECH_THRESH = 22; // 0–255 average frequency energy
     const SILENCE_WAKE_MS = 1200;
     const SILENCE_CMD_MS = 2000;
+    // Whisper hallucinates these phrases on silence/background noise — treat as empty
+    const WHISPER_HALLUCINATIONS = new Set([
+      'thank you',
+      'thank you.',
+      'thanks for watching',
+      'thanks for watching.',
+      'thank you for watching',
+      'thank you for watching.',
+      'you',
+      'you.',
+      'bye',
+      'bye.',
+    ]);
 
     const transcribe = async (blob: Blob): Promise<string> => {
       try {
@@ -380,12 +393,18 @@ export default function CompanionOverlayPage() {
 
       const blob = new Blob(chunks, { type: 'audio/webm' });
       chunks = [];
-      if (stopped || blob.size < 500) return;
+      if (stopped) return;
+      if (blob.size < 500) {
+        setWakeDebug(`too short (${blob.size}b)`);
+        return;
+      }
 
-      const transcript = await transcribe(blob);
+      setWakeDebug(`sending ${blob.size}b…`);
+      const raw = await transcribe(blob);
       if (stopped) return;
 
-      setWakeDebug(transcript || '(silence)');
+      const transcript = WHISPER_HALLUCINATIONS.has(raw.toLowerCase().trim()) ? '' : raw;
+      setWakeDebug(transcript ? `"${transcript}"` : `(noise, ${blob.size}b)`);
 
       if (awaitingCommand) {
         awaitingCommand = false;
