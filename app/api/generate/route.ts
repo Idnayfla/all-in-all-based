@@ -1425,8 +1425,9 @@ async function callModel(
     ];
     const maxTokens = modelType === 'generator' ? 8000 : modelType === 'planner' ? 300 : 800;
 
-    // Direct Anthropic — fastest path when key is present
-    const hasOwnKey = HAS_ANTHROPIC_KEY;
+    // Direct Anthropic — fastest path when key is present.
+    // Free-tier requests skip Anthropic entirely (see streamText for rationale).
+    const hasOwnKey = HAS_ANTHROPIC_KEY && aiModel !== 'free';
     if (hasOwnKey) {
       const directModel =
         modelType === 'planner' || modelType === 'summary' ? MODEL_HAIKU : MODEL_SONNET;
@@ -1454,12 +1455,14 @@ async function callModel(
       }
     }
 
-    if (aiModel === 'free' && process.env.GROQ_API_KEY) {
-      try {
+    // Free-tier path: Groq only. Never fall through to Pantheon/Anthropic.
+    if (aiModel === 'free') {
+      if (process.env.GROQ_API_KEY) {
         return await callGroq(msgs, maxTokens);
-      } catch {
-        /* fall through to Pantheon */
       }
+      throw new Error(
+        'Free AI is temporarily unavailable — switch to Based AI or try again later.'
+      );
     }
     return callPantheon(msgs, modelType === 'generator' ? 'chat' : 'fast_chat', maxTokens);
   }
@@ -1483,8 +1486,11 @@ async function streamText(
   aiModel?: 'based' | 'free',
   taskType: 'fast_chat' | 'chat' = 'chat'
 ): Promise<string> {
-  // Direct Anthropic streaming — fastest path when key is present
-  const hasOwnKey = HAS_ANTHROPIC_KEY;
+  // Direct Anthropic streaming — fastest path when key is present.
+  // Free-tier requests MUST NOT touch Anthropic: they go straight to Groq (or
+  // Pantheon). Without this guard a free user hits Anthropic and, on any 401
+  // (auth/spend-cap), surfaces "Missing or invalid API key" to the client.
+  const hasOwnKey = HAS_ANTHROPIC_KEY && aiModel !== 'free';
   if (hasOwnKey) {
     const systemMsg = messages.find(m => m.role === 'system');
     const conversationMessages = messages.filter(m => m.role !== 'system');
@@ -1522,12 +1528,13 @@ async function streamText(
     }
   }
 
-  if (aiModel === 'free' && process.env.GROQ_API_KEY) {
-    try {
+  // Free-tier path: Groq only. Never fall through to Pantheon/Anthropic for free
+  // users — that is what produced raw provider auth errors in the client.
+  if (aiModel === 'free') {
+    if (process.env.GROQ_API_KEY) {
       return await streamGroqCollecting(messages, maxTokens, onChunk);
-    } catch {
-      /* fall through */
     }
+    throw new Error('Free AI is temporarily unavailable — switch to Based AI or try again later.');
   }
   return streamPantheonCollecting(messages, taskType, maxTokens, onChunk, onRetry);
 }
@@ -1674,7 +1681,13 @@ export async function POST(req: NextRequest) {
       coach:
         "You are Based as a personal coach. Be motivating, clear, and focused on the user's growth and accountability.",
     };
-    const usingFreeModel = aiModel === 'free' && !!process.env.GROQ_API_KEY;
+    // A free-tier request is "free" regardless of whether Groq is configured.
+    // The GROQ_API_KEY presence check belongs inside streamText/callModel (where
+    // Groq is actually called) — NOT here. Coupling it to the env var caused free
+    // users to be silently routed into the Anthropic-direct paths whenever
+    // GROQ_API_KEY was unset, surfacing raw Anthropic "Missing or invalid API key"
+    // 401s instead of a graceful free-AI response.
+    const usingFreeModel = aiModel === 'free';
 
     // ALWAYS_PRO=true bypasses all tier checks (owner testing only).
     const alwaysPro = process.env.ALWAYS_PRO === 'true';
@@ -2759,7 +2772,15 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
             } catch {}
           })();
         } catch (e: unknown) {
-          const friendly = friendlyError(e);
+          let friendly = friendlyError(e);
+          // Free-tier users must never see raw provider auth errors. Vision
+          // (image) requests are Anthropic-only; if that fails for a free user,
+          // surface an upgrade hint instead of "Missing or invalid API key".
+          if (usingFreeModel && /api key|authentication|x-api-key|401/i.test(friendly)) {
+            friendly = hasImage
+              ? 'Image analysis requires Based AI — switch to Based AI to analyse images.'
+              : 'Free AI is temporarily unavailable — switch to Based AI or try again later.';
+          }
           Sentry.captureException(e, { extra: { message: lastUserMessage, aiModel } });
           trace?.update({ output: { error: friendly } });
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: friendly })}\n\n`));
