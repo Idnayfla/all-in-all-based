@@ -338,6 +338,7 @@ export default function CompanionOverlayPage() {
 
     let stopped = false;
     let vad: MicVAD | null = null;
+    let vadStarted = false;
     let awaitingCommand = false;
     let cmdTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -433,7 +434,12 @@ export default function CompanionOverlayPage() {
           },
         });
 
+        if (stopped) {
+          void vad.destroy().catch(() => {});
+          return;
+        }
         await vad.start();
+        vadStarted = true;
         setWakeListening(true);
         setWakeError(null);
 
@@ -460,7 +466,7 @@ export default function CompanionOverlayPage() {
     return () => {
       stopped = true;
       if (cmdTimeout) clearTimeout(cmdTimeout);
-      void vad?.destroy();
+      if (vad && vadStarted) void vad.destroy().catch(() => {});
       setWakeListening(false);
       setWakeState('idle');
       wakeStateRef.current = 'idle';
