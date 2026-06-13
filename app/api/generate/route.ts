@@ -2702,13 +2702,19 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
           const summarySystem =
             'You are Based. Reply with 1-2 plain sentences describing what was just built. No code, no forge tags, no lists.';
           const summaryPrompt = `User asked: "${lastUserMessage}"\nFiles generated: ${generatedFiles.map(f => f.name).join(', ')}\n\nDescribe what was built in 1-2 sentences.`;
-          const reply =
-            ((await callModel(
+          let replyText = '';
+          try {
+            replyText = await callModel(
               summaryPrompt,
               summarySystem,
               'summary',
               usingFreeModel ? 'free' : 'based'
-            )) ||
+            );
+          } catch {
+            /* summary is best-effort — files already generated */
+          }
+          const reply =
+            (replyText ||
               `Built ${generatedFiles.length} files: ${generatedFiles.map(f => f.name).join(', ')}`) +
             imageStudioTip;
 

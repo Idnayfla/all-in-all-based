@@ -13,6 +13,13 @@ app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 // process.stderr.write cannot intercept them. This flag is the correct layer.
 app.commandLine.appendSwitch('log-level', '3');
 
+// Google API key for Web Speech API — Electron ships without Chrome's embedded key,
+// so onresult never fires. This key grants access to the Speech Recognition endpoint.
+// Falls back gracefully (wake word stays disabled) if the key is absent.
+if (process.env.GOOGLE_API_KEY) {
+  app.commandLine.appendSwitch('google-api-key', process.env.GOOGLE_API_KEY);
+}
+
 const IS_DEV = process.env.ELECTRON_DEV === 'true';
 const APP_URL = IS_DEV ? 'http://localhost:3000' : 'https://www.getbased.dev';
 const OVERLAY_URL = IS_DEV ? 'http://localhost:3000/companion' : 'https://www.getbased.dev/companion';

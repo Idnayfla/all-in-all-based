@@ -27,11 +27,23 @@ declare interface SpeechRecognitionErrorEvent extends Event {
 // Pure function — lives outside the component so it is referentially stable
 // and never needs to be in a useEffect dependency array.
 function isWakePhrase(raw: string): boolean {
-  const s = raw.toLowerCase().replace(/[,\.!?]/g, '').trim();
+  const s = raw
+    .toLowerCase()
+    .replace(/[,\.!?]/g, '')
+    .trim();
   const direct = [
-    'hey based', 'hey base', 'hay based', 'hay base',
-    'hey baste', 'hey bass', 'hey bays', 'hey paste',
-    'a based', 'a base', 'ok based', 'hi based',
+    'hey based',
+    'hey base',
+    'hay based',
+    'hay base',
+    'hey baste',
+    'hey bass',
+    'hey bays',
+    'hey paste',
+    'a based',
+    'a base',
+    'ok based',
+    'hi based',
   ];
   if (direct.some(w => s.includes(w))) return true;
   // (hey|hay|ok|hi) followed by anything starting with "bas"
@@ -285,17 +297,25 @@ export default function CompanionOverlayPage() {
     speakRef.current = speak;
   }, [speak]);
 
-  useEffect(() => { wakeWordEnabledRef.current = wakeWordEnabled; }, [wakeWordEnabled]);
-  useEffect(() => { isGeneratingRef.current = isGenerating; }, [isGenerating]);
-  useEffect(() => { isSpeakingRef.current = isSpeaking; }, [isSpeaking]);
+  useEffect(() => {
+    wakeWordEnabledRef.current = wakeWordEnabled;
+  }, [wakeWordEnabled]);
+  useEffect(() => {
+    isGeneratingRef.current = isGenerating;
+  }, [isGenerating]);
+  useEffect(() => {
+    isSpeakingRef.current = isSpeaking;
+  }, [isSpeaking]);
 
   // Wake word — "Hey Based" using Web Speech API
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const SRClass =
-      (window as unknown as { SpeechRecognition?: new () => SpeechRecognition }).SpeechRecognition ??
-      (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognition }).webkitSpeechRecognition;
+      (window as unknown as { SpeechRecognition?: new () => SpeechRecognition })
+        .SpeechRecognition ??
+      (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognition })
+        .webkitSpeechRecognition;
 
     if (!SRClass || !wakeWordEnabled) {
       wakeRecogRef.current?.stop();
@@ -309,10 +329,8 @@ export default function CompanionOverlayPage() {
 
     setWakeError(null);
     let lastStartAt = 0;
-    let startWake: () => void;
-    let startCommand: () => void;
 
-    startCommand = () => {
+    const startCommand = () => {
       const recog = new SRClass();
       recog.continuous = false;
       recog.interimResults = false;
@@ -361,10 +379,14 @@ export default function CompanionOverlayPage() {
         if (wakeWordEnabledRef.current) setTimeout(startWake, 200);
       };
 
-      try { recog.start(); } catch { /* ignore duplicate-start */ }
+      try {
+        recog.start();
+      } catch {
+        /* ignore duplicate-start */
+      }
     };
 
-    startWake = () => {
+    const startWake = () => {
       if (!wakeWordEnabledRef.current) return;
       if (wakeStateRef.current !== 'idle') return;
       const now = Date.now();
@@ -1329,7 +1351,14 @@ export default function CompanionOverlayPage() {
         )}
 
         {wakeWordEnabled && wakeDebug !== null && (
-          <div style={{ fontSize: '10px', opacity: 0.5, padding: '2px 8px', color: 'var(--text-muted, #888)' }}>
+          <div
+            style={{
+              fontSize: '10px',
+              opacity: 0.5,
+              padding: '2px 8px',
+              color: 'var(--text-muted, #888)',
+            }}
+          >
             heard: {wakeDebug || '—'}
           </div>
         )}
