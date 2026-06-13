@@ -17,7 +17,10 @@ app.commandLine.appendSwitch('log-level', '3');
 // so onresult never fires. This key grants access to the Speech Recognition endpoint.
 // Falls back gracefully (wake word stays disabled) if the key is absent.
 if (process.env.GOOGLE_API_KEY) {
+  console.log('[based] Google API key loaded:', process.env.GOOGLE_API_KEY.slice(0, 8) + '...');
   app.commandLine.appendSwitch('google-api-key', process.env.GOOGLE_API_KEY);
+} else {
+  console.log('[based] No GOOGLE_API_KEY found — Web Speech will fail');
 }
 
 const IS_DEV = process.env.ELECTRON_DEV === 'true';

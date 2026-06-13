@@ -307,157 +307,176 @@ export default function CompanionOverlayPage() {
     isSpeakingRef.current = isSpeaking;
   }, [isSpeaking]);
 
-  // Wake word — "Hey Based" using Web Speech API
+  // Wake word — "Hey Based" using MediaRecorder + Groq Whisper (works in all browsers/Electron)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const SRClass =
-      (window as unknown as { SpeechRecognition?: new () => SpeechRecognition })
-        .SpeechRecognition ??
-      (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognition })
-        .webkitSpeechRecognition;
-
-    if (!SRClass || !wakeWordEnabled) {
-      wakeRecogRef.current?.stop();
-      wakeRecogRef.current = null;
+    if (!wakeWordEnabled) {
       wakeStateRef.current = 'idle';
       setWakeState('idle');
       setWakeListening(false);
       setWakeError(null);
+      setWakeDebug(null);
       return;
     }
 
-    setWakeError(null);
-    let lastStartAt = 0;
+    let stopped = false;
+    let micStream: MediaStream | null = null;
+    let audioCtx: AudioContext | null = null;
+    let mediaRecorder: MediaRecorder | null = null;
+    let silenceTimer: ReturnType<typeof setTimeout> | null = null;
+    let chunks: Blob[] = [];
+    let isRecording = false;
+    let awaitingCommand = false;
 
-    const startCommand = () => {
-      const recog = new SRClass();
-      recog.continuous = false;
-      recog.interimResults = false;
-      recog.lang = 'en-US';
+    const SPEECH_THRESH = 12; // 0–255 average frequency energy
+    const SILENCE_WAKE_MS = 1200;
+    const SILENCE_CMD_MS = 2000;
 
-      let handled = false;
-      const timeout = setTimeout(() => {
-        if (!handled) {
-          handled = true;
-          recog.stop();
-          // Reset wakeState so startWake's idle guard doesn't block future sessions
-          wakeStateRef.current = 'idle';
-          setWakeState('idle');
-        }
-      }, 8000);
+    const transcribe = async (blob: Blob): Promise<string> => {
+      try {
+        const form = new FormData();
+        form.append('audio', blob, 'audio.webm');
+        const res = await fetch('/api/stt', {
+          method: 'POST',
+          body: form,
+          ...(authTokenRef.current
+            ? { headers: { Authorization: `Bearer ${authTokenRef.current}` } }
+            : {}),
+        });
+        if (!res.ok) return '';
+        const data = (await res.json()) as { transcript?: string };
+        return data.transcript ?? '';
+      } catch {
+        return '';
+      }
+    };
 
-      recog.onresult = (e: SpeechRecognitionEvent) => {
-        handled = true;
-        clearTimeout(timeout);
-        const transcript = e.results[0]?.[0]?.transcript?.trim() ?? '';
-        if (transcript) {
-          wakeStateRef.current = 'processing';
-          setWakeState('processing');
-          void sendFnRef.current(transcript);
+    const startRec = () => {
+      if (isRecording || !micStream) return;
+      chunks = [];
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : '';
+      const mr = mimeType
+        ? new MediaRecorder(micStream, { mimeType })
+        : new MediaRecorder(micStream);
+      mr.ondataavailable = e => {
+        if (e.data.size > 0) chunks.push(e.data);
+      };
+      mr.start(100);
+      mediaRecorder = mr;
+      isRecording = true;
+    };
+
+    const stopAndTranscribe = async () => {
+      if (!isRecording || !mediaRecorder) return;
+      isRecording = false;
+      await new Promise<void>(resolve => {
+        mediaRecorder!.onstop = () => resolve();
+        mediaRecorder!.stop();
+      });
+      mediaRecorder = null;
+
+      const blob = new Blob(chunks, { type: 'audio/webm' });
+      chunks = [];
+      if (stopped || blob.size < 500) return;
+
+      const transcript = await transcribe(blob);
+      if (stopped) return;
+
+      setWakeDebug(transcript || '(silence)');
+
+      if (awaitingCommand) {
+        awaitingCommand = false;
+        wakeStateRef.current = 'processing';
+        setWakeState('processing');
+        if (transcript.trim()) {
+          await sendFnRef.current(transcript);
         } else {
           wakeStateRef.current = 'idle';
           setWakeState('idle');
-          if (wakeWordEnabledRef.current) startWake();
         }
-      };
+      } else if (isWakePhrase(transcript)) {
+        awaitingCommand = true;
+        wakeStateRef.current = 'listening';
+        setWakeState('listening');
+      }
+    };
 
-      recog.onend = () => {
-        clearTimeout(timeout);
-        if (!handled || wakeStateRef.current === 'listening') {
+    const start = async () => {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        audioCtx = new AudioContext();
+        const source = audioCtx.createMediaStreamSource(micStream);
+        const analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        const freqData = new Uint8Array(analyser.frequencyBinCount);
+
+        setWakeListening(true);
+        setWakeError(null);
+
+        // Let send()'s finally block reset state — VAD loop continues automatically
+        restartWakeRef.current = () => {
+          if (stopped) return;
+          awaitingCommand = false;
           wakeStateRef.current = 'idle';
           setWakeState('idle');
-          if (wakeWordEnabledRef.current) startWake();
-        }
-      };
+        };
 
-      recog.onerror = () => {
-        clearTimeout(timeout);
-        handled = true;
-        wakeStateRef.current = 'idle';
-        setWakeState('idle');
-        if (wakeWordEnabledRef.current) setTimeout(startWake, 200);
-      };
-
-      try {
-        recog.start();
-      } catch {
-        /* ignore duplicate-start */
-      }
-    };
-
-    const startWake = () => {
-      if (!wakeWordEnabledRef.current) return;
-      if (wakeStateRef.current !== 'idle') return;
-      const now = Date.now();
-      const elapsed = now - lastStartAt;
-      if (elapsed < 300) {
-        // Throttled — schedule a retry so the mic never goes permanently silent
-        setTimeout(startWake, 300 - elapsed + 10);
-        return;
-      }
-      lastStartAt = now;
-
-      const recog = new SRClass();
-      recog.continuous = true;
-      recog.interimResults = true;
-      recog.lang = 'en-US';
-
-      recog.onstart = () => {
-        setWakeListening(true);
-      };
-
-      recog.onresult = (e: SpeechRecognitionEvent) => {
-        if (isSpeakingRef.current || isGeneratingRef.current) return;
-        if (wakeStateRef.current !== 'idle') return;
-        for (let i = e.resultIndex; i < e.results.length; i++) {
-          const t = e.results[i][0].transcript;
-          setWakeDebug(t || '(empty)'); // show what Google hears — remove once working
-          if (isWakePhrase(t)) {
-            wakeStateRef.current = 'listening';
-            setWakeState('listening');
-            recog.stop();
-            startCommand();
+        const tick = () => {
+          if (stopped) return;
+          // Pause VAD during generation so we don't record Based's own TTS
+          if (wakeStateRef.current === 'processing' || isSpeakingRef.current) {
+            requestAnimationFrame(tick);
             return;
           }
-        }
-      };
 
-      recog.onend = () => {
-        if (!wakeWordEnabledRef.current) {
-          setWakeListening(false);
-        } else if (wakeStateRef.current === 'idle') {
-          setTimeout(startWake, 150);
-        }
-        // wakeState === 'listening' | 'processing': keep wakeListening true — no flicker.
-      };
+          analyser.getByteFrequencyData(freqData);
+          const avg = freqData.reduce((a, b) => a + b, 0) / freqData.length;
 
-      recog.onerror = (e: SpeechRecognitionErrorEvent) => {
-        if (e.error === 'not-allowed') {
-          setWakeListening(false);
-          setWakeError('Mic denied — allow microphone in browser settings');
-        }
-        // All other errors ('network', 'no-speech', 'aborted', etc.): transient.
-        // onend fires next and restarts at 150ms — don't touch wakeListening.
-      };
+          if (avg > SPEECH_THRESH) {
+            if (silenceTimer) {
+              clearTimeout(silenceTimer);
+              silenceTimer = null;
+            }
+            if (!isRecording) startRec();
+          } else if (isRecording && !silenceTimer) {
+            const delay = awaitingCommand ? SILENCE_CMD_MS : SILENCE_WAKE_MS;
+            silenceTimer = setTimeout(() => {
+              silenceTimer = null;
+              void stopAndTranscribe();
+            }, delay);
+          }
 
-      try {
-        recog.start();
+          requestAnimationFrame(tick);
+        };
+
+        tick();
       } catch {
-        // InvalidStateError: already started — will onend → restart naturally
+        setWakeError('Mic permission denied');
+        setWakeListening(false);
       }
-      wakeRecogRef.current = recog;
     };
 
-    restartWakeRef.current = startWake;
-    startWake();
+    void start();
 
     return () => {
-      wakeRecogRef.current?.stop();
-      wakeRecogRef.current = null;
-      // Cleanup or disable — clear the visual state
+      stopped = true;
+      if (silenceTimer) clearTimeout(silenceTimer);
+      if (mediaRecorder && isRecording) {
+        try {
+          mediaRecorder.stop();
+        } catch {
+          /* ignore */
+        }
+      }
+      micStream?.getTracks().forEach(t => t.stop());
+      void audioCtx?.close();
       setWakeListening(false);
       setWakeState('idle');
+      wakeStateRef.current = 'idle';
     };
   }, [wakeWordEnabled]);
 
@@ -1332,6 +1351,11 @@ export default function CompanionOverlayPage() {
           <div className="companion-wake-indicator">
             <span className="companion-wake-pulse" />
             {wakeState === 'listening' ? 'Listening for your command...' : 'Processing...'}
+          </div>
+        )}
+        {wakeWordEnabled && wakeDebug && (
+          <div style={{ fontSize: '10px', opacity: 0.5, padding: '2px 8px' }}>
+            heard: {wakeDebug}
           </div>
         )}
 
