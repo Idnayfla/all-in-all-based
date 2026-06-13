@@ -181,6 +181,7 @@ export default function CompanionOverlayPage() {
   const [wakeState, setWakeState] = useState<'idle' | 'listening' | 'processing'>('idle');
   const [wakeListening, setWakeListening] = useState(false); // mic actually capturing
   const [wakeError, setWakeError] = useState<string | null>(null);
+  const [wakeDebug, setWakeDebug] = useState<string | null>(null); // temporary: show last heard
   const wakeStateRef = useRef<'idle' | 'listening' | 'processing'>('idle');
   const wakeWordEnabledRef = useRef(false);
   const isGeneratingRef = useRef(false);
@@ -389,6 +390,7 @@ export default function CompanionOverlayPage() {
         if (wakeStateRef.current !== 'idle') return;
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const t = e.results[i][0].transcript;
+          setWakeDebug(t || '(empty)'); // show what Google hears — remove once working
           if (isWakePhrase(t)) {
             wakeStateRef.current = 'listening';
             setWakeState('listening');
@@ -1323,6 +1325,12 @@ export default function CompanionOverlayPage() {
           <div className="companion-wake-indicator">
             <span className="companion-wake-pulse" />
             {wakeState === 'listening' ? 'Listening for your command...' : 'Processing...'}
+          </div>
+        )}
+
+        {wakeWordEnabled && wakeDebug !== null && (
+          <div style={{ fontSize: '10px', opacity: 0.5, padding: '2px 8px', color: 'var(--text-muted, #888)' }}>
+            heard: {wakeDebug || '—'}
           </div>
         )}
 
