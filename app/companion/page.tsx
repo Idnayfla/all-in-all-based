@@ -1310,56 +1310,28 @@ export default function CompanionOverlayPage() {
             </button>
           )}
           <button
-            className={`companion-capture-btn${wakeWordEnabled ? ' active' : ''}`}
-            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-            onClick={() => {
-              const next = !wakeWordEnabled;
-              setWakeWordEnabled(next);
-              setWakeError(null);
-              localStorage.setItem('based_companion_wake', String(next));
-            }}
-            title={
-              wakeWordEnabled
-                ? wakeListening
-                  ? 'Mic active — say "Hey Based"'
-                  : wakeError
-                    ? wakeError
-                    : 'Starting mic...'
-                : 'Enable wake word — say "Hey Based" to activate'
+            className="companion-capture-btn"
+            style={
+              {
+                WebkitAppRegion: 'no-drag',
+                opacity: 0.35,
+                cursor: 'not-allowed',
+              } as React.CSSProperties
             }
+            disabled
+            title="Hey Based wake word — coming soon"
           >
-            {wakeWordEnabled
-              ? wakeState === 'listening'
-                ? '◉ Listening...'
-                : wakeState === 'processing'
-                  ? '◈ Processing...'
-                  : wakeListening
-                    ? '◉ Hey Based'
-                    : '⊙ Hey Based'
-              : '⊙ Hey Based'}
+            ⊙ Hey Based
           </button>
           {(captureError || wakeError) && (
             <span className="companion-capture-error">{captureError ?? wakeError}</span>
           )}
         </div>
 
-        {wakeWordEnabled && wakeState !== 'idle' && (
+        {false && wakeWordEnabled && wakeState !== 'idle' && (
           <div className="companion-wake-indicator">
             <span className="companion-wake-pulse" />
             {wakeState === 'listening' ? 'Listening for your command...' : 'Processing...'}
-          </div>
-        )}
-
-        {wakeWordEnabled && wakeDebug !== null && (
-          <div
-            style={{
-              fontSize: '10px',
-              opacity: 0.5,
-              padding: '2px 8px',
-              color: 'var(--text-muted, #888)',
-            }}
-          >
-            heard: {wakeDebug || '—'}
           </div>
         )}
 
