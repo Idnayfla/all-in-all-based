@@ -402,6 +402,11 @@ export default function CompanionOverlayPage() {
           startOnLoad: false,
           ortConfig: (ort: typeof import('onnxruntime-web/wasm')) => {
             ort.env.logLevel = 'error';
+            // numThreads=1 prevents ORT from spawning pthread workers via
+            // new Worker(new URL(import.meta.url)) — in Turbopack dev mode
+            // import.meta.url points to the bundled chunk, not the .mjs file,
+            // causing "worker sent an error! undefined:undefined" failures.
+            ort.env.wasm.numThreads = 1;
           },
 
           onSpeechStart: () => {
