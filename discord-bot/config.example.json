@@ -18,7 +18,7 @@
   "provider": "auto",
 
   "model_groq": "llama-3.3-70b-versatile",
-  "model_opus": "claude-fable-5",
+  "model_opus": "claude-opus-4-8",
   "model_sonnet": "claude-sonnet-4-6",
 
   "exa_api_key": "your exa key for web search",

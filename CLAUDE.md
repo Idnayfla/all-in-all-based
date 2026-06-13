@@ -108,27 +108,27 @@ CI runs automatically on every push to `dev` and `main` via `.github/workflows/c
 
 ## Model Guide
 
-Default model is **Sonnet 4.6** (fast, cost-efficient). Automatically switch to **Fable 5** for quality-critical tasks using the `Skill` tool — no user action needed.
+Default model is **Sonnet 4.6** (fast, cost-efficient). Automatically switch to **Opus 4.8** for quality-critical tasks using the `Skill` tool — no user action needed.
 
-- Auto-switch to Fable 5: invoke `Skill("build")` at the start of the task
+- Auto-switch to Opus 4.8: invoke `Skill("build")` at the start of the task
 - Return to Sonnet: invoke `Skill("fix")` at the start of the task
 
-| Task                                 | Model                              |
-| ------------------------------------ | ---------------------------------- |
-| Questions, explanations              | sonnet (`claude-sonnet-4-6`)       |
-| CSS / styling tweaks                 | sonnet (`claude-sonnet-4-6`)       |
-| Small fixes (1-2 files, clear bug)   | sonnet (`claude-sonnet-4-6`)       |
-| Discussing approach / planning       | sonnet (`claude-sonnet-4-6`)       |
-| New feature from scratch             | **auto-invoke** `/build` (Fable 5) |
-| Complex multi-file changes           | **auto-invoke** `/build` (Fable 5) |
-| Hard bug you've been stuck on        | **auto-invoke** `/build` (Fable 5) |
-| Changes to `generate/route.ts` logic | **auto-invoke** `/build` (Fable 5) |
+| Task                                 | Model                               |
+| ------------------------------------ | ----------------------------------- |
+| Questions, explanations              | sonnet (`claude-sonnet-4-6`)        |
+| CSS / styling tweaks                 | sonnet (`claude-sonnet-4-6`)        |
+| Small fixes (1-2 files, clear bug)   | sonnet (`claude-sonnet-4-6`)        |
+| Discussing approach / planning       | sonnet (`claude-sonnet-4-6`)        |
+| New feature from scratch             | **auto-invoke** `/build` (Opus 4.8) |
+| Complex multi-file changes           | **auto-invoke** `/build` (Opus 4.8) |
+| Hard bug you've been stuck on        | **auto-invoke** `/build` (Opus 4.8) |
+| Changes to `generate/route.ts` logic | **auto-invoke** `/build` (Opus 4.8) |
 
 ### Current model IDs (`lib/models.ts`)
 
 | Role   | Model ID            | Used for                                 |
 | ------ | ------------------- | ---------------------------------------- |
-| Opus   | `claude-fable-5`    | All app generation, file builder, agents |
+| Opus   | `claude-opus-4-8`   | All app generation, file builder, agents |
 | Sonnet | `claude-sonnet-4-6` | Chat, companion, spec, 3D, font AI       |
 | Haiku  | `claude-haiku-4-5`  | Planner, summary, memory extraction      |
 
