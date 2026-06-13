@@ -2724,6 +2724,12 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <footer style={{ textAlign: 'center', padding: '8px', fontSize: '11px', opacity: 0.4 }}>
+        <a href="/privacy" style={{ color: 'inherit', textDecoration: 'underline' }}>
+          Privacy Policy
+        </a>
+      </footer>
     </div>
   );
 }
