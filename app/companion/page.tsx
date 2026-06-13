@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { captureScreen, isScreenCaptureSupported } from '@/hooks/useScreenCapture';
-import type { PorcupineWorker as PorcupineWorkerType } from '@picovoice/porcupine-web';
+import type { MicVAD } from '@ricky0123/vad-web';
 
 // Web Speech API types (not in all TS DOM libs)
 declare interface SpeechRecognition extends EventTarget {
@@ -323,8 +323,9 @@ export default function CompanionOverlayPage() {
     isSpeakingRef.current = isSpeaking;
   }, [isSpeaking]);
 
-  // Wake word — "Hey Based" using Picovoice Porcupine (local on-device, Siri-grade accuracy)
-  // Porcupine detects the wake word; Groq Whisper transcribes the command after wake fires.
+  // Wake word — "Hey Based" using Silero VAD (@ricky0123/vad-web) + Groq Whisper
+  // Silero VAD isolates real speech segments, eliminating hallucinations from silence.
+  // No accounts, no rate limits, zero cost at any scale.
   useEffect(() => {
     if (!wakeWordEnabled) {
       wakeStateRef.current = 'idle';
@@ -336,25 +337,19 @@ export default function CompanionOverlayPage() {
     }
 
     let stopped = false;
-    let micStream: MediaStream | null = null;
-    let audioCtx: AudioContext | null = null;
-    let porcupineWorker: PorcupineWorkerType | null = null;
-    let mediaRecorder: MediaRecorder | null = null;
-    let analyserNode: AnalyserNode | null = null;
-    let freqData: Uint8Array<ArrayBuffer> | null = null;
-    let chunks: Blob[] = [];
-    let commandTimer: ReturnType<typeof setTimeout> | null = null;
-    let silenceTimer: ReturnType<typeof setTimeout> | null = null;
+    let vad: MicVAD | null = null;
+    let awaitingCommand = false;
+    let cmdTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    const SPEECH_THRESH = 22;
-    const SILENCE_CMD_MS = 2000;
     const CMD_TIMEOUT_MS = 8000;
-    const MIN_CMD_BLOB = 2000;
 
-    const transcribe = async (blob: Blob): Promise<string> => {
+    const transcribeAudio = async (audio: Float32Array): Promise<string> => {
       try {
+        const { utils } = await import('@ricky0123/vad-web');
+        const wavBuf = utils.encodeWAV(audio);
+        const blob = new Blob([wavBuf], { type: 'audio/wav' });
         const form = new FormData();
-        form.append('audio', blob, 'audio.webm');
+        form.append('audio', blob, 'audio.wav');
         const res = await fetch('/api/stt', {
           method: 'POST',
           body: form,
@@ -370,170 +365,92 @@ export default function CompanionOverlayPage() {
       }
     };
 
-    const stopCommand = async () => {
-      if (commandTimer) {
-        clearTimeout(commandTimer);
-        commandTimer = null;
-      }
-      if (silenceTimer) {
-        clearTimeout(silenceTimer);
-        silenceTimer = null;
-      }
-      if (!mediaRecorder || mediaRecorder.state === 'inactive') {
-        wakeStateRef.current = 'idle';
-        setWakeState('idle');
-        return;
-      }
-      await new Promise<void>(resolve => {
-        mediaRecorder!.onstop = () => resolve();
-        try {
-          mediaRecorder!.stop();
-        } catch {
-          resolve();
-        }
-      });
-      mediaRecorder = null;
-
-      const blob = new Blob(chunks, { type: 'audio/webm' });
-      chunks = [];
-      if (stopped) return;
-
-      if (blob.size < MIN_CMD_BLOB) {
-        setWakeDebug(`(too short — ${blob.size}b)`);
-        wakeStateRef.current = 'idle';
-        setWakeState('idle');
-        return;
-      }
-
-      wakeStateRef.current = 'processing';
-      setWakeState('processing');
-
-      const raw = await transcribe(blob);
-      if (stopped) return;
-
-      if (!raw.trim()) {
-        wakeStateRef.current = 'idle';
-        setWakeState('idle');
-        setWakeDebug('(no speech detected)');
-        return;
-      }
-
-      setWakeDebug(`heard: "${raw}"`);
-      await sendFnRef.current(raw);
-    };
-
-    const onWakeDetected = () => {
-      if (stopped || wakeStateRef.current !== 'idle') return;
-
-      window.electronAPI?.showCompanion?.();
-      wakeStateRef.current = 'listening';
-      setWakeState('listening');
-      setWakeDebug('◉ Listening...');
-
-      if (!micStream) return;
-
-      chunks = [];
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
-          ? 'audio/webm'
-          : '';
-      const mr = mimeType
-        ? new MediaRecorder(micStream, { mimeType })
-        : new MediaRecorder(micStream);
-      mr.ondataavailable = e => {
-        if (e.data.size > 0) chunks.push(e.data);
-      };
-      mr.start(100);
-      mediaRecorder = mr;
-
-      // VAD tick — stop recording once the user stops speaking
-      const cmdTick = () => {
-        if (stopped || wakeStateRef.current !== 'listening') return;
-        if (analyserNode && freqData) {
-          analyserNode.getByteFrequencyData(freqData);
-          const avg = freqData.reduce((a, b) => a + b, 0) / freqData.length;
-          if (avg < SPEECH_THRESH) {
-            if (!silenceTimer) {
-              silenceTimer = setTimeout(() => {
-                silenceTimer = null;
-                void stopCommand();
-              }, SILENCE_CMD_MS);
-            }
-          } else {
-            if (silenceTimer) {
-              clearTimeout(silenceTimer);
-              silenceTimer = null;
-            }
-          }
-        }
-        setTimeout(cmdTick, 50);
-      };
-      cmdTick();
-
-      // Hard cutoff if user never speaks
-      commandTimer = setTimeout(() => void stopCommand(), CMD_TIMEOUT_MS);
-    };
-
     const start = async () => {
       try {
-        const accessKey = process.env.NEXT_PUBLIC_PICOVOICE_ACCESS_KEY;
-        if (!accessKey) {
-          setWakeError('Set NEXT_PUBLIC_PICOVOICE_ACCESS_KEY in .env.local');
-          setWakeListening(false);
-          return;
-        }
+        const { MicVAD } = await import('@ricky0123/vad-web');
 
-        const { PorcupineWorker, BuiltInKeyword } = await import('@picovoice/porcupine-web');
+        vad = await MicVAD.new({
+          model: 'v5',
+          baseAssetPath: '/vad/',
+          onnxWASMBasePath: '/vad/',
+          startOnLoad: false,
+          ortConfig: ort => {
+            ort.env.logLevel = 'error';
+          },
 
-        // Once you have trained "hey based" in Picovoice Console and placed hey-based.ppn in
-        // public/porcupine/, set NEXT_PUBLIC_PORCUPINE_HAS_CUSTOM_MODEL=true in .env.local
-        const hasCustomModel = process.env.NEXT_PUBLIC_PORCUPINE_HAS_CUSTOM_MODEL === 'true';
-        const keyword = hasCustomModel
-          ? { label: 'hey-based', publicPath: '/porcupine/hey-based.ppn', sensitivity: 0.7 }
-          : { builtin: BuiltInKeyword.Porcupine, sensitivity: 0.7 };
+          onSpeechStart: () => {
+            if (stopped || !awaitingCommand) return;
+            setWakeDebug('◉ Listening...');
+          },
 
-        porcupineWorker = await PorcupineWorker.create(accessKey, keyword, onWakeDetected, {
-          publicPath: '/porcupine/porcupine_params.pv',
+          onSpeechEnd: async (audio: Float32Array) => {
+            if (stopped) return;
+            if (wakeStateRef.current === 'processing' || isSpeakingRef.current) return;
+
+            const raw = await transcribeAudio(audio);
+            if (stopped || !raw.trim()) return;
+
+            if (awaitingCommand) {
+              awaitingCommand = false;
+              if (cmdTimeout) {
+                clearTimeout(cmdTimeout);
+                cmdTimeout = null;
+              }
+              wakeStateRef.current = 'processing';
+              setWakeState('processing');
+              setWakeDebug(`heard: "${raw}"`);
+              await sendFnRef.current(raw);
+            } else {
+              const command = extractWakeCommand(raw);
+              if (command === null) return;
+
+              window.electronAPI?.showCompanion?.();
+
+              if (command.trim()) {
+                wakeStateRef.current = 'processing';
+                setWakeState('processing');
+                setWakeDebug(`heard: "${command}"`);
+                await sendFnRef.current(command);
+              } else {
+                awaitingCommand = true;
+                wakeStateRef.current = 'listening';
+                setWakeState('listening');
+                setWakeDebug('◉ Go ahead...');
+                cmdTimeout = setTimeout(() => {
+                  if (stopped) return;
+                  awaitingCommand = false;
+                  cmdTimeout = null;
+                  wakeStateRef.current = 'idle';
+                  setWakeState('idle');
+                  setWakeDebug(null);
+                }, CMD_TIMEOUT_MS);
+              }
+            }
+          },
+
+          onVADMisfire: () => {
+            /* too short — ignore */
+          },
         });
 
-        micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-        audioCtx = new AudioContext({ sampleRate: porcupineWorker.sampleRate });
-        await audioCtx.resume();
-
-        const source = audioCtx.createMediaStreamSource(micStream);
-
-        analyserNode = audioCtx.createAnalyser();
-        analyserNode.fftSize = 256;
-        freqData = new Uint8Array(analyserNode.frequencyBinCount);
-        source.connect(analyserNode);
-
-        const frameLen = porcupineWorker.frameLength;
-        const proc = audioCtx.createScriptProcessor(frameLen, 1, 1);
-        source.connect(proc);
-        proc.connect(audioCtx.destination);
-
-        const pw = porcupineWorker;
-        proc.onaudioprocess = (e: AudioProcessingEvent) => {
-          if (stopped || wakeStateRef.current !== 'idle') return;
-          const float32 = e.inputBuffer.getChannelData(0);
-          const int16 = new Int16Array(new ArrayBuffer(float32.length * 2));
-          for (let i = 0; i < float32.length; i++) {
-            int16[i] = Math.max(-32768, Math.min(32767, float32[i] * 32768));
-          }
-          pw.process(int16);
-        };
-
+        await vad.start();
         setWakeListening(true);
         setWakeError(null);
 
         restartWakeRef.current = () => {
           if (stopped) return;
+          awaitingCommand = false;
+          if (cmdTimeout) {
+            clearTimeout(cmdTimeout);
+            cmdTimeout = null;
+          }
           wakeStateRef.current = 'idle';
           setWakeState('idle');
         };
-      } catch {
-        setWakeError('Mic permission denied');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const isDenied = /permission|denied|NotAllowed/i.test(msg);
+        setWakeError(isDenied ? 'Mic permission denied' : 'Wake word failed to start');
         setWakeListening(false);
       }
     };
@@ -542,19 +459,8 @@ export default function CompanionOverlayPage() {
 
     return () => {
       stopped = true;
-      if (commandTimer) clearTimeout(commandTimer);
-      if (silenceTimer) clearTimeout(silenceTimer);
-      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-        try {
-          mediaRecorder.stop();
-        } catch {
-          /* ignore */
-        }
-      }
-      micStream?.getTracks().forEach(t => t.stop());
-      void audioCtx?.close();
-      void porcupineWorker?.release();
-      porcupineWorker?.terminate();
+      if (cmdTimeout) clearTimeout(cmdTimeout);
+      void vad?.destroy();
       setWakeListening(false);
       setWakeState('idle');
       wakeStateRef.current = 'idle';
