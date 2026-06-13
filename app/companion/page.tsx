@@ -46,8 +46,13 @@ function isWakePhrase(raw: string): boolean {
     'hi based',
   ];
   if (direct.some(w => s.includes(w))) return true;
-  // (hey|hay|ok|hi) followed by anything starting with "bas"
+  // Standard: (hey|hay|ok|hi) before anything starting with "bas"
   if (/\b(hey|hay|ok|hi)\s+bas\w*/i.test(s)) return true;
+  // Whisper commonly mishears "hey" as "and", "the", "i", "in", "a" —
+  // catch those too since "based" stays recognizable
+  if (/\b(and|the|in)\s+bas(ed|e|es)?\b/i.test(s)) return true;
+  // Standalone "based" as the first word (user said only the name)
+  if (/^bas(ed|e)?\b/i.test(s)) return true;
   return false;
 }
 
