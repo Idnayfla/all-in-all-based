@@ -1,6 +1,7 @@
 const { app, BrowserWindow, shell, Menu, globalShortcut, ipcMain, screen, session, desktopCapturer } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { startProactiveEngine, stopProactiveEngine } = require('./proactiveEngine');
 
 // Disable Chromium's autoplay restriction so TTS audio plays without a prior
 // user gesture — required for the auto-greeting in the companion overlay.
@@ -235,6 +236,7 @@ app.whenReady().then(async () => {
   createWindow();
   createOverlayWindow();
   createBubbleWindow();
+  startProactiveEngine(() => overlayWin);
 
   // Grant microphone + media permissions so Web Speech API (Hey Based wake word)
   // works without a browser permission prompt. Without this handler, Electron 20+
@@ -385,6 +387,7 @@ app.on('before-quit', () => {
 
 app.on('will-quit', () => {
   globalShortcut.unregisterAll();
+  stopProactiveEngine();
 });
 
 app.on('window-all-closed', () => {

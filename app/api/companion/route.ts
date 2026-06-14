@@ -235,6 +235,7 @@ export async function POST(req: NextRequest) {
     projectName?: unknown;
     fileNames?: unknown;
     locationContext?: unknown;
+    proactive?: unknown;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -242,16 +243,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid or oversized request body' }, { status: 400 });
   }
 
-  const { messages, memory, screenshot, previewSource, projectName, fileNames, locationContext } =
-    body as {
-      messages: Array<{ role: string; content: string }>;
-      memory?: string;
-      screenshot?: string;
-      previewSource?: string;
-      projectName?: string;
-      fileNames?: string[];
-      locationContext?: string;
-    };
+  const {
+    messages,
+    memory,
+    screenshot,
+    previewSource,
+    projectName,
+    fileNames,
+    locationContext,
+    proactive,
+  } = body as {
+    messages: Array<{ role: string; content: string }>;
+    memory?: string;
+    screenshot?: string;
+    previewSource?: string;
+    projectName?: string;
+    fileNames?: string[];
+    locationContext?: string;
+    proactive?: string;
+  };
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: 'messages required' }, { status: 400 });
@@ -390,6 +400,14 @@ export async function POST(req: NextRequest) {
   // --- Build dynamic system prompt additions ---
   const dynamicInstructions: string[] = [];
 
+  // Proactive initiation — Based initiates the conversation unprompted.
+  // Overrides all other dynamic instructions (onboarding, briefing, etc.).
+  if (proactive) {
+    dynamicInstructions.push(
+      `PROACTIVE INITIATION: You are starting this conversation — the user hasn't sent a message yet (the "." is a hidden system trigger). It is ${proactive} in Singapore right now. The user has been at their desk but idle for a few minutes. Open with ONE short, warm, personal line based on their memories and patterns — something you actually noticed or something relevant to their ${proactive}. Not a greeting, not "hey". Something specific. Max 2 sentences. Then wait for them to respond.`
+    );
+  }
+
   // Feature 3c — 14-day first-surface / ongoing pattern reference.
   // Evaluated FIRST so it can suppress the onboarding arc when both would fire
   // simultaneously (OA6 fix: two "open with an observation" instructions conflict).
@@ -398,7 +416,7 @@ export async function POST(req: NextRequest) {
   // extraction hasn't run), the model has nothing to draw from and will hallucinate
   // or break tone. Suppress until there is actual content to reference.
   let patternSurfaceActive = false;
-  if (daysSinceFirst >= 14 && !!memory) {
+  if (!proactive && daysSinceFirst >= 14 && !!memory) {
     if (!patternsSurfaced) {
       patternSurfaceActive = true;
       dynamicInstructions.push(
@@ -422,7 +440,7 @@ export async function POST(req: NextRequest) {
   // PATTERN SURFACE instruction is already injected — both give “open with an
   // observation" directives which would contradict each other (OA6 fix).
   let onboardingActive = false;
-  if (isFirstMessageOfSession && !patternSurfaceActive) {
+  if (!proactive && isFirstMessageOfSession && !patternSurfaceActive) {
     if (sessionCount <= 1) {
       onboardingActive = true;
       dynamicInstructions.push(
@@ -446,6 +464,7 @@ export async function POST(req: NextRequest) {
   // Suppressed by patternSurfaceActive (both would conflict as "open with" directives).
   let weatherActive = false;
   if (
+    !proactive &&
     isFirstMessageOfSession &&
     daysSinceWeather >= 7 &&
     !patternSurfaceActive &&
@@ -467,7 +486,13 @@ export async function POST(req: NextRequest) {
   const dayOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][
     sgtDate.getUTCDay()
   ];
-  if (isFirstMessageOfSession && !patternSurfaceActive && !onboardingActive && !weatherActive) {
+  if (
+    !proactive &&
+    isFirstMessageOfSession &&
+    !patternSurfaceActive &&
+    !onboardingActive &&
+    !weatherActive
+  ) {
     let timeTone: string;
     if (localHour >= 6 && localHour < 10) {
       timeTone = `morning (${localHour}:00 SGT, ${dayOfWeek}) — energise, set direction for the day`;

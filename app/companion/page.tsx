@@ -155,6 +155,7 @@ declare global {
       resizeStart?: () => void;
       setCompanionWidth?: (width: number) => void;
       resizeEnd?: () => void;
+      onProactiveTrigger?: (cb: (data: { context: string }) => void) => void;
     };
     AndroidBridge?: {
       close: () => void;
@@ -256,6 +257,7 @@ export default function CompanionOverlayPage() {
   const wakeRecogRef = useRef<SpeechRecognition | null>(null);
   const restartWakeRef = useRef<(() => void) | null>(null);
   const sendFnRef = useRef<(voiceText?: string) => Promise<void>>(async () => {});
+  const sendProactiveFnRef = useRef<(context: string) => Promise<void>>(async () => {});
   const enterListenModeRef = useRef<(() => void) | null>(null);
   const wantsAutoListenRef = useRef(false);
   const stopSpeakingRef = useRef<(() => void) | null>(null);
@@ -1386,6 +1388,128 @@ export default function CompanionOverlayPage() {
   useEffect(() => {
     sendFnRef.current = send;
   });
+
+  // Proactive send — Based initiates the conversation from an Electron IPC trigger.
+  // Modelled after sendGreeting but passes proactive: context to the API so the
+  // companion receives a PROACTIVE INITIATION instruction instead of the normal
+  // onboarding / daily briefing arc.
+  const sendProactive = async (context: string) => {
+    const token = authToken;
+    if (!token || isGeneratingRef.current) return;
+
+    const triggerMsg: Msg = { role: 'user', content: '.', hidden: true };
+    setMessages([triggerMsg, { role: 'assistant', content: '' }]);
+    setIsGenerating(true);
+    setSlowWarning(false);
+
+    slowWarningTimerRef.current = setTimeout(() => setSlowWarning(true), 15000);
+    hardResetTimerRef.current = setTimeout(() => {
+      setIsGenerating(false);
+      setMessages(prev => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last?.role === 'assistant' && !last.content?.trim()) {
+          next[next.length - 1] = { ...last, content: '✕ Request timed out.' };
+        }
+        return next;
+      });
+    }, 45000);
+
+    const abortController = new AbortController();
+    const fetchTimeoutId = setTimeout(() => abortController.abort(), 30000);
+
+    try {
+      const res = await fetch('/api/companion', {
+        method: 'POST',
+        signal: abortController.signal,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: '.' }],
+          proactive: context,
+          ...(sessionMemoryRef.current ? { memory: sessionMemoryRef.current } : {}),
+        }),
+      });
+
+      if (!res.ok || !res.body) {
+        setMessages(prev => {
+          const next = [...prev];
+          next[next.length - 1] = { ...next[next.length - 1], content: '' };
+          return next;
+        });
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      let streamDone = false;
+      let assembledText = '';
+
+      while (!streamDone) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6).trim();
+          if (raw === '[DONE]') {
+            streamDone = true;
+            break;
+          }
+          try {
+            const parsed = JSON.parse(raw) as { text?: string };
+            if (parsed.text) {
+              assembledText += parsed.text;
+              setMessages(prev => {
+                const next = [...prev];
+                next[next.length - 1] = { ...next[next.length - 1], content: assembledText };
+                return next;
+              });
+            }
+          } catch {
+            /* ignore malformed chunks */
+          }
+        }
+      }
+    } catch {
+      setMessages(prev => {
+        const next = [...prev];
+        const last = next[next.length - 1];
+        if (last?.role === 'assistant' && !last.content?.trim()) {
+          next[next.length - 1] = { ...last, content: '' };
+        }
+        return next;
+      });
+    } finally {
+      clearTimeout(fetchTimeoutId);
+      if (slowWarningTimerRef.current) clearTimeout(slowWarningTimerRef.current);
+      if (hardResetTimerRef.current) clearTimeout(hardResetTimerRef.current);
+      setIsGenerating(false);
+      setSlowWarning(false);
+      if (wakeStateRef.current === 'processing' && wakeWordEnabledRef.current) {
+        wakeStateRef.current = 'idle';
+        setWakeState('idle');
+        setTimeout(() => restartWakeRef.current?.(), 600);
+      }
+    }
+  };
+
+  useEffect(() => {
+    sendProactiveFnRef.current = sendProactive;
+  });
+
+  // Register the Electron proactive-trigger IPC listener once at mount.
+  // Uses refs so the closure is never stale.
+  useEffect(() => {
+    if (!window.electronAPI?.onProactiveTrigger) return;
+    window.electronAPI.onProactiveTrigger(({ context }) => {
+      if (isGeneratingRef.current) return;
+      window.electronAPI?.showCompanion?.();
+      void sendProactiveFnRef.current(context);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleShare = (content: string, msgIdx: number) => {
     const sentences = content.split(/(?<=[.!?])\s+/);

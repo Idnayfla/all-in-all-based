@@ -14,4 +14,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   resizeStart: () => ipcRenderer.send('companion:resize-start'),
   setCompanionWidth: (width) => ipcRenderer.send('companion:set-width', width),
   resizeEnd: () => ipcRenderer.send('companion:resize-end'),
+  onProactiveTrigger: (cb) => ipcRenderer.on('proactive-trigger', (_event, data) => cb(data)),
 });
