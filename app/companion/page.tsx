@@ -368,7 +368,9 @@ export default function CompanionOverlayPage() {
 
     const start = async () => {
       try {
+        console.log('[based/vad] importing @ricky0123/vad-web...');
         const { MicVAD } = await import('@ricky0123/vad-web');
+        console.log('[based/vad] MicVAD imported, calling MicVAD.new()...');
 
         vad = await MicVAD.new({
           model: 'v5',
@@ -381,6 +383,7 @@ export default function CompanionOverlayPage() {
 
           onSpeechStart: () => {
             if (stopped) return;
+            console.log('[based/vad] speech started, awaitingCommand=', awaitingCommand);
             if (awaitingCommand) setWakeDebug('◉ Listening...');
             else setWakeDebug('· …');
           },
@@ -389,8 +392,10 @@ export default function CompanionOverlayPage() {
             if (stopped) return;
             if (wakeStateRef.current === 'processing' || isSpeakingRef.current) return;
 
+            console.log('[based/vad] speech ended, audio length=', audio.length);
             setWakeDebug('· heard speech');
             const raw = await transcribeAudio(audio);
+            console.log('[based/vad] STT result=', JSON.stringify(raw));
             if (stopped || !raw.trim()) {
               setWakeDebug(`· stt empty`);
               return;
@@ -444,8 +449,10 @@ export default function CompanionOverlayPage() {
           void vad.destroy().catch(() => {});
           return;
         }
+        console.log('[based/vad] MicVAD.new() done, calling vad.start()...');
         await vad.start();
         vadStarted = true;
+        console.log('[based/vad] vad.start() done — listening');
         setWakeListening(true);
         setWakeError(null);
 
@@ -460,6 +467,7 @@ export default function CompanionOverlayPage() {
           setWakeState('idle');
         };
       } catch (err) {
+        console.error('[based/vad] FAILED:', err);
         const msg = err instanceof Error ? err.message : String(err);
         const isDenied = /permission|denied|NotAllowed/i.test(msg);
         setWakeError(isDenied ? 'Mic permission denied' : 'Wake word failed to start');
