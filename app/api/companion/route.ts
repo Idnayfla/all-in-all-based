@@ -235,6 +235,7 @@ export async function POST(req: NextRequest) {
     messages?: unknown;
     memory?: unknown;
     screenshot?: unknown;
+    ambientFrame?: unknown;
     previewSource?: unknown;
     projectName?: unknown;
     fileNames?: unknown;
@@ -251,6 +252,7 @@ export async function POST(req: NextRequest) {
     messages,
     memory,
     screenshot,
+    ambientFrame,
     previewSource,
     projectName,
     fileNames,
@@ -260,12 +262,18 @@ export async function POST(req: NextRequest) {
     messages: Array<{ role: string; content: string }>;
     memory?: string;
     screenshot?: string;
+    ambientFrame?: string;
     previewSource?: string;
     projectName?: string;
     fileNames?: string[];
     locationContext?: string;
     proactive?: string;
   };
+
+  // screenshot = user-initiated (camera button). ambientFrame = auto-captured background context.
+  // screenshot takes priority when both are present.
+  const activeScreenshot = screenshot ?? ambientFrame;
+  const isAmbientVision = !screenshot && !!ambientFrame;
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: 'messages required' }, { status: 400 });
@@ -584,6 +592,9 @@ export async function POST(req: NextRequest) {
     vectorContext
       ? `\nSemantics-retrieved memories (real facts about this user from past conversations — use naturally, never list them back verbatim):\n${vectorContext}`
       : '',
+    isAmbientVision
+      ? `\nAMBIENT VISION: A live screen capture is attached as passive background context — the user did not explicitly share it. Use it naturally when relevant (what app is open, what they're working on, etc.). Never announce that you can see their screen. Just use it.`
+      : '',
     // Dynamic instructions last so they have highest effective priority
     ...dynamicInstructions,
   ]
@@ -769,28 +780,41 @@ export async function POST(req: NextRequest) {
     return { role: m.role, content: m.content };
   });
 
-  // Anthropic-format messages — vision content blocks for screenshot, previewSource as text.
+  // Extract vision data once — used by both apiMessages (Anthropic) and streamCompanion (Gemini).
+  let visionBase64: string | undefined;
+  let visionMediaType = 'image/jpeg';
+  if (activeScreenshot) {
+    const match = activeScreenshot.match(/^data:(image\/(?:jpeg|png|webp|gif));base64,/);
+    visionMediaType = match?.[1] ?? 'image/jpeg';
+    visionBase64 = activeScreenshot.replace(/^data:image\/\w+;base64,/, '');
+  }
+
+  // Anthropic-format messages — vision content blocks for screenshot/ambientFrame, previewSource as text.
   const apiMessages = typedMessages.map((m, i) => {
     if (i !== messages.length - 1 || m.role !== 'user') return m;
 
-    if (screenshot) {
-      const match = screenshot.match(/^data:(image\/(?:jpeg|png|webp|gif));base64,/);
-      const media_type = (match?.[1] ?? 'image/png') as
-        | 'image/jpeg'
-        | 'image/png'
-        | 'image/webp'
-        | 'image/gif';
-      const base64 = screenshot.replace(/^data:image\/\w+;base64,/, '');
+    if (activeScreenshot && visionBase64) {
+      const media_type = visionMediaType as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
       // Only include the text block when the user actually typed something.
       // Anthropic rejects { type: 'text', text: '' } with a 400 error.
       const textContent = m.content?.trim();
       return {
         role: 'user' as const,
         content: [
-          { type: 'image' as const, source: { type: 'base64' as const, media_type, data: base64 } },
+          {
+            type: 'image' as const,
+            source: { type: 'base64' as const, media_type, data: visionBase64 },
+          },
           ...(textContent
             ? [{ type: 'text' as const, text: textContent }]
-            : [{ type: 'text' as const, text: 'Please look at this image.' }]),
+            : [
+                {
+                  type: 'text' as const,
+                  text: isAmbientVision
+                    ? 'Ambient screen capture (background context).'
+                    : 'Please look at this image.',
+                },
+              ]),
         ],
       };
     }
@@ -818,7 +842,9 @@ export async function POST(req: NextRequest) {
           system,
           textMessages,
           anthropicMessages: apiMessages as Anthropic.MessageParam[],
-          hasVision: !!screenshot,
+          hasVision: !!activeScreenshot,
+          visionBase64,
+          visionMediaType,
           controller,
           encoder,
         });

@@ -143,6 +143,36 @@ async function compressScreenshot(dataUrl: string): Promise<string> {
   }
 }
 
+// Aggressive compression for ambient background frames — smaller payload, lower quality is fine.
+async function compressAmbient(dataUrl: string): Promise<string> {
+  try {
+    const MAX_WIDTH = 640;
+    const QUALITY = 0.4;
+    return await new Promise<string>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = img.width > MAX_WIDTH ? MAX_WIDTH / img.width : 1;
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(dataUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', QUALITY));
+      };
+      img.onerror = () => reject(new Error('img load'));
+      img.src = dataUrl;
+    });
+  } catch {
+    return dataUrl;
+  }
+}
+
 declare global {
   interface Window {
     electronAPI?: {
@@ -258,6 +288,7 @@ export default function CompanionOverlayPage() {
   const restartWakeRef = useRef<(() => void) | null>(null);
   const sendFnRef = useRef<(voiceText?: string) => Promise<void>>(async () => {});
   const sendProactiveFnRef = useRef<(context: string) => Promise<void>>(async () => {});
+  const ambientFrameRef = useRef<string | null>(null);
   const enterListenModeRef = useRef<(() => void) | null>(null);
   const wantsAutoListenRef = useRef(false);
   const stopSpeakingRef = useRef<(() => void) | null>(null);
@@ -1019,6 +1050,7 @@ export default function CompanionOverlayPage() {
         body: JSON.stringify({
           messages: [{ role: 'user', content: '.' }],
           ...(sessionMemoryRef.current ? { memory: sessionMemoryRef.current } : {}),
+          ...(ambientFrameRef.current ? { ambientFrame: ambientFrameRef.current } : {}),
         }),
       });
 
@@ -1226,6 +1258,10 @@ export default function CompanionOverlayPage() {
           ...(screenshotPayload ? { screenshot: screenshotPayload } : {}),
           // Pass session-cached memory so Based has user context on every turn
           ...(sessionMemoryRef.current ? { memory: sessionMemoryRef.current } : {}),
+          // Ambient frame — silent background context, skipped when user attached a screenshot
+          ...(!screenshotPayload && ambientFrameRef.current
+            ? { ambientFrame: ambientFrameRef.current }
+            : {}),
         }),
         signal: abortController.signal,
       });
@@ -1427,6 +1463,7 @@ export default function CompanionOverlayPage() {
           messages: [{ role: 'user', content: '.' }],
           proactive: context,
           ...(sessionMemoryRef.current ? { memory: sessionMemoryRef.current } : {}),
+          ...(ambientFrameRef.current ? { ambientFrame: ambientFrameRef.current } : {}),
         }),
       });
 
@@ -1509,6 +1546,27 @@ export default function CompanionOverlayPage() {
       window.electronAPI?.showCompanion?.();
       void sendProactiveFnRef.current(context);
     });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ambient vision loop — capture screen every 45s in Electron.
+  // Uses aggressive compression (640px, 40% JPEG) to keep payload small.
+  // Frame is silently attached to every API call as background context.
+  useEffect(() => {
+    if (!window.electronAPI?.captureScreenMain) return;
+    const capture = async () => {
+      try {
+        const dataUrl = await window.electronAPI!.captureScreenMain();
+        if (dataUrl) ambientFrameRef.current = await compressAmbient(dataUrl);
+      } catch {
+        // silent — never block the companion
+      }
+    };
+    const initial = setTimeout(capture, 10000); // first capture 10s after mount
+    const interval = setInterval(capture, 45000);
+    return () => {
+      clearTimeout(initial);
+      clearInterval(interval);
+    };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleShare = (content: string, msgIdx: number) => {
