@@ -37,6 +37,7 @@ function extractWakeCommand(raw: string): string | null {
     .trim();
 
   const directPrefixes = [
+    // Standard
     'hey based',
     'hey base',
     'hay based',
@@ -45,23 +46,60 @@ function extractWakeCommand(raw: string): string | null {
     'hey bass',
     'hey bays',
     'hey paste',
+    'hello based',
+    'hello base',
+    'hi based',
+    'hi base',
+    'ok based',
+    'okay based',
     'a based',
     'a base',
-    'ok based',
-    'hi based',
+    // Whisper phonetic mishears of "based" when spoken from a distance or by female voices
+    'hey raise',
+    'hey rays',
+    'hey race',
+    'hey bis',
+    'hey biz',
+    'hey days',
+    'hey haze',
+    'hey hayes',
+    'hey place',
+    'hey pace',
+    'hey phase',
+    'hey blaze',
+    'hey blade',
+    'hello raise',
+    'hello bis',
+    'hi raise',
+    'hi bis',
+    // Standalone — Whisper collapses "hey based" into a single mishear word
     'best',
     'baste',
-    'beast', // Whisper collapses "hey based" into one word
+    'beast',
+    'heavens', // mishear of "hey based" as one phoneme stream
+    'heaven',
+    'heybase',
+    'heybased',
   ];
   for (const prefix of directPrefixes) {
     if (s.startsWith(prefix)) return s.slice(prefix.length).trim();
     if (s.includes(prefix)) return ''; // wake phrase mid-sentence, treat as wake-only
   }
-  // Standard: (hey|hay|ok|hi|and|the|in) before anything starting with "bas"
+  // Broad catch: any attention word + anything phonetically near "bas-" OR known mishears
+  const phonetic = 'bas\\w*|raise|rays|race|bis|biz|days|haze|hayes|place|pace|phase|blaze';
   const m =
-    s.match(/^(?:hey|hay|ok|hi|and|the|in|a)\s+bas\w*[,\s]*(.*)$/i) ??
-    s.match(/^bas(?:ed|e)?\s*(.*)$/i);
+    s.match(
+      new RegExp(`^(?:hey|hay|ok|okay|hi|hello|and|the|in|a)\\s+(?:${phonetic})[,\\s]*(.*)$`, 'i')
+    ) ?? s.match(/^bas(?:ed|e)?\s*(.*)$/i);
   if (m) return m[1]?.trim() ?? '';
+
+  // Vocative: "Based" used as a name at the end of the sentence.
+  // e.g. "how are you doing Based?" → command is "how are you doing"
+  // Exclude "based on" which is a preposition, not a name.
+  if (!/\bbased?\s+on\b/i.test(s)) {
+    const endVocative = s.match(/^(.+?)\s+bas(?:ed|e)?\s*[?,!.]?\s*$/i);
+    if (endVocative?.[1]) return endVocative[1].trim();
+  }
 
   return null; // no wake phrase
 }
@@ -209,7 +247,8 @@ export default function CompanionOverlayPage() {
   const [wakeState, setWakeState] = useState<'idle' | 'listening' | 'processing'>('idle');
   const [wakeListening, setWakeListening] = useState(false); // mic actually capturing
   const [wakeError, setWakeError] = useState<string | null>(null);
-  const [wakeDebug, setWakeDebug] = useState<string | null>(null); // temporary: show last heard
+  const [wakeDebug, setWakeDebug] = useState<string | null>(null);
+  const [wakeStatus, setWakeStatus] = useState<string | null>(null); // VAD lifecycle status
   const wakeStateRef = useRef<'idle' | 'listening' | 'processing'>('idle');
   const wakeWordEnabledRef = useRef(false);
   const isGeneratingRef = useRef(false);
@@ -217,6 +256,9 @@ export default function CompanionOverlayPage() {
   const wakeRecogRef = useRef<SpeechRecognition | null>(null);
   const restartWakeRef = useRef<(() => void) | null>(null);
   const sendFnRef = useRef<(voiceText?: string) => Promise<void>>(async () => {});
+  const enterListenModeRef = useRef<(() => void) | null>(null);
+  const wantsAutoListenRef = useRef(false);
+  const stopSpeakingRef = useRef<(() => void) | null>(null);
 
   const [panelWidth, setPanelWidth] = useState<number>(WIDTH_DEFAULT);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -270,6 +312,16 @@ export default function CompanionOverlayPage() {
 
       audio.onplay = () => {
         setIsSpeaking(true);
+        stopSpeakingRef.current = () => {
+          audio.pause();
+          lastSpokenRef.current = '';
+          setIsSpeaking(false);
+          isSpeakingRef.current = false;
+          window.electronAPI?.setSpeaking(false, '');
+          URL.revokeObjectURL(url);
+          currentAudioRef.current = null;
+          stopSpeakingRef.current = null;
+        };
         if (words.length > 0) {
           // Build sentence chunks, anchor each to its first word's ElevenLabs timestamp
           const chunks = buildSpeechChunks(text);
@@ -286,13 +338,20 @@ export default function CompanionOverlayPage() {
         }
       };
       audio.onended = () => {
+        stopSpeakingRef.current = null;
         lastSpokenRef.current = '';
         setIsSpeaking(false);
         window.electronAPI?.setSpeaking(false, '');
         URL.revokeObjectURL(url);
         currentAudioRef.current = null;
+        // Auto-enter listen mode if Based just asked a question (voice path)
+        if (wantsAutoListenRef.current) {
+          wantsAutoListenRef.current = false;
+          setTimeout(() => enterListenModeRef.current?.(), 400);
+        }
       };
       audio.onerror = () => {
+        stopSpeakingRef.current = null;
         lastSpokenRef.current = '';
         setIsSpeaking(false);
         window.electronAPI?.setSpeaking(false, '');
@@ -341,10 +400,36 @@ export default function CompanionOverlayPage() {
     let vadStarted = false;
     let awaitingCommand = false;
     let cmdTimeout: ReturnType<typeof setTimeout> | null = null;
+    // Audio buffered while a wake-word STT call is in-flight. If the user speaks
+    // their command immediately after "Hey Based" (before STT returns), we capture
+    // it here and process it the moment the wake phrase is confirmed.
+    let pendingCommandAudio: Float32Array | null = null;
+    let wakeSTTInFlight = false;
+    let conversationWindowUntil = 0;
+    const CONVERSATION_WINDOW_MS = 20000;
 
     const CMD_TIMEOUT_MS = 8000;
 
-    const transcribeAudio = async (audio: Float32Array): Promise<string> => {
+    // RMS energy of a Float32Array (samples in -1..1 range).
+    // VAD at 16 kHz: ambient noise is typically <0.015, real speech >0.02.
+    const audioRMS = (audio: Float32Array): number => {
+      let sum = 0;
+      for (let i = 0; i < audio.length; i++) sum += audio[i] * audio[i];
+      return Math.sqrt(sum / audio.length);
+    };
+
+    const transcribeAudio = async (audio: Float32Array, lenient = false): Promise<string> => {
+      // Gate 1: minimum duration — segments under 0.4 s (6 400 samples at 16 kHz)
+      // are almost always noise bursts or mic clicks, never real speech.
+      if (audio.length < 6400) return '';
+
+      // Gate 2: RMS energy — ambient noise (fan, AC, keyboard) sits below 0.015.
+      // Real speech, even from across the room, clears 0.02. Skipping STT here
+      // prevents Deepgram/Whisper from hallucinating "Hello Based" on silence.
+      // In lenient mode (awaitingCommand, barge-in): skip energy gate — user is
+      // intentionally speaking, we just need to avoid responding to true silence.
+      if (audioRMS(audio) < (lenient ? 0.006 : 0.015)) return '';
+
       try {
         const { utils } = await import('@ricky0123/vad-web');
         const wavBuf = utils.encodeWAV(audio);
@@ -377,32 +462,47 @@ export default function CompanionOverlayPage() {
           baseAssetPath: '/vad/',
           onnxWASMBasePath: '/vad/',
           startOnLoad: false,
+          // Far-field tuning: lower positive threshold so distant speech scores
+          // high enough to trigger, while keeping the hysteresis band (positive minus
+          // negative) at ~0.20 — wide enough to avoid rapid speech/silence toggling.
+          positiveSpeechThreshold: 0.35,
+          negativeSpeechThreshold: 0.15,
+          // 600 ms redemption: bridges natural brief pauses mid-phrase without
+          // splitting one utterance into two separate VAD segments.
+          redemptionMs: 600,
+          // Modest pre-pad: captures onset consonants without adding noticeable latency.
+          preSpeechPadMs: 150,
           ortConfig: ort => {
             ort.env.logLevel = 'error';
           },
 
           onSpeechStart: () => {
             if (stopped) return;
-            console.log('[based/vad] speech started, awaitingCommand=', awaitingCommand);
             if (awaitingCommand) setWakeDebug('◉ Listening...');
             else setWakeDebug('· …');
           },
 
           onSpeechEnd: async (audio: Float32Array) => {
             if (stopped) return;
-            if (wakeStateRef.current === 'processing' || isSpeakingRef.current) return;
+            if (wakeStateRef.current === 'processing') return;
 
-            console.log('[based/vad] speech ended, audio length=', audio.length);
-            setWakeDebug('· heard speech');
-            const raw = await transcribeAudio(audio);
-            console.log('[based/vad] STT result: length=', raw.length, 'empty=', !raw.trim());
-            if (stopped || !raw.trim()) {
-              setWakeDebug(`· stt empty`);
+            if (isSpeakingRef.current) {
+              // Barge-in: stop TTS immediately and treat this audio as a new command.
+              // No wake phrase required — the interruption itself is the intent signal.
+              stopSpeakingRef.current?.();
+              wantsAutoListenRef.current = false;
+              const raw = await transcribeAudio(audio, true);
+              if (!raw.trim()) return;
+              setWakeDebug(`· "${raw}"`);
+              wakeStateRef.current = 'processing';
+              setWakeState('processing');
+              conversationWindowUntil = Date.now() + CONVERSATION_WINDOW_MS;
+              await sendFnRef.current(raw);
               return;
             }
-            setWakeDebug(`· "${raw}"`);
 
             if (awaitingCommand) {
+              // Command utterance after a bare "Hey Based"
               awaitingCommand = false;
               if (cmdTimeout) {
                 clearTimeout(cmdTimeout);
@@ -410,20 +510,94 @@ export default function CompanionOverlayPage() {
               }
               wakeStateRef.current = 'processing';
               setWakeState('processing');
+              setWakeDebug('· processing...');
+              const raw = await transcribeAudio(audio, true); // lenient — user is replying
+              if (!raw.trim()) {
+                // Didn't catch it — silently re-enter listen mode for another attempt
+                awaitingCommand = true;
+                wakeStateRef.current = 'listening';
+                setWakeState('listening');
+                setWakeDebug('◉ Go ahead...');
+                cmdTimeout = setTimeout(() => {
+                  if (stopped) return;
+                  awaitingCommand = false;
+                  cmdTimeout = null;
+                  wakeStateRef.current = 'idle';
+                  setWakeState('idle');
+                  setWakeDebug(null);
+                }, CMD_TIMEOUT_MS);
+                return;
+              }
               setWakeDebug(`heard: "${raw}"`);
+              conversationWindowUntil = Date.now() + CONVERSATION_WINDOW_MS;
               await sendFnRef.current(raw);
-            } else {
-              const command = extractWakeCommand(raw);
-              if (command === null) return;
+              return;
+            }
 
-              window.electronAPI?.showCompanion?.();
+            // If a wake-word STT is already running, buffer this audio — the user
+            // likely spoke their command before the first STT returned.
+            if (wakeSTTInFlight) {
+              pendingCommandAudio = audio;
+              return;
+            }
 
-              if (command.trim()) {
-                wakeStateRef.current = 'processing';
-                setWakeState('processing');
-                setWakeDebug(`heard: "${command}"`);
-                await sendFnRef.current(command);
+            wakeSTTInFlight = true;
+            setWakeDebug('· heard speech');
+            const raw = await transcribeAudio(audio);
+            wakeSTTInFlight = false;
+
+            if (stopped || !raw.trim()) {
+              setWakeDebug('· stt empty');
+              pendingCommandAudio = null;
+              return;
+            }
+            setWakeDebug(`· "${raw}"`);
+
+            const command = extractWakeCommand(raw);
+            if (command === null) {
+              // Inside an active conversation window: treat this as a continuation command
+              // without requiring the wake phrase again. This handles long speech split by VAD
+              // and natural follow-up turns.
+              if (Date.now() < conversationWindowUntil) {
+                // Require 3+ words — single/double-word noise transcriptions ("hi",
+                // "thanks", "yeah okay") should not fire as continuation commands.
+                const wordCount = raw.trim().split(/\s+/).filter(Boolean).length;
+                if (wordCount >= 3) {
+                  conversationWindowUntil = Date.now() + CONVERSATION_WINDOW_MS; // extend
+                  window.electronAPI?.showCompanion?.();
+                  wakeStateRef.current = 'processing';
+                  setWakeState('processing');
+                  setWakeDebug(`· "${raw}"`);
+                  await sendFnRef.current(raw);
+                }
+              }
+              pendingCommandAudio = null;
+              return;
+            }
+
+            window.electronAPI?.showCompanion?.();
+
+            if (command.trim()) {
+              // Inline command: "Hey Based, what time is it?"
+              wakeStateRef.current = 'processing';
+              setWakeState('processing');
+              setWakeDebug(`heard: "${command}"`);
+              conversationWindowUntil = Date.now() + CONVERSATION_WINDOW_MS;
+              await sendFnRef.current(command);
+            } else if (pendingCommandAudio) {
+              // Wake-only, but audio was buffered during STT — process it immediately
+              const buffered = pendingCommandAudio;
+              pendingCommandAudio = null;
+              wakeStateRef.current = 'processing';
+              setWakeState('processing');
+              setWakeDebug('· processing...');
+              const cmdRaw = await transcribeAudio(buffered);
+              if (cmdRaw.trim()) {
+                setWakeDebug(`heard: "${cmdRaw}"`);
+                conversationWindowUntil = Date.now() + CONVERSATION_WINDOW_MS;
+                await sendFnRef.current(cmdRaw);
               } else {
+                // Buffered audio was silence — fall back to await mode
                 awaitingCommand = true;
                 wakeStateRef.current = 'listening';
                 setWakeState('listening');
@@ -437,6 +611,27 @@ export default function CompanionOverlayPage() {
                   setWakeDebug(null);
                 }, CMD_TIMEOUT_MS);
               }
+            } else {
+              // Wake-only, nothing buffered — wait for next utterance.
+              // Low-energy audio that matched a wake phrase is likely an
+              // ambient noise hallucination — skip rather than entering
+              // listen mode on nothing.
+              if (audioRMS(audio) < 0.025) {
+                pendingCommandAudio = null;
+                return;
+              }
+              awaitingCommand = true;
+              wakeStateRef.current = 'listening';
+              setWakeState('listening');
+              setWakeDebug('◉ Go ahead...');
+              cmdTimeout = setTimeout(() => {
+                if (stopped) return;
+                awaitingCommand = false;
+                cmdTimeout = null;
+                wakeStateRef.current = 'idle';
+                setWakeState('idle');
+                setWakeDebug(null);
+              }, CMD_TIMEOUT_MS);
             }
           },
 
@@ -465,6 +660,25 @@ export default function CompanionOverlayPage() {
           }
           wakeStateRef.current = 'idle';
           setWakeState('idle');
+        };
+        enterListenModeRef.current = () => {
+          if (stopped || !wakeWordEnabledRef.current) return;
+          if (cmdTimeout) {
+            clearTimeout(cmdTimeout);
+            cmdTimeout = null;
+          }
+          awaitingCommand = true;
+          wakeStateRef.current = 'listening';
+          setWakeState('listening');
+          setWakeDebug('◉ Go ahead...');
+          cmdTimeout = setTimeout(() => {
+            if (stopped) return;
+            awaitingCommand = false;
+            cmdTimeout = null;
+            wakeStateRef.current = 'idle';
+            setWakeState('idle');
+            setWakeDebug(null);
+          }, CMD_TIMEOUT_MS);
         };
       } catch (err) {
         console.error('[based/vad] FAILED:', err);
@@ -1101,6 +1315,15 @@ export default function CompanionOverlayPage() {
         void speak(assembledText);
       }
 
+      // If Based ended with a question and wake word is on, auto-listen for reply
+      if (
+        wakeWordEnabledRef.current &&
+        !streamError &&
+        /\?\s*["']?\s*$/.test(assembledText.trim())
+      ) {
+        wantsAutoListenRef.current = true;
+      }
+
       // Only show an error message if the server explicitly sent an error event.
       // Show the actual error text when it's short and meaningful so failures
       // are debuggable; fall back to a generic message for long/technical strings.
@@ -1149,6 +1372,11 @@ export default function CompanionOverlayPage() {
         wakeStateRef.current = 'idle';
         setWakeState('idle');
         setTimeout(() => restartWakeRef.current?.(), 600);
+      }
+      // No-voice path: if TTS is off, enter listen mode directly after a pause
+      if (wantsAutoListenRef.current && !voiceEnabledRef.current) {
+        wantsAutoListenRef.current = false;
+        setTimeout(() => enterListenModeRef.current?.(), 600);
       }
     }
   };
