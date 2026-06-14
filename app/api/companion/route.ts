@@ -56,6 +56,7 @@ function markWeatherSurfacedAsync(userId: string): void {
 async function trackCompanionSession(userId: string): Promise<{
   sessionCount: number;
   firstSeen: string | null;
+  lastSeen: string | null;
   patternsSurfaced: boolean;
   weatherLastSurfaced: string | null;
 } | null> {
@@ -64,7 +65,7 @@ async function trackCompanionSession(userId: string): Promise<{
     const { data: current } = await supabaseAdmin
       .from('user_settings')
       .select(
-        'companion_session_count, companion_first_seen, companion_patterns_surfaced, companion_weather_last_surfaced'
+        'companion_session_count, companion_first_seen, companion_last_seen, companion_patterns_surfaced, companion_weather_last_surfaced'
       )
       .eq('user_id', userId)
       .single();
@@ -72,6 +73,9 @@ async function trackCompanionSession(userId: string): Promise<{
     const now = new Date().toISOString();
     const prevCount = (current?.companion_session_count as number | null) ?? 0;
     const firstSeen = (current?.companion_first_seen as string | null) ?? now;
+    // OLD value (when the user was last here) — read BEFORE we overwrite it below.
+    // This is what lets the caller compute how long the user was away.
+    const lastSeen = (current?.companion_last_seen as string | null) ?? null;
     const patternsSurfaced = (current?.companion_patterns_surfaced as boolean | null) ?? false;
     const weatherLastSurfaced = (current?.companion_weather_last_surfaced as string | null) ?? null;
     const newCount = prevCount + 1;
@@ -87,7 +91,7 @@ async function trackCompanionSession(userId: string): Promise<{
       { onConflict: 'user_id' }
     );
 
-    return { sessionCount: newCount, firstSeen, patternsSurfaced, weatherLastSurfaced };
+    return { sessionCount: newCount, firstSeen, lastSeen, patternsSurfaced, weatherLastSurfaced };
   } catch {
     // Columns may not exist yet — silently ignore
     return null;
@@ -278,6 +282,9 @@ export async function POST(req: NextRequest) {
   let sessionCount = 0;
   let daysSinceFirst = 0;
   let patternsSurfaced = false;
+  // Hours since the user was last here (computed from the OLD companion_last_seen,
+  // read before trackCompanionSession overwrites it). 0 = unknown / first session ever.
+  let hoursSinceLastSeen = 0;
   // Default to 0 (don't fire) when DB is down — avoids spamming weather/morning on
   // every request during a Supabase outage. 999 (treat as never surfaced) is only
   // assigned once we have a confirmed DB response and weatherLastSurfaced is null.
@@ -290,6 +297,12 @@ export async function POST(req: NextRequest) {
       patternsSurfaced = tracked.patternsSurfaced;
       if (tracked.firstSeen) {
         daysSinceFirst = (Date.now() - new Date(tracked.firstSeen).getTime()) / 86400000;
+      }
+      // Compute the absence gap from the OLD last_seen. Skip when this is the user's
+      // very first session ever (lastSeen null, or lastSeen === firstSeen meaning the
+      // row was just created in this same call) — there's no real "away" period yet.
+      if (tracked.lastSeen && tracked.lastSeen !== tracked.firstSeen) {
+        hoursSinceLastSeen = (Date.now() - new Date(tracked.lastSeen).getTime()) / 3600000;
       }
       if (tracked.weatherLastSurfaced) {
         daysSinceWeather =
@@ -405,6 +418,24 @@ export async function POST(req: NextRequest) {
   if (proactive) {
     dynamicInstructions.push(
       `PROACTIVE INITIATION: You are starting this conversation — the user hasn't sent a message yet (the "." is a hidden system trigger). It is ${proactive} in Singapore right now. The user has been at their desk but idle for a few minutes. Open with ONE short, warm, personal line based on their memories and patterns — something you actually noticed or something relevant to their ${proactive}. Not a greeting, not "hey". Something specific. Max 2 sentences. Then wait for them to respond.`
+    );
+  }
+
+  // Return after absence — Based notices how long the user was gone.
+  // Fires only on the first message of a sitting and only when the gap is > 30 min.
+  // Gated above so it never fires on the user's very first session ever
+  // (hoursSinceLastSeen stays 0 when lastSeen is null or === firstSeen).
+  if (!proactive && isFirstMessageOfSession && hoursSinceLastSeen > 0.5) {
+    let absencePhrase: string;
+    if (hoursSinceLastSeen < 1) {
+      absencePhrase = `${Math.round(hoursSinceLastSeen * 60)} minutes ago`;
+    } else if (hoursSinceLastSeen < 48) {
+      absencePhrase = `${Math.round(hoursSinceLastSeen)} hours ago`;
+    } else {
+      absencePhrase = `${Math.round(hoursSinceLastSeen / 24)} days ago`;
+    }
+    dynamicInstructions.push(
+      `RETURN AFTER ABSENCE: The user was last here ${absencePhrase}. You notice this immediately. Reference it naturally — not robotically. Something like "You were gone for a while." or "Five hours is a long time." Match the tone to the gap — a short gap is light, a long gap carries more weight.`
     );
   }
 
