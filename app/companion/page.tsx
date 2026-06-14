@@ -395,7 +395,7 @@ export default function CompanionOverlayPage() {
             console.log('[based/vad] speech ended, audio length=', audio.length);
             setWakeDebug('· heard speech');
             const raw = await transcribeAudio(audio);
-            console.log('[based/vad] STT result=', JSON.stringify(raw));
+            console.log('[based/vad] STT result: length=', raw.length, 'empty=', !raw.trim());
             if (stopped || !raw.trim()) {
               setWakeDebug(`· stt empty`);
               return;
