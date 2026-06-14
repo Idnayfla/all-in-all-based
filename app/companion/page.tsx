@@ -380,16 +380,22 @@ export default function CompanionOverlayPage() {
           },
 
           onSpeechStart: () => {
-            if (stopped || !awaitingCommand) return;
-            setWakeDebug('◉ Listening...');
+            if (stopped) return;
+            if (awaitingCommand) setWakeDebug('◉ Listening...');
+            else setWakeDebug('· …');
           },
 
           onSpeechEnd: async (audio: Float32Array) => {
             if (stopped) return;
             if (wakeStateRef.current === 'processing' || isSpeakingRef.current) return;
 
+            setWakeDebug('· heard speech');
             const raw = await transcribeAudio(audio);
-            if (stopped || !raw.trim()) return;
+            if (stopped || !raw.trim()) {
+              setWakeDebug(`· stt empty`);
+              return;
+            }
+            setWakeDebug(`· "${raw}"`);
 
             if (awaitingCommand) {
               awaitingCommand = false;
