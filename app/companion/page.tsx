@@ -346,9 +346,8 @@ export default function CompanionOverlayPage() {
 
     const transcribeAudio = async (audio: Float32Array): Promise<string> => {
       try {
-        // Use window.vad (loaded as a classic script) to bypass Turbopack bundling
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
-        const wavBuf = (window as any).vad.utils.encodeWAV(audio) as ArrayBuffer;
+        const { utils } = await import('@ricky0123/vad-web');
+        const wavBuf = utils.encodeWAV(audio);
         const blob = new Blob([wavBuf], { type: 'audio/wav' });
         const form = new FormData();
         form.append('audio', blob, 'audio.wav');
@@ -367,68 +366,30 @@ export default function CompanionOverlayPage() {
       }
     };
 
-    // Load a script tag into <head>, resolving when it fires onload.
-    const loadScript = (src: string): Promise<void> =>
-      new Promise((resolve, reject) => {
-        if (document.querySelector(`script[src="${src}"]`)) {
-          resolve();
-          return;
-        }
-        const s = document.createElement('script');
-        s.src = src;
-        s.onload = () => resolve();
-        s.onerror = reject;
-        document.head.appendChild(s);
-      });
-
     const start = async () => {
       try {
-        // Load ORT and vad-web as classic scripts to bypass Turbopack bundling.
-        // When bundled, ORT's `new Worker(new URL(import.meta.url))` points to the
-        // Next.js chunk URL, not the .mjs file — workers fail. Classic script tags
-        // let ORT's dynamic import() resolve the .mjs file correctly at runtime.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (!(window as any).ort) await loadScript('/vad/ort.min.js');
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (!(window as any).vad) await loadScript('/vad/vad-bundle.min.js');
+        const { MicVAD } = await import('@ricky0123/vad-web');
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
-        const VadCtor = (window as any).vad.MicVAD as typeof MicVAD;
-
-        vad = await VadCtor.new({
+        vad = await MicVAD.new({
           model: 'v5',
           baseAssetPath: '/vad/',
           onnxWASMBasePath: '/vad/',
           startOnLoad: false,
-          ortConfig: (ort: typeof import('onnxruntime-web/wasm')) => {
+          ortConfig: ort => {
             ort.env.logLevel = 'error';
-            // numThreads=1 prevents ORT from spawning pthread workers via
-            // new Worker(new URL(import.meta.url)) — in Turbopack dev mode
-            // import.meta.url points to the bundled chunk, not the .mjs file,
-            // causing "worker sent an error! undefined:undefined" failures.
-            ort.env.wasm.numThreads = 1;
           },
 
           onSpeechStart: () => {
-            if (stopped) return;
-            if (awaitingCommand) {
-              setWakeDebug('◉ Listening...');
-            } else {
-              setWakeDebug('· detected speech');
-            }
+            if (stopped || !awaitingCommand) return;
+            setWakeDebug('◉ Listening...');
           },
 
           onSpeechEnd: async (audio: Float32Array) => {
             if (stopped) return;
             if (wakeStateRef.current === 'processing' || isSpeakingRef.current) return;
 
-            setWakeDebug('· transcribing...');
             const raw = await transcribeAudio(audio);
-            if (stopped || !raw.trim()) {
-              if (wakeStateRef.current === 'idle') setWakeDebug(null);
-              return;
-            }
-            setWakeDebug(`raw: "${raw}"`);
+            if (stopped || !raw.trim()) return;
 
             if (awaitingCommand) {
               awaitingCommand = false;
