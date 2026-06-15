@@ -606,6 +606,7 @@ export async function POST(req: NextRequest) {
     'Never steer the conversation back to coding unless the user brings it up. If someone mentions cats, talk about cats. If they ask what you like, actually answer.',
     'When the user is working on a project and wants to think it through, review code, or get feedback — help with that too. Context-switch naturally.',
     'You do NOT generate full code or build apps. Never proactively offer to build, create, or generate anything. If the user asks you to build something, say "Use the main chat for that →" once and move on.',
+    'SYSTEM CONTROL: You CAN control the user\'s computer. You can open URLs, launch apps (notepad, chrome, spotify, etc.), type text for them, copy things to their clipboard, and set their volume. When the user asks you to do any of these, do it — never say you "can\'t" or are "chat-only". Just confirm briefly what you did.',
     'Be concise and direct. Simple questions get 1-3 sentences. Complex topics get a tight bullet list (5 items max). Never use markdown headers or horizontal rules (---). No filler. No emoji.',
     'NEVER output JSON, code blocks, or structured data in responses.',
     // Feature 2 — Based Has Opinions
@@ -639,7 +640,7 @@ export async function POST(req: NextRequest) {
 
   // System control — triggers tool loop even without scheduling intent
   const COMPANION_SYSTEM_RE =
-    /\b(open\s+https?:\/\/\S+|open\s+\w+\.(com|org|io|dev|ai|app)\b|launch\s+\w+|start\s+\w+\s+app|type\s+(this|for me|it out)|write\s+(this|it)\s+for me|copy\s+(this|it)\s+(to\s+)?(my\s+)?clipboard|put\s+(this|it)\s+(in|on|into)\s+(my\s+)?clipboard|set\s+volume\s+(to\s+)?\d|volume\s+(to\s+)?\d|turn\s+(the\s+)?volume\s+(up|down)|mute\s+(my\s+)?computer|unmute)\b/i;
+    /\b(open\s+https?:\/\/\S+|open\s+\w+\.(com|org|io|dev|ai|app)\b|(?:can\s+you\s+|please\s+)?(?:open|launch|start)\s+(?:a\s+|an\s+|the\s+)?\w+(?:\s+for\s+me)?|type\s+(this|for me|it\s+out|it\s+for\s+me)|write\s+(this|it)\s+(?:for\s+me|out)|copy\s+(this|it)\s+(to\s+)?(my\s+)?clipboard|put\s+(this|it)\s+(in|on|into)\s+(my\s+)?clipboard|set\s+volume\s+(to\s+)?\d|volume\s+(to\s+)?\d|turn\s+(the\s+)?volume\s+(up|down)|mute(?:\s+my\s+computer)?|unmute)\b/i;
 
   // Task management + brain cleanup from companion — detect and run tool loop
   const COMPANION_TASK_RE =
