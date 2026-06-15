@@ -472,6 +472,7 @@ export default function CompanionOverlayPage() {
     let stopped = false;
     let vad: MicVAD | null = null;
     let vadStarted = false;
+    let micStream: MediaStream | null = null;
     let awaitingCommand = false;
     let cmdTimeout: ReturnType<typeof setTimeout> | null = null;
     // Audio buffered while a wake-word STT call is in-flight. If the user speaks
@@ -531,11 +532,33 @@ export default function CompanionOverlayPage() {
         const { MicVAD } = await import('@ricky0123/vad-web');
         console.log('[based/vad] MicVAD imported, calling MicVAD.new()...');
 
+        // Request mic with WebRTC noise processing enabled.
+        // Silero VAD already handles speech/silence — these constraints clean the
+        // raw audio before it reaches the model (steady-state noise, echo, gain).
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              noiseSuppression: true,
+              echoCancellation: true,
+              autoGainControl: true,
+              channelCount: 1,
+            },
+          });
+        } catch {
+          // Fall through — MicVAD will open its own stream without constraints.
+        }
+
+        if (stopped) {
+          micStream?.getTracks().forEach(t => t.stop());
+          return;
+        }
+
         vad = await MicVAD.new({
           model: 'v5',
           baseAssetPath: '/vad/',
           onnxWASMBasePath: '/vad/',
           startOnLoad: false,
+          ...(micStream ? { stream: micStream } : {}),
           // Far-field tuning: lower positive threshold so distant speech scores
           // high enough to trigger, while keeping the hysteresis band (positive minus
           // negative) at ~0.20 — wide enough to avoid rapid speech/silence toggling.
@@ -769,6 +792,7 @@ export default function CompanionOverlayPage() {
       stopped = true;
       if (cmdTimeout) clearTimeout(cmdTimeout);
       if (vad && vadStarted) void vad.destroy().catch(() => {});
+      micStream?.getTracks().forEach(t => t.stop());
       setWakeListening(false);
       setWakeState('idle');
       wakeStateRef.current = 'idle';
