@@ -835,9 +835,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
                 >
                   {formatDue(task.due_date)}
                   {task.due_time && (
-                    <span className="tasks-row-due-time">
-                      {task.due_time.slice(0, 5)}
-                    </span>
+                    <span className="tasks-row-due-time">{task.due_time.slice(0, 5)}</span>
                   )}
                 </span>
               )}

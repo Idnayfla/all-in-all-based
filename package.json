@@ -23,6 +23,7 @@
     "cap:sync": "npx cap sync",
     "cap:open:android": "npx cap open android",
     "cap:open:ios": "npx cap open ios",
+    "android:start": "cd android && gradlew.bat assembleDebug && adb install -r app\\build\\outputs\\apk\\debug\\app-debug.apk && adb shell am start -n dev.getbased.app/.MainActivity && cd ..",
     "electron:start": "node electron/dev-start.js",
     "electron:start:prod": "electron electron/main.js",
     "electron:build": "electron-builder build --config electron-builder.config.js"
@@ -38,6 +39,7 @@
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@gsap/react": "^2.1.2",
+    "@jitsi/rnnoise-wasm": "^0.2.1",
     "@monaco-editor/react": "^4.7.0",
     "@picovoice/porcupine-web": "^4.0.0",
     "@react-spring/web": "^10.1.0",

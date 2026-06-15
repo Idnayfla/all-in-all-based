@@ -473,6 +473,7 @@ export default function CompanionOverlayPage() {
     let vad: MicVAD | null = null;
     let vadStarted = false;
     let micStream: MediaStream | null = null;
+    let audioCtx: AudioContext | null = null;
     let awaitingCommand = false;
     let cmdTimeout: ReturnType<typeof setTimeout> | null = null;
     // Audio buffered while a wake-word STT call is in-flight. If the user speaks
@@ -546,6 +547,31 @@ export default function CompanionOverlayPage() {
           });
         } catch {
           // Fall through — MicVAD will open its own stream without constraints.
+        }
+
+        // Run mic through RNNoise neural noise suppression before Silero VAD
+        if (micStream && !stopped) {
+          try {
+            audioCtx = new AudioContext({ sampleRate: 48000 });
+            await audioCtx.audioWorklet.addModule('/rnnoise-processor.js', { type: 'module' } as WorkletOptions);
+            const source = audioCtx.createMediaStreamSource(micStream);
+            const rnnoiseNode = new AudioWorkletNode(audioCtx, 'rnnoise-processor');
+            const dest = audioCtx.createMediaStreamDestination();
+            await new Promise<void>((resolve, reject) => {
+              const t = setTimeout(() => resolve(), 3000);
+              rnnoiseNode.port.onmessage = (e: MessageEvent) => {
+                if (e.data?.type === 'ready') { clearTimeout(t); resolve(); }
+                else if (e.data?.type === 'error') { clearTimeout(t); reject(new Error(e.data.message as string)); }
+              };
+            });
+            source.connect(rnnoiseNode);
+            rnnoiseNode.connect(dest);
+            micStream = dest.stream;
+          } catch {
+            // RNNoise unavailable — continue with WebRTC NS stream
+            await audioCtx?.close().catch(() => {});
+            audioCtx = null;
+          }
         }
 
         if (stopped) {
@@ -792,6 +818,7 @@ export default function CompanionOverlayPage() {
       stopped = true;
       if (cmdTimeout) clearTimeout(cmdTimeout);
       if (vad && vadStarted) void vad.destroy().catch(() => {});
+      audioCtx?.close().catch(() => {});
       micStream?.getTracks().forEach(t => t.stop());
       setWakeListening(false);
       setWakeState('idle');

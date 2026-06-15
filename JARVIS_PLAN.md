@@ -76,29 +76,33 @@ Behavioral signals (typing speed, mic silence duration, time of day, recent topi
 
 ## Phases
 
-### Phase 1 — Now (immediate, this week)
-- Route companion chat to Groq + Cerebras
-- Opus only fires for app generation
-- Zero companion API cost immediately
-- **Start here:** Multi-model router
+### Phase 1 — Now ✓ DONE
+- Companion → Groq (free) → Cerebras (free) → Anthropic Sonnet fallback
+- Opus reserved for app generation only
+- Desktop Ollama **skipped** — Groq/Cerebras already faster and zero risk to desktop bot
 
-### Phase 2 — Mac Mini arrives
-- Run `llama3:70b` locally via Ollama
-- Companion fully offline, no API dependency for conversation
+### Phase 2 — Mac Mini M4 Pro 48GB (S$2,899)
+- Trigger: Based API costs hit S$150+/month consistently
+- Move Discord bot from desktop → Mac Mini
+- Run Qwen2.5 72B locally (fits in 48GB unified memory at 4-bit)
+- Replace Anthropic for all agent work
+- Local Whisper for STT — no more cloud audio
 - Vector memory goes live
+- Tailscale for remote access from anywhere
 
 ### Phase 3 — Jarvis
-- Ambient vision loop
-- Proactive engine
-- System control
-- Sensor fusion + mood engine
+- Ambient vision loop + screen control
+- Proactive engine (Based speaks first)
+- System control via Electron IPC
+- Sensor fusion (screen + camera + calendar + mood)
+- Based VS Code extension (see below)
 - Based is always watching, always aware, speaks first when it matters
 
 ---
 
 ## Build Order
 
-1. Multi-model router ← start here, one file, immediate savings
+1. ~~Multi-model router~~ ✓ shipped
 2. Long-term vector memory ← biggest UX gap vs Jarvis
 3. Proactive engine ← the moment it stops feeling like a chatbot
 4. Ambient vision loop + screen control
@@ -106,3 +110,31 @@ Behavioral signals (typing speed, mic silence duration, time of day, recent topi
 6. Multi-language support
 7. Mic input profiles (external / headset / built-in)
 8. Sensor fusion + mood engine
+9. **Based for VS Code** ← platform expansion
+
+---
+
+## Based for VS Code
+
+Claude has Claude Code. Based gets Based for VS Code.
+
+**What it does:**
+- Sidebar panel: Based companion lives inside VS Code — chat, voice, Hey Based wake word
+- Code-aware: reads the open file, selected code, terminal output, errors as automatic context
+- Generation: trigger Based's app generator from inside the editor — output lands directly in workspace files
+- Inline suggestions: Based proposes edits, user accepts/rejects like Copilot
+- Screen awareness: sees what's on screen without user pasting code manually
+- Agent mode: "fix this bug" → Based reads the error, finds the file, proposes the edit
+
+**How it's built:**
+- VS Code Extension API (TypeScript) — same language as the rest of Based
+- Webview panel for the companion UI (reuse existing companion React component)
+- Language Server Protocol (LSP) for inline suggestions
+- Connects to getbased.dev API — same backend, new client surface
+- Published to VS Code Marketplace + Open VSX (for Cursor, Windsurf, etc.)
+
+**Why this matters:**
+- Claude Code is CLI-first, developer-only
+- Based for VS Code targets the same developers who already use the web app
+- Companion + generation + voice in one editor panel = Jarvis in the IDE
+- Distribution: VS Code has 17M+ users — Marketplace is a growth channel
