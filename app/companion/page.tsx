@@ -306,6 +306,10 @@ export default function CompanionOverlayPage() {
 
   // Wake word — "Hey Based"
   const [wakeWordEnabled, setWakeWordEnabled] = useState(false);
+  const [vadSensitivity, setVadSensitivity] = useState(() => {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('based_vad_sensitivity') : null;
+    return stored ? parseFloat(stored) : 0.35;
+  });
   const [wakeState, setWakeState] = useState<'idle' | 'listening' | 'processing'>('idle');
   const [wakeListening, setWakeListening] = useState(false); // mic actually capturing
   const [wakeError, setWakeError] = useState<string | null>(null);
@@ -535,8 +539,8 @@ export default function CompanionOverlayPage() {
           // Far-field tuning: lower positive threshold so distant speech scores
           // high enough to trigger, while keeping the hysteresis band (positive minus
           // negative) at ~0.20 — wide enough to avoid rapid speech/silence toggling.
-          positiveSpeechThreshold: 0.35,
-          negativeSpeechThreshold: 0.15,
+          positiveSpeechThreshold: vadSensitivity,
+          negativeSpeechThreshold: Math.max(0.05, vadSensitivity - 0.20),
           // 600 ms redemption: bridges natural brief pauses mid-phrase without
           // splitting one utterance into two separate VAD segments.
           redemptionMs: 600,
@@ -769,7 +773,7 @@ export default function CompanionOverlayPage() {
       setWakeState('idle');
       wakeStateRef.current = 'idle';
     };
-  }, [wakeWordEnabled]);
+  }, [wakeWordEnabled, vadSensitivity]);
 
   useEffect(() => {
     const stored = localStorage.getItem('based_companion_voice');
@@ -1835,6 +1839,27 @@ export default function CompanionOverlayPage() {
             <span className="companion-capture-error">{captureError ?? wakeError}</span>
           )}
         </div>
+
+        {wakeWordEnabled && (
+          <div className="companion-vad-slider">
+            <span>sensitive</span>
+            <input
+              type="range"
+              min={0.2}
+              max={0.6}
+              step={0.05}
+              value={vadSensitivity}
+              onChange={e => {
+                const v = parseFloat(e.target.value);
+                setVadSensitivity(v);
+                localStorage.setItem('based_vad_sensitivity', String(v));
+              }}
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              title={`Mic sensitivity: ${Math.round((1 - (vadSensitivity - 0.2) / 0.4) * 100)}%`}
+            />
+            <span>strict</span>
+          </div>
+        )}
 
         {wakeWordEnabled && wakeState !== 'idle' && (
           <div className="companion-wake-indicator">

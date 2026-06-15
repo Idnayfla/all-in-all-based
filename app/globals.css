@@ -8354,6 +8354,22 @@ html.has-wallpaper .editor-panel {
   margin-left: 4px;
 }
 
+.companion-vad-slider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+.companion-vad-slider input[type='range'] {
+  flex: 1;
+  height: 2px;
+  accent-color: rgba(124, 58, 237, 0.7);
+  cursor: pointer;
+  background: transparent;
+}
 .companion-wake-indicator {
   display: flex;
   align-items: center;
@@ -8375,8 +8391,15 @@ html.has-wallpaper .editor-panel {
   animation: wake-pulse 1s ease-in-out infinite;
 }
 @keyframes wake-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.3; transform: scale(0.65); }
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.65);
+  }
 }
 
 .companion-pending-badge {
