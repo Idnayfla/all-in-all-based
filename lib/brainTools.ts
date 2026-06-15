@@ -297,6 +297,70 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
       required: ['date', 'time'],
     },
   },
+  // ── System control (Electron-only, executed client-side) ──────────────────
+  {
+    name: 'open_url',
+    description:
+      "Open a URL in the user's default browser. Use when the user says 'open [site]', 'go to [url]', or 'launch [website]'.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Full URL to open, e.g. "https://google.com".' },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'launch_app',
+    description:
+      "Launch a desktop application. Use when the user says 'open [app]' or 'launch [app]' and it clearly refers to a local app, not a website.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        app_name: {
+          type: 'string',
+          description: 'App name as it appears in PATH or Start Menu, e.g. "notepad", "spotify", "code".',
+        },
+      },
+      required: ['app_name'],
+    },
+  },
+  {
+    name: 'type_text',
+    description:
+      "Type text at the current cursor position in whatever app the user has focused. Use when the user says 'type this for me', 'write this', or 'enter this text'.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'The exact text to type.' },
+      },
+      required: ['text'],
+    },
+  },
+  {
+    name: 'write_clipboard',
+    description:
+      "Write text to the user's clipboard. Use when the user says 'copy this to clipboard' or 'put this in my clipboard'.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'Text to place on the clipboard.' },
+      },
+      required: ['text'],
+    },
+  },
+  {
+    name: 'set_volume',
+    description:
+      'Set system volume. Use when the user says "set volume to X", "turn it up to X%", "mute" (level 0), or "full volume" (level 100).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        level: { type: 'number', description: 'Volume level 0–100.' },
+      },
+      required: ['level'],
+    },
+  },
   {
     name: 'upsert_scheduling_prefs',
     description:
@@ -433,10 +497,9 @@ export async function updateTask(
     notes?: string;
   }
 ): Promise<string> {
-  const isUuid =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      input.task_id_or_title
-    );
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    input.task_id_or_title
+  );
 
   let query = supabaseAdmin
     .from('tasks')
@@ -448,8 +511,7 @@ export async function updateTask(
     : query.ilike('title', `%${input.task_id_or_title}%`);
 
   const { data: rows } = await query.limit(1);
-  if (!rows || rows.length === 0)
-    return `No matching task found for "${input.task_id_or_title}".`;
+  if (!rows || rows.length === 0) return `No matching task found for "${input.task_id_or_title}".`;
   const task = rows[0];
 
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -488,11 +550,18 @@ export async function updateTask(
           ((input.duration_minutes ?? task.duration_minutes) as number | null) ?? null;
 
         if (task.google_event_id) {
-          await updateEvent(accessToken, task.google_event_id as string, calTitle, syncDate, calNotes, {
-            dueTime: calDueTime,
-            durationMinutes: calDuration,
-            tzOffset,
-          });
+          await updateEvent(
+            accessToken,
+            task.google_event_id as string,
+            calTitle,
+            syncDate,
+            calNotes,
+            {
+              dueTime: calDueTime,
+              durationMinutes: calDuration,
+              tzOffset,
+            }
+          );
           calResult = ' Google Calendar event updated.';
         } else {
           // No prior calendar event — create one now
@@ -501,10 +570,7 @@ export async function updateTask(
             durationMinutes: calDuration,
             tzOffset,
           });
-          await supabaseAdmin
-            .from('tasks')
-            .update({ google_event_id: event.id })
-            .eq('id', task.id);
+          await supabaseAdmin.from('tasks').update({ google_event_id: event.id }).eq('id', task.id);
           calResult = ' Added to Google Calendar.';
         }
       }
@@ -909,6 +975,19 @@ export async function runBrainTool(
           String(input.time ?? ''),
           typeof input.duration_minutes === 'number' ? input.duration_minutes : 60
         );
+      // System control — execution is deferred to the Electron client.
+      // Return a sentinel that the companion route strips out and streams
+      // back as a system_actions SSE event for the renderer to execute.
+      case 'open_url':
+        return `__SYSTEM_ACTION__${JSON.stringify({ action: 'open_url', url: String(input.url ?? '') })}`;
+      case 'launch_app':
+        return `__SYSTEM_ACTION__${JSON.stringify({ action: 'launch_app', app_name: String(input.app_name ?? '') })}`;
+      case 'type_text':
+        return `__SYSTEM_ACTION__${JSON.stringify({ action: 'type_text', text: String(input.text ?? '') })}`;
+      case 'write_clipboard':
+        return `__SYSTEM_ACTION__${JSON.stringify({ action: 'write_clipboard', text: String(input.text ?? '') })}`;
+      case 'set_volume':
+        return `__SYSTEM_ACTION__${JSON.stringify({ action: 'set_volume', level: Number(input.level ?? 50) })}`;
       case 'upsert_scheduling_prefs':
         return await upsertSchedulingPrefs(userId, {
           timezone: input.timezone ? String(input.timezone) : undefined,

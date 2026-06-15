@@ -1,6 +1,22 @@
-const { app, BrowserWindow, shell, Menu, globalShortcut, ipcMain, screen, session, desktopCapturer } = require('electron');
+const { app, BrowserWindow, shell, Menu, globalShortcut, ipcMain, screen, session, desktopCapturer, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+const { execFile } = require('child_process');
+
+// Write script to a temp .ps1 file and invoke PowerShell with execFile so no
+// shell is involved and the file path is never interpolated into a shell string.
+function runPS(script) {
+  return new Promise((resolve, reject) => {
+    const tmp = path.join(os.tmpdir(), `based_ps_${Date.now()}.ps1`);
+    fs.writeFileSync(tmp, script, 'utf8');
+    execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', tmp], (err, stdout) => {
+      fs.unlink(tmp, () => {});
+      if (err) reject(err);
+      else resolve(stdout.trim());
+    });
+  });
+}
 const { startProactiveEngine, stopProactiveEngine } = require('./proactiveEngine');
 
 // Disable Chromium's autoplay restriction so TTS audio plays without a prior
@@ -378,6 +394,91 @@ app.whenReady().then(async () => {
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+
+  // ── System control IPC ────────────────────────────────────────────────────
+  // Open a URL in the default browser.
+  ipcMain.handle('system:open-url', async (_, url) => {
+    const safe = String(url);
+    if (!/^https?:\/\//.test(safe)) return 'error: only http/https URLs allowed';
+    try { await shell.openExternal(safe); return 'opened'; }
+    catch (e) { return `error: ${e.message}`; }
+  });
+
+  // Launch an application. App name goes via env var so it is never shell-interpolated.
+  ipcMain.handle('system:launch-app', (_, appName) => {
+    return new Promise((resolve) => {
+      execFile(
+        'powershell',
+        ['-NoProfile', '-Command', 'Start-Process $env:BASED_APP'],
+        { env: { ...process.env, BASED_APP: String(appName) } },
+        (err) => resolve(err ? `error: ${err.message}` : 'launched')
+      );
+    });
+  });
+
+  // Type text at the current cursor position.
+  // Text goes via env var; only SendKeys special-char escaping is applied inside PS.
+  ipcMain.handle('system:type-text', (_, text) => {
+    // Escape SendKeys metacharacters so they are sent as literals.
+    const escaped = String(text).replace(/[+^%~(){}[\]]/g, '{$&}');
+    return new Promise((resolve) => {
+      execFile(
+        'powershell',
+        ['-NoProfile', '-Command',
+          'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait($env:BASED_SEND_TEXT)'
+        ],
+        { env: { ...process.env, BASED_SEND_TEXT: escaped } },
+        (err) => resolve(err ? `error: ${err.message}` : 'typed')
+      );
+    });
+  });
+
+  // Clipboard — use Electron's built-in (no exec needed).
+  ipcMain.handle('system:clipboard-read', () => clipboard.readText());
+  ipcMain.handle('system:clipboard-write', (_, text) => {
+    clipboard.writeText(String(text));
+    return 'written';
+  });
+
+  // Volume — level is a validated integer so embedding it in the PS script is safe.
+  ipcMain.handle('system:get-volume', async () => {
+    try {
+      const out = await runPS(`
+Add-Type -TypeDefinition @"
+using System.Runtime.InteropServices;
+public class WinVolG { [DllImport("winmm.dll")] public static extern int waveOutGetVolume(int h, out uint v); }
+"@
+[uint32]$v = 0; [WinVolG]::waveOutGetVolume(0, [ref]$v)
+[math]::Round(($v -band 0xFFFF) / 65535 * 100)
+`);
+      return parseInt(out) || 0;
+    } catch { return 0; }
+  });
+
+  ipcMain.handle('system:set-volume', async (_, level) => {
+    const pct = Math.max(0, Math.min(100, Number(level) || 0));
+    try {
+      await runPS(`
+Add-Type -TypeDefinition @"
+using System.Runtime.InteropServices;
+public class WinVolS { [DllImport("winmm.dll")] public static extern int waveOutSetVolume(int h, uint v); }
+"@
+$v = [uint32]([math]::Round(${pct} / 100 * 65535))
+[WinVolS]::waveOutSetVolume(0, ($v -bor ($v -shl 16)))
+`);
+      return `volume set to ${pct}%`;
+    } catch (e) { return `error: ${e.message}`; }
+  });
+
+  // Get the name of the currently focused application.
+  ipcMain.handle('system:get-active-app', async () => {
+    try {
+      const out = await runPS(
+        `Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | Sort-Object CPU -Descending | Select-Object -First 1 -ExpandProperty Name`
+      );
+      return out || 'unknown';
+    } catch { return 'unknown'; }
   });
 });
 

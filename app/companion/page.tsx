@@ -186,6 +186,15 @@ declare global {
       setCompanionWidth?: (width: number) => void;
       resizeEnd?: () => void;
       onProactiveTrigger?: (cb: (data: { context: string }) => void) => void;
+      // System control
+      openUrl?: (url: string) => Promise<string>;
+      launchApp?: (appName: string) => Promise<string>;
+      typeText?: (text: string) => Promise<string>;
+      clipboardRead?: () => Promise<string>;
+      clipboardWrite?: (text: string) => Promise<string>;
+      getVolume?: () => Promise<number>;
+      setVolume?: (level: number) => Promise<string>;
+      getActiveApp?: () => Promise<string>;
     };
     AndroidBridge?: {
       close: () => void;
@@ -235,6 +244,28 @@ function buildSpeechChunks(text: string, maxWords = 12): string[] {
     for (let i = 0; i < ws.length; i += maxWords) out.push(ws.slice(i, i + maxWords).join(' '));
   }
   return out.filter(Boolean);
+}
+
+async function executeSystemAction(sa: Record<string, unknown>) {
+  if (!window.electronAPI) return;
+  const action = sa.action as string;
+  switch (action) {
+    case 'open_url':
+      await window.electronAPI.openUrl?.(sa.url as string);
+      break;
+    case 'launch_app':
+      await window.electronAPI.launchApp?.(sa.app_name as string);
+      break;
+    case 'type_text':
+      await window.electronAPI.typeText?.(sa.text as string);
+      break;
+    case 'write_clipboard':
+      await window.electronAPI.clipboardWrite?.(sa.text as string);
+      break;
+    case 'set_volume':
+      await window.electronAPI.setVolume?.(sa.level as number);
+      break;
+  }
 }
 
 export default function CompanionOverlayPage() {
@@ -295,6 +326,12 @@ export default function CompanionOverlayPage() {
 
   const [panelWidth, setPanelWidth] = useState<number>(WIDTH_DEFAULT);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Mood/state tracking — signals sent to the API to adapt tone
+  const sessionStartAtRef = useRef<number>(Date.now());
+  const lastBasedReplyAtRef = useRef<number>(0);
+  const recentMsgLengthsRef = useRef<number[]>([]);
+  const shortStreakRef = useRef<number>(0);
   const isResizingRef = useRef(false);
 
   useEffect(() => {
@@ -1223,6 +1260,31 @@ export default function CompanionOverlayPage() {
     const fetchTimeoutId = setTimeout(() => abortController.abort(), 30000);
 
     try {
+      // Mood signals — inferred from response latency, message length, session length
+      const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+      recentMsgLengthsRef.current = [...recentMsgLengthsRef.current.slice(-4), wordCount];
+      if (wordCount <= 3) shortStreakRef.current += 1;
+      else shortStreakRef.current = 0;
+      const moodSignals = {
+        latencyMs: lastBasedReplyAtRef.current > 0 ? Date.now() - lastBasedReplyAtRef.current : undefined,
+        avgLength: recentMsgLengthsRef.current.length > 0
+          ? Math.round(recentMsgLengthsRef.current.reduce((a, b) => a + b, 0) / recentMsgLengthsRef.current.length)
+          : undefined,
+        sessionMinutes: Math.round((Date.now() - sessionStartAtRef.current) / 60000),
+        shortStreak: shortStreakRef.current,
+      };
+
+      // Electron context — pre-fetch clipboard / active app if the message implies they're needed
+      const electronContext: { clipboard?: string; activeApp?: string } = {};
+      if (window.electronAPI) {
+        if (/\bclipboard\b/i.test(text) && window.electronAPI.clipboardRead) {
+          try { electronContext.clipboard = await window.electronAPI.clipboardRead(); } catch { /* silent */ }
+        }
+        if (/\b(active\s+app|what\s+(am\s+i|app)\s+(using|on)|current\s+app)\b/i.test(text) && window.electronAPI.getActiveApp) {
+          try { electronContext.activeApp = await window.electronAPI.getActiveApp(); } catch { /* silent */ }
+        }
+      }
+
       // Use the token fetched at mount (authToken state). Calling getSession()
       // here again can trigger a network round-trip to Supabase to refresh an
       // expired token, which times out in Electron. The server validates the
@@ -1262,6 +1324,8 @@ export default function CompanionOverlayPage() {
           ...(!screenshotPayload && ambientFrameRef.current
             ? { ambientFrame: ambientFrameRef.current }
             : {}),
+          moodSignals,
+          ...(Object.keys(electronContext).length > 0 ? { electronContext } : {}),
         }),
         signal: abortController.signal,
       });
@@ -1313,10 +1377,15 @@ export default function CompanionOverlayPage() {
             break;
           }
           try {
-            const parsed = JSON.parse(raw) as { text?: string; error?: string };
+            const parsed = JSON.parse(raw) as { text?: string; error?: string; system_actions?: Array<Record<string, unknown>> };
             if (parsed.error) {
               // Server signalled a stream failure — record it and let [DONE] close the loop
               streamError = parsed.error;
+            } else if (parsed.system_actions) {
+              // Execute system control actions on the Electron side
+              for (const sa of parsed.system_actions) {
+                void executeSystemAction(sa);
+              }
             } else if (parsed.text) {
               assembledText += parsed.text;
               setMessages(prev => {
@@ -1345,6 +1414,9 @@ export default function CompanionOverlayPage() {
           return next;
         });
       }
+
+      // Track when Based last replied — used for mood latency inference
+      if (!streamError && assembledText.trim()) lastBasedReplyAtRef.current = Date.now();
 
       // Speak the completed assistant response when voice is enabled and no error occurred.
       // Call speak() directly with the locally assembled text — never inside a setMessages()

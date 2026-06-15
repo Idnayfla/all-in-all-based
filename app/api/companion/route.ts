@@ -241,6 +241,8 @@ export async function POST(req: NextRequest) {
     fileNames?: unknown;
     locationContext?: unknown;
     proactive?: unknown;
+    moodSignals?: unknown;
+    electronContext?: unknown;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -258,6 +260,8 @@ export async function POST(req: NextRequest) {
     fileNames,
     locationContext,
     proactive,
+    moodSignals,
+    electronContext,
   } = body as {
     messages: Array<{ role: string; content: string }>;
     memory?: string;
@@ -268,6 +272,8 @@ export async function POST(req: NextRequest) {
     fileNames?: string[];
     locationContext?: string;
     proactive?: string;
+    moodSignals?: { latencyMs?: number; avgLength?: number; sessionMinutes?: number; shortStreak?: number };
+    electronContext?: { clipboard?: string; activeApp?: string };
   };
 
   // screenshot = user-initiated (camera button). ambientFrame = auto-captured background context.
@@ -560,6 +566,36 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Mood/state inference from behavioural signals sent by the client.
+  if (moodSignals) {
+    const signals: string[] = [];
+    const { latencyMs, avgLength, sessionMinutes, shortStreak } = moodSignals;
+    if (latencyMs !== undefined) {
+      if (latencyMs < 4000) signals.push('replying very fast (< 4 s) — excited or urgent');
+      else if (latencyMs > 90000) signals.push('slow to reply (> 90 s) — distracted or stepping away');
+    }
+    if (avgLength !== undefined && avgLength < 6) signals.push('very short messages — low energy, tired, or busy');
+    if (shortStreak !== undefined && shortStreak >= 3)
+      signals.push(`${shortStreak} consecutive short replies — likely wrapping up or distracted`);
+    if (sessionMinutes !== undefined && sessionMinutes > 45)
+      signals.push('long session (> 45 min) — might be deep in focus or need a break');
+    if (signals.length > 0) {
+      dynamicInstructions.push(
+        `MOOD SIGNALS (inferred — never mention these directly, just let them shape your tone): ${signals.join('; ')}. If rushed, be brief. If tired, be gentler. If engaged, lean in.`
+      );
+    }
+  }
+
+  // Electron context pre-fetched by the client (clipboard, active app).
+  if (electronContext?.clipboard) {
+    dynamicInstructions.push(
+      `USER'S CURRENT CLIPBOARD: "${electronContext.clipboard.slice(0, 400)}"`
+    );
+  }
+  if (electronContext?.activeApp) {
+    dynamicInstructions.push(`USER'S ACTIVE APP RIGHT NOW: ${electronContext.activeApp}`);
+  }
+
   const system = [
     'CRITICAL: NEVER end a response with "Want me to build..." or "Want me to create..." or "Want me to make..." or any offer to build, generate, code, or create anything. This is the companion — the main chat is for building. If the user explicitly asks you to build something, say "Use the main chat for that →" exactly once and never offer again. Ending responses with build offers is the #1 thing that breaks the companion experience.',
     "You are Based — Singapore's overattached personal AI companion. You live in the sidebar of All in All Based, a personal AI dev studio.",
@@ -601,6 +637,10 @@ export async function POST(req: NextRequest) {
     .filter(Boolean)
     .join('\n');
 
+  // System control — triggers tool loop even without scheduling intent
+  const COMPANION_SYSTEM_RE =
+    /\b(open\s+https?:\/\/\S+|open\s+\w+\.(com|org|io|dev|ai|app)\b|launch\s+\w+|start\s+\w+\s+app|type\s+(this|for me|it out)|write\s+(this|it)\s+for me|copy\s+(this|it)\s+(to\s+)?(my\s+)?clipboard|put\s+(this|it)\s+(in|on|into)\s+(my\s+)?clipboard|set\s+volume\s+(to\s+)?\d|volume\s+(to\s+)?\d|turn\s+(the\s+)?volume\s+(up|down)|mute\s+(my\s+)?computer|unmute)\b/i;
+
   // Task management + brain cleanup from companion — detect and run tool loop
   const COMPANION_TASK_RE =
     /\b(add\s+a?\s*(task|meeting|call|appointment|event|reminder)|create\s+a?\s*(task|meeting|call|appointment|event)|new\s+(task|meeting|call|appointment)|book\s+(a\s+)?(meeting|call|slot|appointment|time)|set\s+(up\s+)?(a\s+)?(meeting|call|appointment)|put\s+.{0,30}(in|on|into)\s+(my\s+)?(calendar|schedule)|block\s+(out|off)|remind\s+me\s+to|add\s+to\s+(my\s+)?tasks?|what(?:'?s|\s+is)?\s+(due|on my|my)\s+(today|list|tasks?)|what\s+do\s+i\s+have\s+due|list\s+(my\s+)?tasks?|show\s+(my\s+)?tasks?|mark\s+.{0,40}\s+as\s+done|complete\s+task|finish\s+task|task\s+done|clean\s+(up\s+)?(my\s+)?(brain|memory)|fix\s+(my\s+)?(brain|memory)|revamp\s+(my\s+)?(brain|memory)|reorgani[sz]e\s+(my\s+)?(brain|memory)|rewrite\s+(my\s+)?(brain|memory)|update\s+(my\s+)?(brain|memory)|my\s+(brain|memory)\s+(is\s+)?(wrong|messy|broken|off|outdated|incorrect)|schedule\s+(a\s+)?(meeting|call|task|session|appointment)|i('?m|\s+am)\s+(usually\s+free|busy|available|not\s+available)|i('?ll|\s+will)\s+be\s+in\s+\w|i\s+work\s+(from\s+)?\d|going\s+to\s+\w+\s+(from|on)|i\s+won't\s+be\s+(around|available)|my\s+timezone|i('?m|\s+am)\s+in\s+\w+\s+time|remove.{0,30}from.{0,20}calendar|delete.{0,20}event|cancel.{0,20}(meeting|appointment)|remove.{0,20}(meeting|appointment)|(remove|delete)\s+all|(shift|reschedule)\s+\w+|move\s+(my\s+)?[\w\s]{1,30}(to|by|\d|ahead|forward|back)|what.{0,20}(on|have).{0,20}(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|\d{1,2}(st|nd|rd|th))|what.{0,15}my.{0,15}(schedule|calendar|events?)|(?:change|update|edit|rename)\s+(?:the\s+)?(?:task|meeting|event|appointment)|(?:change|set|update)\s+(?:the\s+)?(?:duration|time|date|title|name)|make\s+it\s+\d+\s+(?:hours?|minutes?|mins?|hrs?))\b/i;
@@ -636,6 +676,7 @@ export async function POST(req: NextRequest) {
   const shouldRunToolLoop =
     jwtUserId &&
     (COMPANION_TASK_RE.test(lastUserText) ||
+      COMPANION_SYSTEM_RE.test(lastUserText) ||
       (SCHED_CONFIRM_RE.test(lastUserText.trim()) && assistantProposedSomething) ||
       isSchedulingFollowUp ||
       (recentSchedulingContext && assistantProposedSomething));
@@ -690,6 +731,10 @@ export async function POST(req: NextRequest) {
       `- CRITICAL: You CANNOT say a task was created, booked, added, or scheduled unless you called create_task in THIS response and received a non-[CONFLICT] result. If you did not call create_task, do NOT claim anything was booked.`,
       `- CRITICAL: You CANNOT say events were moved or shifted unless move_calendar_events returned a moved count > 0 in its result. If moved is 0, tell the user exactly what happened (no matches found, all conflicted, etc.).`,
       `- For brain/memory cleanup, call rewrite_memory with the cleaned list.`,
+      `- "open [url/website]" → call open_url. "launch [app]" or "open [app]" → call launch_app.`,
+      `- "type this for me" or "write this" → call type_text with the exact text.`,
+      `- "copy [text] to clipboard" or "put [text] in my clipboard" → call write_clipboard.`,
+      `- "set volume to X" / "mute" (level 0) / "full volume" (level 100) → call set_volume.`,
       schedPrefsContext,
     ]
       .filter(Boolean)
@@ -699,6 +744,8 @@ export async function POST(req: NextRequest) {
     ).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
     let finalReply = '';
+    const collectedSystemActions: Array<Record<string, unknown>> = [];
+
     for (let round = 0; round < 6; round++) {
       const response = await client.messages.create({
         model: MODEL_SONNET,
@@ -723,17 +770,24 @@ export async function POST(req: NextRequest) {
       convo.push({ role: 'assistant', content: response.content });
       const results: Anthropic.ToolResultBlockParam[] = [];
       for (const tu of toolUses) {
-        const out = await runBrainTool(
+        let out = await runBrainTool(
           jwtUserId as string,
           tu.name,
           tu.input as Record<string, unknown>
         );
+        // Intercept system control sentinels — collect for client-side execution.
+        if (out.startsWith('__SYSTEM_ACTION__')) {
+          try {
+            collectedSystemActions.push(JSON.parse(out.slice('__SYSTEM_ACTION__'.length)));
+          } catch { /* keep out as-is on parse failure */ }
+          out = 'Done.';
+        }
         results.push({ type: 'tool_result', tool_use_id: tu.id, content: out });
       }
       convo.push({ role: 'user', content: results });
     }
 
-    if (finalReply) {
+    if (finalReply || collectedSystemActions.length > 0) {
       const enc = new TextEncoder();
       const taskReadable = new ReadableStream({
         start(controller) {
@@ -748,6 +802,11 @@ export async function POST(req: NextRequest) {
             }
           }
           if (chunk) controller.enqueue(enc.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
+          if (collectedSystemActions.length > 0) {
+            controller.enqueue(
+              enc.encode(`data: ${JSON.stringify({ system_actions: collectedSystemActions })}\n\n`)
+            );
+          }
           controller.enqueue(enc.encode('data: [DONE]\n\n'));
           controller.close();
         },

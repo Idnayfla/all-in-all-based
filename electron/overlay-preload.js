@@ -15,4 +15,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   setCompanionWidth: (width) => ipcRenderer.send('companion:set-width', width),
   resizeEnd: () => ipcRenderer.send('companion:resize-end'),
   onProactiveTrigger: (cb) => ipcRenderer.on('proactive-trigger', (_event, data) => cb(data)),
+  // System control
+  openUrl: (url) => ipcRenderer.invoke('system:open-url', url),
+  launchApp: (appName) => ipcRenderer.invoke('system:launch-app', appName),
+  typeText: (text) => ipcRenderer.invoke('system:type-text', text),
+  clipboardRead: () => ipcRenderer.invoke('system:clipboard-read'),
+  clipboardWrite: (text) => ipcRenderer.invoke('system:clipboard-write', text),
+  getVolume: () => ipcRenderer.invoke('system:get-volume'),
+  setVolume: (level) => ipcRenderer.invoke('system:set-volume', level),
+  getActiveApp: () => ipcRenderer.invoke('system:get-active-app'),
 });
