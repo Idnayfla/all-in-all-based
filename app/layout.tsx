@@ -23,6 +23,9 @@ export const metadata: Metadata = {
     description: 'Describe what you want to build. Based generates it.',
   },
   metadataBase: new URL('https://getbased.dev'),
+  alternates: {
+    canonical: 'https://getbased.dev',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
