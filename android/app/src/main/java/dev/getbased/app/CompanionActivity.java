@@ -1,4 +1,4 @@
-﻿package dev.getbased.app;
+package dev.getbased.app;
 
 import android.Manifest;
 import android.app.Activity;
@@ -57,6 +57,7 @@ public class CompanionActivity extends AppCompatActivity {
     private static final int    REQUEST_MEDIA_PROJECTION = 1002;
 
     private WebView webView;
+    private FrameLayout panel;
     private FrameLayout.LayoutParams panelParams;
 
     // ── Camera2 fields — front (face) ─────────────────────────────────────────
@@ -74,6 +75,15 @@ public class CompanionActivity extends AppCompatActivity {
     private Handler              photoHandler;
     private HandlerThread        photoThread;
     private volatile boolean     photoCapturing = false;
+    private String               pendingProactiveContext = null;
+    private boolean              cameraFacingFront = false; // false = back (surroundings), true = front (selfie)
+    private int                  cameraSensorOrientation = 90; // set when face/cam camera opens
+    private int                  photoSensorOrientation  = 90; // set when photo camera opens
+    // Physical device orientation (0/90/180/270) from OrientationEventListener.
+    // We use this instead of Display.getRotation() because Display.getRotation()
+    // returns 0 when the Activity is portrait-locked, even if the device is landscape.
+    private volatile int                          physicalOrientation = 0;
+    private android.view.OrientationEventListener orientationListener;
 
     private final Runnable cameraFrameRunnable = new Runnable() {
         @Override
@@ -103,6 +113,41 @@ public class CompanionActivity extends AppCompatActivity {
     }
 
     @Override
+    public void onConfigurationChanged(@NonNull android.content.res.Configuration newConfig) {
+        super.onConfigurationChanged(newConfig);
+        // Recalculate panel height so it stays 65% of the screen in both portrait and landscape
+        if (panel != null && panelParams != null) {
+            android.util.DisplayMetrics metrics = new android.util.DisplayMetrics();
+            getWindowManager().getDefaultDisplay().getMetrics(metrics);
+            panelParams.height = (int) (metrics.heightPixels * 0.65f);
+            panel.setLayoutParams(panelParams);
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        String ctx = intent.getStringExtra("PROACTIVE_CONTEXT");
+        if (ctx != null) {
+            if (webView != null) injectProactiveTrigger(ctx);
+            else pendingProactiveContext = ctx;
+        }
+    }
+
+    private void injectProactiveTrigger(String context) {
+        if (webView == null) return;
+        final String safe = context.replaceAll("[^a-z]", "");
+        runOnUiThread(() -> webView.evaluateJavascript(
+            "setTimeout(function(){" +
+            "  try{" +
+            "    if(window.__abProactiveCallback)window.__abProactiveCallback({context:'" + safe + "'});" +
+            "    else window.dispatchEvent(new CustomEvent('proactive-trigger',{detail:{context:'" + safe + "'}}));" +
+            "  }catch(e){}" +
+            "},1500);", null));
+    }
+
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         overridePendingTransition(0, 0);
@@ -120,7 +165,7 @@ public class CompanionActivity extends AppCompatActivity {
         getWindowManager().getDefaultDisplay().getMetrics(metrics);
         int panelHeight = (int) (metrics.heightPixels * 0.65f);
 
-        FrameLayout panel = new FrameLayout(this);
+        panel = new FrameLayout(this);
         panel.setBackgroundColor(Color.TRANSPARENT);
 
         panelParams = new FrameLayout.LayoutParams(
@@ -142,12 +187,12 @@ public class CompanionActivity extends AppCompatActivity {
         cm.setAcceptCookie(true);
         cm.setAcceptThirdPartyCookies(webView, true);
 
-        webView.setBackgroundColor(Color.TRANSPARENT);
+        webView.setBackgroundColor(Color.parseColor("#08070e")); // dark bg during load; companion fills it
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
-            public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                view.loadUrl(url);
+            public boolean shouldOverrideUrlLoading(WebView view, android.webkit.WebResourceRequest request) {
+                view.loadUrl(request.getUrl().toString());
                 return true;
             }
 
@@ -155,6 +200,65 @@ public class CompanionActivity extends AppCompatActivity {
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
                 if (!url.contains("/companion")) return;
+
+                // Android CSS: disable the Electron slide-in animation (starts opacity:0 —
+                // if it doesn't fire the panel stays invisible). Force opacity:1 immediately.
+                // The slide-up effect is handled at the Java ViewPropertyAnimator level.
+                // Also make the capture row horizontally scrollable so all buttons are reachable.
+                view.evaluateJavascript(
+                    "(function(){" +
+                    "  if(document.getElementById('__ab_android_css'))return;" +
+                    "  var s=document.createElement('style');" +
+                    "  s.id='__ab_android_css';" +
+                    "  s.textContent=" +
+                    "    '.companion-overlay-root{" +
+                    "      animation:none!important;opacity:1!important;transform:none!important;" +
+                    "      top:0!important;left:0!important;right:0!important;bottom:0!important;" +
+                    "      width:auto!important;border-radius:0!important" +
+                    "    }" +
+                    "    .companion-capture-row{" +
+                    "      overflow-x:auto!important;flex-wrap:nowrap!important;" +
+                    "      -webkit-overflow-scrolling:touch!important" +
+                    "    }" +
+                    "    .companion-capture-row .companion-capture-btn," +
+                    "    .companion-capture-row .companion-voice-btn{" +
+                    "      flex-shrink:0!important;white-space:nowrap!important" +
+                    "    }';" +
+                    "  document.head.appendChild(s);" +
+                    "})()", null);
+
+                // Intercept SpeechRecognition so we can abort it when Based is speaking.
+                // This prevents the mic from capturing TTS audio and sending it back as
+                // a new user message (which causes two overlapping voices).
+                view.evaluateJavascript(
+                    "(function(){" +
+                    "  var SR=window.webkitSpeechRecognition||window.SpeechRecognition;" +
+                    "  if(!SR)return;" +
+                    "  var _start=SR.prototype.start;" +
+                    "  SR.prototype.start=function(){" +
+                    "    if(window.__abSpeakingActive)return;" + // block start while TTS playing
+                    "    window.__abActiveSR=this;" +
+                    "    _start.apply(this,arguments);" +
+                    "  };" +
+                    "})()", null);
+
+                // electronAPI shim — routes Electron IPC calls to AndroidBridge
+                view.evaluateJavascript(
+                    "(function(){" +
+                    "  if(window.electronAPI)return;" +
+                    "  window.electronAPI={" +
+                    "    setSpeaking:function(s,t){if(window.AndroidBridge)window.AndroidBridge.setSpeaking(!!s,t||'');}," +
+                    "    onProactiveTrigger:function(cb){window.__abProactiveCallback=cb;}," +
+                    "    hideForCapture:function(){}," +
+                    "    showAfterCapture:function(){}," +
+                    "    captureScreenMain:function(){return Promise.resolve(null);}," +
+                    "    resizeStart:function(){}," +
+                    "    setCompanionWidth:function(){}," +
+                    "    resizeEnd:function(){}," +
+                    "    hideCompanion:function(){if(window.AndroidBridge)window.AndroidBridge.close();}," +
+                    "    showCompanion:function(){}" +
+                    "  };" +
+                    "})()", null);
 
                 // Voice default
                 view.evaluateJavascript(
@@ -264,6 +368,69 @@ public class CompanionActivity extends AppCompatActivity {
                     "window.close=function(){" +
                     "  if(window.AndroidBridge)window.AndroidBridge.close();};", null);
 
+                // Inline sign-in: after Supabase's 3s auth timeout + buffer, if still
+                // not signed in inject an email+password form that calls the Supabase REST
+                // auth endpoint directly — no navigation away from the companion needed.
+                // On success the token is stored in localStorage and the page reloads,
+                // which makes Supabase's getSession() pick it up on next mount.
+                view.evaluateJavascript(
+                    "setTimeout(function(){" +
+                    "  var notice=document.querySelector('.companion-auth-notice');" +
+                    "  if(!notice||!notice.textContent.includes('Sign in'))return;" +
+                    "  if(document.getElementById('__ab_signin_form'))return;" +
+                    "  var form=document.createElement('div');" +
+                    "  form.id='__ab_signin_form';" +
+                    "  form.style.cssText='display:flex;flex-direction:column;gap:8px;padding:4px 0;';" +
+                    "  var inpStyle='padding:10px 12px;background:rgba(255,255,255,0.06);" +
+                    "    border:1px solid rgba(201,168,124,0.3);border-radius:8px;color:#ede8d0;" +
+                    "    font-size:14px;box-sizing:border-box;outline:none;width:100%;';" +
+                    "  var email=document.createElement('input');" +
+                    "  email.type='email';email.placeholder='Email address';email.style.cssText=inpStyle;" +
+                    "  var pass=document.createElement('input');" +
+                    "  pass.type='password';pass.placeholder='Password';pass.style.cssText=inpStyle;" +
+                    "  var btn=document.createElement('button');" +
+                    "  btn.textContent='\\u25C8 Sign In';" +
+                    "  btn.style.cssText='padding:10px;background:#c9a87c;color:#0e0c17;" +
+                    "    border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;';" +
+                    "  var err=document.createElement('div');" +
+                    "  err.style.cssText='color:#ff6b6b;font-size:12px;display:none;';" +
+                    "  var hint=document.createElement('div');" +
+                    "  hint.style.cssText='color:rgba(237,232,208,0.4);font-size:11px;text-align:center;margin-top:2px;';" +
+                    "  hint.textContent='Signed up with Google? Open the Based app first.';" +
+                    "  btn.onclick=function(){" +
+                    "    var e=email.value.trim(),p=pass.value;" +
+                    "    if(!e||!p){err.textContent='Enter email and password';err.style.display='block';return;}" +
+                    "    btn.textContent='Signing in\\u2026';btn.disabled=true;err.style.display='none';" +
+                    "    fetch('https://ooiqyptgaakasfczmiyp.supabase.co/auth/v1/token?grant_type=password',{" +
+                    "      method:'POST'," +
+                    "      headers:{" +
+                    "        'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9vaXF5cHRnYWFrYXNmY3ptaXlwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzMzY4NDUsImV4cCI6MjA5MzkxMjg0NX0.SSfe9CeIzZxvvXnkYwHIxO-RCJY0jFha2zbmfur7Lc8'," +
+                    "        'Content-Type':'application/json'" +
+                    "      }," +
+                    "      body:JSON.stringify({email:e,password:p})" +
+                    "    }).then(function(r){return r.json();}).then(function(d){" +
+                    "      if(d.error||d.error_description){" +
+                    "        err.textContent=d.error_description||d.error||'Sign in failed';" +
+                    "        err.style.display='block';" +
+                    "        btn.textContent='\\u25C8 Sign In';btn.disabled=false;" +
+                    "      }else{" +
+                    "        try{localStorage.setItem('sb-ooiqyptgaakasfczmiyp-auth-token',JSON.stringify(d));}catch(x){}" +
+                    "        window.location.reload();" +
+                    "      }" +
+                    "    }).catch(function(){" +
+                    "      err.textContent='Network error — check connection';" +
+                    "      err.style.display='block';" +
+                    "      btn.textContent='\\u25C8 Sign In';btn.disabled=false;" +
+                    "    });" +
+                    "  };" +
+                    "  form.appendChild(email);" +
+                    "  form.appendChild(pass);" +
+                    "  form.appendChild(btn);" +
+                    "  form.appendChild(err);" +
+                    "  form.appendChild(hint);" +
+                    "  notice.insertAdjacentElement('afterend',form);" +
+                    "},3500);", null);
+
                 // Feature 7: companion name bridge — read from localStorage on load,
                 // and expose window.setBasedName() so the web UI can update it.
                 view.evaluateJavascript(
@@ -301,20 +468,18 @@ public class CompanionActivity extends AppCompatActivity {
                     "  };" +
                     "})()", null);
 
-                // Inject screen + face-camera UI from Android — no web deploy required.
+                // Inject photo + face-camera buttons. Screen capture is handled by the web
+                // companion's own button (isAndroidBridge=true) to avoid duplicates.
                 view.evaluateJavascript(
                     "(function inject(){" +
                     "  var row=document.querySelector('.companion-capture-row');" +
                     "  if(!row){setTimeout(inject,300);return;}" +
-                    "  if(document.getElementById('__ab_screen_btn'))return;" +
+                    "  if(document.getElementById('__ab_photo_btn'))return;" +
 
-                    // ── Shared state ──────────────────────────────────────────
-                    "  window.__abFrame=null;" +       // latest screen frame (single-use)
-                    "  window.__abPhotoFrame=null;" +  // latest back-camera photo (single-use)
-                    "  window.__abCamFrame=null;" +    // latest face camera frame (continuous)
+                    "  window.__abPhotoFrame=null;" +
+                    "  window.__abCamFrame=null;" +
                     "  window.__abCamOn=false;" +
 
-                    // ── Toast-style error banner (replaces alert() which is silent in WebView) ──
                     "  function showError(msg){" +
                     "    console.error('[Based Android] '+msg);" +
                     "    var t=document.getElementById('__ab_err_toast');" +
@@ -332,17 +497,12 @@ public class CompanionActivity extends AppCompatActivity {
                     "    t.__hideTimer=setTimeout(function(){t.style.display='none';},4000);" +
                     "  }" +
 
-                    // ── Shared helpers ────────────────────────────────────────
                     "  var inputArea=document.querySelector('.companion-input-area');" +
                     "  var preview=document.createElement('div');" +
                     "  preview.id='__ab_preview';" +
                     "  preview.style.cssText='display:none;padding:6px 12px;gap:8px;flex-direction:column;background:rgba(255,255,255,0.04);border-top:1px solid rgba(255,255,255,0.08);';" +
                     "  var thumbRow=document.createElement('div');" +
                     "  thumbRow.style.cssText='display:flex;gap:8px;align-items:center;';" +
-                    "  var screenThumb=document.createElement('img');" +
-                    "  screenThumb.id='__ab_screen_thumb';" +
-                    "  screenThumb.title='Screen';" +
-                    "  screenThumb.style.cssText='display:none;width:90px;height:50px;object-fit:cover;border-radius:4px;border:1px solid rgba(255,200,0,0.4);';" +
                     "  var photoThumb=document.createElement('img');" +
                     "  photoThumb.id='__ab_photo_thumb';" +
                     "  photoThumb.title='Photo';" +
@@ -356,17 +516,11 @@ public class CompanionActivity extends AppCompatActivity {
                     "  askBtn.style.cssText='flex:1;font-size:11px;';" +
                     "  askBtn.textContent='\\u25C9 Ask about what you see';" +
                     "  askBtn.onclick=function(){" +
-                    "    var msg;" +
-                    "    if(window.__abPhotoFrame&&!window.__abFrame){" +
-                    "      msg='What product or object is this?';" +
-                    "    }else if(window.__abCamOn&&!window.__abFrame&&!window.__abPhotoFrame){" +
-                    "      msg='What do you see in my face? How do I look?';" +
-                    "    }else{" +
-                    "      msg='What can you see right now?';" +
-                    "    }" +
+                    "    var msg=window.__abCamOn&&!window.__abPhotoFrame" +
+                    "      ?'What do you see in my face? How do I look?'" +
+                    "      :'What can you see right now?';" +
                     "    sendWithFrame(msg);" +
                     "  };" +
-                    "  thumbRow.appendChild(screenThumb);" +
                     "  thumbRow.appendChild(photoThumb);" +
                     "  thumbRow.appendChild(camThumb);" +
                     "  thumbRow.appendChild(askBtn);" +
@@ -374,90 +528,87 @@ public class CompanionActivity extends AppCompatActivity {
                     "  if(inputArea)inputArea.insertBefore(preview,inputArea.firstChild);" +
 
                     "  function refreshPreview(){" +
-                    "    var any=!!(window.__abFrame||window.__abPhotoFrame||window.__abCamOn);" +
-                    "    preview.style.display=any?'flex':'none';" +
+                    "    preview.style.display=!!(window.__abPhotoFrame||window.__abCamOn)?'flex':'none';" +
                     "  }" +
 
-                    // ── sendWithFrame: sets textarea + clicks send ────────────
                     "  function sendWithFrame(text){" +
                     "    var ta=document.querySelector('.companion-textarea');" +
                     "    var sb=document.querySelector('.companion-send');" +
-                    "    if(!ta||!sb){console.error('[Based Android] sendWithFrame: textarea or send btn not found');return;}" +
+                    "    if(!ta||!sb){console.error('[Based Android] sendWithFrame: no textarea/send');return;}" +
                     "    try{" +
                     "      var desc=Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype,'value');" +
-                    "      if(desc&&typeof desc.set==='function'){" +
-                    "        desc.set.call(ta,text);" +
-                    "      }else{" +
-                    "        ta.value=text;" +
-                    "      }" +
-                    "    }catch(e){" +
-                    "      console.error('[Based Android] sendWithFrame setter error:',e);" +
-                    "      ta.value=text;" +
-                    "    }" +
+                    "      if(desc&&typeof desc.set==='function'){desc.set.call(ta,text);}else{ta.value=text;}" +
+                    "    }catch(e){ta.value=text;}" +
                     "    ta.dispatchEvent(new Event('input',{bubbles:true}));" +
                     "    ta.dispatchEvent(new Event('change',{bubbles:true}));" +
                     "    setTimeout(function(){sb.click();},80);" +
                     "  }" +
 
-                    // ── Screen snapshot button (single-shot, not a toggle) ────
-                    "  var screenBtn=document.createElement('button');" +
-                    "  screenBtn.id='__ab_screen_btn';" +
-                    "  screenBtn.className='companion-capture-btn';" +
-                    "  screenBtn.textContent='\\u25C9 Screen';" +
-                    "  screenBtn.onclick=function(){" +
-                    "    screenBtn.textContent='\\u25C9 Capturing…';" +
-                    "    screenBtn.disabled=true;" +
-                    "    window.AndroidBridge.startScreenCapture();" +
-                    "  };" +
-                    "  row.insertBefore(screenBtn,row.firstChild);" +
+                    "  window.__abCamIsFront=false;" + // starts as back camera (surroundings)
 
-                    // ── Photo button (single-shot back camera) ────────────────
                     "  var photoBtn=document.createElement('button');" +
                     "  photoBtn.id='__ab_photo_btn';" +
                     "  photoBtn.className='companion-capture-btn';" +
                     "  photoBtn.textContent='\\u25C9 Photo';" +
                     "  photoBtn.onclick=function(){" +
+                    // If back cam is already streaming, grab its current frame instead of
+                    // opening the camera a second time (Camera2 can't open the same lens twice).
+                    "    if(window.__abCamOn&&!window.__abCamIsFront&&window.__abCamFrame){" +
+                    "      window.onPhotoFrame&&window.onPhotoFrame(window.__abCamFrame.split(',')[1]);" +
+                    "      return;" +
+                    "    }" +
                     "    photoBtn.textContent='\\u25C9 Snapping\\u2026';" +
                     "    photoBtn.disabled=true;" +
                     "    window.AndroidBridge.takePhoto();" +
                     "  };" +
-                    "  row.insertBefore(photoBtn,screenBtn.nextSibling);" +
+                    "  row.insertBefore(photoBtn,row.firstChild);" +
 
-                    // ── Camera (face) toggle button — uses Camera2 bridge ─────
                     "  var camBtn=document.createElement('button');" +
                     "  camBtn.id='__ab_cam_btn';" +
                     "  camBtn.className='companion-capture-btn';" +
-                    "  camBtn.textContent='\\u25C9 Face';" +
+                    "  camBtn.textContent='\\u25C9 Cam';" +
                     "  camBtn.onclick=function(){" +
                     "    if(window.__abCamOn){" +
                     "      window.AndroidBridge.stopCameraCapture();" +
                     "      window.__abCamOn=false;window.__abCamFrame=null;" +
-                    "      camBtn.textContent='\\u25C9 Face';" +
-                    "      camBtn.classList.remove('active');" +
-                    "      var th=document.getElementById('__ab_cam_thumb');" +
-                    "      if(th)th.style.display='none';" +
+                    "      camBtn.textContent='\\u25C9 Cam';camBtn.classList.remove('active');" +
+                    "      var th=document.getElementById('__ab_cam_thumb');if(th)th.style.display='none';" +
                     "      refreshPreview();" +
                     "    }else{" +
                     "      window.AndroidBridge.startCameraCapture();" +
                     "      window.__abCamOn=true;" +
-                    "      camBtn.textContent='\\u25C9 Seeing';" +
+                    "      camBtn.textContent=window.__abCamIsFront?'\\u25C9 Face':'\\u25C9 Seeing';" +
                     "      camBtn.classList.add('active');" +
                     "      refreshPreview();" +
                     "    }" +
                     "  };" +
                     "  row.insertBefore(camBtn,photoBtn.nextSibling);" +
 
-                    // ── Camera frame receiver (called from Java via Camera2) ──
+                    "  var flipBtn=document.createElement('button');" +
+                    "  flipBtn.id='__ab_flip_btn';" +
+                    "  flipBtn.className='companion-capture-btn';" +
+                    "  flipBtn.textContent='\\u21C4 Flip';" +
+                    "  flipBtn.onclick=function(){" +
+                    "    window.AndroidBridge.switchCamera();" +
+                    "  };" +
+                    "  row.insertBefore(flipBtn,camBtn.nextSibling);" +
+
+                    "  window.onCameraSwitch=function(isFront){" +
+                    "    window.__abCamIsFront=isFront;" +
+                    "    if(window.__abCamOn){" +
+                    "      camBtn.textContent=isFront?'\\u25C9 Face':'\\u25C9 Seeing';" +
+                    "    }" +
+                    "  };" +
+
                     "  window.onCameraFrame=function(b64){" +
-                    "    if(!b64){console.error('[Based Android] onCameraFrame: empty frame');return;}" +
+                    "    if(!b64)return;" +
                     "    window.__abCamFrame='data:image/jpeg;base64,'+b64;" +
                     "    var th=document.getElementById('__ab_cam_thumb');" +
                     "    if(th){th.src=window.__abCamFrame;th.style.display='block';}" +
                     "  };" +
 
-                    // ── Photo frame receiver (single-shot back camera) ─────────
                     "  window.onPhotoFrame=function(b64){" +
-                    "    if(!b64){console.error('[Based Android] onPhotoFrame: empty frame');return;}" +
+                    "    if(!b64){showError('Photo capture failed');return;}" +
                     "    window.__abPhotoFrame='data:image/jpeg;base64,'+b64;" +
                     "    var th=document.getElementById('__ab_photo_thumb');" +
                     "    if(th){th.src=window.__abPhotoFrame;th.style.display='block';}" +
@@ -466,53 +617,27 @@ public class CompanionActivity extends AppCompatActivity {
                     "    refreshPreview();" +
                     "  };" +
 
-                    // ── Screen frame receiver ─────────────────────────────────
-                    "  window.onScreenFrame=function(b64){" +
-                    "    if(!b64){console.error('[Based Android] onScreenFrame: empty frame');return;}" +
-                    "    window.__abFrame='data:image/jpeg;base64,'+b64;" +
-                    "    var th=document.getElementById('__ab_screen_thumb');" +
-                    "    if(th){th.src=window.__abFrame;th.style.display='block';}" +
-                    "    var btn=document.getElementById('__ab_screen_btn');" +
-                    "    if(btn){btn.textContent='\\u25C9 Screen';btn.disabled=false;}" +
-                    "    refreshPreview();" +
-                    "  };" +
-                    "  window.onScreenCaptureDenied=function(){" +
-                    "    window.__abFrame=null;" +
-                    "    var btn=document.getElementById('__ab_screen_btn');" +
-                    "    if(btn){btn.textContent='\\u25C9 Screen';btn.disabled=false;}" +
-                    "    screenThumb.style.display='none';refreshPreview();" +
-                    "    showError('Screen capture permission denied');" +
-                    "  };" +
-                    "  window.onScreenCaptureStopped=function(){" +
-                    "    window.__abFrame=null;" +
-                    "    var btn=document.getElementById('__ab_screen_btn');" +
-                    "    if(btn){btn.textContent='\\u25C9 Screen';btn.disabled=false;}" +
-                    "    screenThumb.style.display='none';refreshPreview();" +
-                    "  };" +
-
-                    // ── Fetch interceptor — priority: screen > photo > face ───
                     "  var _f=window.fetch;" +
                     "  window.fetch=function(url,opts){" +
                     "    if(typeof url==='string'&&url.includes('/api/companion')&&opts&&opts.body){" +
-                    "      var frame=window.__abFrame||window.__abPhotoFrame||window.__abCamFrame;" +
+                    "      var frame=window.__abPhotoFrame||window.__abCamFrame;" +
                     "      if(frame){" +
                     "        try{" +
                     "          if(typeof opts.body==='string'){" +
                     "            var b=JSON.parse(opts.body);" +
                     "            b.screenshot=frame;" +
-                    // Clear single-use frames after attaching; face frame stays
-                    "            if(window.__abFrame){window.__abFrame=null;" +
-                    "              var st=document.getElementById('__ab_screen_thumb');if(st)st.style.display='none';}" +
-                    "            else if(window.__abPhotoFrame){window.__abPhotoFrame=null;" +
+                    "            if(window.__abPhotoFrame){" +
+                    "              window.__abPhotoFrame=null;" +
                     "              var pt=document.getElementById('__ab_photo_thumb');if(pt)pt.style.display='none';" +
                     "              refreshPreview();}" +
                     "            opts=Object.assign({},opts,{body:JSON.stringify(b)});" +
                     "          }" +
-                    "        }catch(e){console.error('[Based Android] fetch interceptor parse error:',e);}" +
+                    "        }catch(e){console.error('[Based Android] fetch interceptor error:',e);}" +
                     "      }" +
                     "    }" +
                     "    return _f.apply(this,arguments);" +
                     "  };" +
+
                     "})()", null);
 
                 // GPS Memory Anchors
@@ -579,9 +704,9 @@ public class CompanionActivity extends AppCompatActivity {
                     "    var bar=document.createElement('div');" +
                     "    bar.id='__ab_loc_consent';" +
                     "    bar.style.cssText='position:fixed;bottom:70px;left:0;right:0;background:rgba(20,20,20,0.97);color:#e0e0e0;font-size:13px;padding:12px 16px;display:flex;align-items:center;gap:10px;z-index:99999;border-top:1px solid rgba(255,255,255,0.08);';" +
-                    "    bar.innerHTML='<span style=""flex:1"">◈ Remember where we talk?</span>'" +
-                    "      +'<button id=""__ab_loc_yes"" style=""background:#f5c842;color:#000;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;"">Yes</button>'" +
-                    "      +'<button id=""__ab_loc_no"" style=""background:transparent;color:#888;border:1px solid #444;padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;"">No</button>';" +
+                    "    bar.innerHTML='<span style=\"flex:1\">◈ Remember where we talk?</span>'" +
+                    "      +'<button id=\"__ab_loc_yes\" style=\"background:#f5c842;color:#000;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;\">Yes</button>'" +
+                    "      +'<button id=\"__ab_loc_no\" style=\"background:transparent;color:#888;border:1px solid #444;padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;\">No</button>';" +
                     "    document.body.appendChild(bar);" +
                     "    document.getElementById('__ab_loc_yes').onclick=function(){" +
                     "      localStorage.setItem('based_location_consent','granted');" +
@@ -601,7 +726,14 @@ public class CompanionActivity extends AppCompatActivity {
                     "    }" +
                     "  });" +
                     "  locConsentObs.observe(document.body,{childList:true,subtree:true});" +
-                    "})()", null);            }
+                    "})()", null);
+
+                // Proactive trigger — inject if activity was opened with PROACTIVE_CONTEXT
+                if (pendingProactiveContext != null) {
+                    injectProactiveTrigger(pendingProactiveContext);
+                    pendingProactiveContext = null;
+                }
+            }
         });
 
         webView.addJavascriptInterface(new AndroidBridge(), "AndroidBridge");
@@ -613,6 +745,7 @@ public class CompanionActivity extends AppCompatActivity {
             }
         });
 
+        pendingProactiveContext = getIntent().getStringExtra("PROACTIVE_CONTEXT");
         webView.loadUrl(COMPANION_URL);
 
         String[] permsNeeded = new java.util.ArrayList<String>() {{
@@ -644,7 +777,29 @@ public class CompanionActivity extends AppCompatActivity {
         panel.addView(closeBtn, closeBtnParams);
 
         root.addView(panel, panelParams);
+
+        // Tapping the transparent area above the panel dismisses the companion
+        root.setOnTouchListener((v, event) -> {
+            if (event.getAction() == android.view.MotionEvent.ACTION_DOWN) {
+                float panelTop = panel.getY();
+                if (panelTop > 0 && event.getY() < panelTop) {
+                    dismissSelf();
+                    return true;
+                }
+            }
+            return false;
+        });
+
         setContentView(root);
+
+        // Slide the panel up from off-screen on open. Pure Java animation — no CSS
+        // dependency, so it works even before the WebView page finishes loading.
+        panel.setTranslationY(panelHeight);
+        panel.post(() -> panel.animate()
+            .translationY(0f)
+            .setDuration(280)
+            .setInterpolator(new android.view.animation.DecelerateInterpolator(1.5f))
+            .start());
 
         // Shift the panel up by the exact IME height when the keyboard opens.
         // WindowCompat.setDecorFitsSystemWindows(false) ensures the inset pipeline
@@ -713,6 +868,19 @@ public class CompanionActivity extends AppCompatActivity {
             @Override public void hide() { setAlpha(0f); }
             @Override public void show() { setAlpha(1f); }
         };
+
+        // Track physical device rotation via accelerometer so camera frames are
+        // rotated correctly even when the Activity is portrait-locked (in which
+        // case Display.getRotation() always returns 0 and can't be used).
+        orientationListener = new android.view.OrientationEventListener(this) {
+            @Override
+            public void onOrientationChanged(int orientation) {
+                if (orientation == ORIENTATION_UNKNOWN) return;
+                // Round to nearest 90° and store as 0/90/180/270
+                physicalOrientation = ((orientation + 45) / 90 * 90) % 360;
+            }
+        };
+        if (orientationListener.canDetectOrientation()) orientationListener.enable();
     }
 
     // ── GPS Memory Anchors — one-shot last-known location fetch ─────────────────
@@ -752,26 +920,31 @@ public class CompanionActivity extends AppCompatActivity {
 
         CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
-            String frontCameraId = null;
+            int targetFacing = cameraFacingFront
+                ? CameraCharacteristics.LENS_FACING_FRONT
+                : CameraCharacteristics.LENS_FACING_BACK;
+            String targetCameraId = null;
             for (String id : manager.getCameraIdList()) {
                 CameraCharacteristics ch = manager.getCameraCharacteristics(id);
                 Integer facing = ch.get(CameraCharacteristics.LENS_FACING);
-                if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
-                    frontCameraId = id;
+                if (facing != null && facing == targetFacing) {
+                    targetCameraId = id;
+                    Integer so = ch.get(CameraCharacteristics.SENSOR_ORIENTATION);
+                    cameraSensorOrientation = so != null ? so : 90;
                     break;
                 }
             }
-            if (frontCameraId == null) {
+            if (targetCameraId == null) {
                 // Fall back to first available camera
                 String[] ids = manager.getCameraIdList();
-                if (ids.length > 0) frontCameraId = ids[0];
+                if (ids.length > 0) targetCameraId = ids[0];
             }
-            if (frontCameraId == null) {
+            if (targetCameraId == null) {
                 notifyCameraError("No camera found on this device");
                 return;
             }
 
-            final String cameraId = frontCameraId;
+            final String cameraId = targetCameraId;
             manager.openCamera(cameraId, new CameraDevice.StateCallback() {
                 @Override
                 public void onOpened(@NonNull CameraDevice camera) {
@@ -860,9 +1033,25 @@ public class CompanionActivity extends AppCompatActivity {
             byte[] bytes = new byte[buffer.remaining()];
             buffer.get(bytes);
 
-            // Compress to JPEG at 50% quality
-            Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-            if (bmp != null) {
+            // Decode, rotate, then compress at 50% quality.
+            // Back:  (sO + physOri) % 360  — both compound in the same direction
+            // Front: (sO - physOri + 360) % 360 — the horizontal flip reverses the physOri direction
+            Bitmap raw = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+            if (raw != null) {
+                int rotation = cameraFacingFront
+                    ? (cameraSensorOrientation - physicalOrientation + 360) % 360
+                    : (cameraSensorOrientation + physicalOrientation) % 360;
+                android.graphics.Matrix m = new android.graphics.Matrix();
+                if (rotation != 0) m.postRotate(rotation);
+                // Front cameras capture a mirrored image — flip horizontally to correct it
+                if (cameraFacingFront) m.postScale(-1f, 1f, raw.getWidth() / 2f, raw.getHeight() / 2f);
+                Bitmap bmp;
+                if (!m.isIdentity()) {
+                    bmp = Bitmap.createBitmap(raw, 0, 0, raw.getWidth(), raw.getHeight(), m, true);
+                    raw.recycle();
+                } else {
+                    bmp = raw;
+                }
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 bmp.compress(Bitmap.CompressFormat.JPEG, 50, baos);
                 bmp.recycle();
@@ -902,6 +1091,9 @@ public class CompanionActivity extends AppCompatActivity {
 
         // 1280×720 JPEG — single buffered (only need one frame)
         photoImageReader = ImageReader.newInstance(1280, 720, ImageFormat.JPEG, 1);
+        // Use the listener instead of calling processPhotoCapture() from onCaptureCompleted —
+        // the image buffer may not be written yet when onCaptureCompleted fires.
+        photoImageReader.setOnImageAvailableListener(reader -> processPhotoCapture(), photoHandler);
 
         CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
@@ -911,6 +1103,8 @@ public class CompanionActivity extends AppCompatActivity {
                 Integer facing = ch.get(CameraCharacteristics.LENS_FACING);
                 if (facing != null && facing == CameraCharacteristics.LENS_FACING_BACK) {
                     backCameraId = id;
+                    Integer so = ch.get(CameraCharacteristics.SENSOR_ORIENTATION);
+                    photoSensorOrientation = so != null ? so : 90;
                     break;
                 }
             }
@@ -944,15 +1138,7 @@ public class CompanionActivity extends AppCompatActivity {
                                         try {
                                             session.capture(
                                                 builder.build(),
-                                                new CameraCaptureSession.CaptureCallback() {
-                                                    @Override
-                                                    public void onCaptureCompleted(
-                                                            @NonNull CameraCaptureSession session,
-                                                            @NonNull CaptureRequest request,
-                                                            @NonNull android.hardware.camera2.TotalCaptureResult result) {
-                                                        processPhotoCapture();
-                                                    }
-                                                },
+                                                new CameraCaptureSession.CaptureCallback() {},
                                                 photoHandler);
                                         } catch (CameraAccessException e) {
                                             notifyPhotoError("Photo capture failed: " + e.getMessage());
@@ -1012,9 +1198,19 @@ public class CompanionActivity extends AppCompatActivity {
             byte[] bytes = new byte[buffer.remaining()];
             buffer.get(bytes);
 
-            // 80% quality — higher than face camera (50%) for product identification
-            Bitmap bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
-            if (bmp != null) {
+            // Same formula as grabCameraFrame: (sensorOrientation + physicalOrientation) % 360
+            Bitmap raw = BitmapFactory.decodeByteArray(bytes, 0, bytes.length);
+            if (raw != null) {
+                Bitmap bmp;
+                int rotation = (photoSensorOrientation + physicalOrientation) % 360;
+                if (rotation != 0) {
+                    android.graphics.Matrix m = new android.graphics.Matrix();
+                    m.postRotate(rotation);
+                    bmp = Bitmap.createBitmap(raw, 0, 0, raw.getWidth(), raw.getHeight(), m, true);
+                    raw.recycle();
+                } else {
+                    bmp = raw;
+                }
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 bmp.compress(Bitmap.CompressFormat.JPEG, 80, baos);
                 bmp.recycle();
@@ -1053,6 +1249,19 @@ public class CompanionActivity extends AppCompatActivity {
             photoThread = null;
         }
         photoHandler = null;
+    }
+
+    private void switchCamera() {
+        cameraFacingFront = !cameraFacingFront;
+        boolean wasRunning = cameraRunning;
+        stopCameraCapture();
+        if (wasRunning) startCameraCapture();
+        final boolean front = cameraFacingFront;
+        if (webView != null) {
+            runOnUiThread(() -> webView.evaluateJavascript(
+                "window.__abCamIsFront=" + front + ";" +
+                "window.onCameraSwitch&&window.onCameraSwitch(" + front + ");", null));
+        }
     }
 
     private void notifyPhotoError(String msg) {
@@ -1106,6 +1315,7 @@ public class CompanionActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if (orientationListener != null) orientationListener.disable();
         stopCameraCapture();
         stopPhotoCamera();
         ScreenCaptureService.frameCallback        = null;
@@ -1121,7 +1331,12 @@ public class CompanionActivity extends AppCompatActivity {
         super.finish();
     }
 
+    private boolean isDismissing = false;
+
     private void dismissSelf() {
+        if (isDismissing) return;
+        isDismissing = true;
+
         // Stop screen capture cleanly when the companion is closed
         Intent stopCapture = new Intent(this, ScreenCaptureService.class);
         stopCapture.setAction(ScreenCaptureService.ACTION_STOP);
@@ -1131,14 +1346,24 @@ public class CompanionActivity extends AppCompatActivity {
                 .setPackage(getPackageName()));
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            // finishAndRemoveTask() bypasses our finish() override, so send the bubble-reset broadcast first
+            sendBroadcast(new Intent(ACTION_COMPANION_CLOSED).setPackage(getPackageName()));
             finishAndRemoveTask();
         } else {
-            finish();
+            finish(); // our finish() override sends ACTION_COMPANION_CLOSED
         }
         overridePendingTransition(0, 0);
     }
 
+    @Override
+    protected void onUserLeaveHint() {
+        super.onUserLeaveHint();
+        // User navigated away (home button, tap-outside-non-touch-modal window, etc.) — close cleanly
+        if (!isFinishing()) dismissSelf();
+    }
+
     /** Exposed to JavaScript as window.AndroidBridge */
+    @SuppressWarnings("unused") // all methods called from JS via @JavascriptInterface
     private class AndroidBridge {
         @JavascriptInterface
         public void close() {
@@ -1194,6 +1419,11 @@ public class CompanionActivity extends AppCompatActivity {
             runOnUiThread(() -> CompanionActivity.this.takePhoto());
         }
 
+        @JavascriptInterface
+        public void switchCamera() {
+            runOnUiThread(() -> CompanionActivity.this.switchCamera());
+        }
+
         /**
          * Called from JS when a /api/companion fetch starts (active=true) or completes
          * (active=false). Broadcasts to FloatingBubbleService so it can animate the bubble.
@@ -1224,6 +1454,28 @@ public class CompanionActivity extends AppCompatActivity {
             intent.putExtra(FloatingBubbleService.EXTRA_NAME, sanitised);
             intent.setPackage(getPackageName());
             sendBroadcast(intent);
+        }
+
+        /**
+         * Called from the electronAPI shim when the companion starts or stops speaking.
+         * Broadcasts to FloatingBubbleService to drive lip-sync animation and speech bubble.
+         */
+        @JavascriptInterface
+        public void setSpeaking(boolean active, String text) {
+            Intent intent = new Intent(FloatingBubbleService.ACTION_BUBBLE_SPEAKING);
+            intent.putExtra(FloatingBubbleService.EXTRA_SPEAKING_ACTIVE, active);
+            intent.putExtra(FloatingBubbleService.EXTRA_SPEAKING_TEXT, text != null ? text : "");
+            intent.setPackage(getPackageName());
+            sendBroadcast(intent);
+            // While TTS is playing, mute the SpeechRecognition so the mic can't
+            // pick up Based's own voice and trigger a second overlapping response.
+            if (webView != null) {
+                final String js = active
+                    ? "window.__abSpeakingActive=true;" +
+                      "if(window.__abActiveSR){try{window.__abActiveSR.abort();}catch(e){}window.__abActiveSR=null;}"
+                    : "window.__abSpeakingActive=false;";
+                runOnUiThread(() -> webView.evaluateJavascript(js, null));
+            }
         }
 
         /**

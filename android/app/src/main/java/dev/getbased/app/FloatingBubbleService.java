@@ -32,6 +32,7 @@ import android.view.animation.AccelerateInterpolator;
 import android.view.animation.LinearInterpolator;
 import android.view.animation.OvershootInterpolator;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 public class FloatingBubbleService extends Service {
@@ -48,6 +49,17 @@ public class FloatingBubbleService extends Service {
     static final String  EXTRA_NAME          = "name";
     static String        companionName       = "Based";
 
+    // ── Speaking state broadcast ───────────────────────────────────────────────
+    static final String ACTION_BUBBLE_SPEAKING = "dev.getbased.app.BUBBLE_SPEAKING";
+    static final String EXTRA_SPEAKING_ACTIVE  = "speaking";
+    static final String EXTRA_SPEAKING_TEXT    = "text";
+
+    // ── Proactive engine ───────────────────────────────────────────────────────
+    private static final long PROACTIVE_INTERVAL_MS = 3L * 60 * 1000;
+    private static final long MIN_IDLE_MS            = 60L * 1000;
+    private static final long MAX_IDLE_MS            = 30L * 60 * 1000;
+    private static final long MIN_TRIGGER_GAP_MS     = 2L * 60 * 60 * 1000;
+
     // ── Feature 8: Evolution tracking ─────────────────────────────────────────
     private static final String PREFS_NAME          = "based_prefs";
     private static final String KEY_FIRST_LAUNCH    = "based_first_launch";
@@ -58,7 +70,11 @@ public class FloatingBubbleService extends Service {
     private View          bubbleView;       // outer container (added to WindowManager)
     private FrameLayout   bubbleCircle;     // inner circle FrameLayout (holds background + tint)
     private TextView      bubbleLabel;
-    private TextView      nameLabel;        // Feature 7 — name shown under bubble icon
+    private ImageView     logoView;
+    private View          blinkView;
+    private final android.os.Handler blinkHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final java.util.Random   blinkRandom  = new java.util.Random();
+    private TextView      nameLabel;        // Feature 7 — name shown under bubble icon (hidden)
     private TextView      crownLabel;       // Feature 8 stage 6 — crown decoration
     private View          outerRing;        // Feature 8 stage 2+ — outer pulsing ring
     private boolean       companionOpen       = false;
@@ -70,6 +86,22 @@ public class FloatingBubbleService extends Service {
     private int     strokeWidthDp    = 2;        // bubble border stroke
     private String  strokeColorIdle  = "#e0e0e0"; // idle stroke colour
     private boolean outerRingVisible = false;    // whether outer ring is shown
+
+    // ── Proactive engine ───────────────────────────────────────────────────────
+    private long lastInteractionTime  = System.currentTimeMillis();
+    private long lastProactiveTrigger = 0L;
+    private final android.os.Handler proactiveHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+
+    // ── Speaking state ─────────────────────────────────────────────────────────
+    private boolean      isSpeaking      = false;
+    private AnimatorSet  lipSyncAnimator;
+
+    // ── Speech bubble overlay ──────────────────────────────────────────────────
+    private TextView                  speechBubbleView;
+    private WindowManager.LayoutParams speechBubbleParams;
+    private boolean                   speechBubbleAdded = false;
+    private WindowManager.LayoutParams bubbleWinParams;
 
     // ── Animation state ────────────────────────────────────────────────────────
     private AnimatorSet breathingAnimator;   // idle breathing pulse (anim 1)
@@ -102,9 +134,6 @@ public class FloatingBubbleService extends Service {
         public void onReceive(Context context, Intent intent) {
             if (CompanionActivity.ACTION_COMPANION_CLOSED.equals(intent.getAction())) {
                 companionOpen = false;
-                if (bubbleLabel != null) {
-                    bubbleLabel.setText("B");
-                }
             }
         }
     };
@@ -141,6 +170,30 @@ public class FloatingBubbleService extends Service {
                         nameLabel.setText(companionName);
                     }
                 }
+            }
+        }
+    };
+
+    // ── Speaking receiver ─────────────────────────────────────────────────────
+    private final BroadcastReceiver speakingReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (ACTION_BUBBLE_SPEAKING.equals(intent.getAction())) {
+                boolean active = intent.getBooleanExtra(EXTRA_SPEAKING_ACTIVE, false);
+                String text    = intent.getStringExtra(EXTRA_SPEAKING_TEXT);
+                if (active) startSpeakingState(text);
+                else        stopSpeakingState();
+            }
+        }
+    };
+
+    // ── Proactive runnable ────────────────────────────────────────────────────
+    private final Runnable proactiveRunnable = new Runnable() {
+        @Override
+        public void run() {
+            if (!isDestroyed) {
+                checkProactiveTrigger();
+                proactiveHandler.postDelayed(this, PROACTIVE_INTERVAL_MS);
             }
         }
     };
@@ -194,6 +247,15 @@ public class FloatingBubbleService extends Service {
             registerReceiver(nameUpdateReceiver, nameFilter);
         }
 
+        IntentFilter speakingFilter = new IntentFilter(ACTION_BUBBLE_SPEAKING);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(speakingReceiver, speakingFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(speakingReceiver, speakingFilter);
+        }
+
+        proactiveHandler.postDelayed(proactiveRunnable, PROACTIVE_INTERVAL_MS);
+
         addBubble();
         // ── Feature 8: apply evolution BEFORE animations start ────────────────
         applyEvolutionStage(daysActive);
@@ -227,6 +289,12 @@ public class FloatingBubbleService extends Service {
         try { unregisterReceiver(screenCaptureReceiver);   } catch (Exception ignored) {}
         try { unregisterReceiver(thinkingReceiver);        } catch (Exception ignored) {}
         try { unregisterReceiver(nameUpdateReceiver);      } catch (Exception ignored) {}
+        try { unregisterReceiver(speakingReceiver);        } catch (Exception ignored) {}
+        proactiveHandler.removeCallbacks(proactiveRunnable);
+        blinkHandler.removeCallbacksAndMessages(null);
+        cancelLipSync();
+        hideSpeechBubble();
+        isSpeaking = false;
 
         if (bubbleView != null) {
             try { windowManager.removeView(bubbleView); } catch (Exception ignored) {}
@@ -266,10 +334,7 @@ public class FloatingBubbleService extends Service {
 
     private void addBubble() {
         int sizePx = dpToPx(BUBBLE_SIZE_DP);
-        // Extra height to accommodate the name label below the bubble circle.
-        // Name label is ~14sp tall (~20dp) + 2dp gap = 22dp extra below bubble.
-        int nameLabelHeightDp = 22;
-        int totalHeightPx = sizePx + dpToPx(nameLabelHeightDp);
+        int totalHeightPx = sizePx;
 
         // ── Root container: bubble circle + name label + optional decorations ─
         FrameLayout container = new FrameLayout(this);
@@ -298,16 +363,47 @@ public class FloatingBubbleService extends Service {
         android.graphics.drawable.GradientDrawable circle =
                 new android.graphics.drawable.GradientDrawable();
         circle.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        circle.setColor(Color.parseColor("#0a0a0f"));
-        circle.setStroke(dpToPx(strokeWidthDp), Color.parseColor(strokeColorIdle));
+        circle.setColor(Color.TRANSPARENT); // no dark fill — PNG provides its own bg
+        circle.setStroke(0, Color.TRANSPARENT); // no border ring
         bubbleCircle.setBackground(circle);
+        // Clip the logo PNG to a circle so no square corners bleed out
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            bubbleCircle.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+            bubbleCircle.setClipToOutline(true);
+        }
 
+        // Strip dark pixels from PNG so only the gold hexagon outline + eye float transparently
+        logoView = new ImageView(this);
+        android.graphics.Bitmap rawLogo = android.graphics.BitmapFactory.decodeResource(
+                getResources(), R.drawable.based_logo);
+        logoView.setImageBitmap(makeExteriorTransparent(rawLogo, 80));
+        rawLogo.recycle();
+        logoView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        bubbleCircle.addView(logoView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT));
+
+        // Blink eyelid — dark strip matching hexagon interior, drops over ONLY the eye
+        // Eye sits at ~52% from top of the 56dp bubble; strip expands downward from eye top
+        blinkView = new View(this);
+        blinkView.setBackgroundColor(Color.parseColor("#09080e")); // matches hexagon interior dark — covers the gold eye
+        blinkView.setScaleY(0f);
+        blinkView.setPivotY(0f); // expand downward from the top edge (like an eyelid dropping)
+        FrameLayout.LayoutParams blinkParams = new FrameLayout.LayoutParams(dpToPx(18), dpToPx(8));
+        blinkParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        blinkParams.topMargin = (int) (sizePx * 0.46f); // top of eye area
+        bubbleCircle.addView(blinkView, blinkParams);
+
+        scheduleBlink();
+
+        // bubbleLabel is kept for potential future use but hidden
         bubbleLabel = new TextView(this);
-        bubbleLabel.setText("B");
+        bubbleLabel.setText("✕");
         bubbleLabel.setTextColor(Color.parseColor("#e0e0e0"));
         bubbleLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 20);
         bubbleLabel.setTypeface(null, Typeface.BOLD);
         bubbleLabel.setGravity(Gravity.CENTER);
+        bubbleLabel.setVisibility(View.GONE);
         bubbleCircle.addView(bubbleLabel, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT));
@@ -316,23 +412,8 @@ public class FloatingBubbleService extends Service {
         bubbleParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
         container.addView(bubbleCircle, bubbleParams);
 
-        // ── Feature 7: companion name label ───────────────────────────────────
+        // Feature 7: nameLabel kept as a field (referenced elsewhere) but not shown
         nameLabel = new TextView(this);
-        nameLabel.setText(companionName);
-        nameLabel.setTextColor(Color.WHITE);
-        nameLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 9);
-        nameLabel.setGravity(Gravity.CENTER);
-        nameLabel.setSingleLine(true);
-        nameLabel.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        nameLabel.setMaxWidth(sizePx);
-        // Text shadow for readability over any background: offsetX, offsetY, radius, colour
-        nameLabel.setShadowLayer(2f, 0f, 1f, Color.argb(180, 0, 0, 0));
-
-        FrameLayout.LayoutParams nameLabelParams = new FrameLayout.LayoutParams(
-                sizePx, FrameLayout.LayoutParams.WRAP_CONTENT);
-        nameLabelParams.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
-        nameLabelParams.bottomMargin = 0;
-        container.addView(nameLabel, nameLabelParams);
 
         // ── Feature 8 stage 6: crown label (hidden until stage 6) ────────────
         crownLabel = new TextView(this);
@@ -358,6 +439,7 @@ public class FloatingBubbleService extends Service {
         params.gravity = Gravity.TOP | Gravity.START;
         params.x = dpToPx(16);
         params.y = dpToPx(200);
+        bubbleWinParams = params;
 
         container.setOnTouchListener(new View.OnTouchListener() {
             private float initialTouchX, initialTouchY;
@@ -386,6 +468,13 @@ public class FloatingBubbleService extends Service {
                         params.x = initialParamsX + (int) dx;
                         params.y = initialParamsY + (int) dy;
                         windowManager.updateViewLayout(bubbleView, params);
+                        if (speechBubbleAdded && speechBubbleView != null && speechBubbleParams != null) {
+                            int bw = dpToPx(180);
+                            speechBubbleParams.x = params.x - (bw - sizePx) / 2;
+                            speechBubbleParams.y = Math.max(0, params.y - dpToPx(90));
+                            try { windowManager.updateViewLayout(speechBubbleView, speechBubbleParams); }
+                            catch (Exception ignored) {}
+                        }
                         return true;
 
                     case MotionEvent.ACTION_UP:
@@ -536,19 +625,107 @@ public class FloatingBubbleService extends Service {
     // ── Companion open/close ───────────────────────────────────────────────────
 
     private void openCompanion() {
+        lastInteractionTime = System.currentTimeMillis();
         companionOpen = true;
-        bubbleLabel.setText("✕");
+        hideSpeechBubble();
         Intent intent = new Intent(this, CompanionActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
         startActivity(intent);
     }
 
     private void closeCompanion() {
+        lastInteractionTime = System.currentTimeMillis();
         companionOpen = false;
-        bubbleLabel.setText("B");
         Intent closeIntent = new Intent(CompanionActivity.ACTION_CLOSE_REQUEST);
         closeIntent.setPackage(getPackageName());
         sendBroadcast(closeIntent);
+    }
+
+    // ── Logo helpers ──────────────────────────────────────────────────────────
+
+    // Flood-fills from every edge pixel outward, making exterior dark pixels transparent.
+    // The gold hexagon outline acts as a wall — interior dark pixels are never reached,
+    // so they keep their colour. Result: transparent outside, dark inside the hexagon.
+    private android.graphics.Bitmap makeExteriorTransparent(android.graphics.Bitmap src, int threshold) {
+        android.graphics.Bitmap out = src.copy(android.graphics.Bitmap.Config.ARGB_8888, true);
+        int w = out.getWidth(), h = out.getHeight();
+        int[] px = new int[w * h];
+        out.getPixels(px, 0, w, 0, 0, w, h);
+
+        boolean[] visited = new boolean[w * h];
+        java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>();
+
+        // Seed: all edge pixels that are dark are definitely exterior
+        for (int x = 0; x < w; x++) {
+            seedEdge(px, visited, queue, x, 0,     w, threshold);
+            seedEdge(px, visited, queue, x, h - 1, w, threshold);
+        }
+        for (int y = 1; y < h - 1; y++) {
+            seedEdge(px, visited, queue, 0,     y, w, threshold);
+            seedEdge(px, visited, queue, w - 1, y, w, threshold);
+        }
+
+        // BFS: spread through connected dark pixels
+        while (!queue.isEmpty()) {
+            int idx = queue.poll();
+            px[idx] = Color.TRANSPARENT;
+            int x = idx % w, y = idx / w;
+            if (x > 0)     tryEnqueue(px, visited, queue, idx - 1,     threshold);
+            if (x < w - 1) tryEnqueue(px, visited, queue, idx + 1,     threshold);
+            if (y > 0)     tryEnqueue(px, visited, queue, idx - w,     threshold);
+            if (y < h - 1) tryEnqueue(px, visited, queue, idx + w,     threshold);
+        }
+
+        out.setPixels(px, 0, w, 0, 0, w, h);
+        return out;
+    }
+
+    private void seedEdge(int[] px, boolean[] visited, java.util.ArrayDeque<Integer> q,
+                          int x, int y, int w, int threshold) {
+        int idx = y * w + x;
+        if (!visited[idx] && isDarkPixel(px[idx], threshold)) {
+            visited[idx] = true;
+            q.add(idx);
+        }
+    }
+
+    private void tryEnqueue(int[] px, boolean[] visited, java.util.ArrayDeque<Integer> q,
+                            int idx, int threshold) {
+        if (!visited[idx] && isDarkPixel(px[idx], threshold)) {
+            visited[idx] = true;
+            q.add(idx);
+        }
+    }
+
+    private boolean isDarkPixel(int color, int threshold) {
+        return Color.red(color) < threshold
+                && Color.green(color) < threshold
+                && Color.blue(color) < threshold;
+    }
+
+    // ── Blink animation ───────────────────────────────────────────────────────
+
+    private void scheduleBlink() {
+        blinkHandler.postDelayed(() -> {
+            if (isDestroyed || blinkView == null) return;
+            // Reset logoView scale in case a previous animation left it stuck
+            if (logoView != null) logoView.setScaleY(1f);
+            // Eyelid drops (scaleY 0→1): fast close
+            ObjectAnimator close = ObjectAnimator.ofFloat(blinkView, "scaleY", 0f, 1f);
+            close.setDuration(150);
+            close.setInterpolator(new AccelerateInterpolator());
+            // Hold fully closed
+            ObjectAnimator hold = ObjectAnimator.ofFloat(blinkView, "scaleY", 1f, 1f);
+            hold.setDuration(60);
+            // Eyelid rises (scaleY 1→0): lazy open
+            ObjectAnimator open = ObjectAnimator.ofFloat(blinkView, "scaleY", 1f, 0f);
+            open.setDuration(200);
+            open.setInterpolator(new android.view.animation.DecelerateInterpolator());
+            AnimatorSet blink = new AnimatorSet();
+            blink.playSequentially(close, hold, open);
+            blink.start();
+            scheduleBlink();
+        }, 2500L + blinkRandom.nextInt(2000)); // random 2.5 – 4.5 s
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -671,6 +848,8 @@ public class FloatingBubbleService extends Service {
         cancelGlow();
         cancelRipple();
         cancelOuterRing();
+        cancelLipSync();
+        hideSpeechBubble();
 
         // Read actual current scale so there's no one-frame snap if an animation
         // was cancelled mid-flight (e.g. breathing at 1.07f, thinking glow at 1.12f).
@@ -703,6 +882,143 @@ public class FloatingBubbleService extends Service {
             }
         });
         exitAnimator.start();
+    }
+
+    // ── Proactive engine ──────────────────────────────────────────────────────
+
+    private void checkProactiveTrigger() {
+        if (companionOpen) { lastInteractionTime = System.currentTimeMillis(); return; }
+
+        android.os.PowerManager pm = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
+        if (pm != null && !pm.isInteractive()) return;
+
+        long now = System.currentTimeMillis();
+        long idleMs = now - lastInteractionTime;
+        if (idleMs < MIN_IDLE_MS || idleMs > MAX_IDLE_MS) return;
+        if (now - lastProactiveTrigger < MIN_TRIGGER_GAP_MS) return;
+
+        java.util.Calendar cal = java.util.Calendar.getInstance(
+                java.util.TimeZone.getTimeZone("Asia/Singapore"));
+        int hour = cal.get(java.util.Calendar.HOUR_OF_DAY);
+        if (hour < 7 || hour >= 23) return;
+
+        lastProactiveTrigger = now;
+        String context = hour < 12 ? "morning" : hour < 17 ? "afternoon" : hour < 21 ? "evening" : "night";
+
+        Intent intent = new Intent(FloatingBubbleService.this, CompanionActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+        intent.putExtra("PROACTIVE_CONTEXT", context);
+        startActivity(intent);
+    }
+
+    // ── Speaking state ────────────────────────────────────────────────────────
+
+    private void startSpeakingState(String text) {
+        lastInteractionTime = System.currentTimeMillis();
+        if (!isSpeaking) {
+            isSpeaking = true;
+            // If thinking is active, clear it so lip-sync takes over
+            if (isThinking) {
+                cancelGlow();
+                if (bubbleCircle != null) {
+                    bubbleCircle.getBackground().clearColorFilter();
+                    bubbleCircle.setLayerType(View.LAYER_TYPE_NONE, null);
+                }
+            }
+            startLipSync();
+        }
+        if (!companionOpen && text != null && !text.isEmpty()) {
+            showSpeechBubble(text);
+        }
+    }
+
+    private void stopSpeakingState() {
+        if (!isSpeaking) return;
+        isSpeaking = false;
+        cancelLipSync();
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            if (!isSpeaking) hideSpeechBubble();
+        }, 1000);
+        if (!isThinking) resumeBreathing();
+    }
+
+    // ── Anim 5b: Lip-sync animation ───────────────────────────────────────────
+
+    private void startLipSync() {
+        if (isDestroyed || bubbleView == null) return;
+        cancelLipSync();
+        pauseBreathing();
+
+        // Mirror Electron's lip-sync keyframes: 1→1.14→0.97→1.10→1 at 500ms
+        ObjectAnimator x = ObjectAnimator.ofFloat(bubbleView, "scaleX", 1f, 1.14f, 0.97f, 1.1f, 1f);
+        ObjectAnimator y = ObjectAnimator.ofFloat(bubbleView, "scaleY", 1f, 1.14f, 0.97f, 1.1f, 1f);
+        x.setDuration(500);
+        y.setDuration(500);
+        x.setRepeatCount(ObjectAnimator.INFINITE);
+        y.setRepeatCount(ObjectAnimator.INFINITE);
+        x.setInterpolator(new AccelerateDecelerateInterpolator());
+        y.setInterpolator(new AccelerateDecelerateInterpolator());
+
+        lipSyncAnimator = new AnimatorSet();
+        lipSyncAnimator.playTogether(x, y);
+        lipSyncAnimator.start();
+    }
+
+    private void cancelLipSync() {
+        if (lipSyncAnimator != null) {
+            lipSyncAnimator.cancel();
+            lipSyncAnimator = null;
+        }
+    }
+
+    // ── Speech bubble overlay ─────────────────────────────────────────────────
+
+    private void showSpeechBubble(String text) {
+        if (bubbleWinParams == null) return;
+        String display = text.length() > 120 ? text.substring(0, 117) + "…" : text;
+
+        if (!speechBubbleAdded) {
+            speechBubbleView = new TextView(this);
+            speechBubbleView.setTextColor(Color.parseColor("#c9a87c"));
+            speechBubbleView.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+            speechBubbleView.setLineSpacing(0f, 1.4f);
+            speechBubbleView.setPadding(dpToPx(10), dpToPx(8), dpToPx(10), dpToPx(8));
+
+            android.graphics.drawable.GradientDrawable bg = new android.graphics.drawable.GradientDrawable();
+            bg.setShape(android.graphics.drawable.GradientDrawable.RECTANGLE);
+            bg.setColor(Color.parseColor("#0e0c17"));
+            bg.setCornerRadius(dpToPx(10));
+            bg.setStroke(dpToPx(1), Color.parseColor("#c9a87c"));
+            speechBubbleView.setBackground(bg);
+
+            int sizePx = dpToPx(BUBBLE_SIZE_DP);
+            int bubbleW = dpToPx(180);
+            speechBubbleParams = new WindowManager.LayoutParams(
+                    bubbleW,
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                        | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+                    PixelFormat.TRANSLUCENT);
+            speechBubbleParams.gravity = Gravity.TOP | Gravity.START;
+            speechBubbleParams.x = bubbleWinParams.x - (bubbleW - sizePx) / 2;
+            speechBubbleParams.y = Math.max(0, bubbleWinParams.y - dpToPx(90));
+
+            windowManager.addView(speechBubbleView, speechBubbleParams);
+            speechBubbleAdded = true;
+        } else {
+            speechBubbleView.setText(display);
+            return;
+        }
+
+        speechBubbleView.setText(display);
+    }
+
+    private void hideSpeechBubble() {
+        if (!speechBubbleAdded || speechBubbleView == null) return;
+        try { windowManager.removeView(speechBubbleView); } catch (Exception ignored) {}
+        speechBubbleView  = null;
+        speechBubbleAdded = false;
     }
 
     // ── Anim 3: Tap ripple ────────────────────────────────────────────────────
@@ -804,12 +1120,12 @@ public class FloatingBubbleService extends Service {
             bubbleCircle.setLayerType(View.LAYER_TYPE_NONE, null);
         }
         if (bubbleView != null) {
-            // Reset scale to 1.0 cleanly before resuming breathing
+            // Reset scale to 1.0 cleanly before resuming animation
             bubbleView.setScaleX(1f);
             bubbleView.setScaleY(1f);
         }
 
-        resumeBreathing();
+        if (isSpeaking) startLipSync(); else resumeBreathing();
     }
 
     private void cancelGlow() {
@@ -826,11 +1142,14 @@ public class FloatingBubbleService extends Service {
         android.graphics.drawable.GradientDrawable circle =
                 new android.graphics.drawable.GradientDrawable();
         circle.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        circle.setColor(Color.parseColor("#0a0a0f"));
-        // Screen-capture active overrides stage idle stroke with amber signal.
-        String strokeColor = screenCaptureActive ? "#f59e0b" : strokeColorIdle;
-        circle.setStroke(dpToPx(strokeWidthDp), Color.parseColor(strokeColor));
+        circle.setColor(Color.TRANSPARENT); // no dark fill — logo PNG provides background
+        circle.setStroke(0, Color.TRANSPARENT); // no border ring
         bubbleCircle.setBackground(circle);
+        // Re-apply clip so the logo PNG stays clipped to the oval after background swap
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            bubbleCircle.setOutlineProvider(android.view.ViewOutlineProvider.BACKGROUND);
+            bubbleCircle.setClipToOutline(true);
+        }
 
         // Re-apply tint if currently thinking (background was just replaced)
         if (isThinking) {
