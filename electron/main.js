@@ -433,7 +433,8 @@ app.whenReady().then(async () => {
     });
   }
 
-  // Win32 focus+paste helper — finds window by title filter, force-focuses it, sends Ctrl+V
+  // Win32 paste helper — finds window by title, sends WM_PASTE directly (no focus needed),
+  // then falls back to focus+SendKeys for apps that ignore WM_PASTE.
   const WIN32_SRC = path.join(TMP, 'based_win32.cs');
   const WIN32_EXE = path.join(TMP, 'based_win32.exe');
   fs.writeFileSync(WIN32_SRC, [
@@ -449,6 +450,10 @@ app.whenReady().then(async () => {
     '  [DllImport("user32.dll")] static extern bool AttachThreadInput(uint a,uint b,bool f);',
     '  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);',
     '  [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();',
+    '  [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h,int cmd);',
+    '  [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);',
+    '  [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l);',
+    '  [DllImport("user32.dll")] static extern IntPtr FindWindowEx(IntPtr p,IntPtr a,string c,string t);',
     '  static IntPtr Find(string q) {',
     '    for(IntPtr h=GetTopWindow(IntPtr.Zero);h!=IntPtr.Zero;h=GetWindow(h,2u)){',
     '      if(!IsWindowVisible(h))continue;',
@@ -468,6 +473,16 @@ app.whenReady().then(async () => {
     '  [STAThread] static void Main(string[] a){',
     '    string q=a.Length>0?a[0]:"";IntPtr h=Find(q);',
     '    if(h==IntPtr.Zero){Console.Error.WriteLine("window not found: "+q);Environment.Exit(1);}',
+    '    if(IsIconic(h))ShowWindow(h,9);',
+    '    const uint WM_PASTE=0x0302;',
+    '    // Primary: post WM_PASTE to main window and common edit child classes — no focus needed.',
+    '    PostMessage(h,WM_PASTE,IntPtr.Zero,IntPtr.Zero);',
+    '    foreach(var cls in new[]{"Edit","RichEdit20W","RICHEDIT50W","RichEditD2DPT","Scintilla"}){',
+    '      IntPtr ch=FindWindowEx(h,IntPtr.Zero,cls,null);',
+    '      if(ch!=IntPtr.Zero){PostMessage(ch,WM_PASTE,IntPtr.Zero,IntPtr.Zero);break;}',
+    '    }',
+    '    Thread.Sleep(150);',
+    '    // Fallback: focus + keyboard shortcut for apps that handle Ctrl+V but not WM_PASTE.',
     '    Focus(h);Thread.Sleep(300);SendKeys.SendWait("^v");',
     '  }',
     '}',
@@ -511,13 +526,20 @@ app.whenReady().then(async () => {
   const win32Ready = compileExe(WIN32_SRC, WIN32_EXE, ['System.Windows.Forms.dll']);
   const audioReady = compileExe(AUDIO_SRC, AUDIO_EXE, null);
 
-  // Type text: write to clipboard, run win32 exe to find+focus target window, paste.
+  // Type text: hide overlay → write clipboard → run Win32 exe → restore.
+  // Hiding the overlay removes it from the focus stack so target window gets focus cleanly.
   // target = window title filter (e.g. 'Notepad', 'Chrome'). Empty = front non-Based window.
   ipcMain.handle('system:type-text', async (_, text, target) => {
     const prev = clipboard.readText();
     clipboard.writeText(String(text));
+
+    // Hide overlay so it doesn't compete for focus while the exe pastes.
+    const wasVisible = overlayWin?.isVisible?.() ?? false;
+    if (overlayWin && wasVisible) overlayWin.hide();
+
     const ready = await win32Ready;
     if (!ready) {
+      if (overlayWin && wasVisible) overlayWin.show();
       setTimeout(() => clipboard.writeText(prev), 500);
       return 'error: win32 helper not compiled';
     }
@@ -534,7 +556,10 @@ app.whenReady().then(async () => {
     } catch (e) {
       result = `error: ${e.message}`;
     }
-    setTimeout(() => clipboard.writeText(prev), 1200);
+    // Wait for paste to complete before restoring overlay and clipboard.
+    await new Promise(r => setTimeout(r, 600));
+    clipboard.writeText(prev);
+    if (overlayWin && wasVisible) overlayWin.show();
     return result;
   });
 

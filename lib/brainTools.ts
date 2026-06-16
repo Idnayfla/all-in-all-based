@@ -319,7 +319,8 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
       properties: {
         app_name: {
           type: 'string',
-          description: 'App name as it appears in PATH or Start Menu, e.g. "notepad", "spotify", "code".',
+          description:
+            'App name as it appears in PATH or Start Menu, e.g. "notepad", "spotify", "code".',
         },
       },
       required: ['app_name'],
@@ -328,12 +329,16 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
   {
     name: 'type_text',
     description:
-      "Type text into a specific app window. Use when the user says 'type this in Notepad', 'write this in VS Code', 'type for me', etc. Pass target as the app or window name the user mentioned.",
+      "Type text into a specific app window. Use when the user says 'type this in Notepad', 'write this in VS Code', 'type for me', etc. Pass target as the app or window name the user mentioned. CRITICAL: 'notepad' or 'the notepad' always means the Windows Notepad desktop app (target='Notepad'), NEVER Google Keep, Notion, or any browser tab — even if you can see those on screen.",
     input_schema: {
       type: 'object',
       properties: {
         text: { type: 'string', description: 'The exact text to type.' },
-        target: { type: 'string', description: "Window title to search for, e.g. 'Notepad', 'Chrome', 'VS Code'. Leave empty to use the front non-Based window." },
+        target: {
+          type: 'string',
+          description:
+            "Window title to search for, e.g. 'Notepad', 'Chrome', 'VS Code'. Leave empty to use the front non-Based window. CRITICAL: when user says 'notepad', always pass 'Notepad' here — it means the Windows desktop app, not a browser tab.",
+        },
       },
       required: ['text'],
     },

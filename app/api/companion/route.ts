@@ -751,6 +751,7 @@ export async function POST(req: NextRequest) {
       `- For brain/memory cleanup, call rewrite_memory with the cleaned list.`,
       `- "open [url/website]" → call open_url. "launch [app]" or "open [app]" → call launch_app.`,
       `- "type this for me" or "write this" → call type_text with the exact text.`,
+      `- CRITICAL: "notepad" or "the notepad" ALWAYS means the Windows Notepad desktop app (target="Notepad"). NEVER use Google Keep, Notion, or any browser tab as the target even if you can see one on screen. Only use a browser-based note app if the user explicitly names it (e.g. "Google Keep", "Notion").`,
       `- "copy [text] to clipboard" or "put [text] in my clipboard" → call write_clipboard.`,
       `- "set volume to X" / "mute" (level 0) / "full volume" (level 100) → call set_volume.`,
       schedPrefsContext,
