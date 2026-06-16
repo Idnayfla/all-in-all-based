@@ -18,7 +18,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // System control
   openUrl: (url) => ipcRenderer.invoke('system:open-url', url),
   launchApp: (appName) => ipcRenderer.invoke('system:launch-app', appName),
-  typeText: (text) => ipcRenderer.invoke('system:type-text', text),
+  typeText: (text, target) => ipcRenderer.invoke('system:type-text', text, target),
   clipboardRead: () => ipcRenderer.invoke('system:clipboard-read'),
   clipboardWrite: (text) => ipcRenderer.invoke('system:clipboard-write', text),
   getVolume: () => ipcRenderer.invoke('system:get-volume'),

@@ -417,77 +417,124 @@ app.whenReady().then(async () => {
     });
   });
 
-  // Win32 helper — finds the front non-Based window and force-focuses it.
-  // Written as a real .cs file (CRLF) so Add-Type -Path avoids heredoc parsing issues.
-  const WIN32_CS_PATH = path.join(os.tmpdir(), 'based_win32.cs');
-  fs.writeFileSync(
-    WIN32_CS_PATH,
-    [
-      'using System;',
-      'using System.Runtime.InteropServices;',
-      'using System.Text;',
-      'public class Win32Helper {',
-      '  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);',
-      '  [DllImport("user32.dll", CharSet=CharSet.Auto)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);',
-      '  [DllImport("user32.dll")] static extern IntPtr GetTopWindow(IntPtr h);',
-      '  [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint cmd);',
-      '  [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int idx);',
-      '  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);',
-      '  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();',
-      '  [DllImport("user32.dll")] static extern bool AttachThreadInput(uint a, uint b, bool attach);',
-      '  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);',
-      '  [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();',
-      '  public static IntPtr FindFrontWindow() {',
-      '    IntPtr h = GetTopWindow(IntPtr.Zero);',
-      '    while (h != IntPtr.Zero) {',
-      '      if (IsWindowVisible(h) && (GetWindowLong(h, -20) & 8) == 0) {',
-      '        var sb = new StringBuilder(256);',
-      '        GetWindowText(h, sb, 256);',
-      '        var t = sb.ToString().Trim();',
-      '        if (t.Length > 0 && !t.Contains("Based") && !t.Contains("Default IME") && !t.Contains("MSCTFIME UI")) return h;',
-      '      }',
-      '      h = GetWindow(h, 2u);',
-      '    }',
-      '    return IntPtr.Zero;',
-      '  }',
-      '  public static void FocusWindow(IntPtr target) {',
-      '    IntPtr fg = GetForegroundWindow();',
-      '    uint dummy;',
-      '    uint fgTid = GetWindowThreadProcessId(fg, out dummy);',
-      '    uint tgTid = GetWindowThreadProcessId(target, out dummy);',
-      '    uint myTid = GetCurrentThreadId();',
-      '    AttachThreadInput(myTid, fgTid, true);',
-      '    AttachThreadInput(myTid, tgTid, true);',
-      '    SetForegroundWindow(target);',
-      '    AttachThreadInput(myTid, tgTid, false);',
-      '    AttachThreadInput(myTid, fgTid, false);',
-      '  }',
-      '}',
-    ].join('\r\n'),
-    'utf8'
-  );
+  // Compile native helper exes once at startup using the built-in .NET Framework csc.exe.
+  // This replaces all PowerShell Add-Type approaches which had heredoc/line-ending issues.
+  const CSC = 'C:\\Windows\\Microsoft.NET\\Framework64\\v4.0.30319\\csc.exe';
+  const TMP = os.tmpdir();
 
-  // Type text at the current cursor position.
-  // Writes to clipboard, then uses Win32 to find and force-focus the front non-Based window,
-  // then pastes with Ctrl+V — no overlay hide/show, no focus guessing.
-  ipcMain.handle('system:type-text', async (_, text) => {
+  function compileExe(src, exePath, refs) {
+    return new Promise(resolve => {
+      const args = ['/nologo', '/target:exe', `/out:${exePath}`, src];
+      if (refs) refs.forEach(r => args.splice(3, 0, `/r:${r}`));
+      execFile(CSC, args, (err, _out, stderr) => {
+        if (err) console.error(`[Based] compile ${path.basename(exePath)} failed:`, stderr || err.message);
+        resolve(!err);
+      });
+    });
+  }
+
+  // Win32 focus+paste helper — finds window by title filter, force-focuses it, sends Ctrl+V
+  const WIN32_SRC = path.join(TMP, 'based_win32.cs');
+  const WIN32_EXE = path.join(TMP, 'based_win32.exe');
+  fs.writeFileSync(WIN32_SRC, [
+    'using System; using System.Runtime.InteropServices; using System.Text; using System.Threading; using System.Windows.Forms;',
+    'class W {',
+    '  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);',
+    '  [DllImport("user32.dll",CharSet=CharSet.Auto)] static extern int GetWindowText(IntPtr h,StringBuilder s,int n);',
+    '  [DllImport("user32.dll")] static extern IntPtr GetTopWindow(IntPtr h);',
+    '  [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h,uint c);',
+    '  [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h,int i);',
+    '  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);',
+    '  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();',
+    '  [DllImport("user32.dll")] static extern bool AttachThreadInput(uint a,uint b,bool f);',
+    '  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);',
+    '  [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();',
+    '  static IntPtr Find(string q) {',
+    '    for(IntPtr h=GetTopWindow(IntPtr.Zero);h!=IntPtr.Zero;h=GetWindow(h,2u)){',
+    '      if(!IsWindowVisible(h))continue;',
+    '      var s=new StringBuilder(256);GetWindowText(h,s,256);var t=s.ToString().Trim();',
+    '      if(t.Length==0)continue;',
+    '      if(q.Length>0){if(t.IndexOf(q,StringComparison.OrdinalIgnoreCase)>=0)return h;}',
+    '      else if((GetWindowLong(h,-20)&8)==0&&t.IndexOf("Based",StringComparison.Ordinal)<0&&t.IndexOf("Default IME",StringComparison.Ordinal)<0)return h;',
+    '    }return IntPtr.Zero;',
+    '  }',
+    '  static void Focus(IntPtr t){',
+    '    uint d;IntPtr f=GetForegroundWindow();',
+    '    uint ft=GetWindowThreadProcessId(f,out d),tt=GetWindowThreadProcessId(t,out d),my=GetCurrentThreadId();',
+    '    AttachThreadInput(my,ft,true);AttachThreadInput(my,tt,true);',
+    '    SetForegroundWindow(t);',
+    '    AttachThreadInput(my,tt,false);AttachThreadInput(my,ft,false);',
+    '  }',
+    '  [STAThread] static void Main(string[] a){',
+    '    string q=a.Length>0?a[0]:"";IntPtr h=Find(q);',
+    '    if(h==IntPtr.Zero){Console.Error.WriteLine("window not found: "+q);Environment.Exit(1);}',
+    '    Focus(h);Thread.Sleep(300);SendKeys.SendWait("^v");',
+    '  }',
+    '}',
+  ].join('\r\n'), 'utf8');
+
+  // Audio volume helper — compiled console app, no PowerShell involved
+  const AUDIO_SRC = path.join(TMP, 'based_audio.cs');
+  const AUDIO_EXE = path.join(TMP, 'based_audio.exe');
+  fs.writeFileSync(AUDIO_SRC, [
+    'using System; using System.Runtime.InteropServices;',
+    '[ComImport,Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")] class MMDeviceEnumerator {}',
+    '[Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]',
+    'interface IMMDeviceEnumerator{ void EnumAudioEndpoints(); void GetDefaultAudioEndpoint(int d,int r,out IMMDevice p); }',
+    '[Guid("D666063F-1587-4E43-81F1-B948E807363F"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]',
+    'interface IMMDevice{ void Activate(ref Guid id,uint ctx,IntPtr p,[MarshalAs(UnmanagedType.IUnknown)]out object o); }',
+    '[Guid("5CDF2C82-841E-4546-9722-0CF74078229A"),InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]',
+    'interface IAudioEndpointVolume{',
+    '  void RegisterControlChangeNotify(IntPtr p); void UnregisterControlChangeNotify(IntPtr p);',
+    '  void GetChannelCount(out uint n);',
+    '  void SetMasterVolumeLevel(float db,ref Guid g); void SetMasterVolumeLevelScalar(float v,ref Guid g);',
+    '  void GetMasterVolumeLevel(out float db); void GetMasterVolumeLevelScalar(out float v);',
+    '}',
+    'class Program{',
+    '  static IAudioEndpointVolume Ep(){',
+    '    var en=(IMMDeviceEnumerator)new MMDeviceEnumerator();',
+    '    IMMDevice d; en.GetDefaultAudioEndpoint(0,1,out d);',
+    '    var id=new Guid("5CDF2C82-841E-4546-9722-0CF74078229A");',
+    '    object o; d.Activate(ref id,23,IntPtr.Zero,out o); return(IAudioEndpointVolume)o;',
+    '  }',
+    '  static void Main(string[] a){',
+    '    try{',
+    '      var ep=Ep();',
+    '      if(a.Length>0&&a[0]=="get"){float v;ep.GetMasterVolumeLevelScalar(out v);Console.WriteLine(Math.Round(v*100));}',
+    '      else if(a.Length>1&&a[0]=="set"){float v=float.Parse(a[1])/100f;Guid g=Guid.Empty;ep.SetMasterVolumeLevelScalar(v,ref g);}',
+    '    }catch(Exception ex){Console.Error.WriteLine(ex.Message);Environment.Exit(1);}',
+    '  }',
+    '}',
+  ].join('\r\n'), 'utf8');
+
+  // Compile both in parallel at startup — ready by the time user asks for them
+  const win32Ready = compileExe(WIN32_SRC, WIN32_EXE, ['System.Windows.Forms.dll']);
+  const audioReady = compileExe(AUDIO_SRC, AUDIO_EXE, null);
+
+  // Type text: write to clipboard, run win32 exe to find+focus target window, paste.
+  // target = window title filter (e.g. 'Notepad', 'Chrome'). Empty = front non-Based window.
+  ipcMain.handle('system:type-text', async (_, text, target) => {
     const prev = clipboard.readText();
     clipboard.writeText(String(text));
+    const ready = await win32Ready;
+    if (!ready) {
+      setTimeout(() => clipboard.writeText(prev), 500);
+      return 'error: win32 helper not compiled';
+    }
+    const filter = String(target || '').replace(/"/g, '').trim();
     let result;
     try {
+      const args = filter ? [filter] : [];
       await new Promise((resolve, reject) => {
-        execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command',
-          `Add-Type -Path '${WIN32_CS_PATH}'; ` +
-          `Add-Type -AssemblyName System.Windows.Forms; ` +
-          `$hw = [Win32Helper]::FindFrontWindow(); ` +
-          `if ($hw -ne [IntPtr]::Zero) { [Win32Helper]::FocusWindow($hw); Start-Sleep -Milliseconds 300; [System.Windows.Forms.SendKeys]::SendWait('^v') }`
-        ], (err) => err ? reject(err) : resolve());
+        execFile(WIN32_EXE, args, (err, _out, stderr) =>
+          err ? reject(new Error(stderr || err.message)) : resolve()
+        );
       });
       result = 'typed';
     } catch (e) {
       result = `error: ${e.message}`;
     }
-    setTimeout(() => clipboard.writeText(prev), 1000);
+    setTimeout(() => clipboard.writeText(prev), 1200);
     return result;
   });
 
@@ -498,56 +545,14 @@ app.whenReady().then(async () => {
     return 'written';
   });
 
-  // Volume — uses Windows Core Audio API (IAudioEndpointVolume).
-  // C# is written to a real .cs file with CRLF so PowerShell's Add-Type -Path avoids
-  // the here-string line-ending bug that silently broke the previous @"..."@ approach.
-  const AUDIO_CS_PATH = path.join(os.tmpdir(), 'based_audio_ctrl.cs');
-  fs.writeFileSync(
-    AUDIO_CS_PATH,
-    [
-      'using System;',
-      'using System.Runtime.InteropServices;',
-      '[ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]',
-      'class MMDeviceEnumerator {}',
-      '[Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]',
-      'interface IMMDeviceEnumerator {',
-      '  int NotImpl1();',
-      '  [PreserveSig] int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice ppDevice);',
-      '}',
-      '[Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]',
-      'interface IMMDevice {',
-      '  [PreserveSig] int Activate(ref Guid iid, uint clsCtx, IntPtr pParams, [MarshalAs(UnmanagedType.IUnknown)] out object ppIface);',
-      '}',
-      '[Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]',
-      'interface IAudioEndpointVolume {',
-      '  int RegisterControlChangeNotify(IntPtr p); int UnregisterControlChangeNotify(IntPtr p);',
-      '  int GetChannelCount(out uint n);',
-      '  int SetMasterVolumeLevel(float db, ref Guid ctx);',
-      '  int SetMasterVolumeLevelScalar(float level, ref Guid ctx);',
-      '  int GetMasterVolumeLevel(out float db);',
-      '  int GetMasterVolumeLevelScalar(out float level);',
-      '}',
-      'public static class AudioCtrl {',
-      '  static IAudioEndpointVolume Ep() {',
-      '    var en = (IMMDeviceEnumerator)new MMDeviceEnumerator();',
-      '    IMMDevice dev; en.GetDefaultAudioEndpoint(0, 1, out dev);',
-      '    var iid = new Guid("5CDF2C82-841E-4546-9722-0CF74078229A");',
-      '    object obj; dev.Activate(ref iid, 23, IntPtr.Zero, out obj);',
-      '    return (IAudioEndpointVolume)obj;',
-      '  }',
-      '  public static void Set(float v) { var ep = Ep(); var g = Guid.Empty; ep.SetMasterVolumeLevelScalar(v, ref g); }',
-      '  public static float Get() { var ep = Ep(); float v; ep.GetMasterVolumeLevelScalar(out v); return v; }',
-      '}',
-    ].join('\r\n'),
-    'utf8'
-  );
-
+  // Volume — compiled exe calls IAudioEndpointVolume directly, no PowerShell.
   ipcMain.handle('system:get-volume', async () => {
+    if (!await audioReady) return 0;
     try {
       const out = await new Promise((resolve, reject) => {
-        execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command',
-          `try { Add-Type -Path '${AUDIO_CS_PATH}'; Write-Output ([Math]::Round([AudioCtrl]::Get() * 100)) } catch { Write-Output 0 }`
-        ], (err, stdout) => err ? reject(err) : resolve(stdout.trim()));
+        execFile(AUDIO_EXE, ['get'], (err, stdout, stderr) =>
+          err ? reject(new Error(stderr || err.message)) : resolve(stdout.trim())
+        );
       });
       return parseInt(out) || 0;
     } catch { return 0; }
@@ -555,14 +560,13 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('system:set-volume', async (_, level) => {
     const pct = Math.max(0, Math.min(100, Number(level) || 0));
-    const fraction = (pct / 100).toFixed(6);
+    if (!await audioReady) return 'error: audio helper not compiled';
     try {
-      const out = await new Promise((resolve, reject) => {
-        execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command',
-          `try { Add-Type -Path '${AUDIO_CS_PATH}'; [AudioCtrl]::Set(${fraction}); Write-Output 'ok' } catch { Write-Output ('err: ' + $_.Exception.Message) }`
-        ], (err, stdout) => err ? reject(err) : resolve(stdout.trim()));
+      await new Promise((resolve, reject) => {
+        execFile(AUDIO_EXE, ['set', String(pct)], (err, _out, stderr) =>
+          err ? reject(new Error(stderr || err.message)) : resolve()
+        );
       });
-      if (out.startsWith('err:')) return out;
       return `volume set to ${pct}%`;
     } catch (e) { return `error: ${e.message}`; }
   });

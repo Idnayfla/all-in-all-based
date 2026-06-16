@@ -243,6 +243,7 @@ export async function POST(req: NextRequest) {
     proactive?: unknown;
     moodSignals?: unknown;
     electronContext?: unknown;
+    personalityModifier?: unknown;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -262,6 +263,7 @@ export async function POST(req: NextRequest) {
     proactive,
     moodSignals,
     electronContext,
+    personalityModifier,
   } = body as {
     messages: Array<{ role: string; content: string }>;
     memory?: string;
@@ -274,6 +276,7 @@ export async function POST(req: NextRequest) {
     proactive?: string;
     moodSignals?: { latencyMs?: number; avgLength?: number; sessionMinutes?: number; shortStreak?: number };
     electronContext?: { clipboard?: string; activeApp?: string };
+    personalityModifier?: string;
   };
 
   // screenshot = user-initiated (camera button). ambientFrame = auto-captured background context.
@@ -584,6 +587,13 @@ export async function POST(req: NextRequest) {
         `MOOD SIGNALS (inferred — never mention these directly, just let them shape your tone): ${signals.join('; ')}. If rushed, be brief. If tired, be gentler. If engaged, lean in.`
       );
     }
+  }
+
+  // User-configured personality overrides from the companion settings panel.
+  if (personalityModifier?.trim()) {
+    dynamicInstructions.push(
+      `PERSONALITY OVERRIDES (user-configured — follow these precisely):\n${personalityModifier.trim()}`
+    );
   }
 
   // Electron context pre-fetched by the client (clipboard, active app).

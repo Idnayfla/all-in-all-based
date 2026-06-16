@@ -328,11 +328,12 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
   {
     name: 'type_text',
     description:
-      "Type text at the current cursor position in whatever app the user has focused. Use when the user says 'type this for me', 'write this', or 'enter this text'.",
+      "Type text into a specific app window. Use when the user says 'type this in Notepad', 'write this in VS Code', 'type for me', etc. Pass target as the app or window name the user mentioned.",
     input_schema: {
       type: 'object',
       properties: {
         text: { type: 'string', description: 'The exact text to type.' },
+        target: { type: 'string', description: "Window title to search for, e.g. 'Notepad', 'Chrome', 'VS Code'. Leave empty to use the front non-Based window." },
       },
       required: ['text'],
     },
@@ -983,7 +984,7 @@ export async function runBrainTool(
       case 'launch_app':
         return `__SYSTEM_ACTION__${JSON.stringify({ action: 'launch_app', app_name: String(input.app_name ?? '') })}`;
       case 'type_text':
-        return `__SYSTEM_ACTION__${JSON.stringify({ action: 'type_text', text: String(input.text ?? '') })}`;
+        return `__SYSTEM_ACTION__${JSON.stringify({ action: 'type_text', text: String(input.text ?? ''), target: String(input.target ?? '') })}`;
       case 'write_clipboard':
         return `__SYSTEM_ACTION__${JSON.stringify({ action: 'write_clipboard', text: String(input.text ?? '') })}`;
       case 'set_volume':

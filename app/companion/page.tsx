@@ -4,6 +4,8 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { captureScreen, isScreenCaptureSupported } from '@/hooks/useScreenCapture';
 import type { MicVAD } from '@ricky0123/vad-web';
+import PersonalityPanel, { buildPersonalityModifier } from '@/components/PersonalityPanel';
+import type { PersonalitySettings } from '@/components/PersonalityPanel';
 
 // Web Speech API types (not in all TS DOM libs)
 declare interface SpeechRecognition extends EventTarget {
@@ -189,7 +191,7 @@ declare global {
       // System control
       openUrl?: (url: string) => Promise<string>;
       launchApp?: (appName: string) => Promise<string>;
-      typeText?: (text: string) => Promise<string>;
+      typeText?: (text: string, target?: string) => Promise<string>;
       clipboardRead?: () => Promise<string>;
       clipboardWrite?: (text: string) => Promise<string>;
       getVolume?: () => Promise<number>;
@@ -257,7 +259,7 @@ async function executeSystemAction(sa: Record<string, unknown>) {
       await window.electronAPI.launchApp?.(sa.app_name as string);
       break;
     case 'type_text':
-      await window.electronAPI.typeText?.(sa.text as string);
+      await window.electronAPI.typeText?.(sa.text as string, (sa.target as string) || '');
       break;
     case 'write_clipboard':
       await window.electronAPI.clipboardWrite?.(sa.text as string);
@@ -282,6 +284,8 @@ export default function CompanionOverlayPage() {
   const [captureError, setCaptureError] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
   const [slowWarning, setSlowWarning] = useState(false);
+  const [showPersonality, setShowPersonality] = useState(false);
+  const [personalityModifier, setPersonalityModifier] = useState('');
   const [isAndroidBridge, setIsAndroidBridge] = useState(false);
   const [androidCapturing, setAndroidCapturing] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
@@ -1406,6 +1410,7 @@ export default function CompanionOverlayPage() {
             : {}),
           moodSignals,
           ...(Object.keys(electronContext).length > 0 ? { electronContext } : {}),
+          ...(personalityModifier ? { personalityModifier } : {}),
         }),
         signal: abortController.signal,
       });
@@ -1780,6 +1785,14 @@ export default function CompanionOverlayPage() {
         <button
           className="companion-clear"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          onClick={() => setShowPersonality(p => !p)}
+          title="Personality settings"
+        >
+          ◈
+        </button>
+        <button
+          className="companion-clear"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           onClick={() => setMessages([])}
           disabled={isGenerating}
           title="Clear history"
@@ -1795,6 +1808,13 @@ export default function CompanionOverlayPage() {
           ✕
         </button>
       </div>
+      {showPersonality && (
+        <div className="companion-personality-panel">
+          <PersonalityPanel
+            onPersonalityChange={(modifier, _settings) => setPersonalityModifier(modifier)}
+          />
+        </div>
+      )}
 
       <div className="companion-messages">
         {!authReady && <div className="companion-auth-notice">◈ Connecting…</div>}
