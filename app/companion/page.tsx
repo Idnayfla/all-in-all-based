@@ -310,6 +310,13 @@ export default function CompanionOverlayPage() {
     const stored = typeof window !== 'undefined' ? localStorage.getItem('based_vad_sensitivity') : null;
     return stored ? parseFloat(stored) : 0.35;
   });
+  // Proximity gate: minimum RMS before audio is sent to STT.
+  // Higher = only close/loud speech triggers; lower = hears from farther away.
+  const [proximityThreshold, setProximityThreshold] = useState(() => {
+    const stored = typeof window !== 'undefined' ? localStorage.getItem('based_proximity_threshold') : null;
+    return stored ? parseFloat(stored) : 0.015;
+  });
+  const proximityThresholdRef = useRef(0.015);
   const [wakeState, setWakeState] = useState<'idle' | 'listening' | 'processing'>('idle');
   const [wakeListening, setWakeListening] = useState(false); // mic actually capturing
   const [wakeError, setWakeError] = useState<string | null>(null);
@@ -345,6 +352,9 @@ export default function CompanionOverlayPage() {
   useEffect(() => {
     authTokenRef.current = authToken;
   }, [authToken]);
+  useEffect(() => {
+    proximityThresholdRef.current = proximityThreshold;
+  }, [proximityThreshold]);
 
   const speak = async (text: string) => {
     if (!voiceEnabled) return;
@@ -504,7 +514,7 @@ export default function CompanionOverlayPage() {
       // prevents Deepgram/Whisper from hallucinating "Hello Based" on silence.
       // In lenient mode (awaitingCommand, barge-in): skip energy gate — user is
       // intentionally speaking, we just need to avoid responding to true silence.
-      if (audioRMS(audio) < (lenient ? 0.006 : 0.015)) return '';
+      if (audioRMS(audio) < (lenient ? Math.max(0.004, proximityThresholdRef.current * 0.4) : proximityThresholdRef.current)) return '';
 
       try {
         const { utils } = await import('@ricky0123/vad-web');
@@ -1909,6 +1919,27 @@ export default function CompanionOverlayPage() {
               title={`Mic sensitivity: ${Math.round((1 - (vadSensitivity - 0.2) / 0.4) * 100)}%`}
             />
             <span>strict</span>
+          </div>
+        )}
+
+        {wakeWordEnabled && (
+          <div className="companion-vad-slider">
+            <span>far</span>
+            <input
+              type="range"
+              min={0.005}
+              max={0.04}
+              step={0.005}
+              value={proximityThreshold}
+              onChange={e => {
+                const v = parseFloat(e.target.value);
+                setProximityThreshold(v);
+                localStorage.setItem('based_proximity_threshold', String(v));
+              }}
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              title={`Proximity: ${Math.round(proximityThreshold / 0.04 * 100)}% (higher = close voices only)`}
+            />
+            <span>close</span>
           </div>
         )}
 

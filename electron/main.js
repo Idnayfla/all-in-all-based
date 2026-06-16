@@ -418,20 +418,31 @@ app.whenReady().then(async () => {
   });
 
   // Type text at the current cursor position.
-  // Text goes via env var; only SendKeys special-char escaping is applied inside PS.
-  ipcMain.handle('system:type-text', (_, text) => {
-    // Escape SendKeys metacharacters so they are sent as literals.
+  // Hides the overlay first so SendKeys fires at the previously active window (e.g. Notepad),
+  // then restores the overlay without stealing focus back.
+  ipcMain.handle('system:type-text', async (_, text) => {
     const escaped = String(text).replace(/[+^%~(){}[\]]/g, '{$&}');
-    return new Promise((resolve) => {
-      execFile(
-        'powershell',
-        ['-NoProfile', '-Command',
-          'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait($env:BASED_SEND_TEXT)'
-        ],
-        { env: { ...process.env, BASED_SEND_TEXT: escaped } },
-        (err) => resolve(err ? `error: ${err.message}` : 'typed')
-      );
-    });
+    const wasVisible = overlayWin?.isVisible();
+    if (wasVisible) overlayWin.hide();
+    await new Promise(r => setTimeout(r, 350));
+    let result;
+    try {
+      await new Promise((resolve, reject) => {
+        execFile(
+          'powershell',
+          ['-NoProfile', '-NonInteractive', '-Command',
+            'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait($env:BASED_SEND_TEXT)'
+          ],
+          { env: { ...process.env, BASED_SEND_TEXT: escaped } },
+          (err) => err ? reject(err) : resolve()
+        );
+      });
+      result = 'typed';
+    } catch (e) {
+      result = `error: ${e.message}`;
+    }
+    if (wasVisible) overlayWin.showInactive();
+    return result;
   });
 
   // Clipboard — use Electron's built-in (no exec needed).
@@ -441,32 +452,56 @@ app.whenReady().then(async () => {
     return 'written';
   });
 
-  // Volume — level is a validated integer so embedding it in the PS script is safe.
+  // Volume — uses Windows Core Audio API (IAudioEndpointVolume) which controls the
+  // true master volume on modern Windows. The legacy waveOutSetVolume only affects
+  // the Wave mixer and has no effect on WASAPI apps (i.e. everything modern).
+  const AUDIO_CTRL_CS = `
+using System;
+using System.Runtime.InteropServices;
+[ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
+class MMDeviceEnumerator {}
+[Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDeviceEnumerator {
+  int NotImpl1();
+  [PreserveSig] int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice ppDevice);
+}
+[Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IMMDevice {
+  [PreserveSig] int Activate(ref Guid iid, uint clsCtx, IntPtr pParams, [MarshalAs(UnmanagedType.IUnknown)] out object ppIface);
+}
+[Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+interface IAudioEndpointVolume {
+  int RegisterControlChangeNotify(IntPtr p); int UnregisterControlChangeNotify(IntPtr p);
+  int GetChannelCount(out uint n);
+  int SetMasterVolumeLevel(float db, ref Guid ctx);
+  int SetMasterVolumeLevelScalar(float level, ref Guid ctx);
+  int GetMasterVolumeLevel(out float db);
+  int GetMasterVolumeLevelScalar(out float level);
+}
+public static class AudioCtrl {
+  static IAudioEndpointVolume Ep() {
+    var en = (IMMDeviceEnumerator)new MMDeviceEnumerator();
+    IMMDevice dev; en.GetDefaultAudioEndpoint(0, 1, out dev);
+    var iid = new Guid("5CDF2C82-841E-4546-9722-0CF74078229A");
+    object obj; dev.Activate(ref iid, 23, IntPtr.Zero, out obj);
+    return (IAudioEndpointVolume)obj;
+  }
+  public static void Set(float v) { var ep = Ep(); var g = Guid.Empty; ep.SetMasterVolumeLevelScalar(v, ref g); }
+  public static float Get() { var ep = Ep(); float v; ep.GetMasterVolumeLevelScalar(out v); return v; }
+}`;
+
   ipcMain.handle('system:get-volume', async () => {
     try {
-      const out = await runPS(`
-Add-Type -TypeDefinition @"
-using System.Runtime.InteropServices;
-public class WinVolG { [DllImport("winmm.dll")] public static extern int waveOutGetVolume(int h, out uint v); }
-"@
-[uint32]$v = 0; [WinVolG]::waveOutGetVolume(0, [ref]$v)
-[math]::Round(($v -band 0xFFFF) / 65535 * 100)
-`);
+      const out = await runPS(`Add-Type -TypeDefinition @"\n${AUDIO_CTRL_CS}\n"@\n[Math]::Round([AudioCtrl]::Get() * 100)`);
       return parseInt(out) || 0;
     } catch { return 0; }
   });
 
   ipcMain.handle('system:set-volume', async (_, level) => {
     const pct = Math.max(0, Math.min(100, Number(level) || 0));
+    const fraction = (pct / 100).toFixed(6);
     try {
-      await runPS(`
-Add-Type -TypeDefinition @"
-using System.Runtime.InteropServices;
-public class WinVolS { [DllImport("winmm.dll")] public static extern int waveOutSetVolume(int h, uint v); }
-"@
-$v = [uint32]([math]::Round(${pct} / 100 * 65535))
-[WinVolS]::waveOutSetVolume(0, ($v -bor ($v -shl 16)))
-`);
+      await runPS(`Add-Type -TypeDefinition @"\n${AUDIO_CTRL_CS}\n"@\n[AudioCtrl]::Set(${fraction})`);
       return `volume set to ${pct}%`;
     } catch (e) { return `error: ${e.message}`; }
   });
