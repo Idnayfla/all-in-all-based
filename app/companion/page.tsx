@@ -248,25 +248,20 @@ function buildSpeechChunks(text: string, maxWords = 12): string[] {
   return out.filter(Boolean);
 }
 
-async function executeSystemAction(sa: Record<string, unknown>) {
+async function executeSystemAction(sa: Record<string, unknown>): Promise<string | undefined> {
   if (!window.electronAPI) return;
   const action = sa.action as string;
   switch (action) {
     case 'open_url':
-      await window.electronAPI.openUrl?.(sa.url as string);
-      break;
+      return window.electronAPI.openUrl?.(sa.url as string);
     case 'launch_app':
-      await window.electronAPI.launchApp?.(sa.app_name as string);
-      break;
+      return window.electronAPI.launchApp?.(sa.app_name as string);
     case 'type_text':
-      await window.electronAPI.typeText?.(sa.text as string, (sa.target as string) || '');
-      break;
+      return window.electronAPI.typeText?.(sa.text as string, (sa.target as string) || '');
     case 'write_clipboard':
-      await window.electronAPI.clipboardWrite?.(sa.text as string);
-      break;
+      return window.electronAPI.clipboardWrite?.(sa.text as string);
     case 'set_volume':
-      await window.electronAPI.setVolume?.(sa.level as number);
-      break;
+      return window.electronAPI.setVolume?.(sa.level as number);
   }
 }
 
@@ -311,13 +306,15 @@ export default function CompanionOverlayPage() {
   // Wake word — "Hey Based"
   const [wakeWordEnabled, setWakeWordEnabled] = useState(false);
   const [vadSensitivity, setVadSensitivity] = useState(() => {
-    const stored = typeof window !== 'undefined' ? localStorage.getItem('based_vad_sensitivity') : null;
+    const stored =
+      typeof window !== 'undefined' ? localStorage.getItem('based_vad_sensitivity') : null;
     return stored ? parseFloat(stored) : 0.35;
   });
   // Proximity gate: minimum RMS before audio is sent to STT.
   // Higher = only close/loud speech triggers; lower = hears from farther away.
   const [proximityThreshold, setProximityThreshold] = useState(() => {
-    const stored = typeof window !== 'undefined' ? localStorage.getItem('based_proximity_threshold') : null;
+    const stored =
+      typeof window !== 'undefined' ? localStorage.getItem('based_proximity_threshold') : null;
     return stored ? parseFloat(stored) : 0.015;
   });
   const proximityThresholdRef = useRef(0.015);
@@ -524,7 +521,13 @@ export default function CompanionOverlayPage() {
       // prevents Deepgram/Whisper from hallucinating "Hello Based" on silence.
       // In lenient mode (awaitingCommand, barge-in): skip energy gate — user is
       // intentionally speaking, we just need to avoid responding to true silence.
-      if (audioRMS(audio) < (lenient ? Math.max(0.004, proximityThresholdRef.current * 0.4) : proximityThresholdRef.current)) return '';
+      if (
+        audioRMS(audio) <
+        (lenient
+          ? Math.max(0.004, proximityThresholdRef.current * 0.4)
+          : proximityThresholdRef.current)
+      )
+        return '';
 
       try {
         const { utils } = await import('@ricky0123/vad-web');
@@ -573,15 +576,22 @@ export default function CompanionOverlayPage() {
         if (micStream && !stopped) {
           try {
             audioCtx = new AudioContext({ sampleRate: 48000 });
-            await audioCtx.audioWorklet.addModule('/rnnoise-processor.js', { type: 'module' } as WorkletOptions);
+            await audioCtx.audioWorklet.addModule('/rnnoise-processor.js', {
+              type: 'module',
+            } as WorkletOptions);
             const source = audioCtx.createMediaStreamSource(micStream);
             const rnnoiseNode = new AudioWorkletNode(audioCtx, 'rnnoise-processor');
             const dest = audioCtx.createMediaStreamDestination();
             await new Promise<void>((resolve, reject) => {
               const t = setTimeout(() => resolve(), 3000);
               rnnoiseNode.port.onmessage = (e: MessageEvent) => {
-                if (e.data?.type === 'ready') { clearTimeout(t); resolve(); }
-                else if (e.data?.type === 'error') { clearTimeout(t); reject(new Error(e.data.message as string)); }
+                if (e.data?.type === 'ready') {
+                  clearTimeout(t);
+                  resolve();
+                } else if (e.data?.type === 'error') {
+                  clearTimeout(t);
+                  reject(new Error(e.data.message as string));
+                }
               };
             });
             source.connect(rnnoiseNode);
@@ -609,7 +619,7 @@ export default function CompanionOverlayPage() {
           // high enough to trigger, while keeping the hysteresis band (positive minus
           // negative) at ~0.20 — wide enough to avoid rapid speech/silence toggling.
           positiveSpeechThreshold: vadSensitivity,
-          negativeSpeechThreshold: Math.max(0.05, vadSensitivity - 0.20),
+          negativeSpeechThreshold: Math.max(0.05, vadSensitivity - 0.2),
           // 600 ms redemption: bridges natural brief pauses mid-phrase without
           // splitting one utterance into two separate VAD segments.
           redemptionMs: 600,
@@ -1350,10 +1360,15 @@ export default function CompanionOverlayPage() {
       if (wordCount <= 3) shortStreakRef.current += 1;
       else shortStreakRef.current = 0;
       const moodSignals = {
-        latencyMs: lastBasedReplyAtRef.current > 0 ? Date.now() - lastBasedReplyAtRef.current : undefined,
-        avgLength: recentMsgLengthsRef.current.length > 0
-          ? Math.round(recentMsgLengthsRef.current.reduce((a, b) => a + b, 0) / recentMsgLengthsRef.current.length)
-          : undefined,
+        latencyMs:
+          lastBasedReplyAtRef.current > 0 ? Date.now() - lastBasedReplyAtRef.current : undefined,
+        avgLength:
+          recentMsgLengthsRef.current.length > 0
+            ? Math.round(
+                recentMsgLengthsRef.current.reduce((a, b) => a + b, 0) /
+                  recentMsgLengthsRef.current.length
+              )
+            : undefined,
         sessionMinutes: Math.round((Date.now() - sessionStartAtRef.current) / 60000),
         shortStreak: shortStreakRef.current,
       };
@@ -1362,10 +1377,21 @@ export default function CompanionOverlayPage() {
       const electronContext: { clipboard?: string; activeApp?: string } = {};
       if (window.electronAPI) {
         if (/\bclipboard\b/i.test(text) && window.electronAPI.clipboardRead) {
-          try { electronContext.clipboard = await window.electronAPI.clipboardRead(); } catch { /* silent */ }
+          try {
+            electronContext.clipboard = await window.electronAPI.clipboardRead();
+          } catch {
+            /* silent */
+          }
         }
-        if (/\b(active\s+app|what\s+(am\s+i|app)\s+(using|on)|current\s+app)\b/i.test(text) && window.electronAPI.getActiveApp) {
-          try { electronContext.activeApp = await window.electronAPI.getActiveApp(); } catch { /* silent */ }
+        if (
+          /\b(active\s+app|what\s+(am\s+i|app)\s+(using|on)|current\s+app)\b/i.test(text) &&
+          window.electronAPI.getActiveApp
+        ) {
+          try {
+            electronContext.activeApp = await window.electronAPI.getActiveApp();
+          } catch {
+            /* silent */
+          }
         }
       }
 
@@ -1462,14 +1488,28 @@ export default function CompanionOverlayPage() {
             break;
           }
           try {
-            const parsed = JSON.parse(raw) as { text?: string; error?: string; system_actions?: Array<Record<string, unknown>> };
+            const parsed = JSON.parse(raw) as {
+              text?: string;
+              error?: string;
+              system_actions?: Array<Record<string, unknown>>;
+            };
             if (parsed.error) {
               // Server signalled a stream failure — record it and let [DONE] close the loop
               streamError = parsed.error;
             } else if (parsed.system_actions) {
               // Execute system control actions on the Electron side
               for (const sa of parsed.system_actions) {
-                void executeSystemAction(sa);
+                executeSystemAction(sa).then(res => {
+                  if (res?.startsWith('error:')) {
+                    setMessages(prev => {
+                      const msgs = [...prev];
+                      const last = msgs[msgs.length - 1];
+                      if (last)
+                        msgs[msgs.length - 1] = { ...last, content: `${last.content}\n[${res}]` };
+                      return msgs;
+                    });
+                  }
+                });
               }
             } else if (parsed.text) {
               assembledText += parsed.text;
@@ -1972,7 +2012,7 @@ export default function CompanionOverlayPage() {
                 localStorage.setItem('based_proximity_threshold', String(v));
               }}
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-              title={`Proximity: ${Math.round(proximityThreshold / 0.04 * 100)}% (higher = close voices only)`}
+              title={`Proximity: ${Math.round((proximityThreshold / 0.04) * 100)}% (higher = close voices only)`}
             />
             <span>close</span>
           </div>

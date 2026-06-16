@@ -274,7 +274,12 @@ export async function POST(req: NextRequest) {
     fileNames?: string[];
     locationContext?: string;
     proactive?: string;
-    moodSignals?: { latencyMs?: number; avgLength?: number; sessionMinutes?: number; shortStreak?: number };
+    moodSignals?: {
+      latencyMs?: number;
+      avgLength?: number;
+      sessionMinutes?: number;
+      shortStreak?: number;
+    };
     electronContext?: { clipboard?: string; activeApp?: string };
     personalityModifier?: string;
   };
@@ -575,9 +580,11 @@ export async function POST(req: NextRequest) {
     const { latencyMs, avgLength, sessionMinutes, shortStreak } = moodSignals;
     if (latencyMs !== undefined) {
       if (latencyMs < 4000) signals.push('replying very fast (< 4 s) — excited or urgent');
-      else if (latencyMs > 90000) signals.push('slow to reply (> 90 s) — distracted or stepping away');
+      else if (latencyMs > 90000)
+        signals.push('slow to reply (> 90 s) — distracted or stepping away');
     }
-    if (avgLength !== undefined && avgLength < 6) signals.push('very short messages — low energy, tired, or busy');
+    if (avgLength !== undefined && avgLength < 6)
+      signals.push('very short messages — low energy, tired, or busy');
     if (shortStreak !== undefined && shortStreak >= 3)
       signals.push(`${shortStreak} consecutive short replies — likely wrapping up or distracted`);
     if (sessionMinutes !== undefined && sessionMinutes > 45)
@@ -650,7 +657,7 @@ export async function POST(req: NextRequest) {
 
   // System control — triggers tool loop even without scheduling intent
   const COMPANION_SYSTEM_RE =
-    /\b(open\s+https?:\/\/\S+|open\s+\w+\.(com|org|io|dev|ai|app)\b|(?:can\s+you\s+|please\s+)?(?:open|launch|start)\s+(?:a\s+|an\s+|the\s+)?\w+(?:\s+for\s+me)?|type\s+(this|for me|it\s+out|it\s+for\s+me)|write\s+(this|it)\s+(?:for\s+me|out)|copy\s+(this|it)\s+(to\s+)?(my\s+)?clipboard|put\s+(this|it)\s+(in|on|into)\s+(my\s+)?clipboard|set\s+volume\s+(to\s+)?\d|volume\s+(to\s+)?\d|turn\s+(the\s+)?volume\s+(up|down)|mute(?:\s+my\s+computer)?|unmute)\b/i;
+    /\b(open\s+https?:\/\/\S+|open\s+\w+\.(com|org|io|dev|ai|app)\b|(?:can\s+you\s+|please\s+)?(?:open|launch|start)\s+(?:a\s+|an\s+|the\s+)?\w+(?:\s+for\s+me)?|type\s+(this|for\s+me|it\s+out|it\s+for\s+me|["'].+?["']|.+?\s+(?:in|into|on)\s+\w+)|write\s+(this|it)\s+(?:for\s+me|out)|copy\s+(this|it)\s+(to\s+)?(my\s+)?clipboard|put\s+(this|it)\s+(in|on|into)\s+(my\s+)?clipboard|set\s+(the\s+)?volume\s+(to\s+)?\d+|volume\s+(to\s+)?\d+|turn\s+(the\s+)?volume\s+(up|down)|mute(?:\s+my\s+computer)?|unmute)\b/i;
 
   // Task management + brain cleanup from companion — detect and run tool loop
   const COMPANION_TASK_RE =
@@ -790,7 +797,9 @@ export async function POST(req: NextRequest) {
         if (out.startsWith('__SYSTEM_ACTION__')) {
           try {
             collectedSystemActions.push(JSON.parse(out.slice('__SYSTEM_ACTION__'.length)));
-          } catch { /* keep out as-is on parse failure */ }
+          } catch {
+            /* keep out as-is on parse failure */
+          }
           out = 'Done.';
         }
         results.push({ type: 'tool_result', tool_use_id: tu.id, content: out });
