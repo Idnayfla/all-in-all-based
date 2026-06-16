@@ -418,22 +418,21 @@ app.whenReady().then(async () => {
   });
 
   // Type text at the current cursor position.
-  // Hides the overlay first so SendKeys fires at the previously active window (e.g. Notepad),
-  // then restores the overlay without stealing focus back.
+  // Writes text to clipboard then sends Ctrl+V — avoids SendKeys focus and escaping issues.
   ipcMain.handle('system:type-text', async (_, text) => {
-    const escaped = String(text).replace(/[+^%~(){}[\]]/g, '{$&}');
+    const prev = clipboard.readText();
+    clipboard.writeText(String(text));
     const wasVisible = overlayWin?.isVisible();
     if (wasVisible) overlayWin.hide();
-    await new Promise(r => setTimeout(r, 350));
+    await new Promise(r => setTimeout(r, 450));
     let result;
     try {
       await new Promise((resolve, reject) => {
         execFile(
           'powershell',
           ['-NoProfile', '-NonInteractive', '-Command',
-            'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait($env:BASED_SEND_TEXT)'
+            'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("^v")'
           ],
-          { env: { ...process.env, BASED_SEND_TEXT: escaped } },
           (err) => err ? reject(err) : resolve()
         );
       });
@@ -441,6 +440,8 @@ app.whenReady().then(async () => {
     } catch (e) {
       result = `error: ${e.message}`;
     }
+    // Restore previous clipboard content after paste completes
+    setTimeout(() => clipboard.writeText(prev), 1000);
     if (wasVisible) overlayWin.showInactive();
     return result;
   });
@@ -452,47 +453,57 @@ app.whenReady().then(async () => {
     return 'written';
   });
 
-  // Volume — uses Windows Core Audio API (IAudioEndpointVolume) which controls the
-  // true master volume on modern Windows. The legacy waveOutSetVolume only affects
-  // the Wave mixer and has no effect on WASAPI apps (i.e. everything modern).
-  const AUDIO_CTRL_CS = `
-using System;
-using System.Runtime.InteropServices;
-[ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
-class MMDeviceEnumerator {}
-[Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-interface IMMDeviceEnumerator {
-  int NotImpl1();
-  [PreserveSig] int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice ppDevice);
-}
-[Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-interface IMMDevice {
-  [PreserveSig] int Activate(ref Guid iid, uint clsCtx, IntPtr pParams, [MarshalAs(UnmanagedType.IUnknown)] out object ppIface);
-}
-[Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-interface IAudioEndpointVolume {
-  int RegisterControlChangeNotify(IntPtr p); int UnregisterControlChangeNotify(IntPtr p);
-  int GetChannelCount(out uint n);
-  int SetMasterVolumeLevel(float db, ref Guid ctx);
-  int SetMasterVolumeLevelScalar(float level, ref Guid ctx);
-  int GetMasterVolumeLevel(out float db);
-  int GetMasterVolumeLevelScalar(out float level);
-}
-public static class AudioCtrl {
-  static IAudioEndpointVolume Ep() {
-    var en = (IMMDeviceEnumerator)new MMDeviceEnumerator();
-    IMMDevice dev; en.GetDefaultAudioEndpoint(0, 1, out dev);
-    var iid = new Guid("5CDF2C82-841E-4546-9722-0CF74078229A");
-    object obj; dev.Activate(ref iid, 23, IntPtr.Zero, out obj);
-    return (IAudioEndpointVolume)obj;
-  }
-  public static void Set(float v) { var ep = Ep(); var g = Guid.Empty; ep.SetMasterVolumeLevelScalar(v, ref g); }
-  public static float Get() { var ep = Ep(); float v; ep.GetMasterVolumeLevelScalar(out v); return v; }
-}`;
+  // Volume — uses Windows Core Audio API (IAudioEndpointVolume).
+  // C# is written to a real .cs file with CRLF so PowerShell's Add-Type -Path avoids
+  // the here-string line-ending bug that silently broke the previous @"..."@ approach.
+  const AUDIO_CS_PATH = path.join(os.tmpdir(), 'based_audio_ctrl.cs');
+  fs.writeFileSync(
+    AUDIO_CS_PATH,
+    [
+      'using System;',
+      'using System.Runtime.InteropServices;',
+      '[ComImport, Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]',
+      'class MMDeviceEnumerator {}',
+      '[Guid("A95664D2-9614-4F35-A746-DE8DB63617E6"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]',
+      'interface IMMDeviceEnumerator {',
+      '  int NotImpl1();',
+      '  [PreserveSig] int GetDefaultAudioEndpoint(int dataFlow, int role, out IMMDevice ppDevice);',
+      '}',
+      '[Guid("D666063F-1587-4E43-81F1-B948E807363F"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]',
+      'interface IMMDevice {',
+      '  [PreserveSig] int Activate(ref Guid iid, uint clsCtx, IntPtr pParams, [MarshalAs(UnmanagedType.IUnknown)] out object ppIface);',
+      '}',
+      '[Guid("5CDF2C82-841E-4546-9722-0CF74078229A"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]',
+      'interface IAudioEndpointVolume {',
+      '  int RegisterControlChangeNotify(IntPtr p); int UnregisterControlChangeNotify(IntPtr p);',
+      '  int GetChannelCount(out uint n);',
+      '  int SetMasterVolumeLevel(float db, ref Guid ctx);',
+      '  int SetMasterVolumeLevelScalar(float level, ref Guid ctx);',
+      '  int GetMasterVolumeLevel(out float db);',
+      '  int GetMasterVolumeLevelScalar(out float level);',
+      '}',
+      'public static class AudioCtrl {',
+      '  static IAudioEndpointVolume Ep() {',
+      '    var en = (IMMDeviceEnumerator)new MMDeviceEnumerator();',
+      '    IMMDevice dev; en.GetDefaultAudioEndpoint(0, 1, out dev);',
+      '    var iid = new Guid("5CDF2C82-841E-4546-9722-0CF74078229A");',
+      '    object obj; dev.Activate(ref iid, 23, IntPtr.Zero, out obj);',
+      '    return (IAudioEndpointVolume)obj;',
+      '  }',
+      '  public static void Set(float v) { var ep = Ep(); var g = Guid.Empty; ep.SetMasterVolumeLevelScalar(v, ref g); }',
+      '  public static float Get() { var ep = Ep(); float v; ep.GetMasterVolumeLevelScalar(out v); return v; }',
+      '}',
+    ].join('\r\n'),
+    'utf8'
+  );
 
   ipcMain.handle('system:get-volume', async () => {
     try {
-      const out = await runPS(`Add-Type -TypeDefinition @"\n${AUDIO_CTRL_CS}\n"@\n[Math]::Round([AudioCtrl]::Get() * 100)`);
+      const out = await new Promise((resolve, reject) => {
+        execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command',
+          `Add-Type -Path '${AUDIO_CS_PATH}'; [Math]::Round([AudioCtrl]::Get() * 100)`
+        ], (err, stdout) => err ? reject(err) : resolve(stdout.trim()));
+      });
       return parseInt(out) || 0;
     } catch { return 0; }
   });
@@ -501,7 +512,11 @@ public static class AudioCtrl {
     const pct = Math.max(0, Math.min(100, Number(level) || 0));
     const fraction = (pct / 100).toFixed(6);
     try {
-      await runPS(`Add-Type -TypeDefinition @"\n${AUDIO_CTRL_CS}\n"@\n[AudioCtrl]::Set(${fraction})`);
+      await new Promise((resolve, reject) => {
+        execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command',
+          `Add-Type -Path '${AUDIO_CS_PATH}'; [AudioCtrl]::Set(${fraction})`
+        ], (err) => err ? reject(err) : resolve());
+      });
       return `volume set to ${pct}%`;
     } catch (e) { return `error: ${e.message}`; }
   });
