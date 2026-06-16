@@ -405,13 +405,41 @@ app.whenReady().then(async () => {
     catch (e) { return `error: ${e.message}`; }
   });
 
-  // Launch an application. App name goes via env var so it is never shell-interpolated.
+  // Launch an application.
+  // appName comes from the AI — validate against a hardcoded allowlist before
+  // executing so a prompt-injection attack cannot launch arbitrary binaries.
   ipcMain.handle('system:launch-app', (_, appName) => {
+    const ALLOWED_APPS = {
+      notepad: 'notepad.exe',
+      calculator: 'calc.exe',
+      paint: 'mspaint.exe',
+      explorer: 'explorer.exe',
+      chrome: 'chrome',
+      'google chrome': 'chrome',
+      firefox: 'firefox',
+      edge: 'msedge',
+      spotify: 'spotify',
+      discord: 'discord',
+      slack: 'slack',
+      zoom: 'zoom',
+      teams: 'teams',
+      word: 'winword',
+      excel: 'excel',
+      powerpoint: 'powerpnt',
+      vscode: 'code',
+      'visual studio code': 'code',
+      code: 'code',
+      terminal: 'wt',
+      'windows terminal': 'wt',
+    };
+    const key = String(appName ?? '').toLowerCase().trim();
+    const safe = ALLOWED_APPS[key];
+    if (!safe) return Promise.resolve(`error: "${appName}" is not in the list of allowed apps`);
     return new Promise((resolve) => {
       execFile(
         'powershell',
         ['-NoProfile', '-Command', 'Start-Process $env:BASED_APP'],
-        { env: { ...process.env, BASED_APP: String(appName) } },
+        { env: { ...process.env, BASED_APP: safe } },
         (err) => resolve(err ? `error: ${err.message}` : 'launched')
       );
     });
