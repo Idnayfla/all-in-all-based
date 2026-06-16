@@ -334,6 +334,9 @@ export default function CompanionOverlayPage() {
   const enterListenModeRef = useRef<(() => void) | null>(null);
   const wantsAutoListenRef = useRef(false);
   const stopSpeakingRef = useRef<(() => void) | null>(null);
+  // Tracks when TTS last stopped playing — VAD ignores audio for 1.5 s after this
+  // to suppress mic pickup of speaker output (Android echo loop fix).
+  const ttsEndedAtRef = useRef<number>(0);
 
   const [panelWidth, setPanelWidth] = useState<number>(WIDTH_DEFAULT);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -398,6 +401,7 @@ export default function CompanionOverlayPage() {
         setIsSpeaking(true);
         stopSpeakingRef.current = () => {
           audio.pause();
+          ttsEndedAtRef.current = Date.now();
           lastSpokenRef.current = '';
           setIsSpeaking(false);
           isSpeakingRef.current = false;
@@ -422,6 +426,7 @@ export default function CompanionOverlayPage() {
         }
       };
       audio.onended = () => {
+        ttsEndedAtRef.current = Date.now();
         stopSpeakingRef.current = null;
         lastSpokenRef.current = '';
         setIsSpeaking(false);
@@ -435,6 +440,7 @@ export default function CompanionOverlayPage() {
         }
       };
       audio.onerror = () => {
+        ttsEndedAtRef.current = Date.now();
         stopSpeakingRef.current = null;
         lastSpokenRef.current = '';
         setIsSpeaking(false);
@@ -619,9 +625,18 @@ export default function CompanionOverlayPage() {
             if (stopped) return;
             if (wakeStateRef.current === 'processing') return;
 
+            // Echo suppression: on Android/mobile the mic picks up speaker audio, creating a
+            // runaway loop where Based's TTS triggers itself indefinitely. Ignore any audio
+            // detected within 1.5 s of TTS stopping — this window covers room reverberation.
+            if (Date.now() - ttsEndedAtRef.current < 1500) return;
+
             if (isSpeakingRef.current) {
-              // Barge-in: stop TTS immediately and treat this audio as a new command.
-              // No wake phrase required — the interruption itself is the intent signal.
+              // Barge-in: intentional user interruption while Based is speaking.
+              // Disabled on mobile (no Electron) — speakers play straight into the mic
+              // and WebRTC echo cancellation alone is not sufficient to prevent echo loops.
+              if (!window.electronAPI) return;
+              // Also skip if a prior request is still in flight.
+              if (isGeneratingRef.current) return;
               stopSpeakingRef.current?.();
               wantsAutoListenRef.current = false;
               const raw = await transcribeAudio(audio, true);
@@ -691,7 +706,7 @@ export default function CompanionOverlayPage() {
               // Inside an active conversation window: treat this as a continuation command
               // without requiring the wake phrase again. This handles long speech split by VAD
               // and natural follow-up turns.
-              if (Date.now() < conversationWindowUntil) {
+              if (Date.now() < conversationWindowUntil && !isGeneratingRef.current) {
                 // Require 3+ words — single/double-word noise transcriptions ("hi",
                 // "thanks", "yeah okay") should not fire as continuation commands.
                 const wordCount = raw.trim().split(/\s+/).filter(Boolean).length;
