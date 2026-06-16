@@ -8,7 +8,7 @@ import { getWeather } from '@/lib/weather';
 import { getCrowdInfo } from '@/lib/crowd';
 import { getTrafficInfo } from '@/lib/traffic';
 import { createLangfuseClient } from '@/lib/langfuse';
-import { MODEL_OPUS, MODEL_SONNET, MODEL_HAIKU, MODEL_GROQ, MODEL_CEREBRAS } from '@/lib/models';
+import { MODEL_OPUS, MODEL_SONNET, MODEL_HAIKU, MODEL_GROQ, MODEL_CEREBRAS, MODEL_GEMINI_VISION } from '@/lib/models';
 import { BRAIN_TOOLS, runBrainTool } from '@/lib/brainTools';
 import { checkAndIncrementGeneration } from '@/lib/tiers';
 
@@ -70,6 +70,9 @@ const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = MODEL_GROQ;
 const CEREBRAS_URL = 'https://api.cerebras.ai/v1/chat/completions';
 const CEREBRAS_MODEL = MODEL_CEREBRAS;
+const GEMINI_API_KEY = process.env.GOOGLE_API_KEY ?? '';
+const HAS_GEMINI_KEY = !!GEMINI_API_KEY;
+const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 function friendlyError(e: unknown): string {
   const raw: string = (e instanceof Error ? e.message : null) ?? String(e);
@@ -290,6 +293,111 @@ async function streamGroqCollecting(
     return accumulated;
   }
   throw new Error('Groq rate limit — try again in a moment.');
+}
+
+// ── Gemini Flash 2.0 vision helpers ───────────────────────────────────────────
+// Used for Free-tier image conversations. Gemini Flash 2.0 is multimodal and
+// has a generous free quota — avoids burning Anthropic API credit for free users.
+
+type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
+type GeminiContent = { role: 'user' | 'model'; parts: GeminiPart[] };
+
+// Converts anthropicMessages (string | ClaudeContentBlock[]) → Gemini contents format.
+// Anthropic uses 'assistant', Gemini uses 'model'; image blocks become inlineData.
+function toGeminiContents(
+  msgs: Array<{ role: string; content: unknown }>
+): GeminiContent[] {
+  return msgs.map(m => {
+    const role = m.role === 'assistant' ? ('model' as const) : ('user' as const);
+    const parts: GeminiPart[] = [];
+    if (typeof m.content === 'string') {
+      if (m.content) parts.push({ text: m.content });
+    } else if (Array.isArray(m.content)) {
+      for (const block of m.content as Array<{ type: string; text?: string; source?: { media_type: string; data: string } }>) {
+        if (block.type === 'text' && block.text) {
+          parts.push({ text: block.text });
+        } else if (block.type === 'image' && block.source) {
+          parts.push({ inlineData: { mimeType: block.source.media_type, data: block.source.data } });
+        }
+      }
+    }
+    if (parts.length === 0) parts.push({ text: '[empty]' });
+    return { role, parts };
+  });
+}
+
+async function callGeminiVision(
+  systemPrompt: string,
+  msgs: Array<{ role: string; content: unknown }>,
+  maxTokens = 2000
+): Promise<string> {
+  const url = `${GEMINI_BASE}/${MODEL_GEMINI_VISION}:generateContent?key=${GEMINI_API_KEY}`;
+  const body: Record<string, unknown> = {
+    contents: toGeminiContents(msgs),
+    generationConfig: { maxOutputTokens: maxTokens },
+  };
+  if (systemPrompt) body.systemInstruction = { parts: [{ text: systemPrompt }] };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  return (data.candidates?.[0]?.content?.parts as GeminiPart[] | undefined)
+    ?.filter((p): p is { text: string } => 'text' in p)
+    .map(p => p.text)
+    .join('') ?? '';
+}
+
+async function streamGeminiVisionCollecting(
+  systemPrompt: string,
+  msgs: Array<{ role: string; content: unknown }>,
+  maxTokens: number,
+  onChunk: (text: string) => void
+): Promise<string> {
+  const url = `${GEMINI_BASE}/${MODEL_GEMINI_VISION}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
+  const body: Record<string, unknown> = {
+    contents: toGeminiContents(msgs),
+    generationConfig: { maxOutputTokens: maxTokens },
+  };
+  if (systemPrompt) body.systemInstruction = { parts: [{ text: systemPrompt }] };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
+  const reader = res.body?.getReader();
+  if (!reader) throw new Error('No response body from Gemini');
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let accumulated = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const payload = line.slice(6).trim();
+      if (!payload) continue;
+      try {
+        const parsed = JSON.parse(payload);
+        const parts = parsed.candidates?.[0]?.content?.parts as GeminiPart[] | undefined;
+        const text = parts
+          ?.filter((p): p is { text: string } => 'text' in p)
+          .map(p => p.text)
+          .join('') ?? '';
+        if (text) {
+          accumulated += text;
+          onChunk(text);
+        }
+      } catch {}
+    }
+  }
+  return accumulated;
 }
 
 // groqPlanner — fast structured JSON planner using Groq's llama-3.3-70b-versatile.
@@ -1472,7 +1580,16 @@ async function callModel(
     return callPantheon(msgs, modelType === 'generator' ? 'chat' : 'fast_chat', maxTokens);
   }
 
-  // Image-containing calls stay on Anthropic (vision required)
+  // Image-containing calls: Free tier → Gemini Flash 2.0 (multimodal, free quota).
+  // Based AI → Anthropic (Haiku for planning, Opus for generation).
+  if (aiModel === 'free' && HAS_GEMINI_KEY) {
+    const systemText = Array.isArray(systemPrompt)
+      ? systemPrompt.map(b => b.text ?? '').join('\n')
+      : (systemPrompt ?? '');
+    const maxTok = modelType === 'generator' ? 8000 : 2000;
+    return callGeminiVision(systemText, [{ role: 'user', content: prompt }], maxTok);
+  }
+
   const response = await client.messages.create({
     model: modelType === 'generator' ? MODEL_OPUS : MODEL_HAIKU,
     max_tokens: modelType === 'generator' ? 16000 : 8000,
@@ -2322,27 +2439,37 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             }
           } catch {
             if (!routeToChat) {
-              // Planner parse failed — stream via Anthropic (fallback for images or recent image context)
+              // Planner parse failed — stream via vision model (images) or text model (no images)
               let fullText = '';
               if (imageBlocks.length > 0 || hasRecentImage) {
-                const stream = await client.messages.stream({
-                  model: MODEL_OPUS,
-                  max_tokens: 16000,
-                  system: [
-                    {
-                      type: 'text' as const,
-                      text: SYSTEM,
-                      cache_control: { type: 'ephemeral' as const },
-                    },
-                  ],
-                  messages: anthropicMessages,
-                });
-                for await (const chunk of stream) {
-                  if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-                    fullText += chunk.delta.text;
-                    controller.enqueue(
-                      encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
-                    );
+                if (usingFreeModel && HAS_GEMINI_KEY) {
+                  fullText = await streamGeminiVisionCollecting(
+                    SYSTEM,
+                    anthropicMessages,
+                    8000,
+                    t =>
+                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`))
+                  );
+                } else {
+                  const stream = await client.messages.stream({
+                    model: MODEL_OPUS,
+                    max_tokens: 16000,
+                    system: [
+                      {
+                        type: 'text' as const,
+                        text: SYSTEM,
+                        cache_control: { type: 'ephemeral' as const },
+                      },
+                    ],
+                    messages: anthropicMessages,
+                  });
+                  for await (const chunk of stream) {
+                    if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+                      fullText += chunk.delta.text;
+                      controller.enqueue(
+                        encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
+                      );
+                    }
                   }
                 }
               } else {
@@ -2382,39 +2509,33 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
 
           if (routeToChat) {
             let fullText = '';
-            if (imageBlocks.length > 0) {
-              // Current message has an image — use Anthropic vision (Groq has no vision support).
-              const stream = await client.messages.stream({
-                model: MODEL_OPUS,
-                max_tokens: 12000,
-                system: systemBlocks,
-                messages: anthropicMessages,
-              });
-              for await (const chunk of stream) {
-                if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-                  fullText += chunk.delta.text;
-                  controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
-                  );
-                }
-              }
-            } else if (hasRecentImage) {
-              // Follow-up text message after an image conversation.
-              // Groq strips non-string content from history (image blocks → lastUserMessage),
-              // breaking the conversation context. Route to Anthropic so the full history
-              // (including the [reference image] placeholder) is preserved correctly.
-              const stream = await client.messages.stream({
-                model: MODEL_OPUS,
-                max_tokens: 12000,
-                system: systemBlocks,
-                messages: anthropicMessages,
-              });
-              for await (const chunk of stream) {
-                if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-                  fullText += chunk.delta.text;
-                  controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
-                  );
+            if (imageBlocks.length > 0 || hasRecentImage) {
+              // Image in current or recent message — Groq/Cerebras have no vision support.
+              // Free tier → Gemini Flash 2.0 (multimodal, free quota).
+              // Based AI (or no Gemini key) → Anthropic Opus with full conversation history.
+              if (usingFreeModel && HAS_GEMINI_KEY) {
+                const sysText = systemBlocks.map(b => b.text).join('\n');
+                fullText = await streamGeminiVisionCollecting(
+                  sysText,
+                  anthropicMessages,
+                  4096,
+                  t =>
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`))
+                );
+              } else {
+                const stream = await client.messages.stream({
+                  model: MODEL_OPUS,
+                  max_tokens: 12000,
+                  system: systemBlocks,
+                  messages: anthropicMessages,
+                });
+                for await (const chunk of stream) {
+                  if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+                    fullText += chunk.delta.text;
+                    controller.enqueue(
+                      encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
+                    );
+                  }
                 }
               }
             } else if (!usingFreeModel && HAS_ANTHROPIC_KEY) {
