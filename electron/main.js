@@ -433,12 +433,14 @@ app.whenReady().then(async () => {
     });
   }
 
-  // Win32 paste helper — finds window by title, sends WM_PASTE directly (no focus needed),
-  // then falls back to focus+SendKeys for apps that ignore WM_PASTE.
+  // Win32 paste helper — three-method cascade, no Windows.Forms dependency.
+  // 1. SendMessage WM_PASTE to main window + every edit-like child (synchronous, no focus needed)
+  // 2. Focus window + keybd_event Ctrl+V (goes to OS foreground window)
+  // Prints "found:<title>" to stdout so the IPC can surface diagnostics.
   const WIN32_SRC = path.join(TMP, 'based_win32.cs');
   const WIN32_EXE = path.join(TMP, 'based_win32.exe');
   fs.writeFileSync(WIN32_SRC, [
-    'using System; using System.Runtime.InteropServices; using System.Text; using System.Threading; using System.Windows.Forms;',
+    'using System; using System.Runtime.InteropServices; using System.Text; using System.Threading;',
     'class W {',
     '  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);',
     '  [DllImport("user32.dll",CharSet=CharSet.Auto)] static extern int GetWindowText(IntPtr h,StringBuilder s,int n);',
@@ -452,9 +454,13 @@ app.whenReady().then(async () => {
     '  [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();',
     '  [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h,int cmd);',
     '  [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);',
-    '  [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l);',
-    '  [DllImport("user32.dll")] static extern IntPtr FindWindowEx(IntPtr p,IntPtr a,string c,string t);',
-    '  static IntPtr Find(string q) {',
+    '  [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h,uint m,IntPtr w,IntPtr l);',
+    '  [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr p,EnumChildProc cb,IntPtr l);',
+    '  [DllImport("user32.dll")] static extern int GetClassName(IntPtr h,StringBuilder s,int n);',
+    '  [DllImport("user32.dll")] static extern void keybd_event(byte vk,byte scan,uint flags,UIntPtr extra);',
+    '  delegate bool EnumChildProc(IntPtr h,IntPtr l);',
+    '  const uint WM_PASTE=0x0302;',
+    '  static IntPtr Find(string q){',
     '    for(IntPtr h=GetTopWindow(IntPtr.Zero);h!=IntPtr.Zero;h=GetWindow(h,2u)){',
     '      if(!IsWindowVisible(h))continue;',
     '      var s=new StringBuilder(256);GetWindowText(h,s,256);var t=s.ToString().Trim();',
@@ -464,26 +470,39 @@ app.whenReady().then(async () => {
     '    }return IntPtr.Zero;',
     '  }',
     '  static void Focus(IntPtr t){',
+    '    if(IsIconic(t))ShowWindow(t,9);',
     '    uint d;IntPtr f=GetForegroundWindow();',
     '    uint ft=GetWindowThreadProcessId(f,out d),tt=GetWindowThreadProcessId(t,out d),my=GetCurrentThreadId();',
     '    AttachThreadInput(my,ft,true);AttachThreadInput(my,tt,true);',
     '    SetForegroundWindow(t);',
     '    AttachThreadInput(my,tt,false);AttachThreadInput(my,ft,false);',
     '  }',
-    '  [STAThread] static void Main(string[] a){',
+    '  static void Main(string[] a){',
     '    string q=a.Length>0?a[0]:"";IntPtr h=Find(q);',
     '    if(h==IntPtr.Zero){Console.Error.WriteLine("window not found: "+q);Environment.Exit(1);}',
+    '    var title=new StringBuilder(256);GetWindowText(h,title,256);',
+    '    Console.WriteLine("found:"+title.ToString().Trim());',
     '    if(IsIconic(h))ShowWindow(h,9);',
-    '    const uint WM_PASTE=0x0302;',
-    '    // Primary: post WM_PASTE to main window and common edit child classes — no focus needed.',
-    '    PostMessage(h,WM_PASTE,IntPtr.Zero,IntPtr.Zero);',
-    '    foreach(var cls in new[]{"Edit","RichEdit20W","RICHEDIT50W","RichEditD2DPT","Scintilla"}){',
-    '      IntPtr ch=FindWindowEx(h,IntPtr.Zero,cls,null);',
-    '      if(ch!=IntPtr.Zero){PostMessage(ch,WM_PASTE,IntPtr.Zero,IntPtr.Zero);break;}',
-    '    }',
-    '    Thread.Sleep(150);',
-    '    // Fallback: focus + keyboard shortcut for apps that handle Ctrl+V but not WM_PASTE.',
-    '    Focus(h);Thread.Sleep(300);SendKeys.SendWait("^v");',
+    '    // Method 1: WM_PASTE to main window (synchronous — waits for processing)',
+    '    SendMessage(h,WM_PASTE,IntPtr.Zero,IntPtr.Zero);',
+    '    // Method 2: WM_PASTE to every edit-like child via EnumChildWindows',
+    '    var cb=new EnumChildProc((ch,_)=>{',
+    '      var cn=new StringBuilder(64);GetClassName(ch,cn,64);string s=cn.ToString();',
+    '      if(s.IndexOf("Edit",StringComparison.OrdinalIgnoreCase)>=0||',
+    '         s.IndexOf("Rich",StringComparison.OrdinalIgnoreCase)>=0||',
+    '         s.IndexOf("Scintilla",StringComparison.OrdinalIgnoreCase)>=0||',
+    '         s.IndexOf("CodeMirror",StringComparison.OrdinalIgnoreCase)>=0)',
+    '        SendMessage(ch,WM_PASTE,IntPtr.Zero,IntPtr.Zero);',
+    '      return true;',
+    '    });',
+    '    EnumChildWindows(h,cb,IntPtr.Zero);',
+    '    GC.KeepAlive(cb);',
+    '    Thread.Sleep(120);',
+    '    // Method 3: focus window + keybd_event Ctrl+V (goes to OS foreground window)',
+    '    Focus(h);Thread.Sleep(350);',
+    '    keybd_event(0x11,0,0,UIntPtr.Zero);keybd_event(0x56,0,0,UIntPtr.Zero);',
+    '    Thread.Sleep(50);',
+    '    keybd_event(0x56,0,2,UIntPtr.Zero);keybd_event(0x11,0,2,UIntPtr.Zero);',
     '  }',
     '}',
   ].join('\r\n'), 'utf8');
@@ -523,7 +542,7 @@ app.whenReady().then(async () => {
   ].join('\r\n'), 'utf8');
 
   // Compile both in parallel at startup — ready by the time user asks for them
-  const win32Ready = compileExe(WIN32_SRC, WIN32_EXE, ['System.Windows.Forms.dll']);
+  const win32Ready = compileExe(WIN32_SRC, WIN32_EXE, null);
   const audioReady = compileExe(AUDIO_SRC, AUDIO_EXE, null);
 
   // Type text: hide overlay → write clipboard → run Win32 exe → restore.
@@ -547,12 +566,12 @@ app.whenReady().then(async () => {
     let result;
     try {
       const args = filter ? [filter] : [];
-      await new Promise((resolve, reject) => {
-        execFile(WIN32_EXE, args, (err, _out, stderr) =>
-          err ? reject(new Error(stderr || err.message)) : resolve()
+      const stdout = await new Promise((resolve, reject) => {
+        execFile(WIN32_EXE, args, (err, out, stderr) =>
+          err ? reject(new Error(stderr || err.message)) : resolve(out.trim())
         );
       });
-      result = 'typed';
+      result = stdout || 'typed';
     } catch (e) {
       result = `error: ${e.message}`;
     }
