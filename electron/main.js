@@ -433,10 +433,8 @@ app.whenReady().then(async () => {
     });
   }
 
-  // Win32 paste helper — three-method cascade, no Windows.Forms dependency.
-  // 1. SendMessage WM_PASTE to main window + every edit-like child (synchronous, no focus needed)
-  // 2. Focus window + keybd_event Ctrl+V (goes to OS foreground window)
-  // Prints "found:<title>" to stdout so the IPC can surface diagnostics.
+  // Win32 paste helper — find window, focus it, send Ctrl+V via keybd_event.
+  // Prints "found:<title>" to stdout for diagnostics.
   const WIN32_SRC = path.join(TMP, 'based_win32.cs');
   const WIN32_EXE = path.join(TMP, 'based_win32.exe');
   fs.writeFileSync(WIN32_SRC, [
@@ -454,12 +452,7 @@ app.whenReady().then(async () => {
     '  [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();',
     '  [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h,int cmd);',
     '  [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);',
-    '  [DllImport("user32.dll")] static extern IntPtr SendMessage(IntPtr h,uint m,IntPtr w,IntPtr l);',
-    '  [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr p,EnumChildProc cb,IntPtr l);',
-    '  [DllImport("user32.dll")] static extern int GetClassName(IntPtr h,StringBuilder s,int n);',
     '  [DllImport("user32.dll")] static extern void keybd_event(byte vk,byte scan,uint flags,UIntPtr extra);',
-    '  delegate bool EnumChildProc(IntPtr h,IntPtr l);',
-    '  const uint WM_PASTE=0x0302;',
     '  static IntPtr Find(string q){',
     '    for(IntPtr h=GetTopWindow(IntPtr.Zero);h!=IntPtr.Zero;h=GetWindow(h,2u)){',
     '      if(!IsWindowVisible(h))continue;',
@@ -482,24 +475,7 @@ app.whenReady().then(async () => {
     '    if(h==IntPtr.Zero){Console.Error.WriteLine("window not found: "+q);Environment.Exit(1);}',
     '    var title=new StringBuilder(256);GetWindowText(h,title,256);',
     '    Console.WriteLine("found:"+title.ToString().Trim());',
-    '    if(IsIconic(h))ShowWindow(h,9);',
-    '    // Method 1: WM_PASTE to main window (synchronous — waits for processing)',
-    '    SendMessage(h,WM_PASTE,IntPtr.Zero,IntPtr.Zero);',
-    '    // Method 2: WM_PASTE to every edit-like child via EnumChildWindows',
-    '    var cb=new EnumChildProc((ch,_)=>{',
-    '      var cn=new StringBuilder(64);GetClassName(ch,cn,64);string s=cn.ToString();',
-    '      if(s.IndexOf("Edit",StringComparison.OrdinalIgnoreCase)>=0||',
-    '         s.IndexOf("Rich",StringComparison.OrdinalIgnoreCase)>=0||',
-    '         s.IndexOf("Scintilla",StringComparison.OrdinalIgnoreCase)>=0||',
-    '         s.IndexOf("CodeMirror",StringComparison.OrdinalIgnoreCase)>=0)',
-    '        SendMessage(ch,WM_PASTE,IntPtr.Zero,IntPtr.Zero);',
-    '      return true;',
-    '    });',
-    '    EnumChildWindows(h,cb,IntPtr.Zero);',
-    '    GC.KeepAlive(cb);',
-    '    Thread.Sleep(120);',
-    '    // Method 3: focus window + keybd_event Ctrl+V (goes to OS foreground window)',
-    '    Focus(h);Thread.Sleep(350);',
+    '    Focus(h);Thread.Sleep(300);',
     '    keybd_event(0x11,0,0,UIntPtr.Zero);keybd_event(0x56,0,0,UIntPtr.Zero);',
     '    Thread.Sleep(50);',
     '    keybd_event(0x56,0,2,UIntPtr.Zero);keybd_event(0x11,0,2,UIntPtr.Zero);',
