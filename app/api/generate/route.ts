@@ -836,6 +836,11 @@ When the user asks to build a video editor, video trimmer, video cutter, or vide
 
 const PLANNER_SYSTEM = `You are a software architect. Output ONLY a JSON array. No explanation. No markdown. Raw JSON only.
 
+IMAGE RULE (highest priority — check before everything else):
+If the request contains an image/photo/screenshot AND the user's text does NOT explicitly say "build", "create", "make", "design", "generate", or "code" — output exactly: [{"chat":true}]
+The image alone is NOT a build request. Only generate a file plan if the user's words explicitly ask to build something.
+If the prompt contains [CONTEXT: Previous messages in this conversation contained images] — treat short responses, descriptions, and questions as chat unless the user explicitly requests to build something.
+
 CHAT DETECTION — check this first:
 If the user's message is a question, calculation, analysis, writing task, explanation request, or general conversation with NO request to build/create/make/design/animate/generate a thing — output exactly: [{"chat":true}]
 
@@ -1754,6 +1759,15 @@ export async function POST(req: NextRequest) {
           }))
       : [];
 
+    // True if ANY recent message (not just the last) contains an image.
+    // Used to keep follow-up text messages in the Anthropic vision path
+    // instead of routing to Groq (which has no vision support).
+    const hasRecentImage = recentMessages.some(
+      m =>
+        Array.isArray(m.content) &&
+        (m.content as ApiContentBlock[]).some(b => b.type === 'image')
+    );
+
     // Edit-intent detection: append Image Studio tip when image + edit keyword
     const EDIT_INTENT_RE =
       /\b(darken|brighten|lighten|darker|brighter|crop|filter|rotate|flip|blur|sharpen|resize|adjust|enhance|edit|retouch|remove\s+background|color|saturate|exposure)\b/i;
@@ -2178,8 +2192,15 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             ? `\n\nExisting files (read before deciding which files to include):\n${(existingFiles as ProjectFile[]).map(f => `--- ${f.name} ---\n${f.content.slice(0, 200).replace(/\n/g, ' ')}`).join('\n')}`
             : '';
 
+          // When user is following up in an image conversation without sending a new image,
+          // hint the planner to prefer chat unless they explicitly ask to build something.
+          const recentImageNote =
+            hasRecentImage && !hasImage
+              ? '\n[CONTEXT: Previous messages in this conversation contained images. Only generate a file plan if the user explicitly says to build/create/make/design something. Otherwise return [{"chat":true}].]'
+              : '';
           const plannerTextContent =
-            (lastUserMessage + existingFilesContext).trim() || 'Please look at this image.';
+            (lastUserMessage + existingFilesContext + recentImageNote).trim() ||
+            'Please look at this image.';
           const plannerPromptContent =
             imageBlocks.length > 0
               ? [
@@ -2301,9 +2322,9 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             }
           } catch {
             if (!routeToChat) {
-              // Planner parse failed — stream via Pantheon (Anthropic fallback for images)
+              // Planner parse failed — stream via Anthropic (fallback for images or recent image context)
               let fullText = '';
-              if (imageBlocks.length > 0) {
+              if (imageBlocks.length > 0 || hasRecentImage) {
                 const stream = await client.messages.stream({
                   model: MODEL_OPUS,
                   max_tokens: 16000,
@@ -2362,6 +2383,26 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
           if (routeToChat) {
             let fullText = '';
             if (imageBlocks.length > 0) {
+              // Current message has an image — use Anthropic vision (Groq has no vision support).
+              const stream = await client.messages.stream({
+                model: MODEL_OPUS,
+                max_tokens: 12000,
+                system: systemBlocks,
+                messages: anthropicMessages,
+              });
+              for await (const chunk of stream) {
+                if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
+                  fullText += chunk.delta.text;
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
+                  );
+                }
+              }
+            } else if (hasRecentImage) {
+              // Follow-up text message after an image conversation.
+              // Groq strips non-string content from history (image blocks → lastUserMessage),
+              // breaking the conversation context. Route to Anthropic so the full history
+              // (including the [reference image] placeholder) is preserved correctly.
               const stream = await client.messages.stream({
                 model: MODEL_OPUS,
                 max_tokens: 12000,
