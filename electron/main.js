@@ -417,32 +417,77 @@ app.whenReady().then(async () => {
     });
   });
 
+  // Win32 helper — finds the front non-Based window and force-focuses it.
+  // Written as a real .cs file (CRLF) so Add-Type -Path avoids heredoc parsing issues.
+  const WIN32_CS_PATH = path.join(os.tmpdir(), 'based_win32.cs');
+  fs.writeFileSync(
+    WIN32_CS_PATH,
+    [
+      'using System;',
+      'using System.Runtime.InteropServices;',
+      'using System.Text;',
+      'public class Win32Helper {',
+      '  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);',
+      '  [DllImport("user32.dll", CharSet=CharSet.Auto)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);',
+      '  [DllImport("user32.dll")] static extern IntPtr GetTopWindow(IntPtr h);',
+      '  [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr h, uint cmd);',
+      '  [DllImport("user32.dll")] static extern int GetWindowLong(IntPtr h, int idx);',
+      '  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);',
+      '  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();',
+      '  [DllImport("user32.dll")] static extern bool AttachThreadInput(uint a, uint b, bool attach);',
+      '  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);',
+      '  [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();',
+      '  public static IntPtr FindFrontWindow() {',
+      '    IntPtr h = GetTopWindow(IntPtr.Zero);',
+      '    while (h != IntPtr.Zero) {',
+      '      if (IsWindowVisible(h) && (GetWindowLong(h, -20) & 8) == 0) {',
+      '        var sb = new StringBuilder(256);',
+      '        GetWindowText(h, sb, 256);',
+      '        var t = sb.ToString().Trim();',
+      '        if (t.Length > 0 && !t.Contains("Based") && !t.Contains("Default IME") && !t.Contains("MSCTFIME UI")) return h;',
+      '      }',
+      '      h = GetWindow(h, 2u);',
+      '    }',
+      '    return IntPtr.Zero;',
+      '  }',
+      '  public static void FocusWindow(IntPtr target) {',
+      '    IntPtr fg = GetForegroundWindow();',
+      '    uint dummy;',
+      '    uint fgTid = GetWindowThreadProcessId(fg, out dummy);',
+      '    uint tgTid = GetWindowThreadProcessId(target, out dummy);',
+      '    uint myTid = GetCurrentThreadId();',
+      '    AttachThreadInput(myTid, fgTid, true);',
+      '    AttachThreadInput(myTid, tgTid, true);',
+      '    SetForegroundWindow(target);',
+      '    AttachThreadInput(myTid, tgTid, false);',
+      '    AttachThreadInput(myTid, fgTid, false);',
+      '  }',
+      '}',
+    ].join('\r\n'),
+    'utf8'
+  );
+
   // Type text at the current cursor position.
-  // Writes text to clipboard then sends Ctrl+V — avoids SendKeys focus and escaping issues.
+  // Writes to clipboard, then uses Win32 to find and force-focus the front non-Based window,
+  // then pastes with Ctrl+V — no overlay hide/show, no focus guessing.
   ipcMain.handle('system:type-text', async (_, text) => {
     const prev = clipboard.readText();
     clipboard.writeText(String(text));
-    const wasVisible = overlayWin?.isVisible();
-    if (wasVisible) overlayWin.hide();
-    await new Promise(r => setTimeout(r, 450));
     let result;
     try {
       await new Promise((resolve, reject) => {
-        execFile(
-          'powershell',
-          ['-NoProfile', '-NonInteractive', '-Command',
-            'Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("^v")'
-          ],
-          (err) => err ? reject(err) : resolve()
-        );
+        execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command',
+          `Add-Type -Path '${WIN32_CS_PATH}'; ` +
+          `Add-Type -AssemblyName System.Windows.Forms; ` +
+          `$hw = [Win32Helper]::FindFrontWindow(); ` +
+          `if ($hw -ne [IntPtr]::Zero) { [Win32Helper]::FocusWindow($hw); Start-Sleep -Milliseconds 300; [System.Windows.Forms.SendKeys]::SendWait('^v') }`
+        ], (err) => err ? reject(err) : resolve());
       });
       result = 'typed';
     } catch (e) {
       result = `error: ${e.message}`;
     }
-    // Restore previous clipboard content after paste completes
     setTimeout(() => clipboard.writeText(prev), 1000);
-    if (wasVisible) overlayWin.showInactive();
     return result;
   });
 
@@ -501,7 +546,7 @@ app.whenReady().then(async () => {
     try {
       const out = await new Promise((resolve, reject) => {
         execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command',
-          `Add-Type -Path '${AUDIO_CS_PATH}'; [Math]::Round([AudioCtrl]::Get() * 100)`
+          `try { Add-Type -Path '${AUDIO_CS_PATH}'; Write-Output ([Math]::Round([AudioCtrl]::Get() * 100)) } catch { Write-Output 0 }`
         ], (err, stdout) => err ? reject(err) : resolve(stdout.trim()));
       });
       return parseInt(out) || 0;
@@ -512,11 +557,12 @@ app.whenReady().then(async () => {
     const pct = Math.max(0, Math.min(100, Number(level) || 0));
     const fraction = (pct / 100).toFixed(6);
     try {
-      await new Promise((resolve, reject) => {
+      const out = await new Promise((resolve, reject) => {
         execFile('powershell', ['-NoProfile', '-NonInteractive', '-Command',
-          `Add-Type -Path '${AUDIO_CS_PATH}'; [AudioCtrl]::Set(${fraction})`
-        ], (err) => err ? reject(err) : resolve());
+          `try { Add-Type -Path '${AUDIO_CS_PATH}'; [AudioCtrl]::Set(${fraction}); Write-Output 'ok' } catch { Write-Output ('err: ' + $_.Exception.Message) }`
+        ], (err, stdout) => err ? reject(err) : resolve(stdout.trim()));
       });
+      if (out.startsWith('err:')) return out;
       return `volume set to ${pct}%`;
     } catch (e) { return `error: ${e.message}`; }
   });
