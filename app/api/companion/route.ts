@@ -657,7 +657,7 @@ export async function POST(req: NextRequest) {
 
   // System control — triggers tool loop even without scheduling intent
   const COMPANION_SYSTEM_RE =
-    /\b(open\s+https?:\/\/\S+|open\s+\w+\.(com|org|io|dev|ai|app)\b|(?:can\s+you\s+|please\s+)?(?:open|launch|start)\s+(?:a\s+|an\s+|the\s+)?\w+(?:\s+for\s+me)?|type\s+(this|for\s+me|it\s+out|it\s+for\s+me|["'].+?["']|.+?\s+(?:in|into|on)\s+\w+)|write\s+(this|it)\s+(?:for\s+me|out)|copy\s+(this|it)\s+(to\s+)?(my\s+)?clipboard|put\s+(this|it)\s+(in|on|into)\s+(my\s+)?clipboard|set\s+(the\s+)?volume\s+(to\s+)?\d+|volume\s+(to\s+)?\d+|turn\s+(the\s+)?volume\s+(up|down)|mute(?:\s+my\s+computer)?|unmute)\b/i;
+    /\b(open\s+https?:\/\/\S+|open\s+\w+\.(com|org|io|dev|ai|app)\b|(?:can\s+you\s+|please\s+)?(?:open|launch|start)\s+(?:a\s+|an\s+|the\s+)?\w+(?:\s+for\s+me)?|type\s+(this|for\s+me|it\s+out|it\s+for\s+me|["'].+?["']|.+?\s+(?:in|inside|into|on)\s+\w+)|write\s+(this|it|something|anything|["'].+?["']|.+?\s+(?:in|inside|into|on)\s+\w+)|copy\s+(this|it)\s+(to\s+)?(my\s+)?clipboard|put\s+(this|it)\s+(in|on|into)\s+(my\s+)?clipboard|set\s+(the\s+)?volume\s+(to\s+)?\d+|volume\s+(to\s+)?\d+|turn\s+(the\s+)?volume\s+(up|down)|mute(?:\s+my\s+computer)?|unmute)\b/i;
 
   // Task management + brain cleanup from companion — detect and run tool loop
   const COMPANION_TASK_RE =
