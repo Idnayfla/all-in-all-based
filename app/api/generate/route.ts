@@ -304,26 +304,48 @@ type GeminiContent = { role: 'user' | 'model'; parts: GeminiPart[] };
 
 // Converts anthropicMessages (string | ClaudeContentBlock[]) → Gemini contents format.
 // Anthropic uses 'assistant', Gemini uses 'model'; image blocks become inlineData.
+// Gemini strict requirements:
+//   1. Conversation MUST start with a 'user' role — strip any leading model turns
+//      (this happens when recentMessages.slice(-10) cuts the first user message)
+//   2. '[reference image]' placeholder → descriptive hint so Gemini knows it already
+//      described that image and can reference its own prior response
 function toGeminiContents(
   msgs: Array<{ role: string; content: unknown }>
 ): GeminiContent[] {
-  return msgs.map(m => {
+  const contents: GeminiContent[] = msgs.map(m => {
     const role = m.role === 'assistant' ? ('model' as const) : ('user' as const);
     const parts: GeminiPart[] = [];
     if (typeof m.content === 'string') {
-      if (m.content) parts.push({ text: m.content });
+      if (m.content) {
+        // Replace stripped-image placeholder with a hint that helps Gemini reference
+        // its own prior description when the user asks "the earlier image" etc.
+        const text = m.content === '[reference image]'
+          ? '[An image was shared here. You described it in your previous response — reference that description when the user asks about it.]'
+          : m.content;
+        parts.push({ text });
+      }
     } else if (Array.isArray(m.content)) {
       for (const block of m.content as Array<{ type: string; text?: string; source?: { media_type: string; data: string } }>) {
         if (block.type === 'text' && block.text) {
-          parts.push({ text: block.text });
+          const text = block.text === '[reference image]'
+            ? '[An image was shared here. You described it in your previous response — reference that description when the user asks about it.]'
+            : block.text;
+          parts.push({ text });
         } else if (block.type === 'image' && block.source) {
           parts.push({ inlineData: { mimeType: block.source.media_type, data: block.source.data } });
         }
       }
     }
-    if (parts.length === 0) parts.push({ text: '[empty]' });
+    if (parts.length === 0) parts.push({ text: '[empty turn]' });
     return { role, parts };
   });
+
+  // Gemini requires the first turn to be 'user'. If recentMessages.slice(-10) cut the
+  // first user message, the history may start with 'model' — drop leading model turns.
+  while (contents.length > 0 && contents[0].role === 'model') {
+    contents.shift();
+  }
+  return contents;
 }
 
 async function callGeminiVision(
