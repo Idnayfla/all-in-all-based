@@ -208,7 +208,7 @@ export default function LandingPage({ onSignIn }: Props) {
       {/* ── Hero ── */}
       <section className="landing-hero">
         <div className="landing-hero-glow" />
-        <div className="landing-hero-badge">◈ Personal Assistant AI</div>
+        <div className="landing-hero-badge">Personal Assistant AI</div>
         <h1 className="landing-headline">
           <span style={{ whiteSpace: 'nowrap' }}>Never leaves</span>
           <br />
