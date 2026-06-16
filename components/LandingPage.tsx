@@ -239,7 +239,7 @@ export default function LandingPage({ onSignIn }: Props) {
             Sign In
           </button>
           <a
-            href="https://github.com/Idnayfla/all-in-all-based/releases/download/v0.1.5/Based.Setup.0.1.5.exe"
+            href="https://github.com/Idnayfla/all-in-all-based/releases/download/v0.1.6/Based.Setup.0.1.6.exe"
             className="landing-cta-download"
             download
           >

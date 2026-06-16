@@ -13,7 +13,7 @@ export function detectPlatform(): AppPlatform {
 }
 
 const WIN_EXE =
-  'https://github.com/Idnayfla/all-in-all-based/releases/download/v0.1.5/Based.Setup.0.1.5.exe';
+  'https://github.com/Idnayfla/all-in-all-based/releases/download/v0.1.6/Based.Setup.0.1.6.exe';
 
 export interface AppTarget {
   label: string;
