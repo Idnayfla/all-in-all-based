@@ -5547,7 +5547,7 @@ body {
   overflow-x: hidden;
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-mono);
+  font-family: var(--font-pixel);
   -webkit-overflow-scrolling: touch;
 }
 
@@ -5564,18 +5564,19 @@ body {
   border-bottom: 1px solid var(--border-subtle);
 }
 .landing-logo {
+  font-family: var(--font-brand);
   font-size: 20px;
   font-weight: 700;
   color: var(--accent);
-  letter-spacing: -0.02em;
+  letter-spacing: 0.04em;
 }
 .landing-signin-btn {
   padding: 8px 22px;
   border: 1px solid var(--border);
-  border-radius: var(--r-full);
+  border-radius: 2px;
   background: transparent;
   color: var(--text);
-  font-family: var(--font-mono);
+  font-family: var(--font-pixel);
   font-size: 11px;
   cursor: pointer;
   transition:
@@ -5658,8 +5659,8 @@ body {
   background: linear-gradient(135deg, var(--accent-hover) 0%, var(--accent) 60%, #b8925c 100%);
   color: var(--bg);
   border: none;
-  border-radius: var(--r-full);
-  font-family: var(--font-mono);
+  border-radius: 2px;
+  font-family: var(--font-pixel);
   font-size: 15px;
   font-weight: 700;
   cursor: pointer;
@@ -5679,8 +5680,8 @@ body {
   background: transparent;
   color: var(--text);
   border: 1px solid var(--border);
-  border-radius: var(--r-full);
-  font-family: var(--font-mono);
+  border-radius: 2px;
+  font-family: var(--font-pixel);
   font-size: 15px;
   cursor: pointer;
   transition:
@@ -5697,13 +5698,14 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  font-family: var(--font-pixel);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: 0.06em;
   color: rgba(201, 168, 124, 0.75);
   text-decoration: none;
   border: 1px solid rgba(201, 168, 124, 0.25);
-  border-radius: var(--r-full);
+  border-radius: 2px;
   padding: 10px 20px;
   transition:
     color 0.2s,
@@ -5823,12 +5825,13 @@ body {
 }
 .landing-bento-tag {
   display: inline-block;
-  padding: 4px 12px;
+  padding: 4px 10px;
   border: 1px solid var(--border);
-  border-radius: var(--r-full);
+  border-radius: 0;
+  font-family: var(--font-pixel);
   font-size: 9px;
   color: var(--text3);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -5915,7 +5918,7 @@ body {
   padding: 0 24px;
 }
 .landing-comparison-title {
-  font-family: var(--font-mono);
+  font-family: var(--font-pixel);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -5932,7 +5935,7 @@ body {
   border: 1px solid var(--border);
 }
 .landing-comparison-col-header {
-  font-family: var(--font-mono);
+  font-family: var(--font-pixel);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -5975,16 +5978,9 @@ body {
   padding: 28px 24px;
 }
 .landing-feature-icon {
-  font-size: 20px;
+  font-size: 22px;
   color: var(--accent);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: var(--accent-muted);
-  border: 1px solid var(--accent-subtle);
-  border-radius: var(--r-lg);
+  display: block;
   margin-bottom: 16px;
 }
 .landing-feature-title {
@@ -6014,6 +6010,7 @@ body {
   flex-wrap: wrap;
 }
 .landing-roadmap-label {
+  font-family: var(--font-pixel);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -6022,6 +6019,7 @@ body {
   margin-bottom: 8px;
 }
 .landing-roadmap-title {
+  font-family: var(--font-display);
   font-size: clamp(24px, 4vw, 36px);
   font-weight: 800;
   letter-spacing: -0.5px;
@@ -6040,9 +6038,9 @@ body {
   padding: 9px 18px;
   background: none;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 2px;
   color: var(--text2);
-  font-family: var(--font-mono);
+  font-family: var(--font-pixel);
   font-size: 12px;
   font-weight: 700;
   text-decoration: none;
@@ -6077,6 +6075,7 @@ body {
   gap: 12px;
 }
 .landing-roadmap-col-label {
+  font-family: var(--font-pixel);
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
@@ -6184,11 +6183,12 @@ body {
   transform: translateX(-50%);
   background: linear-gradient(135deg, var(--accent-hover) 0%, var(--accent) 60%, #b8925c 100%);
   color: var(--bg);
+  font-family: var(--font-brand);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.14em;
   padding: 5px 16px;
-  border-radius: var(--r-full);
+  border-radius: 0;
   box-shadow: 0 2px 12px rgba(201, 168, 124, 0.4);
   white-space: nowrap;
 }
@@ -6225,19 +6225,20 @@ body {
   line-height: 1.5;
 }
 .landing-tier-features li::before {
-  content: '✔';
+  content: '◈';
   position: absolute;
   left: 0;
-  color: var(--accent3);
+  color: var(--accent);
+  font-family: var(--font-pixel);
 }
 .landing-tier-cta {
   width: 100%;
   padding: 14px;
   border: 1px solid var(--border);
-  border-radius: var(--r-lg);
+  border-radius: 2px;
   background: transparent;
   color: var(--text);
-  font-family: var(--font-mono);
+  font-family: var(--font-pixel);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -6288,7 +6289,7 @@ body {
   gap: 20px;
 }
 .landing-closer-badge {
-  font-family: var(--font-mono);
+  font-family: var(--font-brand);
   font-size: 20px;
   font-weight: 700;
   color: var(--accent);
@@ -10321,6 +10322,7 @@ body:has(.beta-banner) .app-root {
 }
 
 .landing-gallery-label {
+  font-family: var(--font-pixel);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -10330,6 +10332,7 @@ body:has(.beta-banner) .app-root {
 }
 
 .landing-gallery-title {
+  font-family: var(--font-display);
   font-size: clamp(24px, 3vw, 36px);
   font-weight: 800;
   letter-spacing: -0.5px;
@@ -10341,7 +10344,7 @@ body:has(.beta-banner) .app-root {
   font-size: var(--fs-sm);
   color: var(--text3);
   margin: 0;
-  font-family: var(--font-mono);
+  font-family: var(--font-pixel);
 }
 
 .landing-gallery-browse-btn {
@@ -10351,10 +10354,10 @@ body:has(.beta-banner) .app-root {
   padding: 10px 22px;
   border: 1px solid var(--accent);
   color: var(--accent);
-  font-family: var(--font-mono);
+  font-family: var(--font-pixel);
   font-size: var(--fs-sm);
   font-weight: 700;
-  border-radius: 8px;
+  border-radius: 2px;
   text-decoration: none;
   transition:
     background 0.15s,
@@ -10447,7 +10450,7 @@ body:has(.beta-banner) .app-root {
 .landing-gal-card-meta {
   font-size: 12px;
   color: var(--text3);
-  font-family: var(--font-mono);
+  font-family: var(--font-pixel);
 }
 
 .landing-gallery-cta-row {
@@ -10457,7 +10460,7 @@ body:has(.beta-banner) .app-root {
 }
 
 .landing-gallery-cta-link {
-  font-family: var(--font-mono);
+  font-family: var(--font-pixel);
   font-size: var(--fs-sm);
   color: var(--accent);
   text-decoration: none;
