@@ -301,7 +301,7 @@ async function streamGroqCollecting(
 // Used for Free-tier image conversations. Gemini Flash 2.0 is multimodal and
 // has a generous free quota — avoids burning Anthropic API credit for free users.
 
-type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
+type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } } | { thought: true; text: string };
 type GeminiContent = { role: 'user' | 'model'; parts: GeminiPart[] };
 
 // Converts anthropicMessages (string | ClaudeContentBlock[]) → Gemini contents format.
@@ -358,7 +358,7 @@ async function callGeminiVision(
   const url = `${GEMINI_BASE}/${MODEL_GEMINI_VISION}:generateContent?key=${GEMINI_API_KEY}`;
   const body: Record<string, unknown> = {
     contents: toGeminiContents(msgs),
-    generationConfig: { maxOutputTokens: maxTokens },
+    generationConfig: { maxOutputTokens: maxTokens, thinkingConfig: { thinkingBudget: 0 } },
   };
   if (systemPrompt) body.systemInstruction = { parts: [{ text: systemPrompt }] };
   const res = await fetch(url, {
@@ -369,7 +369,7 @@ async function callGeminiVision(
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
   const data = await res.json();
   return (data.candidates?.[0]?.content?.parts as GeminiPart[] | undefined)
-    ?.filter((p): p is { text: string } => 'text' in p)
+    ?.filter((p): p is { text: string } => 'text' in p && !('thought' in p))
     .map(p => p.text)
     .join('') ?? '';
 }
@@ -383,7 +383,7 @@ async function streamGeminiVisionCollecting(
   const url = `${GEMINI_BASE}/${MODEL_GEMINI_VISION}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
   const body: Record<string, unknown> = {
     contents: toGeminiContents(msgs),
-    generationConfig: { maxOutputTokens: maxTokens },
+    generationConfig: { maxOutputTokens: maxTokens, thinkingConfig: { thinkingBudget: 0 } },
   };
   if (systemPrompt) body.systemInstruction = { parts: [{ text: systemPrompt }] };
   const res = await fetch(url, {
@@ -410,8 +410,9 @@ async function streamGeminiVisionCollecting(
       try {
         const parsed = JSON.parse(payload);
         const parts = parsed.candidates?.[0]?.content?.parts as GeminiPart[] | undefined;
+        // Filter out thought parts (gemini-2.5-flash internal reasoning — not for display)
         const text = parts
-          ?.filter((p): p is { text: string } => 'text' in p)
+          ?.filter((p): p is { text: string } => 'text' in p && !('thought' in p))
           .map(p => p.text)
           .join('') ?? '';
         if (text) {
@@ -1198,6 +1199,12 @@ IMAGE ANALYSIS:
 - If the image has bright or neon-coloured elements on a dark background, focus on the bright outlines and glowing shapes as the content — the dark background is irrelevant.
 - For puzzles or problems: extract the exact structure first (write it out explicitly), then solve.
 - For stacked-addition or cryptarithm puzzles: identify each row, write out the place-value equation explicitly (e.g. 200a + 30b + 3c = 1258), then solve algebraically. Show all steps.
+
+STACKED ADDITION PUZZLES:
+- Treat lines of shapes/symbols followed by a sum (= XXXX) as right-aligned stacked addition.
+- The rightmost symbol in each row is always the ones column. Count from right to assign place values.
+- Write out each row explicitly with column positions before solving.
+- Set up the algebraic equation and solve forward. Show verification.
 
 REASONING INTEGRITY — NON-NEGOTIABLE:
 - Solve FORWARD: derive the answer from the given data. Never work backward from a known answer and invent a method to justify it.
@@ -2533,7 +2540,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                 }
               } else {
                 const sysText = usingFreeModel
-                  ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally. Focus on the current message only — do not recap or reference previous topics unless the user explicitly asks.'
+                  ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally. Focus on the current message only — do not recap or reference previous topics unless the user explicitly asks.\n\nSTACKED ADDITION PUZZLES:\n- Treat lines of shapes/symbols followed by a sum (= XXXX) as right-aligned stacked addition.\n- The rightmost symbol in each row is always the ones column. Count from right to assign place values.\n- Write out each row explicitly with column positions before solving.\n- Set up the algebraic equation and solve forward. Show verification.'
                   : systemBlocks.map(b => b.text).join('\n');
                 const msgs = [
                   { role: 'system', content: sysText },
@@ -2576,7 +2583,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                 fullText = await streamGeminiVisionCollecting(
                   GEMINI_IMAGE_SYSTEM,
                   anthropicMessages,
-                  4096,
+                  8192,
                   t =>
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`))
                 );
