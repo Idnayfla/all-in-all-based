@@ -20,19 +20,31 @@ function parseInline(text: string, prefix: string): React.ReactNode {
     if (m[1]) parts.push(<strong key={k}>{m[2]}</strong>);
     else if (m[3]) parts.push(<em key={k}>{m[4]}</em>);
     else if (m[5]) parts.push(<code key={k}>{m[6]}</code>);
-    else if (m[7] !== undefined)
+    else if (m[7] !== undefined) {
+      let safeUrl: string | null = null;
+      try {
+        const parsed = new URL(m[8]);
+        if (parsed.protocol === 'https:' || parsed.protocol === 'http:') safeUrl = m[8];
+      } catch {
+        // invalid URL — skip
+      }
       parts.push(
-        <img
-          key={k}
-          src={m[8]}
-          alt={m[7]}
-          className="chat-inline-image"
-          loading="lazy"
-          onError={e => {
-            (e.currentTarget as HTMLImageElement).style.display = 'none';
-          }}
-        />
+        safeUrl ? (
+          <img
+            key={k}
+            src={safeUrl}
+            alt={m[7]}
+            className="chat-inline-image"
+            loading="lazy"
+            onError={e => {
+              (e.currentTarget as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ) : (
+          <span key={k}>{m[7]}</span>
+        )
       );
+    }
     else if (m[9])
       parts.push(
         <a key={k} href={m[10]} target="_blank" rel="noreferrer">
