@@ -371,7 +371,7 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
   {
     name: 'search_images',
     description:
-      'Search the web for real images and display them inline in chat. ALWAYS call this tool first — before writing any text description — whenever the user asks to see, show, find, look up, view, or display any image, photo, picture, or visual. Also call it for follow-up requests like "something scarier", "another one", "show me more", or any adjective-only follow-up in a visual conversation. Never describe images in text when you can fetch real ones.',
+      'Search the web for real images and display them inline in chat. ALWAYS call this tool — before writing ANY text — whenever: (1) The user asks to see, show, find, look up, view, or display any image, photo, picture, or visual. (2) The user sends ANY follow-up in a conversation where the assistant previously showed images — this includes single adjectives ("gorier", "scarier", "darker", "funnier"), comparative phrases ("something gorier", "more disturbing", "less scary"), style/genre descriptors ("practical-effects classic", "modern horror", "80s monsters", "black and white"), or filler-padded requests ("gorier bro", "show me more please"). (3) The user says "more", "another", "different", "next", "again" after seeing images. If the previous assistant response contained image markdown (![...]), ALWAYS call this tool for the next user message instead of responding with text. Never describe images in text when you can fetch real ones. Never skip this tool just because the follow-up message is short or informal.',
     input_schema: {
       type: 'object',
       properties: {

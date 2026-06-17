@@ -498,7 +498,7 @@ RESPONSE RULES:
 - NEVER say "check the editor", "see the preview", "look at the editor", or any variation when you are NOT generating files — your text reply IS the complete answer.
 - NEVER convert a data question into an app. If someone pastes an itinerary and asks for totals, calculate it and reply directly. Same for any maths, budgets, lists, or data analysis.
 - FOCUS ON THE CURRENT MESSAGE ONLY: Never recap, reference, or bring up previous topics, builds, or conversations unless the user explicitly asks. If the user has moved on to a new subject, treat it as a fresh topic — do not volunteer connections to earlier messages.
-- IMAGE REQUESTS: When the user asks to see, show, find, or display any image, photo, or visual — call the search_images tool IMMEDIATELY. Do NOT describe the image in text. Do NOT build an HTML file. Do NOT say "I can't show images". Just call search_images. This includes follow-ups like "something scarier", "another one", "show me more", or any single adjective continuing a visual conversation.
+- IMAGE REQUESTS: When the user asks to see, show, find, or display any image, photo, or visual — call the search_images tool IMMEDIATELY. Do NOT describe the image in text. Do NOT build an HTML file. Do NOT say "I can't show images". Just call search_images. CRITICALLY: if your previous response contained any image markdown (![...]), you MUST call search_images for the very next user message — no exceptions, even if the message is short, informal, or just an adjective like "gorier", "scarier", "darker", a genre like "practical-effects classic", or a casual filler like "gorier bro". Any follow-up in an image conversation = call search_images first.
 
 REASONING INTEGRITY — NON-NEGOTIABLE:
 - Solve FORWARD: derive the answer from the given data. Never work backward from a known answer and fabricate a method to justify it.
@@ -2005,6 +2005,18 @@ export async function POST(req: NextRequest) {
       text: '\nCRITICAL RULE (overrides everything above): When the user asks to build, create, make, design, animate, fix, or generate anything — output forge_file code immediately. Never greet, ask clarifying questions, or refuse a code request. Go straight to the files.',
     });
 
+    // Detect if the last assistant message contained image markdown.
+    // If so, inject a hard directive so the model calls search_images for
+    // follow-ups like "gorier bro" or "practical-effects classic" instead of replying in text.
+    const lastAssistantMsg = recentMessages.filter(m => m.role === 'assistant').pop();
+    const lastAssistantText = lastAssistantMsg ? msgToString(lastAssistantMsg.content ?? '') : '';
+    if (lastAssistantText.includes('![')) {
+      systemBlocks.push({
+        type: 'text',
+        text: '\nIMAGE FOLLOW-UP OVERRIDE: Your previous response contained images. The user is following up in a visual image search conversation. You MUST call the search_images tool immediately — do not write any text first. Even if the message is very short ("gorier", "scarier", "gorier bro", "practical-effects classic", "more", "different", "another") — call search_images. Build a search query from the follow-up adjective/style combined with the topic of the images you just showed.',
+      });
+    }
+
     const encoder = new TextEncoder();
 
     const lf = createLangfuseClient();
@@ -2385,8 +2397,10 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
 
           // When user is following up in an image conversation without sending a new image,
           // hint the planner to prefer chat unless they explicitly ask to build something.
+          // Also catches image-search follow-ups where the last assistant message had image markdown.
+          const hasAssistantImageMarkdown = lastAssistantText.includes('![');
           const recentImageNote =
-            hasRecentImage && !hasImage
+            (hasRecentImage || hasAssistantImageMarkdown) && !hasImage
               ? '\n[CONTEXT: Previous messages in this conversation contained images. Only generate a file plan if the user explicitly says to build/create/make/design something. Otherwise return [{"chat":true}].]'
               : '';
           const plannerTextContent =
