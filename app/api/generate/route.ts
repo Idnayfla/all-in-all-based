@@ -70,7 +70,9 @@ const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = MODEL_GROQ;
 const CEREBRAS_URL = 'https://api.cerebras.ai/v1/chat/completions';
 const CEREBRAS_MODEL = MODEL_CEREBRAS;
-const GEMINI_API_KEY = process.env.GOOGLE_API_KEY ?? '';
+// Prefer a dedicated GEMINI_API_KEY (from AI Studio) over the generic GOOGLE_API_KEY
+// (which may be a Cloud Console key without Generative Language API enabled).
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
 const HAS_GEMINI_KEY = !!GEMINI_API_KEY;
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
