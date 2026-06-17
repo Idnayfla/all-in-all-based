@@ -96,35 +96,69 @@ async function searchImagesExa(
   return images;
 }
 
+function toHttps(url: string): string | null {
+  if (!url) return null;
+  if (url.startsWith('https://') || url.startsWith('http://')) return url;
+  if (url.startsWith('//')) return `https:${url}`;
+  return null;
+}
+
 async function searchImagesWikimedia(
   query: string,
   maxImages: number
 ): Promise<Array<{ url: string; title: string }>> {
   const encoded = encodeURIComponent(query);
-  const res = await fetch(
-    `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encoded}&srnamespace=0&srlimit=${maxImages * 2}&format=json&origin=*`
-  );
-  if (!res.ok) return [];
-  const data = await res.json();
-  const titles: string[] = (data.query?.search ?? []).map((r: { title: string }) => r.title);
-  const images: Array<{ url: string; title: string }> = [];
-  await Promise.all(
-    titles.slice(0, maxImages * 2).map(async (title: string) => {
-      if (images.length >= maxImages) return;
+
+  // Step 1: direct pageimages lookup on the query as a title (fast path for known topics)
+  try {
+    const directRes = await fetch(
+      `https://en.wikipedia.org/w/api.php?action=query&titles=${encoded}&prop=pageimages&pithumbsize=800&pilimit=3&format=json&origin=*`
+    );
+    if (directRes.ok) {
+      const d = await directRes.json();
+      const pages = Object.values(d.query?.pages ?? {}) as Record<string, unknown>[];
+      const directImgs: Array<{ url: string; title: string }> = [];
+      for (const page of pages) {
+        const src = (page as { thumbnail?: { source?: string }; title?: string }).thumbnail?.source;
+        const safe = src ? toHttps(src) : null;
+        if (safe) directImgs.push({ url: safe, title: String((page as { title?: string }).title ?? query) });
+      }
+      if (directImgs.length > 0) return directImgs.slice(0, maxImages);
+    }
+  } catch { /* fall through */ }
+
+  // Step 2: search Wikipedia articles, then fetch pageimages for each sequentially
+  try {
+    const searchRes = await fetch(
+      `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encoded}&srnamespace=0&srlimit=10&format=json&origin=*`
+    );
+    if (!searchRes.ok) return [];
+    const searchData = await searchRes.json();
+    const titles: string[] = (searchData.query?.search ?? []).map((r: { title: string }) => r.title);
+    const images: Array<{ url: string; title: string }> = [];
+
+    for (const title of titles.slice(0, 8)) {
+      if (images.length >= maxImages) break;
       try {
         const r = await fetch(
-          `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`
+          `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=pageimages&pithumbsize=800&format=json&origin=*`
         );
-        if (!r.ok) return;
+        if (!r.ok) continue;
         const p = await r.json();
-        const url: string | undefined = p?.thumbnail?.source ?? p?.originalimage?.source;
-        if (url && url.startsWith('https') && images.length < maxImages) {
-          images.push({ url, title: p.title || title });
+        const pages = Object.values(p.query?.pages ?? {}) as Record<string, unknown>[];
+        for (const page of pages) {
+          const src = (page as { thumbnail?: { source?: string } }).thumbnail?.source;
+          const safe = src ? toHttps(src) : null;
+          if (safe && images.length < maxImages) {
+            images.push({ url: safe, title: title });
+          }
         }
       } catch { /* skip */ }
-    })
-  );
-  return images;
+    }
+    return images;
+  } catch {
+    return [];
+  }
 }
 
 export async function searchImages(
