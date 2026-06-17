@@ -2317,6 +2317,25 @@ export default function ChatPanel({
               </motion.button>
             )}
           </AnimatePresence>
+          {micState !== 'idle' && (
+            <div className={`mic-visual mic-visual--${micState}`}>
+              {micState === 'recording' && (
+                <div className="mic-waveform">
+                  {[0, 1, 2, 3, 4, 5, 6].map(i => (
+                    <span key={i} className="mic-bar" style={{ animationDelay: `${i * 0.08}s` }} />
+                  ))}
+                </div>
+              )}
+              {micState === 'warming' && <div className="mic-pulse-ring" />}
+              {micState === 'transcribing' && (
+                <div className="mic-transcribe-dots">
+                  {[0, 1, 2].map(i => (
+                    <span key={i} className="mic-dot" style={{ animationDelay: `${i * 0.18}s` }} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
           <textarea
             ref={textareaRef}
             className="chat-textarea"

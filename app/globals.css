@@ -1210,6 +1210,68 @@ body {
   align-items: flex-end;
 }
 
+/* ── Mic visual indicator ── */
+.mic-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  min-width: 64px;
+  flex-shrink: 0;
+}
+
+/* Recording: bouncing waveform bars */
+.mic-waveform {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 32px;
+}
+.mic-bar {
+  display: block;
+  width: 3px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--accent);
+  animation: mic-bounce 0.6s ease-in-out infinite alternate;
+}
+@keyframes mic-bounce {
+  0%   { height: 4px; opacity: 0.5; }
+  100% { height: 24px; opacity: 1; }
+}
+
+/* Warming: pulsing ring */
+.mic-pulse-ring {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  animation: mic-ring-pulse 1s ease-in-out infinite;
+}
+@keyframes mic-ring-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%       { transform: scale(1.4); opacity: 0.4; }
+}
+
+/* Transcribing: fading dots */
+.mic-transcribe-dots {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.mic-dot {
+  display: block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: mic-dot-fade 1s ease-in-out infinite;
+}
+@keyframes mic-dot-fade {
+  0%, 100% { opacity: 0.2; transform: scale(0.8); }
+  50%       { opacity: 1;   transform: scale(1.1); }
+}
+
 .upload-btn {
   width: 44px;
   height: 44px;
