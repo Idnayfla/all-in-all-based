@@ -1016,6 +1016,9 @@ body {
 .message.user .message-role {
   color: var(--accent);
 }
+.message.user .message-content {
+  white-space: pre-wrap;
+}
 .message.assistant .message-role {
   color: var(--accent3);
 }
