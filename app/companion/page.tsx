@@ -317,7 +317,13 @@ export default function CompanionOverlayPage() {
       typeof window !== 'undefined' ? localStorage.getItem('based_proximity_threshold') : null;
     return stored ? parseFloat(stored) : 0.015;
   });
-  const proximityThresholdRef = useRef(0.015);
+  const proximityThresholdRef = useRef(
+    typeof window !== 'undefined'
+      ? parseFloat(localStorage.getItem('based_proximity_threshold') ?? '0.015')
+      : 0.015
+  );
+  const vadRestartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [vadSensitivityDebounced, setVadSensitivityDebounced] = useState(vadSensitivity);
   const [wakeState, setWakeState] = useState<'idle' | 'listening' | 'processing'>('idle');
   const [wakeListening, setWakeListening] = useState(false); // mic actually capturing
   const [wakeError, setWakeError] = useState<string | null>(null);
@@ -618,8 +624,8 @@ export default function CompanionOverlayPage() {
           // Far-field tuning: lower positive threshold so distant speech scores
           // high enough to trigger, while keeping the hysteresis band (positive minus
           // negative) at ~0.20 — wide enough to avoid rapid speech/silence toggling.
-          positiveSpeechThreshold: vadSensitivity,
-          negativeSpeechThreshold: Math.max(0.05, vadSensitivity - 0.2),
+          positiveSpeechThreshold: vadSensitivityDebounced,
+          negativeSpeechThreshold: Math.max(0.05, vadSensitivityDebounced - 0.2),
           // 600 ms redemption: bridges natural brief pauses mid-phrase without
           // splitting one utterance into two separate VAD segments.
           redemptionMs: 600,
@@ -863,7 +869,7 @@ export default function CompanionOverlayPage() {
       setWakeState('idle');
       wakeStateRef.current = 'idle';
     };
-  }, [wakeWordEnabled, vadSensitivity]);
+  }, [wakeWordEnabled, vadSensitivityDebounced]);
 
   useEffect(() => {
     const stored = localStorage.getItem('based_companion_voice');
@@ -1989,6 +1995,8 @@ export default function CompanionOverlayPage() {
                 const v = parseFloat(e.target.value);
                 setVadSensitivity(v);
                 localStorage.setItem('based_vad_sensitivity', String(v));
+                if (vadRestartTimerRef.current) clearTimeout(vadRestartTimerRef.current);
+                vadRestartTimerRef.current = setTimeout(() => setVadSensitivityDebounced(v), 800);
               }}
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
               title={`Mic sensitivity: ${Math.round((1 - (vadSensitivity - 0.2) / 0.4) * 100)}%`}
@@ -2002,9 +2010,9 @@ export default function CompanionOverlayPage() {
             <span>far</span>
             <input
               type="range"
-              min={0.005}
-              max={0.04}
-              step={0.005}
+              min={0.002}
+              max={0.08}
+              step={0.002}
               value={proximityThreshold}
               onChange={e => {
                 const v = parseFloat(e.target.value);
@@ -2012,7 +2020,7 @@ export default function CompanionOverlayPage() {
                 localStorage.setItem('based_proximity_threshold', String(v));
               }}
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-              title={`Proximity: ${Math.round((proximityThreshold / 0.04) * 100)}% (higher = close voices only)`}
+              title={`Proximity: ${Math.round((proximityThreshold / 0.08) * 100)}% (higher = close voice only)`}
             />
             <span>close</span>
           </div>
