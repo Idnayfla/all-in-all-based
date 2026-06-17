@@ -620,7 +620,27 @@ export default function ChatPanel({
           const canvas = document.createElement('canvas');
           canvas.width = width;
           canvas.height = height;
-          canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+          const ctx = canvas.getContext('2d')!;
+
+          // Sample average brightness to detect dark/neon-on-black images
+          ctx.drawImage(img, 0, 0, width, height);
+          const pixels = ctx.getImageData(0, 0, width, height).data;
+          let brightness = 0;
+          const step = 40; // sample every 10th pixel
+          for (let i = 0; i < pixels.length; i += step) {
+            brightness += pixels[i] * 0.299 + pixels[i + 1] * 0.587 + pixels[i + 2] * 0.114;
+          }
+          brightness /= pixels.length / step;
+
+          // Dark image (neon-on-black): apply strong contrast + brightness so
+          // Gemini can read shapes and text that are bright outlines on dark bg
+          if (brightness < 80) {
+            ctx.clearRect(0, 0, width, height);
+            ctx.filter = 'contrast(4) brightness(3)';
+            ctx.drawImage(img, 0, 0, width, height);
+            ctx.filter = 'none';
+          }
+
           const compressed = canvas.toDataURL('image/jpeg', 0.85);
           const [, data] = compressed.split(',');
           resolve({ data, mediaType: 'image/jpeg', previewUrl: compressed });
