@@ -2454,6 +2454,10 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                 usingFreeModel ? 'free' : 'based'
               );
             }
+          } else if (usingFreeModel && imageBlocks.length > 0) {
+            // Free AI + image → always a chat turn, never code gen. Skip the Gemini
+            // planner call entirely to halve request count and avoid rate limits.
+            planText = '[{"chat":true}]';
           } else {
             planText = await callModel(
               plannerPromptContent,
