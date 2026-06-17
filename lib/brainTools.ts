@@ -7,6 +7,7 @@
 import { supabaseAdmin } from '@/app/api/_auth';
 import Anthropic from '@anthropic-ai/sdk';
 import { MODEL_HAIKU } from '@/lib/models';
+import { searchImages } from '@/lib/tavily';
 import {
   getValidAccessToken,
   checkFreebusy,
@@ -365,6 +366,22 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
         level: { type: 'number', description: 'Volume level 0–100.' },
       },
       required: ['level'],
+    },
+  },
+  {
+    name: 'search_images',
+    description:
+      'Search the web for images on a topic and return them to display inline in the chat. Use when the user asks to see, show, display, find, look up, or view images, photos, or pictures of something.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description:
+            "What to search images of, e.g. 'golden retriever puppy' or 'Eiffel Tower at night'.",
+        },
+      },
+      required: ['query'],
     },
   },
   {
@@ -994,6 +1011,13 @@ export async function runBrainTool(
         return `__SYSTEM_ACTION__${JSON.stringify({ action: 'write_clipboard', text: String(input.text ?? '') })}`;
       case 'set_volume':
         return `__SYSTEM_ACTION__${JSON.stringify({ action: 'set_volume', level: Number(input.level ?? 50) })}`;
+      case 'search_images': {
+        const imgs = await searchImages(String(input.query ?? ''), 5);
+        if (imgs.length === 0)
+          return `No images found for "${input.query}". Try a different search term.`;
+        const lines = imgs.map(img => `![${img.title}](${img.url})`).join('\n');
+        return `Copy these image lines verbatim into your response so the user sees them inline:\n\n${lines}`;
+      }
       case 'upsert_scheduling_prefs':
         return await upsertSchedulingPrefs(userId, {
           timezone: input.timezone ? String(input.timezone) : undefined,

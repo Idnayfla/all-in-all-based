@@ -1745,13 +1745,14 @@ async function runChatWithTools(
     search_entities: 'Recalling context',
     upsert_entity: 'Updating memory',
     rewrite_memory: 'Cleaning up brain',
+    search_images: 'Searching images',
   };
   const today = new Date().toISOString().slice(0, 10);
   const system = [
     ...systemBlocks,
     {
       type: 'text' as const,
-      text: `\nTODAY'S DATE: ${today}. When creating tasks with relative due dates (tomorrow, next week), resolve them to an absolute ISO date (YYYY-MM-DD). If the user specifies a time (e.g. "at 3pm", "14:00"), set due_time in HH:MM 24h format. If they specify a duration (e.g. "for 1 hour", "30 minutes"), set duration_minutes. You have tools to manage the user's tasks and personal knowledge base (entities). Use search_entities to pull context when the user references something specific from their life before answering. Use upsert_entity when they share a new fact about a project, person, account, or topic. After using a tool, give a short natural confirmation — never expose raw JSON or tool mechanics.`,
+      text: `\nTODAY'S DATE: ${today}. When creating tasks with relative due dates (tomorrow, next week), resolve them to an absolute ISO date (YYYY-MM-DD). If the user specifies a time (e.g. "at 3pm", "14:00"), set due_time in HH:MM 24h format. If they specify a duration (e.g. "for 1 hour", "30 minutes"), set duration_minutes. You have tools to manage the user's tasks and personal knowledge base (entities). Use search_entities to pull context when the user references something specific from their life before answering. Use upsert_entity when they share a new fact about a project, person, account, or topic. Use search_images when the user asks to see, find, or show images/photos of something. After using search_images, copy the returned ![title](url) lines verbatim into your response — do not alter the URLs. After using any other tool, give a short natural confirmation — never expose raw JSON or tool mechanics.`,
     },
   ];
 

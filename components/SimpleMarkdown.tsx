@@ -2,9 +2,10 @@
 
 import React from 'react';
 
-// Inline patterns: **bold**, *italic*, `code`, [text](url)
-// Order matters — bold must be checked before italic
-const INLINE_RE = /(\*\*([^*]+?)\*\*)|(\*([^*]+?)\*)|(`)([^`]+?)`|\[([^\]]+)\]\(([^)]+)\)/g;
+// Inline patterns: **bold**, *italic*, `code`, ![alt](url), [text](url)
+// Order matters — bold before italic, image before link
+const INLINE_RE =
+  /(\*\*([^*]+?)\*\*)|(\*([^*]+?)\*)|(`)([^`]+?)`|!\[([^\]]*)\]\(([^)]+)\)|\[([^\]]+)\]\(([^)]+)\)/g;
 
 function parseInline(text: string, prefix: string): React.ReactNode {
   const parts: React.ReactNode[] = [];
@@ -19,10 +20,23 @@ function parseInline(text: string, prefix: string): React.ReactNode {
     if (m[1]) parts.push(<strong key={k}>{m[2]}</strong>);
     else if (m[3]) parts.push(<em key={k}>{m[4]}</em>);
     else if (m[5]) parts.push(<code key={k}>{m[6]}</code>);
-    else if (m[7])
+    else if (m[7] !== undefined)
       parts.push(
-        <a key={k} href={m[8]} target="_blank" rel="noreferrer">
-          {m[7]}
+        <img
+          key={k}
+          src={m[8]}
+          alt={m[7]}
+          className="chat-inline-image"
+          loading="lazy"
+          onError={e => {
+            (e.currentTarget as HTMLImageElement).style.display = 'none';
+          }}
+        />
+      );
+    else if (m[9])
+      parts.push(
+        <a key={k} href={m[10]} target="_blank" rel="noreferrer">
+          {m[9]}
         </a>
       );
     last = m.index + m[0].length;

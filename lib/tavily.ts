@@ -64,3 +64,49 @@ export async function searchWeb(query: string, maxResults = 3): Promise<string> 
 
   return parts.join('\n\n---\n\n');
 }
+
+export async function searchImages(
+  query: string,
+  maxImages = 5
+): Promise<Array<{ url: string; title: string }>> {
+  const key = process.env.EXA_API_KEY;
+  if (!key) return [];
+
+  try {
+    const res = await fetch('https://api.exa.ai/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': key },
+      body: JSON.stringify({
+        query: `${query} photo image`,
+        numResults: maxImages * 3,
+        contents: { text: { maxCharacters: 0 } },
+        useAutoprompt: true,
+      }),
+    });
+
+    if (!res.ok) return [];
+    const data = await res.json();
+
+    interface ExaResult {
+      title: string;
+      url: string;
+      image?: string;
+    }
+
+    const seen = new Set<string>();
+    const images: Array<{ url: string; title: string }> = [];
+
+    for (const r of (data.results ?? []) as ExaResult[]) {
+      const url = r.image;
+      if (url && url.startsWith('http') && !seen.has(url)) {
+        seen.add(url);
+        images.push({ url, title: r.title || query });
+        if (images.length >= maxImages) break;
+      }
+    }
+
+    return images;
+  } catch {
+    return [];
+  }
+}

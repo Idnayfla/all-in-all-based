@@ -17497,6 +17497,20 @@ body:has(.legal-page) {
   font-family: monospace;
 }
 
+/* ── Inline images from search_images tool ──────────────────────────────── */
+.chat-inline-image {
+  display: block;
+  max-width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin: 6px 0;
+  cursor: pointer;
+}
+.chat-inline-image:hover {
+  opacity: 0.9;
+}
+
 /* ── Quick-chat overlay ─────────────────────────────────────────────────── */
 .quick-chat-overlay {
   position: fixed;
