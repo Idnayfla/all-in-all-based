@@ -26,9 +26,10 @@ export async function POST(req: NextRequest) {
         model: 'nova-3',
         language: 'en',
         punctuate: 'true',
-        // Boost "Based" strongly so it wins over phonetic near-misses like "raise", "bis"
-        keywords: 'Based:5',
       });
+      // Boost wake-phrase components — repeat param for multiple keywords
+      params.append('keywords', 'Based:5');
+      params.append('keywords', 'Hey:2');
       const res = await fetch(`https://api.deepgram.com/v1/listen?${params}`, {
         method: 'POST',
         headers: {

@@ -324,6 +324,7 @@ export default function CompanionOverlayPage() {
   );
   const vadRestartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [vadSensitivityDebounced, setVadSensitivityDebounced] = useState(vadSensitivity);
+  const [vadRestartTick, setVadRestartTick] = useState(0);
   const [wakeState, setWakeState] = useState<'idle' | 'listening' | 'processing'>('idle');
   const [wakeListening, setWakeListening] = useState(false); // mic actually capturing
   const [wakeError, setWakeError] = useState<string | null>(null);
@@ -506,6 +507,7 @@ export default function CompanionOverlayPage() {
     let wakeSTTInFlight = false;
     let conversationWindowUntil = 0;
     const CONVERSATION_WINDOW_MS = 20000;
+    let vadAutoRestartTimer: ReturnType<typeof setTimeout> | null = null;
 
     const CMD_TIMEOUT_MS = 8000;
 
@@ -531,7 +533,7 @@ export default function CompanionOverlayPage() {
         audioRMS(audio) <
         (lenient
           ? Math.max(0.004, proximityThresholdRef.current * 0.4)
-          : proximityThresholdRef.current)
+          : Math.max(0.012, proximityThresholdRef.current))
       )
         return '';
 
@@ -819,6 +821,11 @@ export default function CompanionOverlayPage() {
         setWakeListening(true);
         setWakeError(null);
 
+        // Auto-restart every 45 min to clear ONNX memory drift and false-positive buildup
+        vadAutoRestartTimer = setTimeout(() => {
+          if (!stopped) setVadRestartTick(t => t + 1);
+        }, 45 * 60 * 1000);
+
         restartWakeRef.current = () => {
           if (stopped) return;
           awaitingCommand = false;
@@ -862,6 +869,7 @@ export default function CompanionOverlayPage() {
     return () => {
       stopped = true;
       if (cmdTimeout) clearTimeout(cmdTimeout);
+      if (vadAutoRestartTimer) clearTimeout(vadAutoRestartTimer);
       if (vad && vadStarted) void vad.destroy().catch(() => {});
       audioCtx?.close().catch(() => {});
       micStream?.getTracks().forEach(t => t.stop());
@@ -869,7 +877,7 @@ export default function CompanionOverlayPage() {
       setWakeState('idle');
       wakeStateRef.current = 'idle';
     };
-  }, [wakeWordEnabled, vadSensitivityDebounced]);
+  }, [wakeWordEnabled, vadSensitivityDebounced, vadRestartTick]);
 
   useEffect(() => {
     const stored = localStorage.getItem('based_companion_voice');
@@ -1432,6 +1440,7 @@ export default function CompanionOverlayPage() {
         body: JSON.stringify({
           messages: history
             .filter(m => m.content?.trim())
+            .slice(-20)
             .map(m => ({ role: m.role, content: m.content })),
           ...(screenshotPayload ? { screenshot: screenshotPayload } : {}),
           // Pass session-cached memory so Based has user context on every turn
