@@ -405,13 +405,119 @@ app.whenReady().then(async () => {
     catch (e) { return `error: ${e.message}`; }
   });
 
-  // Launch an application. App name goes via env var so it is never shell-interpolated.
+  // Launch an application.
+  // appName comes from the AI — validate against a hardcoded allowlist before
+  // executing so a prompt-injection attack cannot launch arbitrary binaries.
   ipcMain.handle('system:launch-app', (_, appName) => {
+    const ALLOWED_APPS = {
+      // Browsers
+      chrome: 'chrome', 'google chrome': 'chrome',
+      firefox: 'firefox', 'mozilla firefox': 'firefox',
+      edge: 'msedge', 'microsoft edge': 'msedge',
+      opera: 'opera', brave: 'brave', safari: 'safari',
+      // Communication
+      discord: 'discord',
+      slack: 'slack',
+      zoom: 'zoom',
+      teams: 'teams', 'microsoft teams': 'teams',
+      telegram: 'telegram', 'telegram desktop': 'telegram',
+      whatsapp: 'whatsapp',
+      signal: 'signal',
+      skype: 'skype',
+      outlook: 'outlook', 'microsoft outlook': 'outlook',
+      // Music & Media
+      spotify: 'spotify',
+      'apple music': 'applemusic',
+      itunes: 'itunes',
+      vlc: 'vlc', 'vlc media player': 'vlc',
+      'windows media player': 'wmplayer',
+      'media player': 'wmplayer',
+      youtube: 'youtube',
+      netflix: 'netflix',
+      // Productivity & Office
+      word: 'winword', 'microsoft word': 'winword',
+      excel: 'excel', 'microsoft excel': 'excel',
+      powerpoint: 'powerpnt', 'microsoft powerpoint': 'powerpnt',
+      onenote: 'onenote', 'microsoft onenote': 'onenote',
+      publisher: 'mspub',
+      access: 'msaccess',
+      notepad: 'notepad.exe', 'notepad++': 'notepad++',
+      'sticky notes': 'stikynot.exe',
+      wordpad: 'wordpad.exe',
+      // Dev Tools
+      vscode: 'code', 'visual studio code': 'code', 'vs code': 'code',
+      'visual studio': 'devenv',
+      cursor: 'cursor',
+      sublime: 'subl', 'sublime text': 'subl',
+      'android studio': 'studio64',
+      terminal: 'wt', 'windows terminal': 'wt',
+      cmd: 'cmd.exe', 'command prompt': 'cmd.exe',
+      powershell: 'powershell.exe',
+      git: 'git-bash', 'git bash': 'git-bash',
+      postman: 'postman',
+      insomnia: 'insomnia',
+      // System & Utilities
+      calculator: 'calc.exe', calc: 'calc.exe',
+      paint: 'mspaint.exe', 'ms paint': 'mspaint.exe',
+      'paint 3d': 'paintStudio',
+      explorer: 'explorer.exe', 'file explorer': 'explorer.exe', files: 'explorer.exe',
+      'task manager': 'taskmgr.exe', taskmgr: 'taskmgr.exe',
+      'control panel': 'control.exe',
+      settings: 'ms-settings:',
+      'windows settings': 'ms-settings:',
+      snipping: 'snippingtool.exe', 'snipping tool': 'snippingtool.exe',
+      'screen snip': 'snippingtool.exe',
+      magnifier: 'magnify.exe',
+      'on-screen keyboard': 'osk.exe',
+      clock: 'ms-clock:',
+      'windows clock': 'ms-clock:',
+      camera: 'microsoft.windows.camera:',
+      'windows camera': 'microsoft.windows.camera:',
+      photos: 'ms-photos:', 'windows photos': 'ms-photos:',
+      maps: 'bingmaps:', 'windows maps': 'bingmaps:',
+      weather: 'msnweather:',
+      // Design & Creative
+      figma: 'figma',
+      photoshop: 'photoshop', 'adobe photoshop': 'photoshop',
+      illustrator: 'illustrator', 'adobe illustrator': 'illustrator',
+      lightroom: 'lightroom', 'adobe lightroom': 'lightroom',
+      premiere: 'premiere', 'adobe premiere': 'premiere', 'premiere pro': 'premiere',
+      'after effects': 'afterfx',
+      capcut: 'capcut',
+      canva: 'canva',
+      // Gaming
+      steam: 'steam',
+      epic: 'epicgameslauncher', 'epic games': 'epicgameslauncher',
+      valorant: 'valorant',
+      minecraft: 'minecraft',
+      'league of legends': 'leagueoflegends', lol: 'leagueoflegends',
+      roblox: 'roblox',
+      'genshin impact': 'genshinimpact',
+      fortnite: 'fortnite',
+      // Cloud Storage
+      dropbox: 'dropbox',
+      onedrive: 'onedrive', 'one drive': 'onedrive',
+      'google drive': 'googledrivesync',
+      // Other Common Apps
+      notion: 'notion',
+      obsidian: 'obsidian',
+      '1password': '1password',
+      lastpass: 'lastpass',
+      bitwarden: 'bitwarden',
+      nordvpn: 'nordvpn',
+      expressvpn: 'expressvpn',
+      'windows defender': 'windowsdefender:',
+      'xbox game bar': 'ms-gamebar:',
+      xbox: 'xboxapp',
+    };
+    const key = String(appName ?? '').toLowerCase().trim();
+    const safe = ALLOWED_APPS[key];
+    if (!safe) return Promise.resolve(`error: "${appName}" is not in the list of allowed apps`);
     return new Promise((resolve) => {
       execFile(
         'powershell',
         ['-NoProfile', '-Command', 'Start-Process $env:BASED_APP'],
-        { env: { ...process.env, BASED_APP: String(appName) } },
+        { env: { ...process.env, BASED_APP: safe } },
         (err) => resolve(err ? `error: ${err.message}` : 'launched')
       );
     });

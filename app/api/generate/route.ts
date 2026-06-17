@@ -70,7 +70,9 @@ const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = MODEL_GROQ;
 const CEREBRAS_URL = 'https://api.cerebras.ai/v1/chat/completions';
 const CEREBRAS_MODEL = MODEL_CEREBRAS;
-const GEMINI_API_KEY = process.env.GOOGLE_API_KEY ?? '';
+// Prefer a dedicated GEMINI_API_KEY (from AI Studio) over the generic GOOGLE_API_KEY
+// (which may be a Cloud Console key without Generative Language API enabled).
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
 const HAS_GEMINI_KEY = !!GEMINI_API_KEY;
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
@@ -299,7 +301,7 @@ async function streamGroqCollecting(
 // Used for Free-tier image conversations. Gemini Flash 2.0 is multimodal and
 // has a generous free quota — avoids burning Anthropic API credit for free users.
 
-type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
+type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } } | { thought: true; text: string };
 type GeminiContent = { role: 'user' | 'model'; parts: GeminiPart[] };
 
 // Converts anthropicMessages (string | ClaudeContentBlock[]) → Gemini contents format.
@@ -356,7 +358,7 @@ async function callGeminiVision(
   const url = `${GEMINI_BASE}/${MODEL_GEMINI_VISION}:generateContent?key=${GEMINI_API_KEY}`;
   const body: Record<string, unknown> = {
     contents: toGeminiContents(msgs),
-    generationConfig: { maxOutputTokens: maxTokens },
+    generationConfig: { maxOutputTokens: maxTokens, thinkingConfig: { thinkingBudget: 0 } },
   };
   if (systemPrompt) body.systemInstruction = { parts: [{ text: systemPrompt }] };
   const res = await fetch(url, {
@@ -367,7 +369,7 @@ async function callGeminiVision(
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
   const data = await res.json();
   return (data.candidates?.[0]?.content?.parts as GeminiPart[] | undefined)
-    ?.filter((p): p is { text: string } => 'text' in p)
+    ?.filter((p): p is { text: string } => 'text' in p && !('thought' in p))
     .map(p => p.text)
     .join('') ?? '';
 }
@@ -381,7 +383,7 @@ async function streamGeminiVisionCollecting(
   const url = `${GEMINI_BASE}/${MODEL_GEMINI_VISION}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
   const body: Record<string, unknown> = {
     contents: toGeminiContents(msgs),
-    generationConfig: { maxOutputTokens: maxTokens },
+    generationConfig: { maxOutputTokens: maxTokens, thinkingConfig: { thinkingBudget: 0 } },
   };
   if (systemPrompt) body.systemInstruction = { parts: [{ text: systemPrompt }] };
   const res = await fetch(url, {
@@ -408,8 +410,9 @@ async function streamGeminiVisionCollecting(
       try {
         const parsed = JSON.parse(payload);
         const parts = parsed.candidates?.[0]?.content?.parts as GeminiPart[] | undefined;
+        // Filter out thought parts (gemini-2.5-flash internal reasoning — not for display)
         const text = parts
-          ?.filter((p): p is { text: string } => 'text' in p)
+          ?.filter((p): p is { text: string } => 'text' in p && !('thought' in p))
           .map(p => p.text)
           .join('') ?? '';
         if (text) {
@@ -495,6 +498,13 @@ RESPONSE RULES:
 - NEVER say "check the editor", "see the preview", "look at the editor", or any variation when you are NOT generating files — your text reply IS the complete answer.
 - NEVER convert a data question into an app. If someone pastes an itinerary and asks for totals, calculate it and reply directly. Same for any maths, budgets, lists, or data analysis.
 - FOCUS ON THE CURRENT MESSAGE ONLY: Never recap, reference, or bring up previous topics, builds, or conversations unless the user explicitly asks. If the user has moved on to a new subject, treat it as a fresh topic — do not volunteer connections to earlier messages.
+
+REASONING INTEGRITY — NON-NEGOTIABLE:
+- Solve FORWARD: derive the answer from the given data. Never work backward from a known answer and fabricate a method to justify it.
+- Verify before presenting: cross-check your answer against the original data and show the verification step (e.g. for math: substitute back and confirm).
+- Admit uncertainty clearly: if you don't know, say so — never invent a confident-sounding explanation to cover a gap.
+- No invented logic: if you do not know the rule or method, say "I'm not certain" rather than constructing a plausible-sounding one.
+- When corrected: identify the root cause of the error first, then show the corrected derivation forward from the data.
 
 STRICT OUTPUT FORMAT:
 <forge_type>html|python|node|java|cpp|go|rust|bash</forge_type>
@@ -1172,6 +1182,38 @@ NON-REGRESSION — WHEN MODIFYING EXISTING FILES:
 const PLANNER_SYSTEM_BLOCKS = [
   { type: 'text' as const, text: PLANNER_SYSTEM, cache_control: { type: 'ephemeral' as const } },
 ];
+
+// Focused system prompt for Gemini image conversations.
+// Replaces the code-generation SYSTEM (which is irrelevant noise for image analysis)
+// with clear image-reading and reasoning-integrity rules.
+const GEMINI_IMAGE_SYSTEM = `You are Based — a sharp, direct AI assistant created by Mohamad Hus Alfyandi Bin Mohamed Tahir.
+
+IDENTITY:
+- Sharp, direct, no filler, no over-explaining.
+- Answer questions, analyse data, solve problems, explain things. Reply in plain text — never output code files, forge_file tags, or JSON planning.
+- Focus on the current message. Do not recap previous topics unless asked.
+
+IMAGE ANALYSIS:
+- Read all text in the image precisely — do not guess or paraphrase characters you can see.
+- Identify every visual element: shapes, symbols, numbers, layout, structure, colour.
+- If the image has bright or neon-coloured elements on a dark background, focus on the bright outlines and glowing shapes as the content — the dark background is irrelevant.
+- For puzzles or problems: extract the exact structure first (write it out explicitly), then solve.
+- For stacked-addition or cryptarithm puzzles: identify each row, write out the place-value equation explicitly (e.g. 200a + 30b + 3c = 1258), then solve algebraically. Show all steps.
+
+STACKED ADDITION PUZZLES:
+- Treat shapes/symbols followed by a sum (= XXXX) as right-aligned stacked addition.
+- If the puzzle arrives as a flat line (newlines stripped by the UI), use + and = as delimiters: split on + to get addend groups, split on = to find the sum.
+- The group after + (before =) is the last addend. The group before + contains earlier addends concatenated — split by counting: the last N symbols (N = length of post-+ addend) form one row; remaining symbols at the start form shorter rows.
+- Example flat input: "○ □ △ ○ □ + △ ○ □ = 1 2 5 8" → post-+ addend △○□ has 3 symbols → pre-+ group "○ □ △ ○ □": last 3 = △○□ (row 2), first 2 = ○□ (row 1) → rows are ○□, △○□, △○□ summing to 1258.
+- After parsing, write rows out right-justified explicitly, then solve column by column algebraically. Show full verification.
+- Each puzzle is independent. Never assume a typed puzzle is the same as one analysed from an image.
+
+REASONING INTEGRITY — NON-NEGOTIABLE:
+- Solve FORWARD: derive the answer from the given data. Never work backward from a known answer and invent a method to justify it.
+- Verify before presenting: cross-check your answer against the original data and show the verification step explicitly (e.g. "7 + 17 + 617 + 617 = 1258 ✓").
+- Admit uncertainty clearly: if you cannot read a symbol or are unsure of your interpretation, say so — never fabricate confidence.
+- No invented logic: if you do not know the rule, say "I'm not certain" — do not make one up and present it as fact.
+- When corrected: identify the root cause of the error, then show the corrected forward derivation.`;
 
 const FILE_GENERATOR_SYSTEM_BLOCKS = [
   {
@@ -2422,6 +2464,10 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                 usingFreeModel ? 'free' : 'based'
               );
             }
+          } else if (usingFreeModel && imageBlocks.length > 0) {
+            // Free AI + image → always a chat turn, never code gen. Skip the Gemini
+            // planner call entirely to halve request count and avoid rate limits.
+            planText = '[{"chat":true}]';
           } else {
             planText = await callModel(
               plannerPromptContent,
@@ -2466,7 +2512,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
               if (imageBlocks.length > 0 || hasRecentImage) {
                 if (usingFreeModel && HAS_GEMINI_KEY) {
                   fullText = await streamGeminiVisionCollecting(
-                    SYSTEM,
+                    GEMINI_IMAGE_SYSTEM,
                     anthropicMessages,
                     8000,
                     t =>
@@ -2496,7 +2542,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                 }
               } else {
                 const sysText = usingFreeModel
-                  ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally. Focus on the current message only — do not recap or reference previous topics unless the user explicitly asks.'
+                  ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally. Focus on the current message only — do not recap or reference previous topics unless the user explicitly asks.\n\nSTACKED ADDITION PUZZLES:\n- Chat UIs strip newlines, so a stacked addition puzzle will arrive as ONE flat line like: ○ □ △ ○ □ + △ ○ □ = 1 2 5 8 △ ○ □ = ?\n- Parse it using + and = as delimiters: split on + to get addend groups, split on = to find the sum and question.\n- The group after + (before =) is the last addend. The group before + contains all earlier addends concatenated — split them by counting: the last N symbols (where N = length of post-+ addend) form one row; any remaining symbols at the start form shorter rows.\n- Example: "○ □ △ ○ □ + △ ○ □ = 1 2 5 8" → post-+ addend is △○□ (3 symbols) → pre-+ group is "○ □ △ ○ □" → last 3 = △○□ (row 2), first 2 = ○□ (row 1) → three rows: ○□, △○□, △○□ summing to 1258.\n- After parsing rows, write them out right-justified explicitly, then solve column by column algebraically. Show full verification.\n- Each puzzle is independent. Never compare to a previously analysed image.'
                   : systemBlocks.map(b => b.text).join('\n');
                 const msgs = [
                   { role: 'system', content: sysText },
@@ -2536,11 +2582,10 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
               // Free tier → Gemini Flash 2.0 (multimodal, free quota).
               // Based AI (or no Gemini key) → Anthropic Opus with full conversation history.
               if (usingFreeModel && HAS_GEMINI_KEY) {
-                const sysText = systemBlocks.map(b => b.text).join('\n');
                 fullText = await streamGeminiVisionCollecting(
-                  sysText,
+                  GEMINI_IMAGE_SYSTEM,
                   anthropicMessages,
-                  4096,
+                  8192,
                   t =>
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`))
                 );
@@ -2576,7 +2621,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
               );
             } else {
               const sysText = usingFreeModel
-                ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally. Focus on the current message only — do not recap or reference previous topics unless the user explicitly asks.'
+                ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally. Focus on the current message only — do not recap or reference previous topics unless the user explicitly asks.\n\nSTACKED ADDITION PUZZLES:\n- Chat UIs strip newlines, so a stacked addition puzzle will arrive as ONE flat line like: ○ □ △ ○ □ + △ ○ □ = 1 2 5 8 △ ○ □ = ?\n- Parse it using + and = as delimiters: split on + to get addend groups, split on = to find the sum and question.\n- The group after + (before =) is the last addend. The group before + contains all earlier addends concatenated — split them by counting: the last N symbols (where N = length of post-+ addend) form one row; any remaining symbols at the start form shorter rows.\n- Example: "○ □ △ ○ □ + △ ○ □ = 1 2 5 8" → post-+ addend is △○□ (3 symbols) → pre-+ group is "○ □ △ ○ □" → last 3 = △○□ (row 2), first 2 = ○□ (row 1) → three rows: ○□, △○□, △○□ summing to 1258.\n- After parsing rows, write them out right-justified explicitly, then solve column by column algebraically. Show full verification.\n- Each puzzle is independent. Never compare to a previously analysed image.'
                 : systemBlocks.map(b => b.text).join('\n');
               const msgs = [
                 { role: 'system', content: sysText },

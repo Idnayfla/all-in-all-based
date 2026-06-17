@@ -283,6 +283,7 @@ export default function ChatPanel({
     abortRef.current?.abort();
   };
   const [showAttachMenu, setShowAttachMenu] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [pendingFiles, setPendingFiles] = useState<
     Array<{ name: string; relativePath: string; content: string }>
   >([]);
@@ -620,7 +621,27 @@ export default function ChatPanel({
           const canvas = document.createElement('canvas');
           canvas.width = width;
           canvas.height = height;
-          canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+          const ctx = canvas.getContext('2d')!;
+
+          // Sample average brightness to detect dark/neon-on-black images
+          ctx.drawImage(img, 0, 0, width, height);
+          const pixels = ctx.getImageData(0, 0, width, height).data;
+          let brightness = 0;
+          const step = 40; // sample every 10th pixel
+          for (let i = 0; i < pixels.length; i += step) {
+            brightness += pixels[i] * 0.299 + pixels[i + 1] * 0.587 + pixels[i + 2] * 0.114;
+          }
+          brightness /= pixels.length / step;
+
+          // Dark image (neon-on-black): apply strong contrast + brightness so
+          // Gemini can read shapes and text that are bright outlines on dark bg
+          if (brightness < 80) {
+            ctx.clearRect(0, 0, width, height);
+            ctx.filter = 'contrast(4) brightness(3)';
+            ctx.drawImage(img, 0, 0, width, height);
+            ctx.filter = 'none';
+          }
+
           const compressed = canvas.toDataURL('image/jpeg', 0.85);
           const [, data] = compressed.split(',');
           resolve({ data, mediaType: 'image/jpeg', previewUrl: compressed });
@@ -772,6 +793,62 @@ export default function ChatPanel({
 
   const clearPendingFile = (index: number) =>
     setPendingFiles(prev => prev.filter((_, i) => i !== index));
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = Array.from(e.clipboardData.items);
+    const imageItems = items.filter(item => item.kind === 'file' && item.type.startsWith('image/'));
+    if (imageItems.length > 0) {
+      e.preventDefault();
+      const files = imageItems.map(item => item.getAsFile()).filter((f): f is File => f !== null);
+      Promise.all(files.map(processImageFile))
+        .then(results => setPendingImages(prev => [...prev, ...results].slice(0, 20)))
+        .catch(err => console.error('[Based] paste image failed:', err));
+      return;
+    }
+    const fileItems = items.filter(item => item.kind === 'file');
+    if (fileItems.length > 0) {
+      const files = fileItems.map(item => item.getAsFile()).filter((f): f is File => f !== null);
+      const eligible = files.filter(f => isTextFile(f.name) && f.size < 500_000);
+      if (eligible.length > 0) {
+        e.preventDefault();
+        Promise.all(eligible.slice(0, MAX_FILES).map(processTextFile))
+          .then(results => setPendingFiles(prev => [...prev, ...results].slice(0, MAX_FILES)))
+          .catch(err => console.error('[Based] paste file failed:', err));
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length === 0) return;
+    const imageFiles = files.filter(f => f.type.startsWith('image/'));
+    const textFiles = files.filter(f => !f.type.startsWith('image/') && isTextFile(f.name) && f.size < 500_000);
+    if (imageFiles.length > 0) {
+      Promise.all(imageFiles.map(processImageFile))
+        .then(results => setPendingImages(prev => [...prev, ...results].slice(0, 20)))
+        .catch(err => console.error('[Based] drop image failed:', err));
+    }
+    if (textFiles.length > 0) {
+      Promise.all(textFiles.slice(0, MAX_FILES).map(processTextFile))
+        .then(results => setPendingFiles(prev => [...prev, ...results].slice(0, MAX_FILES)))
+        .catch(err => console.error('[Based] drop file failed:', err));
+    }
+  };
 
   const parseForgeFiles = (text: string) => {
     const forgeFiles: { name: string; language: string; content: string }[] = [];
@@ -1918,7 +1995,13 @@ export default function ChatPanel({
         )}
         <div ref={bottomRef} />
       </div>
-      <div className="chat-input-area">
+      <div
+        className={`chat-input-area${isDragging ? ' chat-input-area--drag' : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        {isDragging && <div className="drag-overlay">Drop image or file here</div>}
         <AnimatePresence>
           {showStudioBanner && (
             <motion.div
@@ -2243,6 +2326,7 @@ export default function ChatPanel({
               autoResize();
             }}
             onKeyDown={handleKey}
+            onPaste={handlePaste}
             onTouchStart={e => {
               if (window.innerWidth <= 768) {
                 e.preventDefault();
