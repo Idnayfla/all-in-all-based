@@ -98,62 +98,49 @@ async function searchImagesExa(
 
 function toHttps(url: string): string | null {
   if (!url) return null;
-  if (url.startsWith('https://') || url.startsWith('http://')) return url;
+  if (url.startsWith('https://')) return url;
   if (url.startsWith('//')) return `https:${url}`;
+  if (url.startsWith('http://')) return `https://${url.slice(7)}`;
   return null;
+}
+
+async function wikiSummaryImage(title: string): Promise<{ url: string; title: string } | null> {
+  try {
+    const r = await fetch(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`
+    );
+    if (!r.ok) return null;
+    const p = await r.json() as { thumbnail?: { source?: string }; originalimage?: { source?: string }; title?: string };
+    const src = p?.thumbnail?.source ?? p?.originalimage?.source;
+    const safe = src ? toHttps(src) : null;
+    return safe ? { url: safe, title: p.title ?? title } : null;
+  } catch {
+    return null;
+  }
 }
 
 async function searchImagesWikimedia(
   query: string,
   maxImages: number
 ): Promise<Array<{ url: string; title: string }>> {
-  const encoded = encodeURIComponent(query);
+  // Step 1: try direct REST summary on the query string (fast path for well-known topics)
+  const direct = await wikiSummaryImage(query);
+  if (direct) return [direct];
 
-  // Step 1: direct pageimages lookup on the query as a title (fast path for known topics)
-  try {
-    const directRes = await fetch(
-      `https://en.wikipedia.org/w/api.php?action=query&titles=${encoded}&prop=pageimages&pithumbsize=800&pilimit=3&format=json&origin=*`
-    );
-    if (directRes.ok) {
-      const d = await directRes.json();
-      const pages = Object.values(d.query?.pages ?? {}) as Record<string, unknown>[];
-      const directImgs: Array<{ url: string; title: string }> = [];
-      for (const page of pages) {
-        const src = (page as { thumbnail?: { source?: string }; title?: string }).thumbnail?.source;
-        const safe = src ? toHttps(src) : null;
-        if (safe) directImgs.push({ url: safe, title: String((page as { title?: string }).title ?? query) });
-      }
-      if (directImgs.length > 0) return directImgs.slice(0, maxImages);
-    }
-  } catch { /* fall through */ }
-
-  // Step 2: search Wikipedia articles, then fetch pageimages for each sequentially
+  // Step 2: search Wikipedia for matching articles, then fetch REST summary for each
   try {
     const searchRes = await fetch(
-      `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encoded}&srnamespace=0&srlimit=10&format=json&origin=*`
+      `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&srnamespace=0&srlimit=10&format=json&origin=*`
     );
     if (!searchRes.ok) return [];
-    const searchData = await searchRes.json();
-    const titles: string[] = (searchData.query?.search ?? []).map((r: { title: string }) => r.title);
+    const searchData = await searchRes.json() as { query?: { search?: { title: string }[] } };
+    const titles = (searchData.query?.search ?? []).map(r => r.title);
     const images: Array<{ url: string; title: string }> = [];
 
     for (const title of titles.slice(0, 8)) {
       if (images.length >= maxImages) break;
-      try {
-        const r = await fetch(
-          `https://en.wikipedia.org/w/api.php?action=query&titles=${encodeURIComponent(title)}&prop=pageimages&pithumbsize=800&format=json&origin=*`
-        );
-        if (!r.ok) continue;
-        const p = await r.json();
-        const pages = Object.values(p.query?.pages ?? {}) as Record<string, unknown>[];
-        for (const page of pages) {
-          const src = (page as { thumbnail?: { source?: string } }).thumbnail?.source;
-          const safe = src ? toHttps(src) : null;
-          if (safe && images.length < maxImages) {
-            images.push({ url: safe, title: title });
-          }
-        }
-      } catch { /* skip */ }
+      const img = await wikiSummaryImage(title);
+      if (img) images.push(img);
     }
     return images;
   } catch {
