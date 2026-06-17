@@ -982,6 +982,11 @@ If the request contains an image/photo/screenshot AND the user's text does NOT e
 The image alone is NOT a build request. Only generate a file plan if the user's words explicitly ask to build something.
 If the prompt contains [CONTEXT: Previous messages in this conversation contained images] — treat short responses, descriptions, and questions as chat unless the user explicitly requests to build something.
 
+IMAGE SEARCH RULE (check before code detection):
+If the user says "show me", "find me", "search for", "look up", or asks to SEE images/photos/pictures of something — output exactly: [{"chat":true}]
+This includes phrases like "show me something scary", "show me an unsettling image", "find pictures of X", "what does X look like", "show me more", "another one".
+The word "image" or "photo" in a SEARCH/SHOW context is NOT a build request — it is chat. Only treat as image GENERATION if the user explicitly says "generate", "create", "make", "draw", or "design" an image.
+
 CHAT DETECTION — check this first:
 If the user's message is a question, calculation, analysis, writing task, explanation request, or general conversation with NO request to build/create/make/design/animate/generate a thing — output exactly: [{"chat":true}]
 
@@ -995,6 +1000,9 @@ CHAT examples (output [{"chat":true}]):
 - "translate this"
 - "write me a cover letter"
 - "what are the best restaurants in Tokyo?"
+- "show me what a golden retriever looks like" → chat (image search)
+- "show me something scary" → chat (image search)
+- "find me images of Tokyo" → chat (image search)
 - Any message where the user pastes raw data (numbers, lists, itineraries, expenses, tables) and asks for totals, averages, summaries, or analysis — ALWAYS chat, NEVER an app
 
 CODE examples (output a file plan):
