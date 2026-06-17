@@ -1201,10 +1201,12 @@ IMAGE ANALYSIS:
 - For stacked-addition or cryptarithm puzzles: identify each row, write out the place-value equation explicitly (e.g. 200a + 30b + 3c = 1258), then solve algebraically. Show all steps.
 
 STACKED ADDITION PUZZLES:
-- Treat lines of shapes/symbols followed by a sum (= XXXX) as right-aligned stacked addition.
-- The rightmost symbol in each row is always the ones column. Count from right to assign place values.
-- Write out each row explicitly with column positions before solving.
-- Set up the algebraic equation and solve forward. Show verification.
+- Treat shapes/symbols followed by a sum (= XXXX) as right-aligned stacked addition.
+- If the puzzle arrives as a flat line (newlines stripped by the UI), use + and = as delimiters: split on + to get addend groups, split on = to find the sum.
+- The group after + (before =) is the last addend. The group before + contains earlier addends concatenated — split by counting: the last N symbols (N = length of post-+ addend) form one row; remaining symbols at the start form shorter rows.
+- Example flat input: "○ □ △ ○ □ + △ ○ □ = 1 2 5 8" → post-+ addend △○□ has 3 symbols → pre-+ group "○ □ △ ○ □": last 3 = △○□ (row 2), first 2 = ○□ (row 1) → rows are ○□, △○□, △○□ summing to 1258.
+- After parsing, write rows out right-justified explicitly, then solve column by column algebraically. Show full verification.
+- Each puzzle is independent. Never assume a typed puzzle is the same as one analysed from an image.
 
 REASONING INTEGRITY — NON-NEGOTIABLE:
 - Solve FORWARD: derive the answer from the given data. Never work backward from a known answer and invent a method to justify it.
@@ -2540,7 +2542,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                 }
               } else {
                 const sysText = usingFreeModel
-                  ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally. Focus on the current message only — do not recap or reference previous topics unless the user explicitly asks.\n\nSTACKED ADDITION PUZZLES:\n- Treat lines of shapes/symbols followed by a sum (= XXXX) as right-aligned stacked addition.\n- The rightmost symbol in each row is always the ones column. Count from right to assign place values.\n- Write out each row explicitly with column positions before solving.\n- Set up the algebraic equation and solve forward. Show verification.'
+                  ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally. Focus on the current message only — do not recap or reference previous topics unless the user explicitly asks.\n\nSTACKED ADDITION PUZZLES:\n- Chat UIs strip newlines, so a stacked addition puzzle will arrive as ONE flat line like: ○ □ △ ○ □ + △ ○ □ = 1 2 5 8 △ ○ □ = ?\n- Parse it using + and = as delimiters: split on + to get addend groups, split on = to find the sum and question.\n- The group after + (before =) is the last addend. The group before + contains all earlier addends concatenated — split them by counting: the last N symbols (where N = length of post-+ addend) form one row; any remaining symbols at the start form shorter rows.\n- Example: "○ □ △ ○ □ + △ ○ □ = 1 2 5 8" → post-+ addend is △○□ (3 symbols) → pre-+ group is "○ □ △ ○ □" → last 3 = △○□ (row 2), first 2 = ○□ (row 1) → three rows: ○□, △○□, △○□ summing to 1258.\n- After parsing rows, write them out right-justified explicitly, then solve column by column algebraically. Show full verification.\n- Each puzzle is independent. Never compare to a previously analysed image.'
                   : systemBlocks.map(b => b.text).join('\n');
                 const msgs = [
                   { role: 'system', content: sysText },
@@ -2619,7 +2621,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
               );
             } else {
               const sysText = usingFreeModel
-                ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally. Focus on the current message only — do not recap or reference previous topics unless the user explicitly asks.'
+                ? 'You are Based — a sharp, direct AI assistant. Answer helpfully and concisely. Never output forge_file tags, forge_type tags, or navigation menus. Just reply naturally. Focus on the current message only — do not recap or reference previous topics unless the user explicitly asks.\n\nSTACKED ADDITION PUZZLES:\n- Chat UIs strip newlines, so a stacked addition puzzle will arrive as ONE flat line like: ○ □ △ ○ □ + △ ○ □ = 1 2 5 8 △ ○ □ = ?\n- Parse it using + and = as delimiters: split on + to get addend groups, split on = to find the sum and question.\n- The group after + (before =) is the last addend. The group before + contains all earlier addends concatenated — split them by counting: the last N symbols (where N = length of post-+ addend) form one row; any remaining symbols at the start form shorter rows.\n- Example: "○ □ △ ○ □ + △ ○ □ = 1 2 5 8" → post-+ addend is △○□ (3 symbols) → pre-+ group is "○ □ △ ○ □" → last 3 = △○□ (row 2), first 2 = ○□ (row 1) → three rows: ○□, △○□, △○□ summing to 1258.\n- After parsing rows, write them out right-justified explicitly, then solve column by column algebraically. Show full verification.\n- Each puzzle is independent. Never compare to a previously analysed image.'
                 : systemBlocks.map(b => b.text).join('\n');
               const msgs = [
                 { role: 'system', content: sysText },
