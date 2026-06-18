@@ -710,7 +710,7 @@ export async function moveCalendarEvents(
       checkConflicts: !input.confirmed,
     });
     if (moved === 0 && failed === 0 && conflicts.length === 0)
-      return `No upcoming events found matching "${input.title_keyword}".`;
+      return `No events found matching "${input.title_keyword}" in the searched date range. If the events were in the past, call move_calendar_events again with date_from set to cover the original event dates (e.g. 90 days back).`;
     const conflictNote =
       conflicts.length > 0
         ? `\n[CONFLICTS — ${conflicts.length} event(s) NOT moved due to destination conflicts:\n${conflicts.map(c => `  · "${c.title}" → ${c.newStart}`).join('\n')}\nCall move_calendar_events again with confirmed: true to force the move.]`
@@ -722,14 +722,19 @@ export async function moveCalendarEvents(
         : input.new_time
           ? `moved to ${input.new_time}`
           : 'updated';
-    const failNote = failed > 0 ? ` (${failed} failed)` : '';
+    const failNote =
+      failed > 0
+        ? ` (${failed} event${failed !== 1 ? 's' : ''} failed to update — calendar token may need reconnecting)`
+        : '';
     const movedNote =
       moved > 0
         ? `${moved} event${moved !== 1 ? 's' : ''} matching "${input.title_keyword}" ${action} in Google Calendar.${failNote}`
-        : '';
+        : failed > 0
+          ? `FAILED: found ${failed} matching event${failed !== 1 ? 's' : ''} but could not update any. The Google Calendar token may need reconnecting. Tell the user to go to Settings → Google Calendar → Disconnect and reconnect.`
+          : '';
     return (
       (movedNote + conflictNote).trim() ||
-      `All matching events had conflicts — use confirmed: true to force.`
+      `All matching events had conflicts — call move_calendar_events again with confirmed: true to force.`
     );
   } catch (e) {
     return `Failed to move events: ${e instanceof Error ? e.message : String(e)}`;
