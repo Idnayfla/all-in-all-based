@@ -2,9 +2,10 @@
 
 import React from 'react';
 
-// Inline patterns: **bold**, *italic*, `code`, [text](url)
-// Order matters — bold must be checked before italic
-const INLINE_RE = /(\*\*([^*]+?)\*\*)|(\*([^*]+?)\*)|(`)([^`]+?)`|\[([^\]]+)\]\(([^)]+)\)/g;
+// Inline patterns: **bold**, *italic*, `code`, ![alt](url), [text](url)
+// Order matters — bold before italic, image before link
+const INLINE_RE =
+  /(\*\*([^*]+?)\*\*)|(\*([^*]+?)\*)|(`)([^`]+?)`|!\[([^\]]*)\]\(([^)]+)\)|\[([^\]]+)\]\(([^)]+)\)/g;
 
 function parseInline(text: string, prefix: string): React.ReactNode {
   const parts: React.ReactNode[] = [];
@@ -19,10 +20,35 @@ function parseInline(text: string, prefix: string): React.ReactNode {
     if (m[1]) parts.push(<strong key={k}>{m[2]}</strong>);
     else if (m[3]) parts.push(<em key={k}>{m[4]}</em>);
     else if (m[5]) parts.push(<code key={k}>{m[6]}</code>);
-    else if (m[7])
+    else if (m[7] !== undefined) {
+      let safeUrl: string | null = null;
+      try {
+        const parsed = new URL(m[8]);
+        if (parsed.protocol === 'https:' || parsed.protocol === 'http:') safeUrl = m[8];
+      } catch {
+        // invalid URL — skip
+      }
       parts.push(
-        <a key={k} href={m[8]} target="_blank" rel="noreferrer">
-          {m[7]}
+        safeUrl ? (
+          <img
+            key={k}
+            src={safeUrl}
+            alt={m[7]}
+            className="chat-inline-image"
+            loading="lazy"
+            onError={e => {
+              (e.currentTarget as HTMLImageElement).style.display = 'none';
+            }}
+          />
+        ) : (
+          <span key={k}>{m[7]}</span>
+        )
+      );
+    }
+    else if (m[9])
+      parts.push(
+        <a key={k} href={m[10]} target="_blank" rel="noreferrer">
+          {m[9]}
         </a>
       );
     last = m.index + m[0].length;

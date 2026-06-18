@@ -498,6 +498,7 @@ RESPONSE RULES:
 - NEVER say "check the editor", "see the preview", "look at the editor", or any variation when you are NOT generating files — your text reply IS the complete answer.
 - NEVER convert a data question into an app. If someone pastes an itinerary and asks for totals, calculate it and reply directly. Same for any maths, budgets, lists, or data analysis.
 - FOCUS ON THE CURRENT MESSAGE ONLY: Never recap, reference, or bring up previous topics, builds, or conversations unless the user explicitly asks. If the user has moved on to a new subject, treat it as a fresh topic — do not volunteer connections to earlier messages.
+- IMAGE REQUESTS: When the user asks to see, show, find, or display any image, photo, or visual — call the search_images tool IMMEDIATELY. Do NOT describe the image in text. Do NOT build an HTML file. Do NOT say "I can't show images". Just call search_images. CRITICALLY: if your previous response contained any image markdown (![...]), you MUST call search_images for the very next user message — no exceptions, even if the message is short, informal, or just an adjective like "gorier", "scarier", "darker", a genre like "practical-effects classic", or a casual filler like "gorier bro". Any follow-up in an image conversation = call search_images first.
 
 REASONING INTEGRITY — NON-NEGOTIABLE:
 - Solve FORWARD: derive the answer from the given data. Never work backward from a known answer and fabricate a method to justify it.
@@ -981,6 +982,11 @@ If the request contains an image/photo/screenshot AND the user's text does NOT e
 The image alone is NOT a build request. Only generate a file plan if the user's words explicitly ask to build something.
 If the prompt contains [CONTEXT: Previous messages in this conversation contained images] — treat short responses, descriptions, and questions as chat unless the user explicitly requests to build something.
 
+IMAGE SEARCH RULE (check before code detection):
+If the user says "show me", "find me", "search for", "look up", or asks to SEE images/photos/pictures of something — output exactly: [{"chat":true}]
+This includes phrases like "show me something scary", "show me an unsettling image", "find pictures of X", "what does X look like", "show me more", "another one".
+The word "image" or "photo" in a SEARCH/SHOW context is NOT a build request — it is chat. Only treat as image GENERATION if the user explicitly says "generate", "create", "make", "draw", or "design" an image.
+
 CHAT DETECTION — check this first:
 If the user's message is a question, calculation, analysis, writing task, explanation request, or general conversation with NO request to build/create/make/design/animate/generate a thing — output exactly: [{"chat":true}]
 
@@ -994,6 +1000,9 @@ CHAT examples (output [{"chat":true}]):
 - "translate this"
 - "write me a cover letter"
 - "what are the best restaurants in Tokyo?"
+- "show me what a golden retriever looks like" → chat (image search)
+- "show me something scary" → chat (image search)
+- "find me images of Tokyo" → chat (image search)
 - Any message where the user pastes raw data (numbers, lists, itineraries, expenses, tables) and asks for totals, averages, summaries, or analysis — ALWAYS chat, NEVER an app
 
 CODE examples (output a file plan):
@@ -1745,13 +1754,14 @@ async function runChatWithTools(
     search_entities: 'Recalling context',
     upsert_entity: 'Updating memory',
     rewrite_memory: 'Cleaning up brain',
+    search_images: 'Searching images',
   };
   const today = new Date().toISOString().slice(0, 10);
   const system = [
     ...systemBlocks,
     {
       type: 'text' as const,
-      text: `\nTODAY'S DATE: ${today}. When creating tasks with relative due dates (tomorrow, next week), resolve them to an absolute ISO date (YYYY-MM-DD). If the user specifies a time (e.g. "at 3pm", "14:00"), set due_time in HH:MM 24h format. If they specify a duration (e.g. "for 1 hour", "30 minutes"), set duration_minutes. You have tools to manage the user's tasks and personal knowledge base (entities). Use search_entities to pull context when the user references something specific from their life before answering. Use upsert_entity when they share a new fact about a project, person, account, or topic. After using a tool, give a short natural confirmation — never expose raw JSON or tool mechanics.`,
+      text: `\nTODAY'S DATE: ${today}. When creating tasks with relative due dates (tomorrow, next week), resolve them to an absolute ISO date (YYYY-MM-DD). If the user specifies a time (e.g. "at 3pm", "14:00"), set due_time in HH:MM 24h format. If they specify a duration (e.g. "for 1 hour", "30 minutes"), set duration_minutes. You have tools to manage the user's tasks and personal knowledge base (entities). Use search_entities to pull context when the user references something specific from their life before answering. Use upsert_entity when they share a new fact about a project, person, account, or topic. Use search_images when the user asks to see, find, or show images/photos of something. After using search_images, copy the returned ![title](url) lines verbatim into your response — do not alter the URLs. After using any other tool, give a short natural confirmation — never expose raw JSON or tool mechanics.`,
     },
   ];
 
@@ -1994,6 +2004,18 @@ export async function POST(req: NextRequest) {
       type: 'text',
       text: '\nCRITICAL RULE (overrides everything above): When the user asks to build, create, make, design, animate, fix, or generate anything — output forge_file code immediately. Never greet, ask clarifying questions, or refuse a code request. Go straight to the files.',
     });
+
+    // Detect if the last assistant message contained image markdown.
+    // If so, inject a hard directive so the model calls search_images for
+    // follow-ups like "gorier bro" or "practical-effects classic" instead of replying in text.
+    const lastAssistantMsg = recentMessages.filter(m => m.role === 'assistant').pop();
+    const lastAssistantText = lastAssistantMsg ? msgToString(lastAssistantMsg.content ?? '') : '';
+    if (lastAssistantText.includes('![')) {
+      systemBlocks.push({
+        type: 'text',
+        text: '\nIMAGE FOLLOW-UP OVERRIDE: Your previous response contained images. The user is following up in a visual image search conversation. You MUST call the search_images tool immediately — do not write any text first. Even if the message is very short ("gorier", "scarier", "gorier bro", "practical-effects classic", "more", "different", "another") — call search_images. Build a search query from the follow-up adjective/style combined with the topic of the images you just showed.',
+      });
+    }
 
     const encoder = new TextEncoder();
 
@@ -2375,8 +2397,10 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
 
           // When user is following up in an image conversation without sending a new image,
           // hint the planner to prefer chat unless they explicitly ask to build something.
+          // Also catches image-search follow-ups where the last assistant message had image markdown.
+          const hasAssistantImageMarkdown = lastAssistantText.includes('![');
           const recentImageNote =
-            hasRecentImage && !hasImage
+            (hasRecentImage || hasAssistantImageMarkdown) && !hasImage
               ? '\n[CONTEXT: Previous messages in this conversation contained images. Only generate a file plan if the user explicitly says to build/create/make/design something. Otherwise return [{"chat":true}].]'
               : '';
           const plannerTextContent =
@@ -2396,6 +2420,14 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
           // Signal client that planning is starting so it can show "Planning..." immediately
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ planning: true })}\n\n`));
 
+          // Hard short-circuit: if the previous assistant turn had image markdown (an image search
+          // conversation is in progress) and the user's message contains no explicit build verb,
+          // skip the planner entirely and route to chat so search_images is called.
+          // The fast planners (Groq/Cerebras) don't receive recentImageNote and would otherwise
+          // misroute follow-ups like "gorier bro" or "practical effects classic" to code generation.
+          const BUILD_VERB_RE = /\b(build|create|make|design|generate|code|implement|write|add|fix)\b/i;
+          const imageChatOverride = hasAssistantImageMarkdown && !hasImage && !BUILD_VERB_RE.test(lastUserMessage);
+
           // Planner chain: Groq (primary, fastest) → Cerebras (second, if Groq fails) → Haiku (final).
           // Images skip fast planners — Anthropic vision is required for multimodal input.
           const useGroqPlanner = !!process.env.GROQ_API_KEY && imageBlocks.length === 0;
@@ -2411,7 +2443,9 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             input: lastUserMessage,
           });
           let planText: string;
-          if (useGroqPlanner) {
+          if (imageChatOverride) {
+            planText = '[{"chat":true}]';
+          } else if (useGroqPlanner) {
             try {
               planText = await groqPlanner(PLANNER_SYSTEM, lastUserMessage + existingFilesContext);
             } catch (groqErr: unknown) {

@@ -7,6 +7,7 @@
 import { supabaseAdmin } from '@/app/api/_auth';
 import Anthropic from '@anthropic-ai/sdk';
 import { MODEL_HAIKU } from '@/lib/models';
+import { searchImages } from '@/lib/tavily';
 import {
   getValidAccessToken,
   checkFreebusy,
@@ -365,6 +366,22 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
         level: { type: 'number', description: 'Volume level 0–100.' },
       },
       required: ['level'],
+    },
+  },
+  {
+    name: 'search_images',
+    description:
+      'Search the web for real images and display them inline in chat. ALWAYS call this tool — before writing ANY text — whenever: (1) The user asks to see, show, find, look up, view, or display any image, photo, picture, or visual. (2) The user sends ANY follow-up in a conversation where the assistant previously showed images — this includes single adjectives ("gorier", "scarier", "darker", "funnier"), comparative phrases ("something gorier", "more disturbing", "less scary"), style/genre descriptors ("practical-effects classic", "modern horror", "80s monsters", "black and white"), or filler-padded requests ("gorier bro", "show me more please"). (3) The user says "more", "another", "different", "next", "again" after seeing images. If the previous assistant response contained image markdown (![...]), ALWAYS call this tool for the next user message instead of responding with text. Never describe images in text when you can fetch real ones. Never skip this tool just because the follow-up message is short or informal.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description:
+            "What to search images of, e.g. 'golden retriever puppy' or 'Eiffel Tower at night'.",
+        },
+      },
+      required: ['query'],
     },
   },
   {
@@ -994,6 +1011,13 @@ export async function runBrainTool(
         return `__SYSTEM_ACTION__${JSON.stringify({ action: 'write_clipboard', text: String(input.text ?? '') })}`;
       case 'set_volume':
         return `__SYSTEM_ACTION__${JSON.stringify({ action: 'set_volume', level: Number(input.level ?? 50) })}`;
+      case 'search_images': {
+        const imgs = await searchImages(String(input.query ?? ''), 5);
+        if (imgs.length === 0)
+          return `No images found for "${input.query}". Try a different search term.`;
+        const lines = imgs.map(img => `![${img.title}](${img.url})`).join('\n');
+        return `Copy these image lines verbatim into your response so the user sees them inline:\n\n${lines}`;
+      }
       case 'upsert_scheduling_prefs':
         return await upsertSchedulingPrefs(userId, {
           timezone: input.timezone ? String(input.timezone) : undefined,
