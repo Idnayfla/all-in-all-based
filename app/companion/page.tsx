@@ -111,6 +111,30 @@ const WIDTH_MIN = 280;
 const WIDTH_MAX = 600;
 const WIDTH_DEFAULT = 360;
 
+type MicProfile = 'auto' | 'built-in' | 'headset' | 'external' | 'mobile';
+const MIC_PROFILES: Record<Exclude<MicProfile, 'auto'>, { vad: number; proximity: number }> = {
+  'built-in': { vad: 0.35, proximity: 0.025 },
+  'headset':  { vad: 0.25, proximity: 0.008 },
+  'external': { vad: 0.20, proximity: 0.005 },
+  'mobile':   { vad: 0.40, proximity: 0.030 },
+};
+
+async function detectMicProfile(): Promise<Exclude<MicProfile, 'auto'>> {
+  try {
+    if (
+      typeof window !== 'undefined' &&
+      (window.AndroidBridge || /android|iphone|ipad/i.test(navigator.userAgent))
+    ) return 'mobile';
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const mics = devices.filter(d => d.kind === 'audioinput');
+    const label =
+      mics.find(d => d.deviceId === 'default')?.label ?? mics[0]?.label ?? '';
+    if (/usb|yeti|blue\s|rode|at2020|focusrite|scarlett|condenser/i.test(label)) return 'external';
+    if (/headset|headphone|earphone|airpod|earbud|jabra|plantronics|bose|sony/i.test(label)) return 'headset';
+  } catch { /* silent */ }
+  return 'built-in';
+}
+
 /**
  * Compresses a screenshot data URL to JPEG at reduced resolution so that
  * the base64 payload stays well under the 20 MB server body limit.
@@ -290,6 +314,11 @@ export default function CompanionOverlayPage() {
     typeof window !== 'undefined' ? (localStorage.getItem('based_companion_language') ?? 'en') : 'en'
   );
   const languageRef = useRef(language);
+  const [micProfile, setMicProfile] = useState<MicProfile>(() =>
+    typeof window !== 'undefined'
+      ? ((localStorage.getItem('based_mic_profile') as MicProfile) ?? 'auto')
+      : 'auto'
+  );
   const slowWarningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hardResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -373,6 +402,21 @@ export default function CompanionOverlayPage() {
   useEffect(() => {
     languageRef.current = language;
   }, [language]);
+
+  const applyMicProfile = useCallback((profile: Exclude<MicProfile, 'auto'>) => {
+    const p = MIC_PROFILES[profile];
+    setVadSensitivity(p.vad);
+    setVadSensitivityDebounced(p.vad);
+    setProximityThreshold(p.proximity);
+    localStorage.setItem('based_vad_sensitivity', String(p.vad));
+    localStorage.setItem('based_proximity_threshold', String(p.proximity));
+  }, []);
+
+  // Auto-detect mic on mount when profile is 'auto', and whenever the user switches back to 'auto'
+  useEffect(() => {
+    if (micProfile !== 'auto') return;
+    void detectMicProfile().then(detected => applyMicProfile(detected));
+  }, [micProfile, applyMicProfile]);
 
   const speak = async (text: string) => {
     if (!voiceEnabled) return;
@@ -2015,6 +2059,29 @@ export default function CompanionOverlayPage() {
             <span className="companion-capture-error">{captureError ?? wakeError}</span>
           )}
         </div>
+
+        {wakeWordEnabled && (
+          <div className="companion-vad-slider">
+            <span>Mic</span>
+            <select
+              value={micProfile}
+              onChange={e => {
+                const p = e.target.value as MicProfile;
+                setMicProfile(p);
+                localStorage.setItem('based_mic_profile', p);
+                if (p !== 'auto') applyMicProfile(p);
+              }}
+              style={{ WebkitAppRegion: 'no-drag', flex: 1, background: 'transparent', color: 'inherit', border: '1px solid var(--border)', borderRadius: '4px', padding: '2px 4px', fontSize: '11px', cursor: 'pointer' } as React.CSSProperties}
+              title="Mic input profile — sets sensitivity and proximity thresholds"
+            >
+              <option value="auto">Auto-detect</option>
+              <option value="built-in">Built-in</option>
+              <option value="headset">Headset</option>
+              <option value="external">External / USB</option>
+              <option value="mobile">Mobile</option>
+            </select>
+          </div>
+        )}
 
         {wakeWordEnabled && (
           <div className="companion-vad-slider">
