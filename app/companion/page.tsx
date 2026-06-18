@@ -1034,6 +1034,9 @@ export default function CompanionOverlayPage() {
       if (event === 'SIGNED_OUT') {
         setMessages([]);
         setAuthToken('');
+        sessionMemoryRef.current = '';
+        calEventsRef.current = '';
+        lastCalFetchRef.current = 0;
       } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
         setAuthToken(session.access_token);
       }
@@ -1044,7 +1047,10 @@ export default function CompanionOverlayPage() {
   // Sensor fusion: background calendar poller — fetches upcoming events every 5 min.
   // Cached in a ref so Based knows what's on the schedule on any conversation turn,
   // not just the first message of a session (which is when the server fetches it).
+  // Clear on every authToken change so a previous user's events never leak to the next.
   useEffect(() => {
+    calEventsRef.current = '';
+    lastCalFetchRef.current = 0;
     if (!authToken) return;
     const CAL_TTL = 5 * 60 * 1000;
     const fetchCal = async () => {
