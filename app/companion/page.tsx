@@ -388,6 +388,9 @@ export default function CompanionOverlayPage() {
 
   const [panelWidth, setPanelWidth] = useState<number>(WIDTH_DEFAULT);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Sensor fusion — upcoming calendar events, background-refreshed every 5 min
+  const calEventsRef = useRef<string>('');
+  const lastCalFetchRef = useRef<number>(0);
 
   // Mood/state tracking — signals sent to the API to adapt tone
   const sessionStartAtRef = useRef<number>(Date.now());
@@ -1031,12 +1034,62 @@ export default function CompanionOverlayPage() {
       if (event === 'SIGNED_OUT') {
         setMessages([]);
         setAuthToken('');
+        sessionMemoryRef.current = '';
+        calEventsRef.current = '';
+        lastCalFetchRef.current = 0;
       } else if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
         setAuthToken(session.access_token);
       }
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  // Sensor fusion: background calendar poller — fetches upcoming events every 5 min.
+  // Cached in a ref so Based knows what's on the schedule on any conversation turn,
+  // not just the first message of a session (which is when the server fetches it).
+  // Clear on every authToken change so a previous user's events never leak to the next.
+  useEffect(() => {
+    calEventsRef.current = '';
+    lastCalFetchRef.current = 0;
+    if (!authToken) return;
+    const CAL_TTL = 5 * 60 * 1000;
+    const fetchCal = async () => {
+      if (Date.now() - lastCalFetchRef.current < CAL_TTL) return;
+      try {
+        const res = await fetch('/api/calendar/events', {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          connected?: boolean;
+          events?: Array<{ title: string; start: string; end: string; allDay: boolean }>;
+        };
+        if (!data.connected || !data.events?.length) return;
+        const nowMs = Date.now();
+        const lines = data.events
+          .filter(e => new Date(e.end).getTime() > nowMs - 30 * 60 * 1000)
+          .slice(0, 6)
+          .map(e => {
+            if (e.allDay) return `All day: ${e.title}`;
+            const fmt = (iso: string) =>
+              new Date(iso).toLocaleTimeString('en-SG', {
+                timeZone: 'Asia/Singapore',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+              });
+            return `${fmt(e.start)}–${fmt(e.end)} ${e.title}`;
+          });
+        calEventsRef.current = lines.join(' · ');
+        lastCalFetchRef.current = Date.now();
+      } catch {
+        /* silent — never block */
+      }
+    };
+    void fetchCal();
+    const interval = setInterval(() => void fetchCal(), CAL_TTL);
+    return () => clearInterval(interval);
+  }, [authToken]);
 
   // Android bridge detection + frame/event handlers
   useEffect(() => {
@@ -1272,6 +1325,7 @@ export default function CompanionOverlayPage() {
           messages: [{ role: 'user', content: '.' }],
           ...(sessionMemoryRef.current ? { memory: sessionMemoryRef.current } : {}),
           ...(ambientFrameRef.current ? { ambientFrame: ambientFrameRef.current } : {}),
+          ...(calEventsRef.current ? { calendarContext: calEventsRef.current } : {}),
           ...(language !== 'en' ? { language } : {}),
         }),
       });
@@ -1474,10 +1528,8 @@ export default function CompanionOverlayPage() {
             /* silent */
           }
         }
-        if (
-          /\b(active\s+app|what\s+(am\s+i|app)\s+(using|on)|current\s+app)\b/i.test(text) &&
-          window.electronAPI.getActiveApp
-        ) {
+        // Sensor fusion: always include active app — Based knows what you're working in
+        if (window.electronAPI.getActiveApp) {
           try {
             electronContext.activeApp = await window.electronAPI.getActiveApp();
           } catch {
@@ -1530,6 +1582,7 @@ export default function CompanionOverlayPage() {
           ...(Object.keys(electronContext).length > 0 ? { electronContext } : {}),
           ...(personalityModifier ? { personalityModifier } : {}),
           ...(language !== 'en' ? { language } : {}),
+          ...(calEventsRef.current ? { calendarContext: calEventsRef.current } : {}),
         }),
         signal: abortController.signal,
       });

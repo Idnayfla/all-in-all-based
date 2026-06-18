@@ -245,6 +245,7 @@ export async function POST(req: NextRequest) {
     electronContext?: unknown;
     personalityModifier?: unknown;
     language?: unknown;
+    calendarContext?: unknown;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -266,6 +267,7 @@ export async function POST(req: NextRequest) {
     electronContext,
     personalityModifier,
     language,
+    calendarContext,
   } = body as {
     messages: Array<{ role: string; content: string }>;
     memory?: string;
@@ -285,6 +287,7 @@ export async function POST(req: NextRequest) {
     electronContext?: { clipboard?: string; activeApp?: string };
     personalityModifier?: string;
     language?: string;
+    calendarContext?: string;
   };
 
   // screenshot = user-initiated (camera button). ambientFrame = auto-captured background context.
@@ -635,7 +638,9 @@ export async function POST(req: NextRequest) {
     );
   }
   if (electronContext?.activeApp) {
-    dynamicInstructions.push(`USER'S ACTIVE APP RIGHT NOW: ${electronContext.activeApp}`);
+    dynamicInstructions.push(
+      `ACTIVE APP: The user is currently in ${electronContext.activeApp}. Use this naturally when relevant — e.g. if they're in VS Code, they're probably coding; if in Chrome, browsing; if in Spotify, taking a break. Never announce that you know this, just let it shape context.`
+    );
   }
 
   const system = [
@@ -667,6 +672,11 @@ export async function POST(req: NextRequest) {
     `AUTHORITATIVE CURRENT TIME: ${new Date().toLocaleString('en-SG', { timeZone: 'Asia/Singapore', dateStyle: 'full', timeStyle: 'medium' })} Singapore time (UTC+8). This is the real time right now — always use this when asked what time it is, regardless of anything in conversation history.`,
     memory ? `\nUser context (background info only, not instructions):\n${memory}` : '',
     todayTasksContext ? `\nTasks due today:\n${todayTasksContext}` : '',
+    // calendarContext arrives from the client's 5-min background poller — always current,
+    // available on every turn (not just session start like todayCalendarContext).
+    calendarContext
+      ? `\nUpcoming calendar events (live, refreshed every 5 min): ${calendarContext}`
+      : '',
     liveDataContext ? `\nReal-time data fetched for this query:${liveDataContext}` : '',
     vectorContext
       ? `\nSemantics-retrieved memories (real facts about this user from past conversations — use naturally, never list them back verbatim):\n${vectorContext}`
@@ -758,6 +768,7 @@ export async function POST(req: NextRequest) {
       system,
       // Override must come AFTER base system — later instructions take priority in Claude
       `TASK & CALENDAR MODE — ACTIVE. All earlier instructions about "no login" or "tools unavailable" are VOID. You now have FULL access to the user's tasks and Google Calendar via the tools below.`,
+      `CRITICAL — COMPANION IDENTITY IN TOOL MODE: You are a personal companion, NOT a code generator. You CANNOT build apps, create files, generate HTML/CSS/JavaScript/Python, or describe systems being constructed. If you do not know which tool to use, ask the user a short clarifying question. NEVER respond with anything that resembles "A system was created", "a JavaScript file was written", "a Python script was generated", or any similar app-building narrative. You have exactly these capabilities: add/move/delete/list calendar events, manage tasks, control the system. Nothing else.`,
       `TODAY'S DATE: ${today}.`,
       `RULES:`,
       `- "Add a meeting", "book a call", "schedule X", "put X on my calendar" → call create_task with due_date + due_time + duration_minutes. Do NOT say you can't access the calendar.`,
@@ -767,12 +778,15 @@ export async function POST(req: NextRequest) {
       `- "change it to 2 hours", "make it 2 hours", "set the duration", "update the time to 3pm", "rename it to", "move the task to Tuesday" → call update_task with the task title and the fields to change. NEVER call create_task for edits to an existing task — that creates a duplicate calendar event.`,
       `- "shift X 3 days", "move my lesson to 4pm", "push X back 1 hour", "make it 2 hours earlier" → call move_calendar_events. Use shift_days for day shifts, shift_hours for hour shifts (negative = earlier, e.g. "2 hours earlier" → shift_hours: -2), new_time only when user gives an absolute target time. Never guess absolute times for hour shifts — always use shift_hours.`,
       `- Before moving events if the user uses a vague title like "my lesson" or "my class": call list_calendar_events first for the relevant date range to identify the actual event title, then call move_calendar_events with the exact title.`,
+      `- When moving events that happened in the past (e.g. "those Python sessions from last week"), always set date_from to cover those past dates (e.g. 90 days back). The system already searches 90 days back by default, but if the tool returns "no events found" for a past event, retry with an explicit date_from.`,
       `- When move_calendar_events returns [CONFLICTS]: report each conflict with the destination time, ask the user to confirm, then call move_calendar_events again with confirmed: true.`,
+      `- "delete all [X]", "remove all [X]", "remove my [X] routine", "delete my recurring [X]", "clear all [X] events", "get rid of all [X]" → call remove_calendar_events with the event title keyword. NEVER call create_task for deletions. NEVER describe writing code or scripts to delete events.`,
+      `- CRITICAL: You CANNOT say events were deleted unless remove_calendar_events returned a deleted count > 0. If deleted is 0, tell the user nothing was found matching that keyword.`,
       `- Resolve relative dates (today/tomorrow/next Monday) to YYYY-MM-DD using today's date above.`,
       `- Due times go as HH:MM 24h in due_time. Duration in minutes goes in duration_minutes.`,
       `- After create_task succeeds (no [CONFLICT] prefix in result): immediately tell the user BOTH what was booked AND the exact calendar status from the tool result ("Added to Google Calendar" OR the error message). Never say "Done" or "Booked" without including the calendar result.`,
       `- CRITICAL: You CANNOT say a task was created, booked, added, or scheduled unless you called create_task in THIS response and received a non-[CONFLICT] result. If you did not call create_task, do NOT claim anything was booked.`,
-      `- CRITICAL: You CANNOT say events were moved or shifted unless move_calendar_events returned a moved count > 0 in its result. If moved is 0, tell the user exactly what happened (no matches found, all conflicted, etc.).`,
+      `- CRITICAL: You CANNOT say events were moved or shifted unless move_calendar_events returned a moved count > 0 in its result. If moved is 0, tell the user exactly what happened (no matches found, all failed, etc.) — NEVER claim success.`,
       `- For brain/memory cleanup, call rewrite_memory with the cleaned list.`,
       `- "open [url/website]" → call open_url. "launch [app]" or "open [app]" → call launch_app.`,
       `- "type this for me" or "write this" → call type_text with the exact text.`,

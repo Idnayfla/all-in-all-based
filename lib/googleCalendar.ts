@@ -485,7 +485,10 @@ export async function moveEventsByTitle(
   failed: number;
   conflicts: Array<{ title: string; newStart: string }>;
 }> {
-  const timeMin = opts.dateFrom ? `${opts.dateFrom}T00:00:00Z` : new Date().toISOString();
+  // Default to 90 days back so past events are found when date_from is not specified
+  const timeMin = opts.dateFrom
+    ? `${opts.dateFrom}T00:00:00Z`
+    : new Date(Date.now() - 90 * 86_400_000).toISOString();
   const timeMax = opts.dateTo
     ? `${opts.dateTo}T23:59:59Z`
     : new Date(Date.now() + 30 * 86_400_000).toISOString();
