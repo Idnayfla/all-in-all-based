@@ -111,27 +111,32 @@ const WIDTH_MIN = 280;
 const WIDTH_MAX = 600;
 const WIDTH_DEFAULT = 360;
 
-type MicProfile = 'auto' | 'built-in' | 'headset' | 'external' | 'mobile';
-const MIC_PROFILES: Record<Exclude<MicProfile, 'auto'>, { vad: number; proximity: number }> = {
+// 'custom' = user manually adjusted sliders away from a preset
+type MicProfile = 'auto' | 'built-in' | 'headset' | 'external' | 'mobile' | 'custom';
+type MicPreset = Exclude<MicProfile, 'auto' | 'custom'>;
+const MIC_PROFILES: Record<MicPreset, { vad: number; proximity: number }> = {
   'built-in': { vad: 0.35, proximity: 0.025 },
-  'headset':  { vad: 0.25, proximity: 0.008 },
-  'external': { vad: 0.20, proximity: 0.005 },
-  'mobile':   { vad: 0.40, proximity: 0.030 },
+  headset: { vad: 0.25, proximity: 0.008 },
+  external: { vad: 0.2, proximity: 0.005 },
+  mobile: { vad: 0.4, proximity: 0.03 },
 };
 
-async function detectMicProfile(): Promise<Exclude<MicProfile, 'auto'>> {
+async function detectMicProfile(): Promise<MicPreset> {
   try {
-    if (
-      typeof window !== 'undefined' &&
-      (window.AndroidBridge || /android|iphone|ipad/i.test(navigator.userAgent))
-    ) return 'mobile';
+    // Electron always has a desktop mic — skip mobile UA check entirely
+    const isElectron = typeof window !== 'undefined' && !!window.electronAPI;
+    if (!isElectron) {
+      if (window.AndroidBridge || /android|iphone|ipad/i.test(navigator.userAgent)) return 'mobile';
+    }
     const devices = await navigator.mediaDevices.enumerateDevices();
     const mics = devices.filter(d => d.kind === 'audioinput');
-    const label =
-      mics.find(d => d.deviceId === 'default')?.label ?? mics[0]?.label ?? '';
+    const label = mics.find(d => d.deviceId === 'default')?.label ?? mics[0]?.label ?? '';
     if (/usb|yeti|blue\s|rode|at2020|focusrite|scarlett|condenser/i.test(label)) return 'external';
-    if (/headset|headphone|earphone|airpod|earbud|jabra|plantronics|bose|sony/i.test(label)) return 'headset';
-  } catch { /* silent */ }
+    if (/headset|headphone|earphone|airpod|earbud|jabra|plantronics|bose|sony/i.test(label))
+      return 'headset';
+  } catch {
+    /* silent */
+  }
   return 'built-in';
 }
 
@@ -311,7 +316,9 @@ export default function CompanionOverlayPage() {
   const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('male');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [language, setLanguage] = useState(() =>
-    typeof window !== 'undefined' ? (localStorage.getItem('based_companion_language') ?? 'en') : 'en'
+    typeof window !== 'undefined'
+      ? (localStorage.getItem('based_companion_language') ?? 'en')
+      : 'en'
   );
   const languageRef = useRef(language);
   const [micProfile, setMicProfile] = useState<MicProfile>(() =>
@@ -403,7 +410,7 @@ export default function CompanionOverlayPage() {
     languageRef.current = language;
   }, [language]);
 
-  const applyMicProfile = useCallback((profile: Exclude<MicProfile, 'auto'>) => {
+  const applyMicProfile = useCallback((profile: MicPreset) => {
     const p = MIC_PROFILES[profile];
     setVadSensitivity(p.vad);
     setVadSensitivityDebounced(p.vad);
@@ -412,11 +419,24 @@ export default function CompanionOverlayPage() {
     localStorage.setItem('based_proximity_threshold', String(p.proximity));
   }, []);
 
-  // Auto-detect mic on mount when profile is 'auto', and whenever the user switches back to 'auto'
+  // On mount: auto-detect when 'auto'; re-apply preset values when a named profile is saved.
+  // Electron can never be mobile — clear any stale stored 'mobile' value.
+  // 'custom' skips this — those values were manually set and should be respected.
   useEffect(() => {
-    if (micProfile !== 'auto') return;
-    void detectMicProfile().then(detected => applyMicProfile(detected));
-  }, [micProfile, applyMicProfile]);
+    const isElectronMount = typeof window !== 'undefined' && !!window.electronAPI;
+    if (isElectronMount && micProfile === 'mobile') {
+      setMicProfile('auto');
+      localStorage.setItem('based_mic_profile', 'auto');
+      void detectMicProfile().then(detected => applyMicProfile(detected));
+      return;
+    }
+    if (micProfile === 'auto') {
+      void detectMicProfile().then(detected => applyMicProfile(detected));
+    } else if (micProfile !== 'custom') {
+      applyMicProfile(micProfile);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // mount only — profile changes handled by onChange below
 
   const speak = async (text: string) => {
     if (!voiceEnabled) return;
@@ -594,7 +614,8 @@ export default function CompanionOverlayPage() {
         const blob = new Blob([wavBuf], { type: 'audio/wav' });
         const form = new FormData();
         form.append('audio', blob, 'audio.wav');
-        if (languageRef.current && languageRef.current !== 'en') form.append('language', languageRef.current);
+        if (languageRef.current && languageRef.current !== 'en')
+          form.append('language', languageRef.current);
         const res = await fetch('/api/stt', {
           method: 'POST',
           body: form,
@@ -874,9 +895,12 @@ export default function CompanionOverlayPage() {
         setWakeError(null);
 
         // Auto-restart every 45 min to clear ONNX memory drift and false-positive buildup
-        vadAutoRestartTimer = setTimeout(() => {
-          if (!stopped) setVadRestartTick(t => t + 1);
-        }, 45 * 60 * 1000);
+        vadAutoRestartTimer = setTimeout(
+          () => {
+            if (!stopped) setVadRestartTick(t => t + 1);
+          },
+          45 * 60 * 1000
+        );
 
         restartWakeRef.current = () => {
           if (stopped) return;
@@ -2077,7 +2101,7 @@ export default function CompanionOverlayPage() {
                 const p = e.target.value as MicProfile;
                 setMicProfile(p);
                 localStorage.setItem('based_mic_profile', p);
-                if (p !== 'auto') applyMicProfile(p);
+                if (p !== 'auto' && p !== 'custom') applyMicProfile(p as MicPreset);
               }}
               title="Mic input profile — tunes sensitivity and proximity thresholds"
             >
@@ -2086,6 +2110,7 @@ export default function CompanionOverlayPage() {
               <option value="headset">Headset</option>
               <option value="external">External / USB</option>
               <option value="mobile">Mobile</option>
+              <option value="custom">Custom</option>
             </select>
           </div>
         )}
@@ -2103,6 +2128,8 @@ export default function CompanionOverlayPage() {
                 const v = parseFloat(e.target.value);
                 setVadSensitivity(v);
                 localStorage.setItem('based_vad_sensitivity', String(v));
+                setMicProfile('custom');
+                localStorage.setItem('based_mic_profile', 'custom');
                 if (vadRestartTimerRef.current) clearTimeout(vadRestartTimerRef.current);
                 vadRestartTimerRef.current = setTimeout(() => setVadSensitivityDebounced(v), 800);
               }}
@@ -2126,6 +2153,8 @@ export default function CompanionOverlayPage() {
                 const v = parseFloat(e.target.value);
                 setProximityThreshold(v);
                 localStorage.setItem('based_proximity_threshold', String(v));
+                setMicProfile('custom');
+                localStorage.setItem('based_mic_profile', 'custom');
               }}
               style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
               title={`Proximity: ${Math.round((proximityThreshold / 0.08) * 100)}% (higher = close voice only)`}
@@ -2140,7 +2169,13 @@ export default function CompanionOverlayPage() {
             {isSpeaking ? (
               <>
                 <div className="companion-siri-bars">
-                  <span /><span /><span /><span /><span /><span /><span />
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                  <span />
+                  <span />
                 </div>
                 <span className="companion-siri-label">speaking</span>
               </>
