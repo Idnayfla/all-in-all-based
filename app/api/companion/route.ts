@@ -810,6 +810,9 @@ export async function POST(req: NextRequest) {
         max_tokens: 512,
         system: toolSystem,
         tools: BRAIN_TOOLS,
+        // Force a tool call on round 0 — prevents text-only hallucinations like
+        // "A JavaScript file was created..." when the model doesn't know which tool to pick.
+        tool_choice: round === 0 ? { type: 'any' } : { type: 'auto' },
         messages: convo,
       });
 

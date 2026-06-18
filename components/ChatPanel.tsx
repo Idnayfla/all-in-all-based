@@ -837,7 +837,9 @@ export default function ChatPanel({
     const files = Array.from(e.dataTransfer.files);
     if (files.length === 0) return;
     const imageFiles = files.filter(f => f.type.startsWith('image/'));
-    const textFiles = files.filter(f => !f.type.startsWith('image/') && isTextFile(f.name) && f.size < 500_000);
+    const textFiles = files.filter(
+      f => !f.type.startsWith('image/') && isTextFile(f.name) && f.size < 500_000
+    );
     if (imageFiles.length > 0) {
       Promise.all(imageFiles.map(processImageFile))
         .then(results => setPendingImages(prev => [...prev, ...results].slice(0, 20)))
@@ -2201,7 +2203,20 @@ export default function ChatPanel({
             disabled={isGenerating}
             title="Attach image"
           >
-            ◆
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <path d="M21 15l-5-5L5 21" />
+            </svg>
           </button>
           <div className="attach-files-wrap" style={{ position: 'relative' }}>
             <button
@@ -2215,7 +2230,18 @@ export default function ChatPanel({
                 }
               }}
             >
-              ⊙
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
             </button>
             {showAttachMenu && (
               <div className="attach-menu">
@@ -2263,7 +2289,41 @@ export default function ChatPanel({
                 micState === 'warming'
               }
             >
-              {micState === 'transcribing' || micState === 'warming' ? '◉' : '⬡'}
+              {micState === 'transcribing' || micState === 'warming' ? (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                  <circle cx="12" cy="12" r="6" opacity="0.4">
+                    <animate
+                      attributeName="r"
+                      values="6;10;6"
+                      dur="1.2s"
+                      repeatCount="indefinite"
+                    />
+                    <animate
+                      attributeName="opacity"
+                      values="0.4;0.1;0.4"
+                      dur="1.2s"
+                      repeatCount="indefinite"
+                    />
+                  </circle>
+                  <circle cx="12" cy="12" r="5" />
+                </svg>
+              ) : (
+                <svg
+                  width="15"
+                  height="15"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="12" y1="19" x2="12" y2="23" />
+                  <line x1="8" y1="23" x2="16" y2="23" />
+                </svg>
+              )}
             </button>
             <button
               className="mic-picker-btn"
