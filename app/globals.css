@@ -8448,17 +8448,99 @@ html.has-wallpaper .editor-panel {
   cursor: pointer;
   background: transparent;
 }
-.companion-wake-indicator {
+/* ── Siri-style visual indicator ───────────────────────────── */
+.companion-siri-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0 6px;
+  border-top: 1px solid rgba(124, 58, 237, 0.12);
+}
+
+/* Listening — pulsing concentric rings */
+.companion-siri-orb {
+  position: relative;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 5px 10px;
-  font-size: 11px;
-  color: rgba(160, 100, 255, 0.9);
-  background: rgba(124, 58, 237, 0.08);
-  border-top: 1px solid rgba(124, 58, 237, 0.15);
-  letter-spacing: 0.02em;
+  justify-content: center;
 }
+.siri-core {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #c4b5fd, #7c3aed);
+  box-shadow: 0 0 10px rgba(124, 58, 237, 0.9);
+  z-index: 2;
+  position: relative;
+}
+.siri-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1.5px solid rgba(167, 139, 250, 0.55);
+  animation: siri-ring-expand 1.8s ease-out infinite;
+}
+.siri-ring:nth-child(1) { width: 22px; height: 22px; animation-delay: 0s; }
+.siri-ring:nth-child(2) { width: 34px; height: 34px; animation-delay: 0.45s; }
+.siri-ring:nth-child(3) { width: 46px; height: 46px; animation-delay: 0.9s; }
+
+@keyframes siri-ring-expand {
+  0%   { opacity: 0.85; transform: scale(0.6); }
+  100% { opacity: 0;    transform: scale(1.3); }
+}
+
+/* Processing — spinning arc */
+.companion-siri-spinner {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid rgba(124, 58, 237, 0.12);
+  border-top-color: #a78bfa;
+  border-right-color: rgba(167, 139, 250, 0.4);
+  animation: siri-spin 0.85s linear infinite;
+}
+@keyframes siri-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Speaking — bouncing bars */
+.companion-siri-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 30px;
+}
+.companion-siri-bars span {
+  display: block;
+  width: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to top, #7c3aed, #c4b5fd);
+  animation: siri-bar 0.7s ease-in-out infinite alternate;
+}
+.companion-siri-bars span:nth-child(1) { height: 8px;  animation-duration: 0.65s; animation-delay: 0s; }
+.companion-siri-bars span:nth-child(2) { height: 20px; animation-duration: 0.5s;  animation-delay: 0.1s; }
+.companion-siri-bars span:nth-child(3) { height: 28px; animation-duration: 0.6s;  animation-delay: 0.05s; }
+.companion-siri-bars span:nth-child(4) { height: 14px; animation-duration: 0.45s; animation-delay: 0.15s; }
+.companion-siri-bars span:nth-child(5) { height: 22px; animation-duration: 0.75s; animation-delay: 0s; }
+.companion-siri-bars span:nth-child(6) { height: 10px; animation-duration: 0.55s; animation-delay: 0.2s; }
+.companion-siri-bars span:nth-child(7) { height: 24px; animation-duration: 0.62s; animation-delay: 0.08s; }
+
+@keyframes siri-bar {
+  from { transform: scaleY(0.25); opacity: 0.5; }
+  to   { transform: scaleY(1);    opacity: 1; }
+}
+
+.companion-siri-label {
+  font-size: 9px;
+  color: rgba(167, 139, 250, 0.65);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Legacy wake indicator — hidden, replaced by Siri indicator */
+.companion-wake-indicator { display: none; }
 .companion-wake-pulse {
   display: inline-block;
   width: 7px;

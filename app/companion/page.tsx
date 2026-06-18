@@ -1832,11 +1832,6 @@ export default function CompanionOverlayPage() {
         />
         <span className="companion-title">BASED</span>
         <span className="companion-session">#{sessionId.current}</span>
-        {isSpeaking && (
-          <span className="companion-speaking-indicator" title="Based is speaking">
-            ◉
-          </span>
-        )}
         <button
           className="companion-clear"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
@@ -2035,10 +2030,32 @@ export default function CompanionOverlayPage() {
           </div>
         )}
 
-        {wakeWordEnabled && wakeState !== 'idle' && (
-          <div className="companion-wake-indicator">
-            <span className="companion-wake-pulse" />
-            {wakeState === 'listening' ? 'Listening for your command...' : 'Processing...'}
+        {/* Siri-style visual indicator — listening / processing / speaking */}
+        {(isSpeaking || isGenerating || (wakeWordEnabled && wakeState !== 'idle')) && (
+          <div className="companion-siri-wrap">
+            {isSpeaking ? (
+              <>
+                <div className="companion-siri-bars">
+                  <span /><span /><span /><span /><span /><span /><span />
+                </div>
+                <span className="companion-siri-label">speaking</span>
+              </>
+            ) : isGenerating || wakeState === 'processing' ? (
+              <>
+                <div className="companion-siri-spinner" />
+                <span className="companion-siri-label">thinking</span>
+              </>
+            ) : wakeState === 'listening' ? (
+              <>
+                <div className="companion-siri-orb">
+                  <span className="siri-ring" />
+                  <span className="siri-ring" />
+                  <span className="siri-ring" />
+                  <span className="siri-core" />
+                </div>
+                <span className="companion-siri-label">listening</span>
+              </>
+            ) : null}
           </div>
         )}
         {wakeWordEnabled && wakeDebug && (
