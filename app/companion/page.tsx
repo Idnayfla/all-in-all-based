@@ -2035,9 +2035,17 @@ export default function CompanionOverlayPage() {
           >
             {wakeWordEnabled && wakeListening ? '◉ Hey Based' : '⊙ Hey Based'}
           </button>
+          {(captureError || wakeError) && (
+            <span className="companion-capture-error">{captureError ?? wakeError}</span>
+          )}
+        </div>
+
+        {/* Language — always visible */}
+        <div className="companion-setting-row">
+          <label>Lang</label>
           <select
-            className="companion-capture-btn"
-            style={{ WebkitAppRegion: 'no-drag', cursor: 'pointer' } as React.CSSProperties}
+            className="companion-select"
+            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             value={language}
             onChange={e => {
               setLanguage(e.target.value);
@@ -2045,25 +2053,25 @@ export default function CompanionOverlayPage() {
             }}
             title="Response language"
           >
-            <option value="en">EN</option>
-            <option value="ms">MS</option>
-            <option value="zh-CN">ZH</option>
-            <option value="ta">TA</option>
-            <option value="ar">AR</option>
-            <option value="fr">FR</option>
-            <option value="id">ID</option>
-            <option value="ja">JA</option>
-            <option value="ko">KO</option>
+            <option value="en">English</option>
+            <option value="ms">Malay</option>
+            <option value="zh-CN">Chinese</option>
+            <option value="ta">Tamil</option>
+            <option value="ar">Arabic</option>
+            <option value="fr">French</option>
+            <option value="id">Indonesian</option>
+            <option value="ja">Japanese</option>
+            <option value="ko">Korean</option>
           </select>
-          {(captureError || wakeError) && (
-            <span className="companion-capture-error">{captureError ?? wakeError}</span>
-          )}
         </div>
 
-        {wakeWordEnabled && (
-          <div className="companion-vad-slider">
-            <span>Mic</span>
+        {/* Mic profile — shown when wake word is on OR on Android (affects STT quality) */}
+        {(wakeWordEnabled || isAndroidBridge) && (
+          <div className="companion-setting-row">
+            <label>Mic</label>
             <select
+              className="companion-select"
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
               value={micProfile}
               onChange={e => {
                 const p = e.target.value as MicProfile;
@@ -2071,8 +2079,7 @@ export default function CompanionOverlayPage() {
                 localStorage.setItem('based_mic_profile', p);
                 if (p !== 'auto') applyMicProfile(p);
               }}
-              style={{ WebkitAppRegion: 'no-drag', flex: 1, background: 'transparent', color: 'inherit', border: '1px solid var(--border)', borderRadius: '4px', padding: '2px 4px', fontSize: '11px', cursor: 'pointer' } as React.CSSProperties}
-              title="Mic input profile — sets sensitivity and proximity thresholds"
+              title="Mic input profile — tunes sensitivity and proximity thresholds"
             >
               <option value="auto">Auto-detect</option>
               <option value="built-in">Built-in</option>
