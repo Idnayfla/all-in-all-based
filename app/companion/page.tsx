@@ -286,6 +286,10 @@ export default function CompanionOverlayPage() {
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('male');
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [language, setLanguage] = useState(() =>
+    typeof window !== 'undefined' ? (localStorage.getItem('based_companion_language') ?? 'en') : 'en'
+  );
+  const languageRef = useRef(language);
   const slowWarningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hardResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -366,6 +370,9 @@ export default function CompanionOverlayPage() {
   useEffect(() => {
     proximityThresholdRef.current = proximityThreshold;
   }, [proximityThreshold]);
+  useEffect(() => {
+    languageRef.current = language;
+  }, [language]);
 
   const speak = async (text: string) => {
     if (!voiceEnabled) return;
@@ -543,6 +550,7 @@ export default function CompanionOverlayPage() {
         const blob = new Blob([wavBuf], { type: 'audio/wav' });
         const form = new FormData();
         form.append('audio', blob, 'audio.wav');
+        if (languageRef.current && languageRef.current !== 'en') form.append('language', languageRef.current);
         const res = await fetch('/api/stt', {
           method: 'POST',
           body: form,
@@ -1196,6 +1204,7 @@ export default function CompanionOverlayPage() {
           messages: [{ role: 'user', content: '.' }],
           ...(sessionMemoryRef.current ? { memory: sessionMemoryRef.current } : {}),
           ...(ambientFrameRef.current ? { ambientFrame: ambientFrameRef.current } : {}),
+          ...(language !== 'en' ? { language } : {}),
         }),
       });
 
@@ -1452,6 +1461,7 @@ export default function CompanionOverlayPage() {
           moodSignals,
           ...(Object.keys(electronContext).length > 0 ? { electronContext } : {}),
           ...(personalityModifier ? { personalityModifier } : {}),
+          ...(language !== 'en' ? { language } : {}),
         }),
         signal: abortController.signal,
       });
@@ -1981,6 +1991,26 @@ export default function CompanionOverlayPage() {
           >
             {wakeWordEnabled && wakeListening ? '◉ Hey Based' : '⊙ Hey Based'}
           </button>
+          <select
+            className="companion-capture-btn"
+            style={{ WebkitAppRegion: 'no-drag', cursor: 'pointer' } as React.CSSProperties}
+            value={language}
+            onChange={e => {
+              setLanguage(e.target.value);
+              localStorage.setItem('based_companion_language', e.target.value);
+            }}
+            title="Response language"
+          >
+            <option value="en">EN</option>
+            <option value="ms">MS</option>
+            <option value="zh-CN">ZH</option>
+            <option value="ta">TA</option>
+            <option value="ar">AR</option>
+            <option value="fr">FR</option>
+            <option value="id">ID</option>
+            <option value="ja">JA</option>
+            <option value="ko">KO</option>
+          </select>
           {(captureError || wakeError) && (
             <span className="companion-capture-error">{captureError ?? wakeError}</span>
           )}
