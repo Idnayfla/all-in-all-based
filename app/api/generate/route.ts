@@ -1679,7 +1679,8 @@ async function streamText(
   onChunk: (text: string) => void,
   onRetry: () => void,
   aiModel?: 'based' | 'free',
-  taskType: 'fast_chat' | 'chat' = 'chat'
+  taskType: 'fast_chat' | 'chat' = 'chat',
+  generatorModel?: string
 ): Promise<string> {
   // Direct Anthropic streaming — fastest path when key is present.
   // Free-tier requests MUST NOT touch Anthropic: they go straight to Groq (or
@@ -1693,7 +1694,7 @@ async function streamText(
       let accumulated = '';
       try {
         const stream = client.messages.stream({
-          model: MODEL_OPUS,
+          model: generatorModel ?? MODEL_OPUS,
           max_tokens: maxTokens,
           system: systemMsg?.content ?? '',
           messages: conversationMessages.map(m => ({
@@ -2699,6 +2700,20 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
           })();
           const generatedFiles: { name: string; language: string; content: string }[] = [];
 
+          // Model routing: single-file apps with no complex requirements → Sonnet (5x cheaper).
+          // Multi-file projects, modifications to existing files, and complex specs → Opus.
+          // Complex keywords: anything requiring real-time state, 3D, physics, multiplayer,
+          // auth, backend logic, or heavy data viz that benefits from Opus's deeper reasoning.
+          const COMPLEX_GEN_RE =
+            /\b(multiplayer|websocket|webgl|three\.js|physics|particle|real.?time|oauth|authentication|backend|express|node\.js|d3\.js|dashboard|chart\.js|recharts|vite|next\.js|react|vue|svelte|angular|typescript|tailwind|prisma|supabase|stripe|payment)\b/i;
+          const isSimpleGen =
+            !usingFreeModel &&
+            HAS_ANTHROPIC_KEY &&
+            filePlan.length === 1 &&
+            !(existingFiles as ProjectFile[] | undefined)?.length &&
+            !COMPLEX_GEN_RE.test(lastUserMessage + ' ' + (filePlan[0]?.description ?? ''));
+          const fileGenModel = isSimpleGen ? MODEL_SONNET : MODEL_OPUS;
+
           // Step 2: Generate each file individually
           for (let i = 0; i < filePlan.length; i++) {
             const fileSpec = filePlan[i];
@@ -2745,7 +2760,7 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
             );
             const fileGeneration = trace?.generation({
               name: `generate-file:${fileSpec.name}`,
-              model: MODEL_OPUS,
+              model: fileGenModel,
               input: filePrompt,
             });
 
@@ -2805,7 +2820,9 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
                   controller.enqueue(
                     encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)
                   ),
-                usingFreeModel ? 'free' : 'based'
+                usingFreeModel ? 'free' : 'based',
+                'chat',
+                fileGenModel
               );
             }
 
@@ -2897,7 +2914,9 @@ ${isModifyingExisting ? `CRITICAL: This is a MODIFICATION of an existing file. T
                         controller.enqueue(
                           encoder.encode(`data: ${JSON.stringify({ retrying: true })}\n\n`)
                         ),
-                      usingFreeModel ? 'free' : 'based'
+                      usingFreeModel ? 'free' : 'based',
+                      'chat',
+                      fileGenModel
                     );
                   }
                   const retryParsed = parseFiles(retryText);

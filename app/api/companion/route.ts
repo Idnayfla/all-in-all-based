@@ -244,6 +244,7 @@ export async function POST(req: NextRequest) {
     moodSignals?: unknown;
     electronContext?: unknown;
     personalityModifier?: unknown;
+    language?: unknown;
   };
   try {
     body = (await req.json()) as typeof body;
@@ -264,6 +265,7 @@ export async function POST(req: NextRequest) {
     moodSignals,
     electronContext,
     personalityModifier,
+    language,
   } = body as {
     messages: Array<{ role: string; content: string }>;
     memory?: string;
@@ -282,6 +284,7 @@ export async function POST(req: NextRequest) {
     };
     electronContext?: { clipboard?: string; activeApp?: string };
     personalityModifier?: string;
+    language?: string;
   };
 
   // screenshot = user-initiated (camera button). ambientFrame = auto-captured background context.
@@ -600,6 +603,28 @@ export async function POST(req: NextRequest) {
   if (personalityModifier?.trim()) {
     dynamicInstructions.push(
       `PERSONALITY OVERRIDES (user-configured — follow these precisely):\n${personalityModifier.trim()}`
+    );
+  }
+
+  // Multi-language: if the user has selected a non-English language, instruct Based to respond in it.
+  if (language && language !== 'en' && !language.startsWith('en-')) {
+    const LANG_NAMES: Record<string, string> = {
+      ms: 'Malay (Bahasa Melayu)',
+      'zh-CN': 'Mandarin Chinese (Simplified)',
+      zh: 'Mandarin Chinese',
+      ta: 'Tamil',
+      ar: 'Arabic',
+      fr: 'French',
+      de: 'German',
+      ja: 'Japanese',
+      ko: 'Korean',
+      es: 'Spanish',
+      id: 'Indonesian (Bahasa Indonesia)',
+      th: 'Thai',
+    };
+    const langName = LANG_NAMES[language] ?? language;
+    dynamicInstructions.push(
+      `LANGUAGE: The user has set their preferred language to ${langName}. Respond entirely in ${langName}. Keep proper nouns, brand names, and code identifiers in English.`
     );
   }
 
