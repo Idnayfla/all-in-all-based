@@ -2420,6 +2420,14 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
           // Signal client that planning is starting so it can show "Planning..." immediately
           controller.enqueue(encoder.encode(`data: ${JSON.stringify({ planning: true })}\n\n`));
 
+          // Hard short-circuit: if the previous assistant turn had image markdown (an image search
+          // conversation is in progress) and the user's message contains no explicit build verb,
+          // skip the planner entirely and route to chat so search_images is called.
+          // The fast planners (Groq/Cerebras) don't receive recentImageNote and would otherwise
+          // misroute follow-ups like "gorier bro" or "practical effects classic" to code generation.
+          const BUILD_VERB_RE = /\b(build|create|make|design|generate|code|implement|write|add|fix)\b/i;
+          const imageChatOverride = hasAssistantImageMarkdown && !hasImage && !BUILD_VERB_RE.test(lastUserMessage);
+
           // Planner chain: Groq (primary, fastest) → Cerebras (second, if Groq fails) → Haiku (final).
           // Images skip fast planners — Anthropic vision is required for multimodal input.
           const useGroqPlanner = !!process.env.GROQ_API_KEY && imageBlocks.length === 0;
@@ -2435,7 +2443,9 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             input: lastUserMessage,
           });
           let planText: string;
-          if (useGroqPlanner) {
+          if (imageChatOverride) {
+            planText = '[{"chat":true}]';
+          } else if (useGroqPlanner) {
             try {
               planText = await groqPlanner(PLANNER_SYSTEM, lastUserMessage + existingFilesContext);
             } catch (groqErr: unknown) {
