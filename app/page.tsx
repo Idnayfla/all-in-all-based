@@ -34,6 +34,7 @@ import VideoEditorPanel from '@/components/VideoEditorPanel';
 // ensures the tone bundle is in its own chunk — no dynamic import() at key-press time.
 const StudioPanel = dynamic(() => import('@/components/StudioPanel'), { ssr: false });
 const ImageStudioPanel = dynamic(() => import('@/components/ImageStudioPanel'), { ssr: false });
+const GraphPanel = dynamic(() => import('@/components/GraphPanel'), { ssr: false });
 import NotesPanel from '@/components/NotesPanel';
 import TasksPanel from '@/components/TasksPanel';
 import EntityPanel from '@/components/EntityPanel';
@@ -180,6 +181,7 @@ export default function Home() {
     | 'spec'
     | 'tasks'
     | 'brain'
+    | 'graph'
   >('chat');
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
@@ -1581,7 +1583,7 @@ export default function Home() {
           })()}
           {/* Tools group: Notes · Tasks · Brain */}
           {(() => {
-            const TOOLS_PANELS = ['notes', 'tasks', 'brain'] as const;
+            const TOOLS_PANELS = ['notes', 'tasks', 'brain', 'graph'] as const;
             const toolsActive = (TOOLS_PANELS as readonly string[]).includes(activePanel);
             const activeLabel = toolsActive
               ? ((
@@ -1589,6 +1591,7 @@ export default function Home() {
                     notes: 'Notes',
                     tasks: 'Tasks',
                     brain: 'Brain',
+                    graph: 'Graph',
                   } as Record<string, string>
                 )[activePanel] ?? 'Tools')
               : 'Tools';
@@ -1611,6 +1614,7 @@ export default function Home() {
                         { id: 'notes', label: 'Notes' },
                         { id: 'tasks', label: 'Tasks' },
                         { id: 'brain', label: 'Brain' },
+                        { id: 'graph', label: 'Graph' },
                       ] as const
                     ).map(item => (
                       <button
@@ -2320,6 +2324,20 @@ export default function Home() {
           <div className={`panel ${activePanel === 'brain' ? 'panel-active' : ''}`}>
             <EntityPanel authToken={authToken} />
           </div>
+          <div className={`panel ${activePanel === 'graph' ? 'panel-active' : ''}`}>
+            <GraphPanel
+              authToken={authToken}
+              onOpenProject={projectId => {
+                const p = projects.find(pr => pr.id === projectId);
+                if (p) setCurrentProject(p);
+                setActivePanel('chat');
+              }}
+              onAskAbout={label => {
+                setPendingPrompt(`Tell me about ${label}`);
+                setActivePanel('chat');
+              }}
+            />
+          </div>
           <div className={`panel ${activePanel === '3d' ? 'panel-active' : ''}`}>
             <ThreeDStudio />
           </div>
@@ -2343,6 +2361,7 @@ export default function Home() {
             activePanel !== 'spec' &&
             activePanel !== 'tasks' &&
             activePanel !== 'brain' &&
+            activePanel !== 'graph' &&
             (incognito ? (
               <div className="panel panel-active">
                 <div className="incognito-banner">
@@ -2476,6 +2495,7 @@ export default function Home() {
                           | 'spec'
                           | 'tasks'
                           | 'brain'
+                          | 'graph'
                       )
                     }
                     onAutoName={
