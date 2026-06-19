@@ -2274,6 +2274,20 @@ export default function CompanionOverlayPage() {
           >
             {wakeWordEnabled && wakeListening ? '◉ Hey Based' : '⊙ Hey Based'}
           </button>
+          <button
+            disabled
+            title="Referral tracking coming soon"
+            className="companion-capture-btn"
+            style={
+              {
+                opacity: 0.35,
+                cursor: 'not-allowed',
+                WebkitAppRegion: 'no-drag',
+              } as React.CSSProperties
+            }
+          >
+            ⬡ Invite
+          </button>
           {(captureError || wakeError) && (
             <span className="companion-capture-error">{captureError ?? wakeError}</span>
           )}
