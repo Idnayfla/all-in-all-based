@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import * as THREE from 'three';
 import type { GraphData, GraphEdge, GraphNode } from '@/app/api/graph/route';
@@ -236,10 +236,6 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
         }
       });
     }
-
-    try {
-      fgRef.current?.refresh?.();
-    } catch {}
   }, []);
 
   const linkColorDynamic = useCallback((link: unknown) => {
@@ -329,13 +325,26 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
         starGroupRef.current.rotation.x = Math.sin(t * 0.003) * 0.04;
       }
 
-      // Pulse each node's emissive at its own phase and speed
-      nodeIds.forEach((id, i) => {
-        const mat = coreMats.current.get(id);
-        if (mat) {
-          mat.emissiveIntensity = 0.45 + Math.sin(t * speeds[i] + phases[i]) * 0.22;
-        }
-      });
+      // Pulse each node — respect hover state so dimmed nodes stay dim
+      const hovered = hoveredNodeRef.current;
+      if (hovered) {
+        const neighbors = adjacencyRef.current.get(hovered) ?? new Set<string>();
+        nodeIds.forEach((id, i) => {
+          const mat = coreMats.current.get(id);
+          if (!mat) return;
+          if (id === hovered) {
+            mat.emissiveIntensity = 1.6 + Math.sin(t * speeds[i] + phases[i]) * 0.2;
+          } else if (neighbors.has(id)) {
+            mat.emissiveIntensity = 0.8 + Math.sin(t * speeds[i] + phases[i]) * 0.1;
+          }
+          // non-adjacent: leave at 0.06 — handleNodeHover set it, don't overwrite
+        });
+      } else {
+        nodeIds.forEach((id, i) => {
+          const mat = coreMats.current.get(id);
+          if (mat) mat.emissiveIntensity = 0.45 + Math.sin(t * speeds[i] + phases[i]) * 0.22;
+        });
+      }
 
       rafRef.current = requestAnimationFrame(tick);
     };
@@ -354,10 +363,13 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
     loadGraph(true);
   };
 
-  const graphData = {
-    nodes: (data?.nodes ?? []).map(n => ({ ...n })),
-    links: (data?.edges ?? []).map(e => ({ ...e })),
-  };
+  const graphData = useMemo(
+    () => ({
+      nodes: (data?.nodes ?? []).map(n => ({ ...n })),
+      links: (data?.edges ?? []).map(e => ({ ...e })),
+    }),
+    [data]
+  );
 
   const showGraph = !!(data && data.nodes.length > 0);
   const isEmpty = !!(data && data.nodes.length === 0);
