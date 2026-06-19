@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FileNode } from '@/app/page';
+import { FileNode } from '@/lib/types';
 import ImageCropModal from './ImageCropModal';
 
 export default function PreviewPanel({

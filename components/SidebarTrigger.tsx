@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './Sidebar';
-import { FileNode, Project } from '@/app/page';
+import { FileNode, Project } from '@/lib/types';
 
 interface SidebarTriggerProps {
   files: FileNode[];

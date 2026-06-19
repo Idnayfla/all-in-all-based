@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Project } from '@/app/page';
+import type { Project } from '@/lib/types';
 import { track } from '@/lib/posthog';
 
 interface SpecSection {

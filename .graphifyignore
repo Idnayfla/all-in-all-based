@@ -1,0 +1,19 @@
+# Vendored / generated files — exclude from knowledge graph
+public/gif.worker.js
+public/gif.worker.js.map
+
+# ONNX / VAD runtime (vad-web bundles)
+public/vad/
+
+# Next.js build output
+.next/
+
+# Node modules
+node_modules/
+
+# Graphify output itself
+graphify-out/
+
+# Android / iOS build artifacts
+android/app/build/
+ios/App/Pods/

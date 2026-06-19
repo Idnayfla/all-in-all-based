@@ -2,7 +2,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { capturePreview, captureScreen, isScreenCaptureSupported } from '@/hooks/useScreenCapture';
-import { FileNode } from '@/app/page';
+import { FileNode } from '@/lib/types';
 
 export interface CMsg {
   role: 'user' | 'assistant';
