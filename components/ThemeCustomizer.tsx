@@ -35,7 +35,15 @@ export function loadTheme(): AppTheme {
 }
 
 export function saveThemeLocally(theme: AppTheme) {
-  localStorage.setItem('based_theme', JSON.stringify(theme));
+  try {
+    localStorage.setItem('based_theme', JSON.stringify(theme));
+  } catch {
+    // Storage full — evict the largest transient key and retry
+    localStorage.removeItem('based_companion_messages');
+    try {
+      localStorage.setItem('based_theme', JSON.stringify(theme));
+    } catch {}
+  }
 }
 
 interface Props {

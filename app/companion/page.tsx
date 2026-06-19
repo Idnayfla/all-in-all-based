@@ -1232,12 +1232,16 @@ export default function CompanionOverlayPage() {
       if (messages.length === 0) {
         localStorage.removeItem('based_companion_messages');
       } else {
-        // Only persist completed messages (skip the live-streaming empty assistant bubble)
-        const toSave = messages.filter(m => m.content?.trim());
+        // Strip captureThumb (base64 images) and cap at 40 messages to stay under quota
+        const toSave = messages
+          .filter(m => m.content?.trim())
+          .slice(-40)
+          .map(({ captureThumb: _, ...m }) => m);
         localStorage.setItem('based_companion_messages', JSON.stringify(toSave));
       }
     } catch {
-      // ignore storage errors (e.g. quota exceeded)
+      // Still over quota — clear messages entirely so theme/personality saves work
+      localStorage.removeItem('based_companion_messages');
     }
   }, [messages]);
 
