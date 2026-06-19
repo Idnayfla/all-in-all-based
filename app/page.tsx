@@ -1392,6 +1392,16 @@ export default function Home() {
                 {subscription.tier === 'beta' ? 30 : 10}
               </button>
             )}
+            <a
+              href="/vote"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="companion-header-btn"
+              title="Vote on what gets built next"
+              style={{ textDecoration: 'none' }}
+            >
+              ⬡ Vote
+            </a>
             {subscription.tier !== 'pro' ? (
               <button
                 className="header-upgrade-btn"
@@ -1414,15 +1424,6 @@ export default function Home() {
                 ◈ Support
               </a>
             )}
-            <a
-              href="/vote"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="icon-btn"
-              title="Vote on what gets built next"
-            >
-              ⬡
-            </a>
             <button
               className={`icon-btn ${showSettings ? 'active' : ''}`}
               onClick={() => {
