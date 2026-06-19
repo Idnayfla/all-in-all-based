@@ -194,7 +194,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         const realIds = new Set(prev.filter(m => !m.id.startsWith('optimistic-')).map(m => m.id));
         const newOnes = fresh.filter(m => !realIds.has(m.id));
         if (newOnes.length === 0) return prev;
-        // Clear optimistic msgs that now have a real counterpart
+        if (newOnes.some(m => m.is_based)) setBasedTyping(false);
         const withoutStale = prev.filter(m => {
           if (!m.id.startsWith('optimistic-')) return true;
           return !fresh.some(f => f.display_name === m.display_name && f.content === m.content);
