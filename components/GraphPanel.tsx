@@ -121,6 +121,36 @@ interface Props {
   onAskAbout: (label: string) => void;
 }
 
+// Star layer config — each layer has its own light density
+const STAR_LAYERS = [
+  { count: 2200, spread: 1800, size: 0.32, opacityMin: 0.10, opacityMax: 0.30, color: '#dde8ff' },
+  { count: 900,  spread: 1600, size: 0.70, opacityMin: 0.35, opacityMax: 0.60, color: '#eef0ff' },
+  { count: 220,  spread: 1400, size: 1.20, opacityMin: 0.60, opacityMax: 0.90, color: '#ffffff' },
+  { count: 35,   spread: 1200, size: 2.60, opacityMin: 0.85, opacityMax: 1.00, color: '#c8d8ff' },
+];
+
+function buildStarLayer(cfg: (typeof STAR_LAYERS)[0]): THREE.Points {
+  const positions = new Float32Array(cfg.count * 3);
+  for (let i = 0; i < cfg.count; i++) {
+    positions[i * 3]     = (Math.random() - 0.5) * cfg.spread;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * cfg.spread;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * cfg.spread;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const opacity = cfg.opacityMin + Math.random() * (cfg.opacityMax - cfg.opacityMin);
+  return new THREE.Points(
+    geo,
+    new THREE.PointsMaterial({
+      color: cfg.color,
+      size: cfg.size,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity,
+    })
+  );
+}
+
 export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Props) {
   const [data, setData] = useState<GraphData | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
@@ -132,6 +162,8 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
   const fgRef = useRef<any>(null);
   const bloomAdded = useRef(false);
   const coreMats = useRef<Map<string, THREE.MeshLambertMaterial>>(new Map());
+  const starGroupRef = useRef<THREE.Group | null>(null);
+  const rafRef = useRef<number | null>(null);
 
   const loadGraph = useCallback(
     (bust = false) => {
@@ -166,11 +198,12 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
     return () => obs.disconnect();
   }, []);
 
-  // Dispose materials on unmount
+  // Dispose materials + cancel RAF on unmount
   useEffect(
     () => () => {
       coreMats.current.forEach(m => m.dispose());
       coreMats.current.clear();
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     },
     []
   );
@@ -195,59 +228,78 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
     document.body.style.cursor = curr ? 'pointer' : '';
   }, []);
 
-  // Add bloom + star field once after simulation first settles
+  // Add bloom + layered star field + animation loop once after simulation settles
   const handleEngineStop = useCallback(() => {
     if (!fgRef.current || bloomAdded.current) return;
     bloomAdded.current = true;
 
-    // Star field — scattered points deep in the background
+    // Smooth orbit controls
+    try {
+      const controls = fgRef.current.controls?.();
+      if (controls) {
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.rotateSpeed = 0.5;
+        controls.zoomSpeed = 0.7;
+      }
+    } catch { /* no-op */ }
+
+    // Multi-layer star field — each layer has its own light density
     try {
       const scene = fgRef.current.scene?.();
       if (scene) {
-        const count = 1600;
-        const spread = 700;
-        const positions = new Float32Array(count * 3);
-        for (let i = 0; i < count; i++) {
-          positions[i * 3] = (Math.random() - 0.5) * spread;
-          positions[i * 3 + 1] = (Math.random() - 0.5) * spread;
-          positions[i * 3 + 2] = (Math.random() - 0.5) * spread;
-        }
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        scene.add(
-          new THREE.Points(
-            geo,
-            new THREE.PointsMaterial({
-              color: '#ede8d0',
-              size: 0.5,
-              sizeAttenuation: true,
-              transparent: true,
-              opacity: 0.55,
-            })
-          )
-        );
+        const group = new THREE.Group();
+        STAR_LAYERS.forEach(cfg => group.add(buildStarLayer(cfg)));
+        scene.add(group);
+        starGroupRef.current = group;
       }
-    } catch {
-      /* scene unavailable — no-op */
-    }
+    } catch { /* no-op */ }
 
     // Bloom
     try {
       const composer = fgRef.current.postProcessingComposer?.();
-      if (!composer) return;
-      const { w, h } = dimsRef.current;
-      import('three/examples/jsm/postprocessing/UnrealBloomPass.js')
-        .then(({ UnrealBloomPass }) => {
-          composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 1.6, 0.5, 0.04));
-        })
-        .catch(() => {});
-    } catch {
-      /* bloom unavailable — no-op */
-    }
+      if (composer) {
+        const { w, h } = dimsRef.current;
+        import('three/examples/jsm/postprocessing/UnrealBloomPass.js')
+          .then(({ UnrealBloomPass }) => {
+            composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 1.8, 0.6, 0.03));
+          })
+          .catch(() => {});
+      }
+    } catch { /* no-op */ }
+
+    // Animation loop — star drift + node pulse
+    const nodeIds = Array.from(coreMats.current.keys());
+    const phases = nodeIds.map(() => Math.random() * Math.PI * 2);
+    const speeds = nodeIds.map(() => 0.4 + Math.random() * 0.6);
+    let t = 0;
+
+    const tick = () => {
+      t += 0.012;
+
+      // Slowly drift the star field — gives infinite-space feeling
+      if (starGroupRef.current) {
+        starGroupRef.current.rotation.y = t * 0.008;
+        starGroupRef.current.rotation.x = Math.sin(t * 0.003) * 0.04;
+      }
+
+      // Pulse each node's emissive at its own phase and speed
+      nodeIds.forEach((id, i) => {
+        const mat = coreMats.current.get(id);
+        if (mat) {
+          mat.emissiveIntensity = 0.45 + Math.sin(t * speeds[i] + phases[i]) * 0.22;
+        }
+      });
+
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
   }, []);
 
   const handleRefresh = () => {
-    // Note: bloomAdded stays true — bloom + stars are added to the scene once and persist
+    if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    starGroupRef.current = null;
+    bloomAdded.current = false;
     coreMats.current.forEach(m => m.dispose());
     coreMats.current.clear();
     loadGraph(true);
