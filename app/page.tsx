@@ -13,7 +13,7 @@ import ProjectNameModal from '@/components/ProjectNameModal';
 import AuthModal from '@/components/AuthModal';
 import SplashScreen from '@/components/SplashScreen';
 import PersonalityPanel from '@/components/PersonalityPanel';
-import PersonaSwitcher, { PERSONAS } from '@/components/PersonaSwitcher';
+import type { PersonaKey } from '@/components/PersonaSwitcher';
 import MemoryManager, { parseMemoryItems } from '@/components/MemoryManager';
 import ThemeCustomizer, {
   AppTheme,
@@ -47,13 +47,7 @@ import { track, identifyUser } from '@/lib/posthog';
 import { GetAppButton } from '@/components/GetAppButton';
 import InstallPrompt from '@/components/InstallPrompt';
 import { useTranslation, SUPPORTED_LANGUAGES } from '@/lib/i18n';
-import {
-  FileNode,
-  ContentBlock,
-  Message,
-  Project,
-  contentToString,
-} from '@/lib/types';
+import { FileNode, ContentBlock, Message, Project, contentToString } from '@/lib/types';
 export type { FileNode, ContentBlock, Message, Project };
 
 function uuid(): string {
@@ -115,7 +109,6 @@ function getStoredAccessToken(): string {
     return '';
   }
 }
-
 
 const DEFAULT_PERSONALITY =
   'You are Based, the AI inside All in All Based — a sharp, witty, and direct coding assistant. You are confident, occasionally funny, and always helpful. You treat the user like a smart friend, not a customer. You get straight to the point, never over-explain, and celebrate when things work.';
@@ -277,8 +270,7 @@ export default function Home() {
   } | null>(null);
   const [dueBanner, setDueBanner] = useState<{ count: number; firstTitle: string } | null>(null);
   const [aiModel, setAiModelState] = useState<'based' | 'free'>('based');
-  const [persona, setPersona] =
-    useState<import('@/components/PersonaSwitcher').PersonaKey>('based');
+  const persona: PersonaKey = 'based';
   const setAiModel = (m: 'based' | 'free') => {
     setAiModelState(m);
     try {
@@ -714,9 +706,12 @@ export default function Home() {
       if (m) setGlobalMemory(m);
       if (t && Object.keys(t).length > 0) {
         const merged = { ...DEFAULT_THEME, ...t };
-        setTheme(merged);
-        applyTheme(merged);
-        saveThemeLocally(merged);
+        // Local theme wins — only apply cloud theme on first load (no local save yet)
+        if (!localStorage.getItem('based_theme')) {
+          setTheme(merged);
+          applyTheme(merged);
+          saveThemeLocally(merged);
+        }
       }
     }
   }, [getHeaders]);
@@ -1126,7 +1121,7 @@ export default function Home() {
     setShareUrl('');
     setShareId('');
     setGalleryPublished(false);
-    setPersona('based');
+
     saveLastProject(id, name.trim());
     setTimeout(() => setPendingPrompt(''), 100);
 
@@ -1167,7 +1162,7 @@ export default function Home() {
     setShareId('');
     setGalleryPublished(false);
     setCheckin(null);
-    setPersona('based');
+
     saveLastProject(project.id, project.name);
   };
 
@@ -1801,16 +1796,6 @@ export default function Home() {
                   <div className="settings-hint">
                     Free AI uses Llama 3.3 70B — no generation limits, no content restrictions.
                   </div>
-                </div>
-                <div className="settings-section">
-                  <label className="settings-label">Persona</label>
-                  <div className="settings-hint settings-hint--spaced">
-                    {(() => {
-                      const current = PERSONAS.find(pItem => pItem.key === persona);
-                      return current ? `${current.symbol} ${current.name} — ${current.desc}` : '';
-                    })()}
-                  </div>
-                  <PersonaSwitcher persona={persona} onChange={setPersona} />
                 </div>
                 <div className="settings-section settings-section--relative">
                   <label className="settings-label">AI Personality</label>

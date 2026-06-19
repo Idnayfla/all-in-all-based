@@ -68,7 +68,14 @@ function load(): PersonalitySettings {
 function save(s: PersonalitySettings) {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(s));
-  } catch {}
+  } catch {
+    // Quota full — evict transient keys and retry
+    localStorage.removeItem('based_companion_messages');
+    localStorage.removeItem('based_projects_cache');
+    try {
+      localStorage.setItem(LS_KEY, JSON.stringify(s));
+    } catch {}
+  }
 }
 
 function blend(value: number, low: string, high: string): string {
@@ -189,7 +196,7 @@ export default function PersonalityPanel({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div className="settings-label">Persona</div>
+      <div className="settings-label">Presets</div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {PRESETS.map(preset => (
           <button
