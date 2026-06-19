@@ -202,6 +202,17 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
               .map((p: { display_name?: string }) => p.display_name ?? 'Someone');
             setTypingUsers([...new Set(typers)]);
           })
+          .on('presence', { event: 'leave' }, () => {
+            const state = channel.presenceState<{ typing?: boolean; display_name?: string }>();
+            const typers = Object.values(state)
+              .flat()
+              .filter(
+                (p: { typing?: boolean; display_name?: string }) =>
+                  p.display_name !== displayNameRef.current && p.typing
+              )
+              .map((p: { display_name?: string }) => p.display_name ?? 'Someone');
+            setTypingUsers([...new Set(typers)]);
+          })
           .subscribe(status => {
             if (status === 'SUBSCRIBED') {
               void channel.track({ typing: false, display_name: name });
@@ -265,7 +276,12 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
 
   const broadcastTyping = useCallback((isTyping: boolean) => {
     if (!channelRef.current) return;
-    void channelRef.current.track({ typing: isTyping, display_name: displayNameRef.current });
+    if (isTyping) {
+      void channelRef.current.track({ typing: true, display_name: displayNameRef.current });
+    } else {
+      // untrack fully removes presence — guarantees 'leave' event fires on other clients
+      void channelRef.current.untrack();
+    }
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
