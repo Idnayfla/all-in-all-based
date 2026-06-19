@@ -12,14 +12,19 @@ async function ensureAuth(): Promise<string | null> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  if (session) return session.access_token;
+  if (session) {
+    supabase.realtime.setAuth(session.access_token);
+    return session.access_token;
+  }
   // Anonymous sign-in for invite recipients who aren't Based users
   const { data, error } = await supabase.auth.signInAnonymously();
   if (error) {
     console.error('[group] signInAnonymously failed:', error.message);
     return null;
   }
-  return data.session?.access_token ?? null;
+  const token = data.session?.access_token ?? null;
+  if (token) supabase.realtime.setAuth(token);
+  return token;
 }
 
 async function authHeaders(): Promise<Record<string, string>> {
@@ -55,6 +60,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const roomRef = useRef<{ id: string; name: string; code: string } | null>(null);
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -86,6 +92,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         }
         const data = (await res.json()) as { id: string; name: string; code: string };
         setRoom(data);
+        roomRef.current = data;
 
         // Persist room so user can find it again
         try {
@@ -173,6 +180,31 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         void supabase.removeChannel(channelRef.current);
       }
     };
+  }, []);
+
+  // Poll every 4s as Realtime fallback — merges in any messages Realtime missed
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (!roomRef.current) return;
+      const headers = await authHeaders();
+      const res = await fetch(`/api/group/messages?room_id=${roomRef.current.id}`, { headers });
+      if (!res.ok) return;
+      const { messages: fresh } = (await res.json()) as { messages: Message[] };
+      setMessages(prev => {
+        const realIds = new Set(prev.filter(m => !m.id.startsWith('optimistic-')).map(m => m.id));
+        const newOnes = fresh.filter(m => !realIds.has(m.id));
+        if (newOnes.length === 0) return prev;
+        // Clear optimistic msgs that now have a real counterpart
+        const withoutStale = prev.filter(m => {
+          if (!m.id.startsWith('optimistic-')) return true;
+          return !fresh.some(f => f.display_name === m.display_name && f.content === m.content);
+        });
+        return [...withoutStale, ...newOnes].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+      });
+    }, 4000);
+    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
