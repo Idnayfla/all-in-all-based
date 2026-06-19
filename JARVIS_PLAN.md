@@ -12,50 +12,58 @@ Always-on ambient AI. Constantly aware, remembers everything, acts without being
 
 Anthropic stays for one job only — app generation. Everything else routes away.
 
-| Job                    | Model                          | Cost                    | Status |
-| ---------------------- | ------------------------------ | ----------------------- | ------ |
-| Companion chat         | Groq `llama-3.3-70b-versatile` | Free (500K tok/day)     | ✅ Live |
-| Companion overflow     | Cerebras `llama-3.3-70b`       | Free (1M tok/day)       | ✅ Live |
-| Hard reasoning         | Deepseek R1                    | $0.14/1M tokens         | ⬜ Phase 3 |
-| Vision (screen/camera) | Gemini Flash 2.0               | $0.075/1M + free vision | ✅ Live |
+| Job                    | Model                          | Cost                    | Status                |
+| ---------------------- | ------------------------------ | ----------------------- | --------------------- |
+| Companion chat         | Groq `llama-3.3-70b-versatile` | Free (500K tok/day)     | ✅ Live               |
+| Companion overflow     | Cerebras `llama-3.3-70b`       | Free (1M tok/day)       | ✅ Live               |
+| Hard reasoning         | Deepseek R1                    | $0.14/1M tokens         | ⬜ Phase 3            |
+| Vision (screen/camera) | Gemini Flash 2.0               | $0.075/1M + free vision | ✅ Live               |
 | Local (offline/fast)   | Ollama `llama3.2:3b`           | $0                      | ⬜ Phase 3 (Mac Mini) |
-| App generation only    | Claude Opus 4.8                | Pay per use             | ✅ Live |
-| STT                    | Deepgram Nova-3 + Groq Whisper | Near free               | ✅ Live |
-| TTS                    | Modal F5-TTS                   | Near free               | ✅ Live |
+| App generation only    | Claude Opus 4.8                | Pay per use             | ✅ Live               |
+| STT                    | Deepgram Nova-3 + Groq Whisper | Near free               | ✅ Live               |
+| TTS                    | Modal F5-TTS                   | Near free               | ✅ Live               |
 
 ---
 
 ## What Was Built
 
 ### ✅ 1. Multi-model Router
+
 Groq → Cerebras → Anthropic Sonnet fallback for text. Gemini 2.0 Flash for vision.
 **Files:** `lib/companionRouter.ts`
 
 ### ✅ 2. Long-term Vector Memory
+
 Gemini text-embedding-004 (768-dim, free). `match_memories` Supabase RPC with cosine similarity (threshold 0.72). Fire-and-forget extraction via Haiku after every conversation.
 **Files:** `lib/vectorMemory.ts`
 
 ### ✅ 3. Proactive Engine
+
 `proactive` param triggers unprompted initiation — Based opens with one warm, specific line based on time of day + user memories. Idle-state detection wired in companion.
 **Files:** `app/api/companion/route.ts` (lines 483–491)
 
 ### ✅ 4. Ambient Vision Loop
+
 `ambientFrameRef` auto-captures screen every N seconds in background. Compressed for payload size. Sent alongside every message as implicit context — Based sees what's on screen without user sharing manually.
 **Files:** `app/companion/page.tsx` (`ambientFrameRef`, `compressAmbient`)
 
 ### ✅ 5. System Control via Electron IPC
+
 Based has hands: `system:launch-app`, `system:type-text`, `system:clipboard-read/write`, `system:get-volume`, `system:set-volume`, `system:get-active-app`.
 **Files:** `electron/main.js` (lines 401–701)
 
 ### ✅ 6. Multi-language Support
+
 `language` param read from companion request. `LANG_NAMES` lookup. Injected into system prompt — Based responds fully in user's chosen language. STT language param follows same setting.
 **Files:** `app/api/companion/route.ts` (lines 668–686)
 
 ### ✅ 7. Mic Input Profiles
+
 `MicProfile` type (`auto | built-in | headset | external | mobile | custom`). Device label detection (Yeti, Rode, AirPods, Jabra, etc.). RMS + VAD thresholds per profile. Persisted in localStorage.
 **Files:** `app/companion/page.tsx` (`MicProfile`, `applyMicProfile`)
 
 ### ✅ 8. Mood + State Inference
+
 `moodSignals` (latency, avgLength, sessionMinutes, shortStreak) sent from client. Based adjusts tone based on inferred state — quick replies = busy, long silence = distracted.
 **Files:** `app/api/companion/route.ts` (lines 623–650), `app/companion/page.tsx`
 
@@ -64,18 +72,21 @@ Based has hands: `system:launch-app`, `system:type-text`, `system:clipboard-read
 ## Phases
 
 ### Phase 1 — ✅ COMPLETE
+
 - Companion → Groq (free) → Cerebras (free) → Anthropic Sonnet fallback
 - Opus reserved for app generation only
 - Long-term vector memory with Gemini embeddings
 - Ambient vision loop + mic profiles + mood signals
 
 ### Phase 2 — ✅ COMPLETE
+
 - Proactive engine (Based speaks first)
 - System control via Electron IPC
 - Multi-language support
 - Sensor fusion layer (screen + mood + calendar + tasks in every request)
 
 ### Phase 3 — Mac Mini M4 Pro (S$2,899)
+
 - Trigger: Based API costs hit S$150+/month consistently
 - Move Discord bot from desktop → Mac Mini
 - Run Qwen2.5 72B locally (fits in 48GB at 4-bit) — replace Anthropic for all agent work

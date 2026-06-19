@@ -1596,6 +1596,15 @@ export default function Home() {
               </div>
             );
           })()}
+          <a
+            href="/vote"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="tab-btn"
+            title="Vote on what gets built next"
+          >
+            ⬡ Vote
+          </a>
         </div>
       </div>
 

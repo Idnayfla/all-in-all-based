@@ -20,20 +20,20 @@ Update this as items move.
 
 ### Active — Community & Growth
 
-| Priority | Feature                   | Status  | Notes                                                                                        |
-| -------- | ------------------------- | ------- | -------------------------------------------------------------------------------------------- |
-| 1        | **Link /vote from nav**   | Next up | Phase 24 board built, unreachable. Add tab in sidebar or header. 10-min job.                 |
-| 2        | **BAS-54 Group Chat P1**  | Next up | Observer mode + @mention routing. Users can pull Based into a group.                         |
-| 3        | **Referral backend**      | Next up | `?ref=xxx` → cookie → `referrals` table on signup. Lights up the greyed-out Invite button.  |
-| 4        | **Phase 21 Changelog**    | Queued  | Public "you asked, we built it" feed. Closes the community loop.                             |
+| Priority | Feature                  | Status  | Notes                                                                                      |
+| -------- | ------------------------ | ------- | ------------------------------------------------------------------------------------------ |
+| 1        | **Link /vote from nav**  | Next up | Phase 24 board built, unreachable. Add tab in sidebar or header. 10-min job.               |
+| 2        | **BAS-54 Group Chat P1** | Next up | Observer mode + @mention routing. Users can pull Based into a group.                       |
+| 3        | **Referral backend**     | Next up | `?ref=xxx` → cookie → `referrals` table on signup. Lights up the greyed-out Invite button. |
+| 4        | **Phase 21 Changelog**   | Queued  | Public "you asked, we built it" feed. Closes the community loop.                           |
 
 ### Platform Expansion
 
-| Priority | Feature               | Status                           | Notes                                                                                                             |
-| -------- | --------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| 5        | **Based for VS Code** | Queued                           | Companion + generation + voice in VS Code sidebar. Same backend, new client. Published to Marketplace + Open VSX. |
-| 6        | **Mac Mini M4 Pro**   | Trigger: API costs hit S$150+/mo | Qwen2.5 72B local → drop Anthropic for all non-generation work. Discord bot moves here.                           |
-| 7        | **App Store / Play Store** | Blocked                       | Needs Apple $99/yr + Google $25.                                                                                  |
+| Priority | Feature                    | Status                           | Notes                                                                                                             |
+| -------- | -------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 5        | **Based for VS Code**      | Queued                           | Companion + generation + voice in VS Code sidebar. Same backend, new client. Published to Marketplace + Open VSX. |
+| 6        | **Mac Mini M4 Pro**        | Trigger: API costs hit S$150+/mo | Qwen2.5 72B local → drop Anthropic for all non-generation work. Discord bot moves here.                           |
+| 7        | **App Store / Play Store** | Blocked                          | Needs Apple $99/yr + Google $25.                                                                                  |
 
 ---
 
