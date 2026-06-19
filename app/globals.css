@@ -5040,6 +5040,27 @@ body {
   margin-top: 2px;
 }
 
+.personality-preset-chip {
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: transparent;
+  color: var(--text-secondary, #888);
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.personality-preset-chip:hover {
+  border-color: rgba(255,255,255,0.3);
+  color: var(--text-primary, #fff);
+}
+.personality-preset-chip--active {
+  border-color: var(--accent, #a78bfa);
+  color: var(--accent, #a78bfa);
+  background: rgba(167,139,250,0.08);
+}
+
 .personality-slider-row {
   display: flex;
   flex-direction: column;

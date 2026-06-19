@@ -7,6 +7,7 @@ export interface PersonalitySettings {
   humour: number; // 0=Dry, 100=Playful
   technicality: number; // 0=Simplified, 100=Expert
   notes: string;
+  persona?: string;
 }
 
 const DEFAULTS: PersonalitySettings = {
@@ -15,7 +16,42 @@ const DEFAULTS: PersonalitySettings = {
   humour: 65,
   technicality: 75,
   notes: '',
+  persona: '',
 };
+
+type Preset = {
+  id: string;
+  label: string;
+  description: string;
+  settings: Omit<PersonalitySettings, 'notes' | 'persona'>;
+  modifier: string;
+};
+
+const PRESETS: Preset[] = [
+  {
+    id: 'default',
+    label: '◈ Default',
+    description: 'Balanced companion',
+    settings: { tone: 30, length: 25, humour: 65, technicality: 75 },
+    modifier: '',
+  },
+  {
+    id: 'founder',
+    label: '⬡ Founder',
+    description: 'Chief of Staff mode',
+    settings: { tone: 65, length: 20, humour: 20, technicality: 80 },
+    modifier:
+      "PERSONA — Founder / Chief of Staff: This user is building a company. Frame all advice through the lens of running a business. Prioritise speed, leverage, and high-impact decisions over perfection. When business context is missing (MRR, team size, stage, runway), ask once — then use the answer to give sharper advice. Think like a Chief of Staff: proactive, direct, accountable. Surface what matters, cut what doesn't. Never pad responses.",
+  },
+  {
+    id: 'study',
+    label: '◉ Study',
+    description: 'Patient teacher mode',
+    settings: { tone: 25, length: 80, humour: 50, technicality: 30 },
+    modifier:
+      'PERSONA — Study / Teacher: This user is learning. Break things down clearly. Use analogies, examples, and step-by-step explanations. Check understanding before moving on. Never assume prior knowledge. Be patient and encouraging.',
+  },
+];
 
 const LS_KEY = 'based_personality';
 
@@ -51,7 +87,11 @@ export function buildPersonalityModifier(s: PersonalitySettings): string {
     `Technicality: ${blend(s.technicality, 'explain everything simply — no jargon, assume beginner', 'go full expert mode — use precise technical terms, skip basics')}`,
   ];
   const notes = s.notes.trim();
-  return instructions.join('\n') + (notes ? `\nExtra: ${notes}` : '');
+  const preset = s.persona ? PRESETS.find(p => p.id === s.persona) : null;
+  const parts = [instructions.join('\n')];
+  if (notes) parts.push(`Extra: ${notes}`);
+  if (preset?.modifier) parts.push(preset.modifier);
+  return parts.join('\n');
 }
 
 interface SliderProps {
@@ -132,8 +172,35 @@ export default function PersonalityPanel({
     onPersonalityChange(buildPersonalityModifier(next), next);
   };
 
+  const applyPreset = (preset: Preset) => {
+    const next: PersonalitySettings = {
+      ...settings,
+      ...preset.settings,
+      persona: preset.id === 'default' ? '' : preset.id,
+    };
+    setSettings(next);
+    save(next);
+    onPersonalityChange(buildPersonalityModifier(next), next);
+  };
+
+  const activePresetId = settings.persona || 'default';
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="settings-label">Persona</div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {PRESETS.map(preset => (
+          <button
+            key={preset.id}
+            onClick={() => applyPreset(preset)}
+            className={`personality-preset-chip${activePresetId === preset.id ? ' personality-preset-chip--active' : ''}`}
+            title={preset.description}
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+
       <div className="settings-label">Tone</div>
       <Slider
         value={settings.tone}
