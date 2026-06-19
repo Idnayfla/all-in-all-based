@@ -45,21 +45,6 @@ function getNodeIdStr(val: unknown): string {
   return '';
 }
 
-function getLinkColor(link: GraphEdge): string {
-  const src = getNodeIdStr(link.source);
-  const tgt = getNodeIdStr(link.target);
-  const alpha = Math.round(Math.max(0.18, link.similarity) * 200)
-    .toString(16)
-    .padStart(2, '0');
-  if (src.startsWith('m:') && tgt.startsWith('m:')) return `#4ade80${alpha}`;
-  if (
-    (src.startsWith('p:') && tgt.startsWith('e:')) ||
-    (src.startsWith('e:') && tgt.startsWith('p:'))
-  )
-    return `#a78bfa${alpha}`;
-  return `#c9a87c${alpha}`;
-}
-
 function getLinkParticleColor(link: GraphEdge): string {
   const src = getNodeIdStr(link.source);
   const tgt = getNodeIdStr(link.target);
@@ -164,6 +149,8 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
   const coreMats = useRef<Map<string, THREE.MeshLambertMaterial>>(new Map());
   const starGroupRef = useRef<THREE.Group | null>(null);
   const rafRef = useRef<number | null>(null);
+  const adjacencyRef = useRef<Map<string, Set<string>>>(new Map());
+  const hoveredNodeRef = useRef<string | null>(null);
 
   const loadGraph = useCallback(
     (bust = false) => {
@@ -184,6 +171,19 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
   useEffect(() => {
     if (authToken) loadGraph();
   }, [authToken, loadGraph]);
+
+  useEffect(() => {
+    const map = new Map<string, Set<string>>();
+    data?.edges.forEach(e => {
+      const src = typeof e.source === 'string' ? e.source : (e.source as { id: string }).id;
+      const tgt = typeof e.target === 'string' ? e.target : (e.target as { id: string }).id;
+      if (!map.has(src)) map.set(src, new Set());
+      if (!map.has(tgt)) map.set(tgt, new Set());
+      map.get(src)!.add(tgt);
+      map.get(tgt)!.add(src);
+    });
+    adjacencyRef.current = map;
+  }, [data]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -214,18 +214,58 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
   );
 
   // Direct material mutation — no React re-render on hover
-  const handleNodeHover = useCallback((node: unknown, prevNode: unknown) => {
-    const prev = prevNode as GraphNode | null;
+  const handleNodeHover = useCallback((node: unknown, _prevNode: unknown) => {
     const curr = node as GraphNode | null;
-    if (prev) {
-      const m = coreMats.current.get(prev.id);
-      if (m) m.emissiveIntensity = 0.55;
-    }
-    if (curr) {
-      const m = coreMats.current.get(curr.id);
-      if (m) m.emissiveIntensity = 1.8;
-    }
+    hoveredNodeRef.current = curr?.id ?? null;
     document.body.style.cursor = curr ? 'pointer' : '';
+
+    if (!curr) {
+      // Restore all to base — RAF pulse resumes naturally next frame
+      coreMats.current.forEach(m => {
+        m.emissiveIntensity = 0.45;
+      });
+    } else {
+      const neighbors = adjacencyRef.current.get(curr.id) ?? new Set<string>();
+      coreMats.current.forEach((m, id) => {
+        if (id === curr.id) {
+          m.emissiveIntensity = 1.8;
+        } else if (neighbors.has(id)) {
+          m.emissiveIntensity = 0.9;
+        } else {
+          m.emissiveIntensity = 0.06;
+        }
+      });
+    }
+
+    try {
+      fgRef.current?.refresh?.();
+    } catch {}
+  }, []);
+
+  const linkColorDynamic = useCallback((link: unknown) => {
+    const l = link as GraphEdge;
+    const src = getNodeIdStr(l.source);
+    const tgt = getNodeIdStr(l.target);
+    const hovered = hoveredNodeRef.current;
+
+    let baseHex: string;
+    if (src.startsWith('m:') && tgt.startsWith('m:')) baseHex = '#4ade80';
+    else if (
+      (src.startsWith('p:') && tgt.startsWith('e:')) ||
+      (src.startsWith('e:') && tgt.startsWith('p:'))
+    )
+      baseHex = '#a78bfa';
+    else baseHex = '#c9a87c';
+
+    if (!hovered) {
+      const alpha = Math.round(Math.max(0.18, l.similarity ?? 0.5) * 200)
+        .toString(16)
+        .padStart(2, '0');
+      return `${baseHex}${alpha}`;
+    }
+
+    const touchesHovered = src === hovered || tgt === hovered;
+    return `${baseHex}${touchesHovered ? 'dd' : '08'}`;
   }, []);
 
   // Add bloom + layered star field + animation loop once after simulation settles
@@ -515,7 +555,7 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
             nodeThreeObject={nodeThreeObject}
             nodeThreeObjectExtend={false}
             nodeLabel={(n: GraphNode) => n.label}
-            linkColor={(l: GraphEdge) => getLinkColor(l)}
+            linkColor={linkColorDynamic}
             linkWidth={(l: GraphEdge) => (l.similarity ?? 0.5) * 1.5}
             linkOpacity={0.6}
             linkCurvature={0.2}
