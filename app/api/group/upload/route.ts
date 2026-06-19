@@ -12,6 +12,11 @@ export async function POST(req: NextRequest) {
   const filename = (body.filename ?? 'image').replace(/[^a-zA-Z0-9._-]/g, '_');
   const contentType = body.content_type ?? 'image/jpeg';
 
+  const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+  if (!ALLOWED_TYPES.has(contentType)) {
+    return NextResponse.json({ error: 'Unsupported image type' }, { status: 400 });
+  }
+
   const path = `${userId}/${Date.now()}_${filename}`;
   const { data, error } = await supabaseAdmin.storage
     .from('group-media')

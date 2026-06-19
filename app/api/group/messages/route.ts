@@ -64,6 +64,22 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Validate media_url must come from our own Supabase Storage bucket
+  if (media_url) {
+    const expectedBase = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/group-media/`;
+    try {
+      const parsed = new URL(media_url);
+      if (
+        !media_url.startsWith(expectedBase) ||
+        parsed.hostname !== new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).hostname
+      ) {
+        return NextResponse.json({ error: 'Invalid media_url' }, { status: 400 });
+      }
+    } catch {
+      return NextResponse.json({ error: 'Invalid media_url' }, { status: 400 });
+    }
+  }
+
   const { data: member } = await supabaseAdmin
     .from('group_members')
     .select('display_name')

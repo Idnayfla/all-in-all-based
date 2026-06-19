@@ -490,7 +490,11 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
                 src={msg.media_url}
                 alt="shared image"
                 className="group-message-img"
-                onClick={() => window.open(msg.media_url!, '_blank')}
+                onClick={() => {
+                  if (/^https?:\/\//i.test(msg.media_url ?? '')) {
+                    window.open(msg.media_url!, '_blank', 'noopener,noreferrer');
+                  }
+                }}
               />
             )}
           </div>
