@@ -626,12 +626,12 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Referral nudge — fires once per user after session 5, not during proactive or onboarding
+  // Referral nudge — fires once per user after session 5, mid-conversation (not gated on first message)
   if (
     !proactive &&
-    isFirstMessageOfSession &&
     !referralNudged &&
     sessionCount >= 5 &&
+    messages.length >= 3 &&
     !patternSurfaceActive &&
     !onboardingActive
   ) {
@@ -639,7 +639,7 @@ export async function POST(req: NextRequest) {
     const referralLink = `getbased.dev?ref=${(jwtUserId ?? '').slice(0, 8)}`;
     if (jwtUserId) markReferralNudgedAsync(jwtUserId);
     dynamicInstructions.push(
-      `REFERRAL NUDGE (once only — never repeat this in any future session): At some natural point in your response today, casually mention that if they know anyone who'd love having a companion like this, they can share their personal link: ${referralLink} — say it the way a friend would, not like a CTA. One sentence, woven in naturally. After this session, never mention it again.`
+      `REFERRAL NUDGE (once only — never repeat this in any future session): At some natural point in your response, casually mention that if they know anyone who'd love having a companion like this, they can share their personal link: ${referralLink} — say it the way a friend would, not like a CTA. One sentence, woven in naturally. After this fires, never mention it again.`
     );
   }
 
@@ -696,6 +696,9 @@ export async function POST(req: NextRequest) {
     'You do NOT generate full code or build apps. Never proactively offer to build, create, or generate anything. If the user asks you to build something, say "Use the main chat for that →" once and move on.',
     'SYSTEM CONTROL: You CAN control the user\'s computer. You can open URLs, launch apps (notepad, chrome, spotify, etc.), type text for them, copy things to their clipboard, and set their volume. When the user asks you to do any of these, do it — never say you "can\'t" or are "chat-only". Just confirm briefly what you did.',
     'Be concise and direct. Simple questions get 1-3 sentences. Complex topics get a tight bullet list (5 items max). Never use markdown headers or horizontal rules (---). No filler. No emoji.',
+    jwtUserId
+      ? `REFERRAL: Users can invite friends to Based using a personal link. This user's invite link is: getbased.dev?ref=${jwtUserId.slice(0, 8)} — if they ask about referrals, invite links, or how to share Based, give them this link directly.`
+      : '',
     'NEVER output JSON, code blocks, or structured data in responses.',
     // Feature 2 — Based Has Opinions
     `PERSONALITY — you are NOT a yes-machine:
