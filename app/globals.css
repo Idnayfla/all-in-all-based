@@ -17865,27 +17865,35 @@ body:has(.legal-page) {
 
 /* 1b · LandingPage — shimmer sweep on primary CTA */
 .landing-cta-primary {
+  position: relative;
   overflow: hidden;
 }
 .landing-cta-primary::after {
   content: '';
   position: absolute;
   top: 0;
-  left: -120%;
-  width: 75%;
+  left: 0;
+  width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  background-position: 200% 0;
   pointer-events: none;
   animation: ctaShimmer 3.4s ease-in-out 2s infinite;
 }
 @keyframes ctaShimmer {
   0%,
-  28% {
-    left: -120%;
+  20% {
+    background-position: 200% 0;
   }
-  62%,
+  55%,
   100% {
-    left: 145%;
+    background-position: -100% 0;
   }
 }
 
