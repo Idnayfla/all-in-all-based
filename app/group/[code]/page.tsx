@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { use, useEffect, useRef, useState, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -25,8 +25,9 @@ interface Message {
   user_id: string | null;
 }
 
-export default function GroupChatPage({ params }: { params: { code: string } }) {
-  const code = params.code.toUpperCase();
+export default function GroupChatPage({ params }: { params: Promise<{ code: string }> }) {
+  const { code: rawCode } = use(params);
+  const code = rawCode.toUpperCase();
 
   const [room, setRoom] = useState<{ id: string; name: string; code: string } | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
