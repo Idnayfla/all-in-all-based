@@ -341,6 +341,21 @@ export async function POST(req: NextRequest) {
   // assigned once we have a confirmed DB response and weatherLastSurfaced is null.
   let daysSinceWeather = 0;
 
+  // On non-first messages, read sessionCount + referralNudged so nudge conditions work mid-conversation
+  if (jwtUserId && !isFirstMessageOfSession) {
+    try {
+      const { data } = await supabaseAdmin
+        .from('user_settings')
+        .select('companion_session_count, companion_referral_nudged')
+        .eq('user_id', jwtUserId)
+        .single();
+      if (data) {
+        sessionCount = (data.companion_session_count as number) ?? 0;
+        referralNudged = (data.companion_referral_nudged as boolean) ?? false;
+      }
+    } catch {}
+  }
+
   if (jwtUserId && isFirstMessageOfSession) {
     const tracked = await trackCompanionSession(jwtUserId);
     if (tracked) {
