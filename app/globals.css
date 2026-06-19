@@ -5043,22 +5043,25 @@ body {
 .personality-preset-chip {
   padding: 4px 10px;
   border-radius: 20px;
-  border: 1px solid rgba(255,255,255,0.12);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   background: transparent;
   color: var(--text-secondary, #888);
   font-size: 11px;
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
   white-space: nowrap;
 }
 .personality-preset-chip:hover {
-  border-color: rgba(255,255,255,0.3);
+  border-color: rgba(255, 255, 255, 0.3);
   color: var(--text-primary, #fff);
 }
 .personality-preset-chip--active {
   border-color: var(--accent, #a78bfa);
   color: var(--accent, #a78bfa);
-  background: rgba(167,139,250,0.08);
+  background: rgba(167, 139, 250, 0.08);
 }
 
 .personality-slider-row {
@@ -8505,7 +8508,7 @@ html.has-wallpaper .editor-panel {
   color: #c8c8e0;
 }
 
-/* Setting rows — language, mic profile, etc. */
+/* Setting rows — language, mic profile, etc. (legacy, kept for compat) */
 .companion-setting-row {
   display: flex;
   align-items: center;
@@ -8540,6 +8543,48 @@ html.has-wallpaper .editor-panel {
   accent-color: rgba(124, 58, 237, 0.7);
   cursor: pointer;
   background: transparent;
+}
+
+/* Controls tray — Lang / Mic / VAD behind ⊙ button */
+.companion-controls-tray {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 4px 0;
+}
+.companion-tray-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+}
+.companion-tray-row label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  min-width: 64px;
+}
+.companion-tray-row .companion-select {
+  flex: 1;
+}
+.companion-tray-hint {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.25);
+  white-space: nowrap;
+}
+.companion-tray-range {
+  flex: 1;
+  height: 2px;
+  accent-color: rgba(124, 58, 237, 0.7);
+  cursor: pointer;
+  background: transparent;
+}
+.companion-clear--active {
+  color: rgba(124, 58, 237, 0.9) !important;
 }
 /* ── Siri-style visual indicator ───────────────────────────── */
 .companion-siri-wrap {
