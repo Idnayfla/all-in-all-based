@@ -8,12 +8,24 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-async function authHeaders(): Promise<Record<string, string>> {
+async function ensureAuth(): Promise<string | null> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  if (!session) return {};
-  return { Authorization: `Bearer ${session.access_token}` };
+  if (session) return session.access_token;
+  // Anonymous sign-in for invite recipients who aren't Based users
+  const { data, error } = await supabase.auth.signInAnonymously();
+  if (error) {
+    console.error('[group] signInAnonymously failed:', error.message);
+    return null;
+  }
+  return data.session?.access_token ?? null;
+}
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = await ensureAuth();
+  if (!token) return {};
+  return { Authorization: `Bearer ${token}` };
 }
 
 interface Message {
@@ -34,10 +46,12 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
   const [input, setInput] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [nameSet, setNameSet] = useState(false);
-  const [error, setError] = useState('');
+  const [joinError, setJoinError] = useState('');
+  const [chatError, setChatError] = useState('');
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
   const [basedTyping, setBasedTyping] = useState(false);
+  const [joining, setJoining] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -46,74 +60,105 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  // Join room and load messages
   const joinRoom = useCallback(
     async (name: string) => {
-      const headers = await authHeaders();
-      const res = await fetch(`/api/group/rooms?code=${code}&name=${encodeURIComponent(name)}`, {
-        headers,
-      });
-      if (!res.ok) {
-        setError('Room not found. Check the invite link.');
-        return;
-      }
-      const data = (await res.json()) as { id: string; name: string; code: string };
-      setRoom(data);
-
-      // Persist room to localStorage so user can find it again later
+      setJoining(true);
+      setChatError('');
       try {
-        const saved = JSON.parse(localStorage.getItem('based_group_rooms') ?? '[]') as {
-          code: string;
-          name: string;
-        }[];
-        const updated = [
-          { code: data.code, name: data.name },
-          ...saved.filter(r => r.code !== data.code),
-        ].slice(0, 20);
-        localStorage.setItem('based_group_rooms', JSON.stringify(updated));
-      } catch {}
+        const headers = await authHeaders();
+        if (!headers.Authorization) {
+          setChatError('Could not authenticate. Try refreshing the page.');
+          return;
+        }
 
-      // Load existing messages
-      const msgRes = await fetch(`/api/group/messages?room_id=${data.id}`, { headers });
-      if (msgRes.ok) {
-        const msgData = (await msgRes.json()) as { messages: Message[] };
-        setMessages(msgData.messages);
-        setTimeout(scrollToBottom, 50);
+        const res = await fetch(`/api/group/rooms?code=${code}&name=${encodeURIComponent(name)}`, {
+          headers,
+        });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          console.error('[group] joinRoom failed:', res.status, body);
+          setJoinError(
+            body.error === 'Room not found'
+              ? 'Room not found. Check the invite link.'
+              : `Error ${res.status} — try refreshing.`
+          );
+          return;
+        }
+        const data = (await res.json()) as { id: string; name: string; code: string };
+        setRoom(data);
+
+        // Persist room so user can find it again
+        try {
+          const saved = JSON.parse(localStorage.getItem('based_group_rooms') ?? '[]') as {
+            code: string;
+            name: string;
+          }[];
+          const updated = [
+            { code: data.code, name: data.name },
+            ...saved.filter(r => r.code !== data.code),
+          ].slice(0, 20);
+          localStorage.setItem('based_group_rooms', JSON.stringify(updated));
+        } catch {}
+
+        // Load messages
+        const msgRes = await fetch(`/api/group/messages?room_id=${data.id}`, { headers });
+        if (msgRes.ok) {
+          const msgData = (await msgRes.json()) as { messages: Message[] };
+          setMessages(msgData.messages);
+          setTimeout(scrollToBottom, 50);
+        } else {
+          console.error('[group] failed to load messages:', msgRes.status);
+        }
+
+        // Realtime subscription
+        if (channelRef.current) {
+          await supabase.removeChannel(channelRef.current);
+          channelRef.current = null;
+        }
+        channelRef.current = supabase
+          .channel(`group:${data.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'group_messages',
+              filter: `room_id=eq.${data.id}`,
+            },
+            payload => {
+              const newMsg = payload.new as Message;
+              setMessages(prev => {
+                if (prev.find(m => m.id === newMsg.id)) return prev;
+                // Replace optimistic message from same sender with the real one
+                const optimisticIdx = prev.findIndex(
+                  m =>
+                    m.id.startsWith('optimistic-') &&
+                    m.display_name === newMsg.display_name &&
+                    m.content === newMsg.content
+                );
+                if (optimisticIdx !== -1) {
+                  const next = [...prev];
+                  next[optimisticIdx] = newMsg;
+                  return next;
+                }
+                return [...prev, newMsg];
+              });
+              if (newMsg.is_based) setBasedTyping(false);
+              setTimeout(scrollToBottom, 50);
+            }
+          )
+          .subscribe();
+      } catch (err) {
+        console.error('[group] joinRoom error:', err);
+        setChatError('Something went wrong joining the room. Try refreshing.');
+      } finally {
+        setJoining(false);
       }
-
-      // Clean up any existing subscription before creating a new one
-      if (channelRef.current) {
-        await supabase.removeChannel(channelRef.current);
-        channelRef.current = null;
-      }
-
-      channelRef.current = supabase
-        .channel(`group:${data.id}`)
-        .on(
-          'postgres_changes',
-          {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'group_messages',
-            filter: `room_id=eq.${data.id}`,
-          },
-          payload => {
-            const newMsg = payload.new as Message;
-            setMessages(prev => {
-              if (prev.find(m => m.id === newMsg.id)) return prev;
-              return [...prev, newMsg];
-            });
-            if (newMsg.is_based) setBasedTyping(false);
-            setTimeout(scrollToBottom, 50);
-          }
-        )
-        .subscribe();
     },
     [code, scrollToBottom]
   );
 
   useEffect(() => {
-    // Check if name already stored for this room
     const saved = sessionStorage.getItem(`group_name_${code}`);
     if (saved) {
       setDisplayName(saved);
@@ -152,14 +197,41 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
 
     if (/@based/i.test(content)) setBasedTyping(true);
 
-    await fetch('/api/group/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-      body: JSON.stringify({ room_id: room.id, content, display_name: displayName }),
-    });
+    // Optimistic update — show message immediately without waiting for Realtime
+    const optimisticMsg: Message = {
+      id: `optimistic-${Date.now()}`,
+      display_name: displayName,
+      content,
+      is_based: false,
+      created_at: new Date().toISOString(),
+      user_id: null,
+    };
+    setMessages(prev => [...prev, optimisticMsg]);
+    setTimeout(scrollToBottom, 50);
 
-    setSending(false);
-    inputRef.current?.focus();
+    try {
+      const res = await fetch('/api/group/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+        body: JSON.stringify({ room_id: room.id, content, display_name: displayName }),
+      });
+      if (!res.ok) {
+        console.error('[group] send failed:', res.status, await res.text().catch(() => ''));
+        // Remove optimistic message on failure
+        setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+        setChatError('Failed to send. Try again.');
+      }
+      // On success, Realtime will push the real message with a real ID;
+      // the dedup check (find by id) won't remove the optimistic one since IDs differ,
+      // so replace optimistic with real when it arrives
+    } catch (err) {
+      console.error('[group] send error:', err);
+      setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+      setChatError('Failed to send. Try again.');
+    } finally {
+      setSending(false);
+      inputRef.current?.focus();
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -210,7 +282,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
               Enter
             </button>
           </form>
-          {error && <div className="group-name-error">{error}</div>}
+          {joinError && <div className="group-name-error">{joinError}</div>}
         </div>
       </div>
     );
@@ -232,14 +304,31 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         Type <strong>@based</strong> to ask Based a question
       </div>
 
+      {chatError && (
+        <div className="group-chat-error">
+          {chatError}{' '}
+          <button
+            onClick={() => {
+              setChatError('');
+              void joinRoom(displayName);
+            }}
+            className="group-chat-error-retry"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {joining && !room && <div className="group-joining">Joining room…</div>}
+
       <div className="group-messages">
-        {messages.length === 0 && (
+        {!joining && messages.length === 0 && (
           <div className="group-empty">No messages yet. Say something.</div>
         )}
         {messages.map(msg => (
           <div
             key={msg.id}
-            className={`group-message${msg.is_based ? ' group-message--based' : ''}`}
+            className={`group-message${msg.is_based ? ' group-message--based' : ''}${msg.id.startsWith('optimistic-') ? ' group-message--optimistic' : ''}`}
           >
             <div className="group-message-meta">
               <span className="group-message-name">
@@ -269,14 +358,20 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         <textarea
           ref={inputRef}
           className="group-input"
-          placeholder={`Message as ${displayName} — @based to ask Based`}
+          placeholder={
+            room ? `Message as ${displayName} — @based to ask Based` : 'Connecting to room…'
+          }
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           rows={1}
-          disabled={sending}
+          disabled={sending || !room}
         />
-        <button className="group-send-btn" type="submit" disabled={!input.trim() || sending}>
+        <button
+          className="group-send-btn"
+          type="submit"
+          disabled={!input.trim() || sending || !room}
+        >
           ◈
         </button>
       </form>

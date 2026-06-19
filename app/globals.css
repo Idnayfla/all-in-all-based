@@ -18484,3 +18484,31 @@ body:has(.legal-page) {
   color: var(--text3);
   font-family: monospace;
 }
+.group-chat-error {
+  background: rgba(248, 113, 113, 0.1);
+  border-bottom: 1px solid rgba(248, 113, 113, 0.3);
+  color: #f87171;
+  font-size: 0.78rem;
+  padding: 6px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.group-chat-error-retry {
+  background: transparent;
+  border: 1px solid #f87171;
+  border-radius: 4px;
+  color: #f87171;
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.group-joining {
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--text3);
+  padding: 8px 0;
+}
+.group-message--optimistic {
+  opacity: 0.6;
+}

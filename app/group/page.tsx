@@ -13,8 +13,10 @@ async function authHeaders(): Promise<Record<string, string>> {
   const {
     data: { session },
   } = await supabase.auth.getSession();
-  if (!session) return {};
-  return { Authorization: `Bearer ${session.access_token}` };
+  if (session) return { Authorization: `Bearer ${session.access_token}` };
+  const { data } = await supabase.auth.signInAnonymously();
+  if (!data.session) return {};
+  return { Authorization: `Bearer ${data.session.access_token}` };
 }
 
 export default function GroupLandingPage() {
