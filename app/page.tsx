@@ -1666,12 +1666,28 @@ export default function Home() {
               >
                 <div className="settings-header">⬡ Settings</div>
                 {user && (
-                  <div className="settings-section settings-account-row">
-                    <span className="settings-hint settings-hint--flush">{user.email}</span>
-                    <button className="auth-signout-btn" onClick={signOut}>
-                      Sign Out
-                    </button>
-                  </div>
+                  <>
+                    <div className="settings-section settings-account-row">
+                      <span className="settings-hint settings-hint--flush">{user.email}</span>
+                      <button className="auth-signout-btn" onClick={signOut}>
+                        Sign Out
+                      </button>
+                    </div>
+                    <div className="settings-section">
+                      <label className="settings-label">Invite a Friend</label>
+                      <div className="settings-hint" style={{ marginBottom: 8 }}>
+                        Share Based with someone who&apos;d love it.
+                      </div>
+                      <button
+                        disabled
+                        title="Referral tracking coming soon"
+                        style={{ opacity: 0.4, cursor: 'not-allowed' }}
+                        className="auth-signout-btn"
+                      >
+                        ⬡ Invite — coming soon
+                      </button>
+                    </div>
+                  </>
                 )}
                 <div className="settings-section">
                   <label className="settings-label">Wallpaper</label>
