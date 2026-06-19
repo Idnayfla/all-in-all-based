@@ -40,6 +40,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
   const [basedTyping, setBasedTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -67,8 +68,13 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         setTimeout(scrollToBottom, 50);
       }
 
-      // Subscribe to realtime
-      supabase
+      // Clean up any existing subscription before creating a new one
+      if (channelRef.current) {
+        await supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+
+      channelRef.current = supabase
         .channel(`group:${data.id}`)
         .on(
           'postgres_changes',
@@ -102,6 +108,14 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
       void joinRoom(saved);
     }
   }, [code, joinRoom]);
+
+  useEffect(() => {
+    return () => {
+      if (channelRef.current) {
+        void supabase.removeChannel(channelRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     scrollToBottom();
