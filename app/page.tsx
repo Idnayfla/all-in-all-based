@@ -1684,6 +1684,33 @@ export default function Home() {
                       </button>
                     </div>
                     <div className="settings-section">
+                      <label className="settings-label">Group Chat</label>
+                      <div className="settings-hint" style={{ marginBottom: 8 }}>
+                        Chat with others — Based joins as a silent observer. @based to ask it
+                        anything.
+                      </div>
+                      <button
+                        className="auth-signout-btn"
+                        onClick={async () => {
+                          const name = prompt('Room name (optional)', 'Group Chat');
+                          if (name === null) return;
+                          const res = await fetch('/api/group/rooms', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              name: name || 'Group Chat',
+                              displayName: user?.email?.split('@')[0] ?? 'You',
+                            }),
+                          });
+                          if (!res.ok) return;
+                          const { code } = (await res.json()) as { code: string };
+                          window.open(`/group/${code}`, '_blank');
+                        }}
+                      >
+                        ⬡ Start Group Chat
+                      </button>
+                    </div>
+                    <div className="settings-section">
                       <label className="settings-label">Invite a Friend</label>
                       <div className="settings-hint" style={{ marginBottom: 8 }}>
                         Share Based with someone who&apos;d love it.
