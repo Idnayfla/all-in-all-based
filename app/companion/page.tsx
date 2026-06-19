@@ -1311,8 +1311,6 @@ export default function CompanionOverlayPage() {
   };
 
   const sendGreeting = useCallback(async () => {
-    if (greetingFiredRef.current) return;
-
     const token = authToken;
     if (!token) return;
 
