@@ -17846,3 +17846,184 @@ body:has(.legal-page) {
   opacity: 0.35;
   cursor: not-allowed;
 }
+
+/* ─── UI Polish (2026-06-19) ──────────────────────────────────────────────── */
+
+/* 1 · LandingPage — bento card scroll-in stagger */
+.landing-bento-card {
+  animation: fadeSlideUp 0.52s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.landing-bento-card:nth-child(1) {
+  animation-delay: 0.05s;
+}
+.landing-bento-card:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.landing-bento-card:nth-child(3) {
+  animation-delay: 0.25s;
+}
+
+/* 1b · LandingPage — shimmer sweep on primary CTA */
+.landing-cta-primary {
+  overflow: hidden;
+}
+.landing-cta-primary::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 75%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
+  pointer-events: none;
+  animation: ctaShimmer 3.4s ease-in-out 2s infinite;
+}
+@keyframes ctaShimmer {
+  0%,
+  28% {
+    left: -120%;
+  }
+  62%,
+  100% {
+    left: 145%;
+  }
+}
+
+/* 2 · ChatPanel — suggestion chip stagger */
+@keyframes chipFadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.suggestion-chips .suggestion-chip {
+  animation: chipFadeUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.suggestion-chips .suggestion-chip:nth-child(1) {
+  animation-delay: 0.04s;
+}
+.suggestion-chips .suggestion-chip:nth-child(2) {
+  animation-delay: 0.1s;
+}
+.suggestion-chips .suggestion-chip:nth-child(3) {
+  animation-delay: 0.16s;
+}
+.suggestion-chips .suggestion-chip:nth-child(4) {
+  animation-delay: 0.22s;
+}
+
+/* 2b · ChatPanel — active gen-file-chip breathes while generating */
+@keyframes chipActivePulse {
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(94, 245, 192, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(94, 245, 192, 0.55);
+    opacity: 0.8;
+  }
+}
+.gen-file-chip.active {
+  animation: chipActivePulse 1.15s ease-in-out infinite;
+}
+
+/* 3 · TasksPanel — just-completed gold flash */
+@keyframes taskDoneFlash {
+  0% {
+    background: rgba(201, 168, 124, 0.14);
+  }
+  100% {
+    background: transparent;
+  }
+}
+.tasks-row--just-done {
+  animation: taskDoneFlash 0.55s ease forwards;
+}
+
+/* 3b · TasksPanel — animated underline on active filter tab */
+.tasks-filter-tab {
+  position: relative;
+}
+.tasks-filter-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 22%;
+  right: 22%;
+  height: 2px;
+  background: var(--accent);
+  border-radius: 1px;
+  transform-origin: center;
+  animation: filterLineIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes filterLineIn {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+/* 4 · PreviewPanel — dark skeleton eliminates white flash */
+.preview-skeleton {
+  position: absolute;
+  inset: 0;
+  background: var(--bg);
+  z-index: 4;
+  pointer-events: none;
+  transition: opacity 0.38s ease;
+}
+.preview-skeleton.loaded {
+  opacity: 0;
+}
+
+/* 5 · StudioPanel — C4 first-play onboarding hint */
+@keyframes c4KeyPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(201, 168, 124, 0);
+    background: #f0ece0;
+  }
+  50% {
+    box-shadow: 0 0 18px 3px rgba(201, 168, 124, 0.55);
+    background: color-mix(in srgb, var(--accent) 28%, #f0ece0);
+  }
+}
+.piano-white.c4-hint {
+  animation: c4KeyPulse 1.5s ease-in-out infinite;
+  position: relative;
+  z-index: 2;
+}
+.piano-c4-tooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 20;
+  animation: fadeSlideUp 0.28s ease both;
+}
+.piano-c4-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--accent);
+}

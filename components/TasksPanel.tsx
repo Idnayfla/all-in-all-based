@@ -244,6 +244,8 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
   const [newPriority, setNewPriority] = useState<Priority>('normal');
   const [adding, setAdding] = useState(false);
 
+  const [justDoneIds, setJustDoneIds] = useState<Set<string>>(new Set());
+
   // Inline edit state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -454,6 +456,18 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
   const cycleStatus = async (task: Task) => {
     const newStatus: Status =
       task.status === 'todo' ? 'in_progress' : task.status === 'in_progress' ? 'done' : 'todo';
+    if (newStatus === 'done') {
+      setJustDoneIds(prev => new Set([...prev, task.id]));
+      setTimeout(
+        () =>
+          setJustDoneIds(prev => {
+            const next = new Set(prev);
+            next.delete(task.id);
+            return next;
+          }),
+        600
+      );
+    }
     setTasks(prev => prev.map(t => (t.id === task.id ? { ...t, status: newStatus } : t)));
     try {
       await fetch('/api/tasks', {
@@ -796,7 +810,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
           return (
             <div
               key={task.id}
-              className={`tasks-row${task.status === 'done' ? ' tasks-row--done' : ''}${task.status === 'cancelled' ? ' tasks-row--cancelled' : ''}${isOverdue(task) ? ' tasks-row--overdue' : ''}${task.status === 'in_progress' ? ' tasks-row--in-progress' : ''}`}
+              className={`tasks-row${task.status === 'done' ? ' tasks-row--done' : ''}${task.status === 'cancelled' ? ' tasks-row--cancelled' : ''}${isOverdue(task) ? ' tasks-row--overdue' : ''}${task.status === 'in_progress' ? ' tasks-row--in-progress' : ''}${justDoneIds.has(task.id) ? ' tasks-row--just-done' : ''}`}
             >
               <button
                 className={checkboxClass(task.status)}

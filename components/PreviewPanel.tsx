@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FileNode } from '@/app/page';
 import ImageCropModal from './ImageCropModal';
 
@@ -20,6 +20,7 @@ export default function PreviewPanel({
   const [isExporting, setIsExporting] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [cropData, setCropData] = useState<{ url: string; format: 'png' | 'jpg' } | null>(null);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -78,6 +79,10 @@ export default function PreviewPanel({
     }
     return html;
   }, [htmlFile, cssFile, jsFile]);
+
+  useEffect(() => {
+    setIframeLoaded(false);
+  }, [previewHtml]);
 
   const runCode = async () => {
     abortRef.current?.abort();
@@ -500,6 +505,7 @@ export default function PreviewPanel({
           )}
         </div>
       </div>
+      <div className={`preview-skeleton${iframeLoaded ? ' loaded' : ''}`} />
       <iframe
         ref={iframeRef}
         className="preview-frame"
@@ -507,6 +513,7 @@ export default function PreviewPanel({
         allow="autoplay"
         title="Preview"
         srcDoc={previewHtml ?? ''}
+        onLoad={() => setIframeLoaded(true)}
         onClick={() => setShowExportMenu(false)}
       />
       {cropData && (
