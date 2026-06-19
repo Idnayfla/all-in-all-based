@@ -155,12 +155,14 @@ export default function PersonalityPanel({
   onPersonalityChange,
   initialSettings,
 }: PersonalityPanelProps) {
-  const [settings, setSettings] = useState<PersonalitySettings>(DEFAULTS);
+  const [settings, setSettings] = useState<PersonalitySettings>(() => initialSettings ?? load());
 
   useEffect(() => {
     const s = initialSettings ?? load();
-    setSettings(s);
-    save(s);
+    if (initialSettings) {
+      setSettings(s);
+      save(s);
+    }
     onPersonalityChange(buildPersonalityModifier(s), s);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialSettings]);

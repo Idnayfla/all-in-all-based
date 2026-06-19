@@ -310,7 +310,15 @@ export default function CompanionOverlayPage() {
   const [isClosing, setIsClosing] = useState(false);
   const [slowWarning, setSlowWarning] = useState(false);
   const [showPersonality, setShowPersonality] = useState(false);
-  const [personalityModifier, setPersonalityModifier] = useState('');
+  const [personalityModifier, setPersonalityModifier] = useState(() => {
+    try {
+      if (typeof window === 'undefined') return '';
+      const raw = localStorage.getItem('based_personality');
+      if (!raw) return '';
+      const s = { tone: 30, length: 25, humour: 65, technicality: 75, notes: '', persona: '', ...JSON.parse(raw) };
+      return buildPersonalityModifier(s);
+    } catch { return ''; }
+  });
   const [isAndroidBridge, setIsAndroidBridge] = useState(false);
   const [androidCapturing, setAndroidCapturing] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
