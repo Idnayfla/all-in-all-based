@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { captureScreen, isScreenCaptureSupported } from '@/hooks/useScreenCapture';
 import type { MicVAD } from '@ricky0123/vad-web';
 import PersonalityPanel, { buildPersonalityModifier } from '@/components/PersonalityPanel';
+import SimpleMarkdown from '@/components/SimpleMarkdown';
 import type { PersonalitySettings } from '@/components/PersonalityPanel';
 
 // Web Speech API types (not in all TS DOM libs)
@@ -1432,7 +1433,9 @@ export default function CompanionOverlayPage() {
     if (!authReady || !authToken) return;
     if (greetingFiredRef.current) return;
     greetingFiredRef.current = true;
-    // Small delay so the UI has rendered before Based starts streaming
+    // Show thinking state immediately — no visible empty flash during the 800ms settle
+    setMessages([{ role: 'assistant', content: '' }]);
+    setIsGenerating(true);
     const t = setTimeout(() => void sendGreeting(), 800);
     return () => clearTimeout(t);
   }, [authReady, authToken]); // sendGreeting intentionally omitted — ref guards single-fire
@@ -2022,7 +2025,11 @@ export default function CompanionOverlayPage() {
                 </div>
               )}
               <div className={`companion-bubble companion-bubble--${msg.role}`}>
-                <span>{msg.content}</span>
+                {msg.role === 'assistant' ? (
+                  <SimpleMarkdown>{msg.content}</SimpleMarkdown>
+                ) : (
+                  <span>{msg.content}</span>
+                )}
                 {msg.role === 'assistant' && isGenerating && i === messages.length - 1 && (
                   <span className="companion-cursor" />
                 )}
@@ -2099,7 +2106,7 @@ export default function CompanionOverlayPage() {
             </button>
           )}
           <button
-            className={`companion-capture-btn${wakeWordEnabled ? ' active' : ''}`}
+            className={`companion-capture-btn${wakeWordEnabled ? ' active' : ''}${wakeWordEnabled && wakeListening && wakeState === 'idle' ? ' wake-idle' : ''}`}
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             onClick={() => {
               const next = !wakeWordEnabled;
