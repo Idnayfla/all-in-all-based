@@ -558,7 +558,13 @@ export default function CompanionOverlayPage() {
       lastSpokenRef.current = '';
       const msg = err instanceof Error ? err.message : String(err);
       // Surface error briefly so it's never silently broken
-      setTtsError(msg.includes('tts failed') ? 'Voice unavailable — check ElevenLabs credits' : msg.includes('NotAllowed') ? 'Voice blocked by browser — click anywhere first' : 'Voice error');
+      setTtsError(
+        msg.includes('tts failed')
+          ? 'Voice unavailable — check ElevenLabs credits'
+          : msg.includes('NotAllowed')
+            ? 'Voice blocked by browser — click anywhere first'
+            : 'Voice error'
+      );
       setTimeout(() => setTtsError(null), 5000);
     }
   };
@@ -2228,7 +2234,15 @@ export default function CompanionOverlayPage() {
             {voiceEnabled ? '◉ Voice' : '⊙ Voice'}
           </button>
           {ttsError && (
-            <span style={{ fontSize: 10, color: 'var(--danger, #f87171)', fontFamily: 'var(--font-mono)', maxWidth: 160, lineHeight: 1.3 }}>
+            <span
+              style={{
+                fontSize: 10,
+                color: 'var(--danger, #f87171)',
+                fontFamily: 'var(--font-mono)',
+                maxWidth: 160,
+                lineHeight: 1.3,
+              }}
+            >
               {ttsError}
             </span>
           )}

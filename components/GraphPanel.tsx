@@ -123,16 +123,16 @@ interface Props {
 
 // Star layer config — each layer has its own light density
 const STAR_LAYERS = [
-  { count: 2200, spread: 1800, size: 0.32, opacityMin: 0.10, opacityMax: 0.30, color: '#dde8ff' },
-  { count: 900,  spread: 1600, size: 0.70, opacityMin: 0.35, opacityMax: 0.60, color: '#eef0ff' },
-  { count: 220,  spread: 1400, size: 1.20, opacityMin: 0.60, opacityMax: 0.90, color: '#ffffff' },
-  { count: 35,   spread: 1200, size: 2.60, opacityMin: 0.85, opacityMax: 1.00, color: '#c8d8ff' },
+  { count: 2200, spread: 1800, size: 0.32, opacityMin: 0.1, opacityMax: 0.3, color: '#dde8ff' },
+  { count: 900, spread: 1600, size: 0.7, opacityMin: 0.35, opacityMax: 0.6, color: '#eef0ff' },
+  { count: 220, spread: 1400, size: 1.2, opacityMin: 0.6, opacityMax: 0.9, color: '#ffffff' },
+  { count: 35, spread: 1200, size: 2.6, opacityMin: 0.85, opacityMax: 1.0, color: '#c8d8ff' },
 ];
 
 function buildStarLayer(cfg: (typeof STAR_LAYERS)[0]): THREE.Points {
   const positions = new Float32Array(cfg.count * 3);
   for (let i = 0; i < cfg.count; i++) {
-    positions[i * 3]     = (Math.random() - 0.5) * cfg.spread;
+    positions[i * 3] = (Math.random() - 0.5) * cfg.spread;
     positions[i * 3 + 1] = (Math.random() - 0.5) * cfg.spread;
     positions[i * 3 + 2] = (Math.random() - 0.5) * cfg.spread;
   }
@@ -242,7 +242,9 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
         controls.rotateSpeed = 0.5;
         controls.zoomSpeed = 0.7;
       }
-    } catch { /* no-op */ }
+    } catch {
+      /* no-op */
+    }
 
     // Multi-layer star field — each layer has its own light density
     try {
@@ -253,7 +255,9 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
         scene.add(group);
         starGroupRef.current = group;
       }
-    } catch { /* no-op */ }
+    } catch {
+      /* no-op */
+    }
 
     // Bloom
     try {
@@ -266,7 +270,9 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
           })
           .catch(() => {});
       }
-    } catch { /* no-op */ }
+    } catch {
+      /* no-op */
+    }
 
     // Animation loop — star drift + node pulse
     const nodeIds = Array.from(coreMats.current.keys());
@@ -297,7 +303,10 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
   }, []);
 
   const handleRefresh = () => {
-    if (rafRef.current !== null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
     starGroupRef.current = null;
     bloomAdded.current = false;
     coreMats.current.forEach(m => m.dispose());
