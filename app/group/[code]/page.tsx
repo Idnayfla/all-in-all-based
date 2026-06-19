@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useRef, useState, useCallback } from 'react';
+import { use, useCallback, useEffect, useRef, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -16,7 +16,6 @@ async function ensureAuth(): Promise<string | null> {
     supabase.realtime.setAuth(session.access_token);
     return session.access_token;
   }
-  // Anonymous sign-in for invite recipients who aren't Based users
   const { data, error } = await supabase.auth.signInAnonymously();
   if (error) {
     console.error('[group] signInAnonymously failed:', error.message);
@@ -33,6 +32,27 @@ async function authHeaders(): Promise<Record<string, string>> {
   return { Authorization: `Bearer ${token}` };
 }
 
+async function uploadImage(file: File): Promise<string | null> {
+  const headers = await authHeaders();
+  const res = await fetch('/api/group/upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: JSON.stringify({ filename: file.name, content_type: file.type }),
+  });
+  if (!res.ok) return null;
+  const { upload_url, public_url, content_type } = (await res.json()) as {
+    upload_url: string;
+    public_url: string;
+    content_type: string;
+  };
+  const put = await fetch(upload_url, {
+    method: 'PUT',
+    body: file,
+    headers: { 'Content-Type': content_type },
+  });
+  return put.ok ? public_url : null;
+}
+
 interface Message {
   id: string;
   display_name: string;
@@ -40,6 +60,7 @@ interface Message {
   is_based: boolean;
   created_at: string;
   user_id: string | null;
+  media_url?: string | null;
 }
 
 export default function GroupChatPage({ params }: { params: Promise<{ code: string }> }) {
@@ -57,10 +78,24 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
   const [copied, setCopied] = useState(false);
   const [basedTyping, setBasedTyping] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [dragging, setDragging] = useState(false);
+
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const roomRef = useRef<{ id: string; name: string; code: string } | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const displayNameRef = useRef('');
+
+  useEffect(() => {
+    displayNameRef.current = displayName;
+  }, [displayName]);
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -82,7 +117,6 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         });
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as { error?: string };
-          console.error('[group] joinRoom failed:', res.status, body);
           setJoinError(
             body.error === 'Room not found'
               ? 'Room not found. Check the invite link.'
@@ -94,7 +128,6 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         setRoom(data);
         roomRef.current = data;
 
-        // Persist room so user can find it again
         try {
           const saved = JSON.parse(localStorage.getItem('based_group_rooms') ?? '[]') as {
             code: string;
@@ -107,23 +140,23 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
           localStorage.setItem('based_group_rooms', JSON.stringify(updated));
         } catch {}
 
-        // Load messages
         const msgRes = await fetch(`/api/group/messages?room_id=${data.id}`, { headers });
         if (msgRes.ok) {
           const msgData = (await msgRes.json()) as { messages: Message[] };
           setMessages(msgData.messages);
           setTimeout(scrollToBottom, 50);
-        } else {
-          console.error('[group] failed to load messages:', msgRes.status);
         }
 
-        // Realtime subscription
         if (channelRef.current) {
           await supabase.removeChannel(channelRef.current);
           channelRef.current = null;
         }
-        channelRef.current = supabase
-          .channel(`group:${data.id}`)
+
+        const channel = supabase.channel(`group:${data.id}`, {
+          config: { presence: { key: name } },
+        });
+
+        channel
           .on(
             'postgres_changes',
             {
@@ -136,7 +169,6 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
               const newMsg = payload.new as Message;
               setMessages(prev => {
                 if (prev.find(m => m.id === newMsg.id)) return prev;
-                // Replace optimistic message from same sender with the real one
                 const optimisticIdx = prev.findIndex(
                   m =>
                     m.id.startsWith('optimistic-') &&
@@ -154,7 +186,19 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
               setTimeout(scrollToBottom, 50);
             }
           )
+          .on('presence', { event: 'sync' }, () => {
+            const state = channel.presenceState<{ typing?: boolean }>();
+            const typers = Object.entries(state)
+              .filter(([key, presences]) => {
+                const latest = presences[presences.length - 1] as { typing?: boolean };
+                return key !== displayNameRef.current && latest?.typing;
+              })
+              .map(([key]) => key);
+            setTypingUsers(typers);
+          })
           .subscribe();
+
+        channelRef.current = channel;
       } catch (err) {
         console.error('[group] joinRoom error:', err);
         setChatError('Something went wrong joining the room. Try refreshing.');
@@ -176,13 +220,15 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
 
   useEffect(() => {
     return () => {
-      if (channelRef.current) {
-        void supabase.removeChannel(channelRef.current);
-      }
+      if (channelRef.current) void supabase.removeChannel(channelRef.current);
     };
   }, []);
 
-  // Poll every 4s as Realtime fallback — merges in any messages Realtime missed
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, scrollToBottom]);
+
+  // Poll every 4s as Realtime fallback
   useEffect(() => {
     const interval = setInterval(async () => {
       if (!roomRef.current) return;
@@ -207,9 +253,17 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages, scrollToBottom]);
+  const broadcastTyping = useCallback((isTyping: boolean) => {
+    if (!channelRef.current) return;
+    void channelRef.current.track({ typing: isTyping, display_name: displayNameRef.current });
+  }, []);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+    broadcastTyping(true);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => broadcastTyping(false), 2000);
+  };
 
   const handleSetName = (e: React.FormEvent) => {
     e.preventDefault();
@@ -220,16 +274,38 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
     void joinRoom(name);
   };
 
+  const handleImageFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) return;
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+    setUploading(true);
+    const url = await uploadImage(file);
+    setImageUrl(url);
+    setUploading(false);
+  };
+
+  const clearImage = () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview(null);
+    setImageUrl(null);
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || !room || sending) return;
+    if ((!input.trim() && !imageUrl) || !room || sending || uploading) return;
+
+    broadcastTyping(false);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
     const content = input.trim();
+    const mediaUrl = imageUrl;
     setInput('');
+    clearImage();
     setSending(true);
 
     if (/@based/i.test(content)) setBasedTyping(true);
 
-    // Optimistic update — show message immediately without waiting for Realtime
     const optimisticMsg: Message = {
       id: `optimistic-${Date.now()}`,
       display_name: displayName,
@@ -237,6 +313,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
       is_based: false,
       created_at: new Date().toISOString(),
       user_id: null,
+      media_url: imagePreview ?? mediaUrl,
     };
     setMessages(prev => [...prev, optimisticMsg]);
     setTimeout(scrollToBottom, 50);
@@ -245,19 +322,18 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
       const res = await fetch('/api/group/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-        body: JSON.stringify({ room_id: room.id, content, display_name: displayName }),
+        body: JSON.stringify({
+          room_id: room.id,
+          content,
+          display_name: displayName,
+          media_url: mediaUrl,
+        }),
       });
       if (!res.ok) {
-        console.error('[group] send failed:', res.status, await res.text().catch(() => ''));
-        // Remove optimistic message on failure
         setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
         setChatError('Failed to send. Try again.');
       }
-      // On success, Realtime will push the real message with a real ID;
-      // the dedup check (find by id) won't remove the optimistic one since IDs differ,
-      // so replace optimistic with real when it arrives
-    } catch (err) {
-      console.error('[group] send error:', err);
+    } catch {
       setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
       setChatError('Failed to send. Try again.');
     } finally {
@@ -271,6 +347,21 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
       e.preventDefault();
       void handleSend(e as unknown as React.FormEvent);
     }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    const file = Array.from(e.clipboardData.files).find(f => f.type.startsWith('image/'));
+    if (file) {
+      e.preventDefault();
+      void handleImageFile(file);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    const file = Array.from(e.dataTransfer.files).find(f => f.type.startsWith('image/'));
+    if (file) void handleImageFile(file);
   };
 
   const copyInvite = () => {
@@ -294,6 +385,15 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
 
   const formatTime = (iso: string) =>
     new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const typingLabel =
+    typingUsers.length === 0
+      ? null
+      : typingUsers.length === 1
+        ? `${typingUsers[0]} is typing…`
+        : typingUsers.length === 2
+          ? `${typingUsers[0]} and ${typingUsers[1]} are typing…`
+          : `${typingUsers[0]} and ${typingUsers.length - 1} others are typing…`;
 
   if (!nameSet) {
     return (
@@ -321,7 +421,17 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
   }
 
   return (
-    <div className="group-chat-root">
+    <div
+      className="group-chat-root"
+      onDragOver={e => {
+        e.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={handleDrop}
+    >
+      {dragging && <div className="group-drop-overlay">Drop image to send</div>}
+
       <div className="group-chat-header">
         <div className="group-chat-title">
           <span className="group-chat-name">{room?.name ?? code}</span>
@@ -333,7 +443,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
       </div>
 
       <div className="group-chat-hint">
-        Type <strong>@based</strong> to ask Based a question
+        Type <strong>@based</strong> to ask Based · drag, paste or attach images
       </div>
 
       {chatError && (
@@ -360,7 +470,13 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         {messages.map(msg => (
           <div
             key={msg.id}
-            className={`group-message${msg.is_based ? ' group-message--based' : ''}${msg.id.startsWith('optimistic-') ? ' group-message--optimistic' : ''}`}
+            className={[
+              'group-message',
+              msg.is_based ? 'group-message--based' : '',
+              msg.id.startsWith('optimistic-') ? 'group-message--optimistic' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
           >
             <div className="group-message-meta">
               <span className="group-message-name">
@@ -368,7 +484,15 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
               </span>
               <span className="group-message-time">{formatTime(msg.created_at)}</span>
             </div>
-            <div className="group-message-content">{msg.content}</div>
+            {msg.content && <div className="group-message-content">{msg.content}</div>}
+            {msg.media_url && (
+              <img
+                src={msg.media_url}
+                alt="shared image"
+                className="group-message-img"
+                onClick={() => window.open(msg.media_url!, '_blank')}
+              />
+            )}
           </div>
         ))}
         {basedTyping && (
@@ -386,7 +510,38 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         <div ref={bottomRef} />
       </div>
 
+      {typingLabel && <div className="group-typing-label">{typingLabel}</div>}
+
+      {imagePreview && (
+        <div className="group-img-preview">
+          <img src={imagePreview} alt="preview" />
+          {uploading && <span className="group-img-uploading">Uploading…</span>}
+          <button className="group-img-preview-remove" onClick={clearImage}>
+            ×
+          </button>
+        </div>
+      )}
+
       <form className="group-input-form" onSubmit={handleSend}>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: 'none' }}
+          onChange={e => {
+            const file = e.target.files?.[0];
+            if (file) void handleImageFile(file);
+            e.target.value = '';
+          }}
+        />
+        <button
+          type="button"
+          className="group-attach-btn"
+          onClick={() => fileInputRef.current?.click()}
+          title="Attach image"
+        >
+          ◈
+        </button>
         <textarea
           ref={inputRef}
           className="group-input"
@@ -394,17 +549,18 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
             room ? `Message as ${displayName} — @based to ask Based` : 'Connecting to room…'
           }
           value={input}
-          onChange={e => setInput(e.target.value)}
+          onChange={handleInputChange}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           rows={1}
           disabled={sending || !room}
         />
         <button
           className="group-send-btn"
           type="submit"
-          disabled={!input.trim() || sending || !room}
+          disabled={(!input.trim() && !imageUrl) || sending || uploading || !room}
         >
-          ◈
+          →
         </button>
       </form>
     </div>

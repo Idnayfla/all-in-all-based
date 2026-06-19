@@ -18512,3 +18512,78 @@ body:has(.legal-page) {
 .group-message--optimistic {
   opacity: 0.6;
 }
+
+/* ── Group Chat v2: images + typing indicator ───────────────────────────── */
+.group-message-img {
+  max-width: 280px;
+  max-height: 320px;
+  border-radius: 8px;
+  margin-top: 6px;
+  display: block;
+  cursor: zoom-in;
+  border: 1px solid var(--border);
+}
+.group-img-preview {
+  position: relative;
+  padding: 6px 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.group-img-preview img {
+  max-height: 72px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+.group-img-uploading {
+  font-size: 0.72rem;
+  color: var(--text3);
+}
+.group-img-preview-remove {
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.group-drop-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(94, 245, 192, 0.07);
+  border: 2px dashed var(--accent);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  color: var(--accent);
+  pointer-events: none;
+  z-index: 10;
+}
+.group-typing-label {
+  font-size: 0.72rem;
+  color: var(--text3);
+  padding: 3px 16px 0;
+  min-height: 18px;
+  font-style: italic;
+}
+.group-attach-btn {
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0 4px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+}
+.group-attach-btn:hover {
+  color: var(--accent);
+}
