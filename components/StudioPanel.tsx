@@ -444,6 +444,10 @@ export default function StudioPanel({
   const [generatedTracks, setGeneratedTracks] = useState<{ url: string; prompt: string }[]>([]);
   const [octave, setOctave] = useState(4);
   const [litKeys, setLitKeys] = useState<Set<string>>(new Set());
+  const [showC4Hint, setShowC4Hint] = useState(() =>
+    typeof window !== 'undefined' ? !localStorage.getItem('studio_c4_hint_seen') : false
+  );
+  const showC4HintRef = useRef(showC4Hint);
   const [micLevel, setMicLevel] = useState(0);
   const [aiInput, setAiInput] = useState('');
   const [aiHint, setAiHint] = useState('');
@@ -708,7 +712,10 @@ export default function StudioPanel({
     return (tRef.current?.synths[map[instrument] ?? 'lead'] as PlayableInstrument) ?? null;
   };
 
-  // Keep tracksRef / bpmRef always current so the scheduler closure reads live values
+  // Keep tracksRef / bpmRef / showC4HintRef always current so closures read live values
+  useEffect(() => {
+    showC4HintRef.current = showC4Hint;
+  }, [showC4Hint]);
   useEffect(() => {
     tracksRef.current = tracks;
   }, [tracks]);
@@ -719,6 +726,10 @@ export default function StudioPanel({
   // ── Play a note (raw Web Audio — no Tone.js context issues) ────────────
   const playNote = useCallback(
     (note: string) => {
+      if (showC4HintRef.current) {
+        setShowC4Hint(false);
+        localStorage.setItem('studio_c4_hint_seen', '1');
+      }
       // Create AudioContext synchronously on first call — Chrome requires this
       // to happen within a user gesture (click/touch). No awaits before it.
       if (!rawCtxRef.current) {
@@ -1411,17 +1422,21 @@ export default function StudioPanel({
     const keys: ReactElement[] = [];
     WHITE_NOTES.forEach((note, wi) => {
       const fullNote = `${note}${oct}`;
+      const isC4 = showC4Hint && fullNote === 'C4';
       keys.push(
         <div
           key={fullNote}
-          className={`piano-white${litKeys.has(fullNote) ? ' lit' : ''}`}
+          className={`piano-white${litKeys.has(fullNote) ? ' lit' : ''}${isC4 ? ' c4-hint' : ''}`}
+          style={isC4 ? { position: 'relative' } : undefined}
           onMouseDown={() => playNote(fullNote)}
           onTouchStart={e => {
             e.preventDefault();
             playNote(fullNote);
           }}
           title={fullNote}
-        />
+        >
+          {isC4 && <div className="piano-c4-tooltip">Try C4</div>}
+        </div>
       );
       const sharp = HAS_BLACK[note];
       if (sharp) {
