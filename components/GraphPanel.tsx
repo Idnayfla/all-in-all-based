@@ -73,6 +73,8 @@ function buildNodeMesh(
     color,
     emissive: color,
     emissiveIntensity: 0.55,
+    transparent: true,
+    opacity: 1.0,
   });
   coreMats.set(node.id, coreMat);
   group.add(new THREE.Mesh(new THREE.SphereGeometry(r, 24, 24), coreMat));
@@ -220,19 +222,24 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
     document.body.style.cursor = curr ? 'pointer' : '';
 
     if (!curr) {
-      // Restore all to base — RAF pulse resumes naturally next frame
+      // Restore all to base
       coreMats.current.forEach(m => {
         m.emissiveIntensity = 0.45;
+        m.opacity = 1.0;
       });
     } else {
       const neighbors = adjacencyRef.current.get(curr.id) ?? new Set<string>();
       coreMats.current.forEach((m, id) => {
         if (id === curr.id) {
-          m.emissiveIntensity = 1.8;
+          m.emissiveIntensity = 2.0;
+          m.opacity = 1.0;
         } else if (neighbors.has(id)) {
-          m.emissiveIntensity = 0.9;
+          m.emissiveIntensity = 1.0;
+          m.opacity = 1.0;
         } else {
-          m.emissiveIntensity = 0.06;
+          // Non-adjacent: near-invisible — both emissive and opacity crushed
+          m.emissiveIntensity = 0.0;
+          m.opacity = 0.04;
         }
       });
     }
@@ -333,16 +340,18 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
           const mat = coreMats.current.get(id);
           if (!mat) return;
           if (id === hovered) {
-            mat.emissiveIntensity = 1.6 + Math.sin(t * speeds[i] + phases[i]) * 0.2;
+            mat.emissiveIntensity = 1.8 + Math.sin(t * speeds[i] + phases[i]) * 0.2;
           } else if (neighbors.has(id)) {
-            mat.emissiveIntensity = 0.8 + Math.sin(t * speeds[i] + phases[i]) * 0.1;
+            mat.emissiveIntensity = 0.9 + Math.sin(t * speeds[i] + phases[i]) * 0.1;
           }
-          // non-adjacent: leave at 0.06 — handleNodeHover set it, don't overwrite
+          // non-adjacent: emissive=0, opacity=0.04 — set by handleNodeHover, don't touch
         });
       } else {
         nodeIds.forEach((id, i) => {
           const mat = coreMats.current.get(id);
-          if (mat) mat.emissiveIntensity = 0.45 + Math.sin(t * speeds[i] + phases[i]) * 0.22;
+          if (!mat) return;
+          mat.opacity = 1.0;
+          mat.emissiveIntensity = 0.45 + Math.sin(t * speeds[i] + phases[i]) * 0.22;
         });
       }
 
