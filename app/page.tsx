@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import NextImage from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
 import ChatPanel from '@/components/ChatPanel';
@@ -1392,6 +1393,14 @@ export default function Home() {
                 {subscription.tier === 'beta' ? 30 : 10}
               </button>
             )}
+            <Link
+              href="/group"
+              className="companion-header-btn"
+              title="Start or join a group chat"
+              style={{ textDecoration: 'none' }}
+            >
+              ⬡ Group
+            </Link>
             <a
               href="/vote"
               target="_blank"
@@ -1681,33 +1690,6 @@ export default function Home() {
                       <span className="settings-hint settings-hint--flush">{user.email}</span>
                       <button className="auth-signout-btn" onClick={signOut}>
                         Sign Out
-                      </button>
-                    </div>
-                    <div className="settings-section">
-                      <label className="settings-label">Group Chat</label>
-                      <div className="settings-hint" style={{ marginBottom: 8 }}>
-                        Chat with others — Based joins as a silent observer. @based to ask it
-                        anything.
-                      </div>
-                      <button
-                        className="auth-signout-btn"
-                        onClick={async () => {
-                          const name = prompt('Room name (optional)', 'Group Chat');
-                          if (name === null) return;
-                          const res = await fetch('/api/group/rooms', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              name: name || 'Group Chat',
-                              displayName: user?.email?.split('@')[0] ?? 'You',
-                            }),
-                          });
-                          if (!res.ok) return;
-                          const { code } = (await res.json()) as { code: string };
-                          window.open(`/group/${code}`, '_blank');
-                        }}
-                      >
-                        ⬡ Start Group Chat
                       </button>
                     </div>
                     <div className="settings-section">
