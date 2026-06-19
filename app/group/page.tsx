@@ -2,7 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -29,6 +29,18 @@ export default function GroupLandingPage() {
   const [joinName, setJoinName] = useState('');
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState('');
+
+  const [myRooms, setMyRooms] = useState<{ code: string; name: string }[]>([]);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('based_group_rooms') ?? '[]') as {
+        code: string;
+        name: string;
+      }[];
+      setMyRooms(saved);
+    } catch {}
+  }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,6 +95,22 @@ export default function GroupLandingPage() {
           it anything.
         </div>
       </div>
+
+      {myRooms.length > 0 && (
+        <div className="group-my-rooms">
+          <div className="group-my-rooms-heading">Your Rooms</div>
+          {myRooms.map(r => (
+            <button
+              key={r.code}
+              className="group-my-room-btn"
+              onClick={() => router.push(`/group/${r.code}`)}
+            >
+              <span className="group-my-room-name">{r.name}</span>
+              <span className="group-my-room-code">#{r.code}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="group-landing-cards">
         <div className="group-landing-card">

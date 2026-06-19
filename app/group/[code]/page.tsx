@@ -60,6 +60,19 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
       const data = (await res.json()) as { id: string; name: string; code: string };
       setRoom(data);
 
+      // Persist room to localStorage so user can find it again later
+      try {
+        const saved = JSON.parse(localStorage.getItem('based_group_rooms') ?? '[]') as {
+          code: string;
+          name: string;
+        }[];
+        const updated = [
+          { code: data.code, name: data.name },
+          ...saved.filter(r => r.code !== data.code),
+        ].slice(0, 20);
+        localStorage.setItem('based_group_rooms', JSON.stringify(updated));
+      } catch {}
+
       // Load existing messages
       const msgRes = await fetch(`/api/group/messages?room_id=${data.id}`, { headers });
       if (msgRes.ok) {
@@ -158,10 +171,21 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
 
   const copyInvite = () => {
     const url = `${window.location.origin}/group/${code}`;
-    void navigator.clipboard.writeText(url).then(() => {
+    if (navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(url).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    } else {
+      const el = document.createElement('textarea');
+      el.value = url;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand('copy');
+      document.body.removeChild(el);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    });
+    }
   };
 
   const formatTime = (iso: string) =>
