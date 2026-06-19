@@ -335,6 +335,7 @@ export default function CompanionOverlayPage() {
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('male');
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [ttsError, setTtsError] = useState<string | null>(null);
   const [language, setLanguage] = useState(() =>
     typeof window !== 'undefined'
       ? (localStorage.getItem('based_companion_language') ?? 'en')
@@ -551,10 +552,14 @@ export default function CompanionOverlayPage() {
         currentAudioRef.current = null;
       };
       await audio.play();
+      setTtsError(null);
     } catch (err) {
       console.error('[tts error]', err);
-      // Silent fail — no robotic fallback voice
       lastSpokenRef.current = '';
+      const msg = err instanceof Error ? err.message : String(err);
+      // Surface error briefly so it's never silently broken
+      setTtsError(msg.includes('tts failed') ? 'Voice unavailable — check ElevenLabs credits' : msg.includes('NotAllowed') ? 'Voice blocked by browser — click anywhere first' : 'Voice error');
+      setTimeout(() => setTtsError(null), 5000);
     }
   };
 
@@ -2222,6 +2227,11 @@ export default function CompanionOverlayPage() {
           >
             {voiceEnabled ? '◉ Voice' : '⊙ Voice'}
           </button>
+          {ttsError && (
+            <span style={{ fontSize: 10, color: 'var(--danger, #f87171)', fontFamily: 'var(--font-mono)', maxWidth: 160, lineHeight: 1.3 }}>
+              {ttsError}
+            </span>
+          )}
           {voiceEnabled && (
             <button
               className="companion-capture-btn"
