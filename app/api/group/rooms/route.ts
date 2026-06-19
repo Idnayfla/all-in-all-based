@@ -1,8 +1,13 @@
+import { randomBytes } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserId, supabaseAdmin } from '../../_auth';
 
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 function randomCode(): string {
-  return Math.random().toString(36).slice(2, 10).toUpperCase();
+  const buf = randomBytes(10);
+  let out = '';
+  for (let i = 0; i < 10; i++) out += CODE_ALPHABET[buf[i] % CODE_ALPHABET.length];
+  return out;
 }
 
 // POST /api/group/rooms — create a room
