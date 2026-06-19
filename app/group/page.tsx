@@ -1,7 +1,21 @@
 'use client';
 
+import { createClient } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
+
+async function authHeaders(): Promise<Record<string, string>> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return {};
+  return { Authorization: `Bearer ${session.access_token}` };
+}
 
 export default function GroupLandingPage() {
   const router = useRouter();
@@ -24,7 +38,7 @@ export default function GroupLandingPage() {
     try {
       const res = await fetch('/api/group/rooms', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
           name: createRoom.trim() || 'Group Chat',
           displayName: createName.trim(),
@@ -48,7 +62,8 @@ export default function GroupLandingPage() {
     setJoinError('');
     try {
       const res = await fetch(
-        `/api/group/rooms?code=${code}&name=${encodeURIComponent(joinName.trim())}`
+        `/api/group/rooms?code=${code}&name=${encodeURIComponent(joinName.trim())}`,
+        { headers: await authHeaders() }
       );
       if (!res.ok) throw new Error('Room not found');
       sessionStorage.setItem(`group_name_${code}`, joinName.trim());

@@ -8,6 +8,14 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+async function authHeaders(): Promise<Record<string, string>> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return {};
+  return { Authorization: `Bearer ${session.access_token}` };
+}
+
 interface Message {
   id: string;
   display_name: string;
@@ -39,7 +47,10 @@ export default function GroupChatPage({ params }: { params: { code: string } }) 
   // Join room and load messages
   const joinRoom = useCallback(
     async (name: string) => {
-      const res = await fetch(`/api/group/rooms?code=${code}&name=${encodeURIComponent(name)}`);
+      const headers = await authHeaders();
+      const res = await fetch(`/api/group/rooms?code=${code}&name=${encodeURIComponent(name)}`, {
+        headers,
+      });
       if (!res.ok) {
         setError('Room not found. Check the invite link.');
         return;
@@ -48,7 +59,7 @@ export default function GroupChatPage({ params }: { params: { code: string } }) 
       setRoom(data);
 
       // Load existing messages
-      const msgRes = await fetch(`/api/group/messages?room_id=${data.id}`);
+      const msgRes = await fetch(`/api/group/messages?room_id=${data.id}`, { headers });
       if (msgRes.ok) {
         const msgData = (await msgRes.json()) as { messages: Message[] };
         setMessages(msgData.messages);
@@ -115,7 +126,7 @@ export default function GroupChatPage({ params }: { params: { code: string } }) 
 
     await fetch('/api/group/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ room_id: room.id, content, display_name: displayName }),
     });
 
