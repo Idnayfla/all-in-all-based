@@ -122,10 +122,10 @@ async function triggerBasedResponse(roomId: string, mentionedBy: string): Promis
       .eq('id', roomId)
       .single();
 
-    // Fetch last 30 messages
+    // Fetch last 30 messages including media_url for vision
     const { data: history } = await supabaseAdmin
       .from('group_messages')
-      .select('display_name, content, is_based, created_at')
+      .select('display_name, content, is_based, created_at, media_url')
       .eq('room_id', roomId)
       .order('created_at', { ascending: true })
       .limit(30);
@@ -138,15 +138,39 @@ async function triggerBasedResponse(roomId: string, mentionedBy: string): Promis
       : '';
     const system = BASED_SYSTEM + summaryBlock;
 
+    const hasVision = history.some(m => m.media_url);
+
     const textMessages = history.map(m => ({
       role: (m.is_based ? 'assistant' : 'user') as 'user' | 'assistant',
-      content: m.is_based ? m.content : `${m.display_name}: ${m.content}`,
+      content: m.is_based
+        ? m.content
+        : m.media_url
+          ? `${m.display_name}: ${m.content || '(sent an image)'} [image attached]`
+          : `${m.display_name}: ${m.content}`,
     }));
 
-    const anthropicMessages: Anthropic.MessageParam[] = textMessages.map(m => ({
-      role: m.role,
-      content: m.content,
-    }));
+    const anthropicMessages: Anthropic.MessageParam[] = history.map(m => {
+      if (m.is_based) {
+        return { role: 'assistant' as const, content: m.content };
+      }
+      const textPart: Anthropic.TextBlockParam = {
+        type: 'text',
+        text: `${m.display_name}: ${m.content || '(sent an image)'}`,
+      };
+      if (m.media_url) {
+        return {
+          role: 'user' as const,
+          content: [
+            textPart,
+            {
+              type: 'image' as const,
+              source: { type: 'url' as const, url: m.media_url },
+            } as Anthropic.ImageBlockParam,
+          ],
+        };
+      }
+      return { role: 'user' as const, content: textPart.text };
+    });
 
     let response = '';
     const encoder = new TextEncoder();
@@ -157,7 +181,7 @@ async function triggerBasedResponse(roomId: string, mentionedBy: string): Promis
           system,
           textMessages,
           anthropicMessages,
-          hasVision: false,
+          hasVision,
           controller,
           encoder,
         });

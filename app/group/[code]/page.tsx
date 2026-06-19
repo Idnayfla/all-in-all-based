@@ -92,6 +92,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
   const roomRef = useRef<{ id: string; name: string; code: string } | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const displayNameRef = useRef('');
+  const presenceKeyRef = useRef('');
 
   useEffect(() => {
     displayNameRef.current = displayName;
@@ -152,8 +153,12 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
           channelRef.current = null;
         }
 
+        // Unique key per session to handle duplicate display names
+        const presenceKey = `${name}-${Math.random().toString(36).slice(2, 6)}`;
+        presenceKeyRef.current = presenceKey;
+
         const channel = supabase.channel(`group:${data.id}`, {
-          config: { presence: { key: name } },
+          config: { presence: { key: presenceKey } },
         });
 
         channel
@@ -187,16 +192,21 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
             }
           )
           .on('presence', { event: 'sync' }, () => {
-            const state = channel.presenceState<{ typing?: boolean }>();
-            const typers = Object.entries(state)
-              .filter(([key, presences]) => {
-                const latest = presences[presences.length - 1] as { typing?: boolean };
-                return key !== displayNameRef.current && latest?.typing;
-              })
-              .map(([key]) => key);
-            setTypingUsers(typers);
+            const state = channel.presenceState<{ typing?: boolean; display_name?: string }>();
+            const typers = Object.values(state)
+              .flat()
+              .filter(
+                (p: { typing?: boolean; display_name?: string }) =>
+                  p.display_name !== displayNameRef.current && p.typing
+              )
+              .map((p: { display_name?: string }) => p.display_name ?? 'Someone');
+            setTypingUsers([...new Set(typers)]);
           })
-          .subscribe();
+          .subscribe(status => {
+            if (status === 'SUBSCRIBED') {
+              void channel.track({ typing: false, display_name: name });
+            }
+          });
 
         channelRef.current = channel;
       } catch (err) {
@@ -544,7 +554,18 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
           onClick={() => fileInputRef.current?.click()}
           title="Attach image"
         >
-          ◈
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+          </svg>
         </button>
         <textarea
           ref={inputRef}
