@@ -54,10 +54,64 @@ async function uploadFile(file: File): Promise<string | null> {
   return put.ok ? public_url : null;
 }
 
-const EMOJIS =
-  '😀 😂 🥰 😎 🤔 😭 🔥 ❤️ 👍 👎 🙏 💪 ✅ ⭐ 🎉 💡 🚀 💯 🤝 🎯 ⚡ 🌟 👀 🤣 😅 😊 🥲 😤 😩 🤯 😴 🤩 😷 🤦 🙌 👏 🫂 💀 💥 ✨ 🎈 🎊 🏆 💰 🎵 🍕 ☕ 🌈 🌙 ☀️ 🎮 🎨 📷 😆 🥹 🫡 💩 👻 🤖 😈 🦋 🐶 🍔 🍣 🥗 🧃 🥤 🍰 🎂'.split(
-    ' '
-  );
+const EMOJI_CATEGORIES = [
+  {
+    label: 'Smileys',
+    emojis:
+      '😀 😃 😄 😁 😆 😅 🤣 😂 🙂 🙃 😉 😊 😇 🥰 😍 🤩 😘 😗 😚 😙 🥲 😋 😛 😜 🤪 😝 🤑 🤗 🤭 🫢 🤫 🤔 🫡 🤐 🤨 😐 😶 🫥 😏 😒 🙄 😬 🤥 😌 😔 😪 🤤 😴 😷 🤒 🤕 🤢 🤮 🤧 🥵 🥶 🥴 😵 🤯 🤠 🥳 🥸 😎 🤓 🧐 😕 🫤 😟 🙁 ☹️ 😮 😲 😳 🥺 😦 😧 😨 😰 😥 😢 😭 😱 😖 😣 😞 😓 😩 😫 🥱 😤 😡 😠 🤬 😈 👿 💀 ☠️ 💩 🤡 👹 👺 👻 👽 👾 🤖'.split(
+        ' '
+      ),
+  },
+  {
+    label: 'People',
+    emojis:
+      '👋 🤚 🖐️ ✋ 🖖 🫱 🫲 🫳 🫴 👌 🤌 🤏 ✌️ 🤞 🫰 🤟 🤘 🤙 👈 👉 👆 👇 ☝️ 🫵 👍 👎 ✊ 👊 🤛 🤜 👏 🫶 🙌 👐 🤲 🤝 🙏 ✍️ 💅 🤳 💪 🦾 🦵 🦶 👂 🦻 👃 🧠 🦷 🦴 👀 👁️ 👅 👄 🫦 💋 👶 🧒 👦 👧 🧑 👱 👨 🧔 👩 👴 👵 🙍 🙎 🙅 🙆 💁 🙋 🧏 🙇 🤦 🤷'.split(
+        ' '
+      ),
+  },
+  {
+    label: 'Hearts',
+    emojis:
+      '❤️ 🧡 💛 💚 💙 💜 🖤 🤍 🤎 💔 ❤️‍🔥 ❤️‍🩹 ❣️ 💕 💞 💓 💗 💖 💘 💝 💟 💯 ✅ ⭐ 🌟 ✨ 💫 ⚡ 🔥 🎉 🎊 🎈 🎀 🎁 🏆 🥇 🥈 🥉 🏅 🎖️'.split(
+        ' '
+      ),
+  },
+  {
+    label: 'Animals',
+    emojis:
+      '🐶 🐱 🐭 🐹 🐰 🦊 🐻 🐼 🐨 🐯 🦁 🐮 🐷 🐸 🐵 🙈 🙉 🙊 🐔 🐧 🐦 🦅 🦆 🦉 🦇 🐺 🐗 🐴 🦄 🐝 🐛 🦋 🐌 🐞 🐜 🦟 🦗 🕷️ 🐢 🐍 🦎 🐙 🦑 🦐 🦀 🐡 🐠 🐟 🐬 🐳 🐋 🦈 🦊 🐊 🦏 🦛 🦒 🐘 🦔 🐾 🦋 🌵 🌲 🌳 🌴 🌾 🍀 🌸 🌺 🌻 🌼 🌷 🌹'.split(
+        ' '
+      ),
+  },
+  {
+    label: 'Food',
+    emojis:
+      '🍎 🍊 🍋 🍌 🍉 🍇 🍓 🫐 🍒 🍑 🥭 🍍 🥥 🥝 🍅 🥑 🍆 🥦 🌽 🍄 🥜 🌰 🍞 🥐 🥖 🧀 🥚 🍳 🥞 🧇 🥓 🍗 🍖 🌭 🍔 🍟 🍕 🌮 🌯 🥗 🍜 🍝 🍛 🍣 🍱 🥟 🍤 🍙 🍘 🧁 🍰 🎂 🍮 🍭 🍬 🍫 🍿 🍩 🍪 ☕ 🍵 🧃 🥤 🧋 🍺 🍻 🥂 🍷 🍸 🍹 🧉 🍾 🥛 🫖 🧊'.split(
+        ' '
+      ),
+  },
+  {
+    label: 'Activities',
+    emojis:
+      '⚽ 🏀 🏈 ⚾ 🎾 🏐 🏉 🎱 🏓 🏸 🥊 🥋 🎯 🎮 🕹️ 🎲 ♟️ 🎭 🎨 🎤 🎧 🎵 🎶 🎸 🥁 🎺 🎻 🪗 🎷 🎹 🚀 ✈️ 🛸 🚁 ⛵ 🚤 🚢 🚂 🚌 🚑 🚒 🚓 🚕 🚗 🚙 🏍️ 🛵 🚲 🛴 🛹 ⛽ 🚦 🛑 ⚓ 🗼 🏰 🏯 🗻 🏔️ ❄️ 🌋 ⛰️ 🏕️ 🏖️ 🏙️ 🌃 🌆 🌇 🌉'.split(
+        ' '
+      ),
+  },
+  {
+    label: 'Objects',
+    emojis:
+      '📱 💻 ⌨️ 🖥️ 🖨️ 🖱️ 💾 💿 📀 📷 📸 📹 🎥 📺 📻 🎙️ 🔔 📡 🔋 🔌 💡 🔦 🕯️ 🔍 🔎 📦 📝 ✏️ 📌 📎 ✂️ 🗑️ 🔒 🔓 🔑 🗝️ 🔨 ⚙️ 🔧 🪛 🔬 🔭 💊 💉 🩺 🩹 🧰 💣 🛒 🧲 🪜 🧲 💰 💳 💎 🪙 🏧 💵 📈 📉 📊 📋 🗂️ 📅 📆 🗓️ ⏰ ⌚ ⏱️ ⏳'.split(
+        ' '
+      ),
+  },
+  {
+    label: 'Symbols',
+    emojis:
+      '💯 ✅ ❌ ❓ ❗ ⚠️ 🔴 🟠 🟡 🟢 🔵 🟣 ⚫ ⚪ 🟤 🔶 🔷 🔸 🔹 🔺 🔻 💠 🔘 🔲 🔳 ▶️ ⏩ ⏫ ⏬ ◀️ ⏪ ⏸️ ⏭️ ⏮️ 🔄 🔁 🔂 🔀 🆕 🆙 🆒 🆓 🆖 🆗 🆘 🆔 🅰️ 🅱️ 🆎 🅾️ 🔤 🔡 🔢 🔣 ♻️ ⚜️ 🔱 📛 🔰 ⭕ ✔️ ❎ ➕ ➖ ➗ ✖️ 💲 💱 ™️ ©️ ®️'.split(
+        ' '
+      ),
+  },
+];
 
 const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
 function isImageFilename(name: string | null | undefined): boolean {
@@ -159,11 +213,24 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         });
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as { error?: string };
-          setJoinError(
-            body.error === 'Room not found'
-              ? 'Room not found. Check the invite link.'
-              : `Error ${res.status} — try refreshing.`
-          );
+          if (body.error === 'Room not found') {
+            // Room was deleted — clear stale localStorage and drop back to landing
+            try {
+              localStorage.removeItem(`group_name_${code}`);
+              const saved = JSON.parse(localStorage.getItem('based_group_rooms') ?? '[]') as {
+                code: string;
+                name: string;
+              }[];
+              localStorage.setItem(
+                'based_group_rooms',
+                JSON.stringify(saved.filter(r => r.code !== code))
+              );
+            } catch {}
+            setNameSet(false);
+            setJoinError('This room no longer exists — it may have been deleted by the host.');
+          } else {
+            setJoinError(`Error ${res.status} — try refreshing.`);
+          }
           return;
         }
         const data = (await res.json()) as {
@@ -899,55 +966,115 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
           }}
         />
 
-        {/* Emoji picker */}
-        <div className="group-emoji-container">
+        {/* Unified + toolbar */}
+        <div className="group-toolbar-root">
           <button
             type="button"
-            className="group-emoji-btn"
+            className={`group-toolbar-plus${showEmoji || showGifs ? ' is-open' : ''}`}
             onClick={() => {
-              setShowEmoji(p => !p);
+              const isOpen = showEmoji || showGifs;
+              setShowEmoji(false);
               setShowGifs(false);
+              if (!isOpen) setShowEmoji(true);
             }}
-            title="Emoji"
+            title="Add emoji, GIF or file"
           >
-            😊
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
           </button>
+
+          {/* Sub-buttons appear when open */}
+          {(showEmoji || showGifs) && (
+            <div className="group-toolbar-sub">
+              <button
+                type="button"
+                className={`group-toolbar-sub-btn${showEmoji ? ' active' : ''}`}
+                onClick={() => {
+                  setShowEmoji(p => !p);
+                  setShowGifs(false);
+                }}
+                title="Emoji"
+              >
+                😊
+              </button>
+              <button
+                type="button"
+                className={`group-toolbar-sub-btn${showGifs ? ' active' : ''}`}
+                onClick={() => {
+                  setShowGifs(p => !p);
+                  setShowEmoji(false);
+                  if (!showGifs) setGifQuery('');
+                }}
+                title="GIF"
+              >
+                GIF
+              </button>
+              <button
+                type="button"
+                className="group-toolbar-sub-btn"
+                onClick={() => {
+                  fileInputRef.current?.click();
+                  setShowEmoji(false);
+                  setShowGifs(false);
+                }}
+                title="File"
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {/* Emoji picker panel */}
           {showEmoji && (
             <>
               <div className="group-panel-backdrop" onClick={() => setShowEmoji(false)} />
               <div className="group-emoji-picker">
-                {EMOJIS.map(e => (
-                  <button
-                    key={e}
-                    type="button"
-                    className="group-emoji-item"
-                    onClick={() => {
-                      setInput(prev => prev + e);
-                      inputRef.current?.focus();
-                    }}
-                  >
-                    {e}
-                  </button>
+                {EMOJI_CATEGORIES.map(cat => (
+                  <div key={cat.label} className="group-emoji-category">
+                    <div className="group-emoji-cat-label">{cat.label}</div>
+                    <div className="group-emoji-cat-grid">
+                      {cat.emojis.map(e => (
+                        <button
+                          key={e}
+                          type="button"
+                          className="group-emoji-item"
+                          onClick={() => {
+                            setInput(prev => prev + e);
+                            inputRef.current?.focus();
+                          }}
+                        >
+                          {e}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             </>
           )}
-        </div>
 
-        {/* GIF picker */}
-        <div className="group-gif-container">
-          <button
-            type="button"
-            className="group-gif-btn"
-            onClick={() => {
-              setShowGifs(p => !p);
-              setShowEmoji(false);
-              if (!showGifs) setGifQuery('');
-            }}
-            title="GIF"
-          >
-            GIF
-          </button>
+          {/* GIF panel */}
           {showGifs && (
             <>
               <div className="group-panel-backdrop" onClick={() => setShowGifs(false)} />
@@ -987,6 +1114,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         <button
           type="button"
           className="group-attach-btn"
+          style={{ display: 'none' }}
           onClick={() => fileInputRef.current?.click()}
           title="Attach file or image"
         >
