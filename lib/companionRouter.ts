@@ -213,7 +213,7 @@ export async function streamCompanion(opts: {
   visionMediaType?: string;
   controller: SSEController;
   encoder: TextEncoder;
-}): Promise<void> {
+}): Promise<{ provider: string }> {
   const {
     client,
     system,
@@ -238,11 +238,13 @@ export async function streamCompanion(opts: {
         encoder
       )
     )
-      return;
+      return { provider: 'gemini' };
   } else if (!hasVision) {
-    if (await tryGroq(system, textMessages, controller, encoder)) return;
-    if (await tryCerebras(system, textMessages, controller, encoder)) return;
+    if (await tryGroq(system, textMessages, controller, encoder)) return { provider: 'groq' };
+    if (await tryCerebras(system, textMessages, controller, encoder))
+      return { provider: 'cerebras' };
   }
 
   await anthropicFallback(client, systemBlocks ?? system, anthropicMessages, controller, encoder);
+  return { provider: 'anthropic' };
 }
