@@ -7204,6 +7204,51 @@ body {
   color: var(--text3);
   line-height: 1.4;
 }
+.image-face-upload-row {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.image-face-btn {
+  font-size: 11px;
+  padding: 4px 10px;
+}
+.image-face-preview {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.image-face-thumb {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--accent);
+}
+.image-face-remove {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.image-face-remove:hover {
+  background: #e53e3e;
+  color: #fff;
+  border-color: transparent;
+}
 .image-ai-prompt {
   width: 100%;
   background: var(--bg3);

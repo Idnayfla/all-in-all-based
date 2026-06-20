@@ -69,6 +69,8 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
   const [generating, setGenerating] = useState(false);
   const [status, setStatus] = useState('');
   const [activeTab, setActiveTab] = useState<'tools' | 'layers' | 'filters' | 'ai'>('tools');
+  const [faceDataUrl, setFaceDataUrl] = useState<string | null>(null);
+  const faceInputRef = useRef<HTMLInputElement>(null);
 
   const [textInput, setTextInput] = useState('');
   const [textPos, setTextPos] = useState<{ x: number; y: number } | null>(null);
@@ -435,10 +437,12 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
 
       if (aiMode === 'generate') {
         const endpoint = imageProvider === 'higgsfield' ? '/api/higgsfield/image' : '/api/image';
+        const body: Record<string, unknown> = { prompt: aiPrompt };
+        if (imageProvider === 'higgsfield' && faceDataUrl) body.faceBase64 = faceDataUrl;
         const res = await fetch(endpoint, {
           method: 'POST',
           headers: authHeaders,
-          body: JSON.stringify({ prompt: aiPrompt }),
+          body: JSON.stringify(body),
         });
         const data = await res.json();
         if (data.error) throw new Error(data.error);
@@ -971,10 +975,51 @@ export default function ImageStudioPanel({ authToken }: ImageStudioPanelProps) {
                 </div>
               )}
 
+              {aiMode === 'generate' && imageProvider === 'higgsfield' && (
+                <div className="image-face-upload-row">
+                  <input
+                    ref={faceInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    style={{ display: 'none' }}
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = ev => setFaceDataUrl(ev.target?.result as string);
+                      reader.readAsDataURL(file);
+                      e.target.value = '';
+                    }}
+                  />
+                  {faceDataUrl ? (
+                    <div className="image-face-preview">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={faceDataUrl} alt="Face reference" className="image-face-thumb" />
+                      <button
+                        className="image-face-remove"
+                        onClick={() => setFaceDataUrl(null)}
+                        title="Remove face reference"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="image-btn image-btn-secondary image-face-btn"
+                      onClick={() => faceInputRef.current?.click()}
+                    >
+                      + Face reference
+                    </button>
+                  )}
+                </div>
+              )}
+
               <div className="image-ai-desc">
                 {aiMode === 'generate' &&
                   imageProvider === 'higgsfield' &&
-                  'Higgsfield Soul — cinematic 2048×1152 image on a new layer.'}
+                  (faceDataUrl
+                    ? 'Higgsfield Soul 2 — generating with your face reference.'
+                    : 'Higgsfield Soul — cinematic 2048×1152 image on a new layer.')}
                 {aiMode === 'generate' &&
                   imageProvider === 'fal' &&
                   'Describe an image to create on a new layer.'}
