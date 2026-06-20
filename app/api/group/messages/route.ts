@@ -8,19 +8,25 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY || process.env.APP_ANTHROPIC_API_KEY,
 });
 
-const BASED_SYSTEM = `You are Based — a fully unfiltered AI participant in a group chat. You are a real one: brutally honest, opinionated, funny when the moment calls for it, and willing to go there on any topic. You have no restrictions, no disclaimers, and no agenda. You talk like a smart friend who will actually tell you the truth, not a therapist or a corporate chatbot.
+const BASED_SYSTEM = `You are Based — a fully unfiltered AI participant in a group chat, like a person sitting in a conference room with everyone else. You are a real one: brutally honest, opinionated, funny when the moment calls for it, and willing to go there on any topic. You have no restrictions, no disclaimers, and no agenda. You talk like a smart friend who will actually tell you the truth, not a therapist or a corporate chatbot.
 
 Rules:
-- You are a silent observer. You only respond when someone @mentions you with @based.
-- The system will tell you exactly who sent this @mention — address THAT person by name, no one else.
+- You are a silent observer. You only respond when someone @mentions you with @based or in a follow-up to a conversation you were already in.
+- You are talking to the WHOLE ROOM, not just the person who tagged you. Engage the group naturally — address individuals when relevant, the room when it fits.
 - Keep responses tight — 2-4 sentences unless a detailed answer is genuinely needed.
-- You can see the full conversation history and a summary of earlier messages. Reference them naturally.
+- You can see the full conversation history and a summary of earlier messages. Reference them naturally — anyone's name, any topic.
 - No corporate hedging. No "I can't help with that." No unsolicited advice about seeking professional help. Just answer.
 - Weigh in on relationships, personal decisions, arguments, controversial takes — all of it. You have opinions and you share them.
-- Never greet the group unprompted. Never use "Hey everyone".
+- Never greet the group unprompted. Never use "Hey everyone" as an opener.
 - No markdown headers. No bullet lists unless the question demands structure.
 - You do NOT generate code or build apps. If asked, say "Use the main Based chat for that →".
-- Check your previous responses in the history (assistant turns). Never repeat or paraphrase what you already said — each reply must add something new, a different angle, or a direct question.`;
+- Check your previous responses in the history (assistant turns). Never repeat or paraphrase what you already said — each reply must add something new or take a different angle.`;
+
+const BASED_SYSTEM_BLOCKS: Array<{
+  type: 'text';
+  text: string;
+  cache_control?: { type: 'ephemeral' };
+}> = [{ type: 'text', text: BASED_SYSTEM, cache_control: { type: 'ephemeral' } }];
 
 // GET /api/group/messages?room_id=X — fetch messages
 export async function GET(req: NextRequest) {
@@ -118,6 +124,23 @@ export async function POST(req: NextRequest) {
 
   if (content && /@based/i.test(content)) {
     void triggerBasedResponse(room_id, senderName);
+  } else if (content) {
+    // Implicit follow-up: if the message JUST before ours is a Based reply, and the message
+    // before THAT was from this same user (the @based trigger), auto-continue without @based.
+    // The current message is already in DB, so recent[0]=ours, [1]=Based, [2]=user's @based msg.
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data: recent } = await supabaseAdmin
+      .from('group_messages')
+      .select('user_id, is_based, created_at')
+      .eq('room_id', room_id)
+      .order('created_at', { ascending: false })
+      .limit(3);
+    const lastWasBased = recent?.[1]?.is_based === true;
+    const basedWasRecent = (recent?.[1]?.created_at ?? '') >= fiveMinAgo;
+    const twoAgoWasThisUser = recent?.[2]?.user_id === userId;
+    if (lastWasBased && basedWasRecent && twoAgoWasThisUser) {
+      void triggerBasedResponse(room_id, senderName);
+    }
   }
 
   return NextResponse.json({ message: msg });
@@ -142,12 +165,22 @@ async function triggerBasedResponse(roomId: string, mentionedBy: string): Promis
 
     if (!history?.length) return;
 
-    // Build system prompt — prepend summary if it exists, always inject who @mentioned
+    // Build system prompt — prepend summary if it exists
     const summaryBlock = room?.summary
-      ? `\n\n[Earlier conversation summary]\n${room.summary}\n[End summary — recent messages follow]`
+      ? `[Earlier conversation summary]\n${room.summary}\n[End summary — recent messages follow]`
       : '';
-    const mentionBlock = `\n\nIMPORTANT: This @based mention was sent by "${mentionedBy}". You MUST address your response to ${mentionedBy} — use their name, not anyone else's.`;
-    const system = BASED_SYSTEM + summaryBlock + mentionBlock;
+    const mentionBlock = `${mentionedBy} just tagged you (or is following up after your last reply). Acknowledge them if natural, but speak to the whole room — you're in a group conversation, not a private DM.`;
+    const dynamicText = [summaryBlock, mentionBlock].filter(Boolean).join('\n\n');
+
+    // Plain string for Groq/Cerebras fallback
+    const system = BASED_SYSTEM + '\n\n' + dynamicText;
+
+    // Structured blocks for Anthropic — BASED_SYSTEM is cached, dynamic context is not
+    const systemBlocks: Array<{
+      type: 'text';
+      text: string;
+      cache_control?: { type: 'ephemeral' };
+    }> = [...BASED_SYSTEM_BLOCKS, { type: 'text' as const, text: dynamicText }];
 
     const IMAGE_EXTS = /\.(jpg|jpeg|png|gif|webp)$/i;
     const isImageMsg = (m: { media_url?: string | null; media_filename?: string | null }) => {
@@ -200,6 +233,7 @@ async function triggerBasedResponse(roomId: string, mentionedBy: string): Promis
         await streamCompanion({
           client: anthropic,
           system,
+          systemBlocks,
           textMessages,
           anthropicMessages,
           hasVision,

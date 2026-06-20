@@ -1035,8 +1035,6 @@ CODE examples (output a file plan):
 
 KEY RULE: pasting data + asking a question = CHAT. Asking to BUILD something = CODE. Never build an app when the user just wants an answer.
 
-SHORT AFFIRMATIVE RULE: Single-word or very short affirmative messages ("ok", "okay", "k", "yes", "yeah", "yep", "sure", "alright", "cool", "great", "nice", "thanks", "got it", "sounds good", "perfect", "noted") — return [{"chat":true}] UNLESS existing project files are shown AND the message clearly continues an active coding task. Never generate code just because the user agreed with something in conversation.
-
 EXISTING PROJECT RULE (overrides chat detection):
 If the prompt ends with "Existing files: ..." — the user already has a project open. In this context:
 - Short feedback like "nice", "looks good", "cool" → [{"chat":true}] (pure reaction, nothing to do)
@@ -2465,16 +2463,8 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             model: plannerModel,
             input: lastUserMessage,
           });
-          // Short-circuit: pure affirmatives with no existing code project → always chat.
-          // Fast planners (Groq/Cerebras) only see the last message without conversation
-          // history, so they can't distinguish "ok build it" from "ok thanks" on their own.
-          const SHORT_AFFIRMATIVE_RE =
-            /^(ok|okay|k|yes|yeah|yep|sure|alright|cool|great|nice|thanks|got it|sounds good|perfect|noted|understood)\.?!?\s*$/i;
-          const isShortAffirmativeNoFiles =
-            SHORT_AFFIRMATIVE_RE.test(lastUserMessage.trim()) && !existingFiles?.length;
-
           let planText: string;
-          if (isShortAffirmativeNoFiles || imageChatOverride) {
+          if (imageChatOverride) {
             planText = '[{"chat":true}]';
           } else if (useGroqPlanner) {
             try {

@@ -159,7 +159,9 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
   const [membersLoading, setMembersLoading] = useState(false);
   const [memberSearch, setMemberSearch] = useState('');
   const [kickBanMsg, setKickBanMsg] = useState<string | null>(null);
-  const [bannedUsers, setBannedUsers] = useState<{ user_id: string; display_name: string | null }[]>([]);
+  const [bannedUsers, setBannedUsers] = useState<
+    { user_id: string; display_name: string | null }[]
+  >([]);
   const [showToolbar, setShowToolbar] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [showGifs, setShowGifs] = useState(false);
@@ -329,9 +331,10 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
             }
             try {
               localStorage.removeItem(`group_name_${code}`);
-              const saved = JSON.parse(
-                localStorage.getItem('based_group_rooms') ?? '[]'
-              ) as { code: string; name: string }[];
+              const saved = JSON.parse(localStorage.getItem('based_group_rooms') ?? '[]') as {
+                code: string;
+                name: string;
+              }[];
               localStorage.setItem(
                 'based_group_rooms',
                 JSON.stringify(saved.filter(r => r.code !== code))
@@ -351,9 +354,10 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
                 channelRef.current = null;
               }
               try {
-                const saved = JSON.parse(
-                  localStorage.getItem('based_group_rooms') ?? '[]'
-                ) as { code: string; name: string }[];
+                const saved = JSON.parse(localStorage.getItem('based_group_rooms') ?? '[]') as {
+                  code: string;
+                  name: string;
+                }[];
                 localStorage.setItem(
                   'based_group_rooms',
                   JSON.stringify(saved.filter(r => r.code !== code))
@@ -387,9 +391,10 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
               }
               try {
                 localStorage.removeItem(`group_name_${code}`);
-                const saved = JSON.parse(
-                  localStorage.getItem('based_group_rooms') ?? '[]'
-                ) as { code: string; name: string }[];
+                const saved = JSON.parse(localStorage.getItem('based_group_rooms') ?? '[]') as {
+                  code: string;
+                  name: string;
+                }[];
                 localStorage.setItem(
                   'based_group_rooms',
                   JSON.stringify(saved.filter(r => r.code !== code))
@@ -542,9 +547,10 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         // Room was deleted — clean up and send non-members back to landing
         try {
           localStorage.removeItem(`group_name_${roomRef.current.code}`);
-          const saved = JSON.parse(
-            localStorage.getItem('based_group_rooms') ?? '[]'
-          ) as { code: string; name: string }[];
+          const saved = JSON.parse(localStorage.getItem('based_group_rooms') ?? '[]') as {
+            code: string;
+            name: string;
+          }[];
           localStorage.setItem(
             'based_group_rooms',
             JSON.stringify(saved.filter(r => r.code !== roomRef.current!.code))
@@ -1019,7 +1025,10 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
                         <div key={b.user_id} className="group-member-row">
                           <span className="group-member-dot" style={{ background: '#ef4444' }} />
                           <span className="group-member-name">{b.display_name ?? 'Unknown'}</span>
-                          <div className="group-mod-actions" style={{ opacity: 1, pointerEvents: 'auto' }}>
+                          <div
+                            className="group-mod-actions"
+                            style={{ opacity: 1, pointerEvents: 'auto' }}
+                          >
                             <button
                               className="group-mod-btn group-mod-btn--unban"
                               onClick={() => void handleUnban(b.user_id)}
@@ -1300,7 +1309,13 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
           {/* Emoji picker panel */}
           {showEmoji && (
             <>
-              <div className="group-panel-backdrop" onClick={() => { setShowEmoji(false); setShowToolbar(false); }} />
+              <div
+                className="group-panel-backdrop"
+                onClick={() => {
+                  setShowEmoji(false);
+                  setShowToolbar(false);
+                }}
+              />
               <div className="group-emoji-picker">
                 {EMOJI_CATEGORIES.map(cat => (
                   <div key={cat.label} className="group-emoji-category">
@@ -1329,7 +1344,13 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
           {/* GIF panel */}
           {showGifs && (
             <>
-              <div className="group-panel-backdrop" onClick={() => { setShowGifs(false); setShowToolbar(false); }} />
+              <div
+                className="group-panel-backdrop"
+                onClick={() => {
+                  setShowGifs(false);
+                  setShowToolbar(false);
+                }}
+              />
               <div className="group-gif-panel">
                 <input
                   className="group-gif-search"
