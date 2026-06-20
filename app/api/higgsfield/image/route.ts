@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fal } from '@fal-ai/client';
 import { checkMediaRateLimit } from '../../_mediaRateLimit';
-import { getUserId, supabaseAdmin } from '../../_auth';
-import { generateImage, importMediaFromUrl } from '../../../../lib/higgsfield';
+import { generateImage } from '../../../../lib/higgsfield';
 
 export const maxDuration = 180;
 
@@ -22,45 +21,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const userId = await getUserId(req).catch(() => null);
-
-  const { prompt, faceBase64 } = (await req.json()) as {
-    prompt?: string;
-    faceBase64?: string;
-  };
+  const { prompt } = await req.json();
   if (!prompt?.trim()) {
     return NextResponse.json({ error: 'Prompt is required' }, { status: 400 });
   }
 
-  // If a face reference was provided, upload it to Supabase and import into Higgsfield
-  let faceMediaId: string | undefined;
-  if (faceBase64) {
-    try {
-      const base64Data = faceBase64.replace(/^data:image\/\w+;base64,/, '');
-      const buffer = Buffer.from(base64Data, 'base64');
-      const mimeMatch = faceBase64.match(/^data:(image\/\w+);base64,/);
-      const contentType = mimeMatch?.[1] ?? 'image/jpeg';
-      const ext = contentType.split('/')[1] ?? 'jpg';
-      const path = `faces/${userId ?? 'anon'}/${Date.now()}.${ext}`;
-
-      const { error: uploadError } = await supabaseAdmin.storage
-        .from('group-media')
-        .upload(path, buffer, { contentType, upsert: false });
-
-      if (uploadError) throw new Error(`Face upload failed: ${uploadError.message}`);
-
-      const { data: urlData } = supabaseAdmin.storage.from('group-media').getPublicUrl(path);
-      faceMediaId = await importMediaFromUrl(urlData.publicUrl);
-    } catch (faceErr: unknown) {
-      const msg = faceErr instanceof Error ? faceErr.message : String(faceErr);
-      console.warn('[higgsfield/image] face import failed, generating without face:', msg);
-      // Fall through — generate without face rather than blocking the user
-    }
-  }
-
   // Try Higgsfield first
   try {
-    const url = await generateImage(prompt, faceMediaId);
+    const url = await generateImage(prompt);
     return NextResponse.json({ url, provider: 'higgsfield' });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

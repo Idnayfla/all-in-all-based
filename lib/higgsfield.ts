@@ -43,37 +43,17 @@ async function pollJobSet(id: string): Promise<string> {
   throw new Error('Higgsfield job timed out after 3 minutes');
 }
 
-export async function importMediaFromUrl(url: string): Promise<string> {
-  const res = await fetch(`${BASE_URL}/v1/media/import-url`, {
+export async function generateImage(prompt: string): Promise<string> {
+  const res = await fetch(`${BASE_URL}/v1/text2image/soul`, {
     method: 'POST',
     headers: higgsHeaders(),
-    body: JSON.stringify({ url, type: 'image' }),
-  });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    throw new Error(
-      `Higgsfield media import error: ${res.status} ${res.statusText}${detail ? ` — ${detail.slice(0, 200)}` : ''}`
-    );
-  }
-  const body = await res.json();
-  const id: string = body.id ?? body.media_id ?? body.mediaId ?? '';
-  if (!id) throw new Error('Higgsfield media import returned no ID');
-  return id;
-}
-
-export async function generateImage(prompt: string, faceMediaId?: string): Promise<string> {
-  const params: Record<string, unknown> = {
-    prompt,
-    aspect_ratio: '16:9',
-    ...(faceMediaId
-      ? { quality: '2k', medias: [{ value: faceMediaId, role: 'image' }] }
-      : { width_and_height: '2048x1152' }),
-  };
-  const endpoint = faceMediaId ? 'soul_2' : 'soul';
-  const res = await fetch(`${BASE_URL}/v1/text2image/${endpoint}`, {
-    method: 'POST',
-    headers: higgsHeaders(),
-    body: JSON.stringify({ params }),
+    body: JSON.stringify({
+      params: {
+        prompt,
+        aspect_ratio: '16:9',
+        width_and_height: '2048x1152',
+      },
+    }),
   });
   if (!res.ok) {
     let detail = '';
