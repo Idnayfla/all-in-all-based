@@ -8,7 +8,14 @@ import { getWeather } from '@/lib/weather';
 import { getCrowdInfo } from '@/lib/crowd';
 import { getTrafficInfo } from '@/lib/traffic';
 import { createLangfuseClient } from '@/lib/langfuse';
-import { MODEL_OPUS, MODEL_SONNET, MODEL_HAIKU, MODEL_GROQ, MODEL_CEREBRAS, MODEL_GEMINI_VISION } from '@/lib/models';
+import {
+  MODEL_OPUS,
+  MODEL_SONNET,
+  MODEL_HAIKU,
+  MODEL_GROQ,
+  MODEL_CEREBRAS,
+  MODEL_GEMINI_VISION,
+} from '@/lib/models';
 import { BRAIN_TOOLS, runBrainTool } from '@/lib/brainTools';
 import { checkAndIncrementGeneration } from '@/lib/tiers';
 
@@ -301,7 +308,10 @@ async function streamGroqCollecting(
 // Used for Free-tier image conversations. Gemini Flash 2.0 is multimodal and
 // has a generous free quota — avoids burning Anthropic API credit for free users.
 
-type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } } | { thought: true; text: string };
+type GeminiPart =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } }
+  | { thought: true; text: string };
 type GeminiContent = { role: 'user' | 'model'; parts: GeminiPart[] };
 
 // Converts anthropicMessages (string | ClaudeContentBlock[]) → Gemini contents format.
@@ -311,9 +321,7 @@ type GeminiContent = { role: 'user' | 'model'; parts: GeminiPart[] };
 //      (this happens when recentMessages.slice(-10) cuts the first user message)
 //   2. '[reference image]' placeholder → descriptive hint so Gemini knows it already
 //      described that image and can reference its own prior response
-function toGeminiContents(
-  msgs: Array<{ role: string; content: unknown }>
-): GeminiContent[] {
+function toGeminiContents(msgs: Array<{ role: string; content: unknown }>): GeminiContent[] {
   const contents: GeminiContent[] = msgs.map(m => {
     const role = m.role === 'assistant' ? ('model' as const) : ('user' as const);
     const parts: GeminiPart[] = [];
@@ -321,20 +329,28 @@ function toGeminiContents(
       if (m.content) {
         // Replace stripped-image placeholder with a hint that helps Gemini reference
         // its own prior description when the user asks "the earlier image" etc.
-        const text = m.content === '[reference image]'
-          ? '[An image was shared here. You described it in your previous response — reference that description when the user asks about it.]'
-          : m.content;
+        const text =
+          m.content === '[reference image]'
+            ? '[An image was shared here. You described it in your previous response — reference that description when the user asks about it.]'
+            : m.content;
         parts.push({ text });
       }
     } else if (Array.isArray(m.content)) {
-      for (const block of m.content as Array<{ type: string; text?: string; source?: { media_type: string; data: string } }>) {
+      for (const block of m.content as Array<{
+        type: string;
+        text?: string;
+        source?: { media_type: string; data: string };
+      }>) {
         if (block.type === 'text' && block.text) {
-          const text = block.text === '[reference image]'
-            ? '[An image was shared here. You described it in your previous response — reference that description when the user asks about it.]'
-            : block.text;
+          const text =
+            block.text === '[reference image]'
+              ? '[An image was shared here. You described it in your previous response — reference that description when the user asks about it.]'
+              : block.text;
           parts.push({ text });
         } else if (block.type === 'image' && block.source) {
-          parts.push({ inlineData: { mimeType: block.source.media_type, data: block.source.data } });
+          parts.push({
+            inlineData: { mimeType: block.source.media_type, data: block.source.data },
+          });
         }
       }
     }
@@ -368,10 +384,12 @@ async function callGeminiVision(
   });
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${await res.text()}`);
   const data = await res.json();
-  return (data.candidates?.[0]?.content?.parts as GeminiPart[] | undefined)
-    ?.filter((p): p is { text: string } => 'text' in p && !('thought' in p))
-    .map(p => p.text)
-    .join('') ?? '';
+  return (
+    (data.candidates?.[0]?.content?.parts as GeminiPart[] | undefined)
+      ?.filter((p): p is { text: string } => 'text' in p && !('thought' in p))
+      .map(p => p.text)
+      .join('') ?? ''
+  );
 }
 
 async function streamGeminiVisionCollecting(
@@ -411,10 +429,11 @@ async function streamGeminiVisionCollecting(
         const parsed = JSON.parse(payload);
         const parts = parsed.candidates?.[0]?.content?.parts as GeminiPart[] | undefined;
         // Filter out thought parts (gemini-2.5-flash internal reasoning — not for display)
-        const text = parts
-          ?.filter((p): p is { text: string } => 'text' in p && !('thought' in p))
-          .map(p => p.text)
-          .join('') ?? '';
+        const text =
+          parts
+            ?.filter((p): p is { text: string } => 'text' in p && !('thought' in p))
+            .map(p => p.text)
+            .join('') ?? '';
         if (text) {
           accumulated += text;
           onChunk(text);
@@ -1956,8 +1975,7 @@ export async function POST(req: NextRequest) {
     // instead of routing to Groq (which has no vision support).
     const hasRecentImage = recentMessages.some(
       m =>
-        Array.isArray(m.content) &&
-        (m.content as ApiContentBlock[]).some(b => b.type === 'image')
+        Array.isArray(m.content) && (m.content as ApiContentBlock[]).some(b => b.type === 'image')
     );
 
     // Edit-intent detection: append Image Studio tip when image + edit keyword
@@ -2426,8 +2444,10 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
           // skip the planner entirely and route to chat so search_images is called.
           // The fast planners (Groq/Cerebras) don't receive recentImageNote and would otherwise
           // misroute follow-ups like "gorier bro" or "practical effects classic" to code generation.
-          const BUILD_VERB_RE = /\b(build|create|make|design|generate|code|implement|write|add|fix)\b/i;
-          const imageChatOverride = hasAssistantImageMarkdown && !hasImage && !BUILD_VERB_RE.test(lastUserMessage);
+          const BUILD_VERB_RE =
+            /\b(build|create|make|design|generate|code|implement|write|add|fix)\b/i;
+          const imageChatOverride =
+            hasAssistantImageMarkdown && !hasImage && !BUILD_VERB_RE.test(lastUserMessage);
 
           // Planner chain: Groq (primary, fastest) → Cerebras (second, if Groq fails) → Haiku (final).
           // Images skip fast planners — Anthropic vision is required for multimodal input.
@@ -2551,7 +2571,9 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                     anthropicMessages,
                     8000,
                     t =>
-                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`))
+                      controller.enqueue(
+                        encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`)
+                      )
                   );
                 } else {
                   const stream = await client.messages.stream({

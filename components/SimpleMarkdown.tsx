@@ -44,8 +44,7 @@ function parseInline(text: string, prefix: string): React.ReactNode {
           <span key={k}>{m[7]}</span>
         )
       );
-    }
-    else if (m[9])
+    } else if (m[9])
       parts.push(
         <a key={k} href={m[10]} target="_blank" rel="noreferrer">
           {m[9]}

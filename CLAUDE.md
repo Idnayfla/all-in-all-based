@@ -16,6 +16,7 @@ Run `graphify update .` after significant code changes (no API cost — AST-only
 Full report: `graphify-out/GRAPH_REPORT.md` · Interactive: `graphify-out/graph.html`
 
 **God nodes** (touch with care — 101 edges each on average):
+
 - `getUserId()` — auth guard called by every API route
 - `supabaseAdmin` — direct DB access, bypasses RLS
 - `FloatingBubbleService` — Android overlay, 42 dependents
