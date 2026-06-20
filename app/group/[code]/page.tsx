@@ -1,6 +1,7 @@
 'use client';
 
 import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -32,7 +33,7 @@ async function authHeaders(): Promise<Record<string, string>> {
   return { Authorization: `Bearer ${token}` };
 }
 
-async function uploadImage(file: File): Promise<string | null> {
+async function uploadFile(file: File): Promise<string | null> {
   const headers = await authHeaders();
   const res = await fetch('/api/group/upload', {
     method: 'POST',
@@ -53,6 +54,21 @@ async function uploadImage(file: File): Promise<string | null> {
   return put.ok ? public_url : null;
 }
 
+const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+function isImageFilename(name: string | null | undefined): boolean {
+  if (!name) return false;
+  const dot = name.lastIndexOf('.');
+  return dot !== -1 && IMAGE_EXTS.has(name.slice(dot).toLowerCase());
+}
+function extractFilename(url: string): string {
+  try {
+    const last = new URL(url).pathname.split('/').pop() ?? '';
+    return last.replace(/^\d+_/, '');
+  } catch {
+    return 'file';
+  }
+}
+
 interface Message {
   id: string;
   display_name: string;
@@ -61,6 +77,7 @@ interface Message {
   created_at: string;
   user_id: string | null;
   media_url?: string | null;
+  media_filename?: string | null;
 }
 
 interface SystemEvent {
@@ -73,8 +90,11 @@ interface SystemEvent {
 export default function GroupChatPage({ params }: { params: Promise<{ code: string }> }) {
   const { code: rawCode } = use(params);
   const code = rawCode.toUpperCase();
+  const router = useRouter();
 
   const [room, setRoom] = useState<{ id: string; name: string; code: string } | null>(null);
+  const [isCreator, setIsCreator] = useState(false);
+  const [onlineCount, setOnlineCount] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
   const [systemEvents, setSystemEvents] = useState<SystemEvent[]>([]);
   const [input, setInput] = useState('');
@@ -87,8 +107,9 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
   const [basedTyping, setBasedTyping] = useState(false);
   const [joining, setJoining] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
 
@@ -132,9 +153,15 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
           );
           return;
         }
-        const data = (await res.json()) as { id: string; name: string; code: string };
+        const data = (await res.json()) as {
+          id: string;
+          name: string;
+          code: string;
+          is_creator?: boolean;
+        };
         setRoom(data);
         roomRef.current = data;
+        setIsCreator(data.is_creator ?? false);
 
         try {
           const saved = JSON.parse(localStorage.getItem('based_group_rooms') ?? '[]') as {
@@ -192,20 +219,17 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
               setTimeout(scrollToBottom, 50);
             }
           )
-          // Broadcast: typing
+          // Broadcast: typing indicator
           .on('broadcast', { event: 'typing' }, ({ payload }) => {
             const { display_name: dn, typing } = payload as {
               display_name: string;
               typing: boolean;
             };
             if (dn === displayNameRef.current) return;
-
             const existing = typingTimersRef.current.get(dn);
             if (existing) clearTimeout(existing);
-
             if (typing) {
               setTypingUsers(prev => [...new Set([...prev, dn])]);
-              // Auto-clear after 3s if stop event is missed
               const timer = setTimeout(() => {
                 setTypingUsers(prev => prev.filter(u => u !== dn));
                 typingTimersRef.current.delete(dn);
@@ -216,39 +240,49 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
               typingTimersRef.current.delete(dn);
             }
           })
-          // Broadcast: join / leave
-          .on('broadcast', { event: 'user_join' }, ({ payload }) => {
-            const { display_name: dn } = payload as { display_name: string };
-            if (dn === displayNameRef.current) return;
-            setSystemEvents(prev => [
-              ...prev,
-              {
-                id: `join-${Date.now()}`,
-                type: 'join',
-                display_name: dn,
-                timestamp: new Date().toISOString(),
-              },
-            ]);
+          // Presence: reliable join/leave tied to WebSocket — auto-fires on tab close
+          .on('presence', { event: 'sync' }, () => {
+            const state = channel.presenceState<{ display_name?: string }>();
+            setOnlineCount(Object.values(state).flat().length);
           })
-          .on('broadcast', { event: 'user_leave' }, ({ payload }) => {
-            const { display_name: dn } = payload as { display_name: string };
-            setSystemEvents(prev => [
-              ...prev,
-              {
-                id: `leave-${Date.now()}`,
-                type: 'leave',
-                display_name: dn,
-                timestamp: new Date().toISOString(),
-              },
-            ]);
+          .on('presence', { event: 'join' }, ({ newPresences }) => {
+            (newPresences as { display_name?: string }[]).forEach(p => {
+              if (p.display_name && p.display_name !== displayNameRef.current) {
+                setSystemEvents(prev => [
+                  ...prev,
+                  {
+                    id: `join-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                    type: 'join' as const,
+                    display_name: p.display_name!,
+                    timestamp: new Date().toISOString(),
+                  },
+                ]);
+              }
+            });
+            const state = channel.presenceState<{ display_name?: string }>();
+            setOnlineCount(Object.values(state).flat().length);
+          })
+          .on('presence', { event: 'leave' }, ({ leftPresences }) => {
+            (leftPresences as { display_name?: string }[]).forEach(p => {
+              if (p.display_name) {
+                setSystemEvents(prev => [
+                  ...prev,
+                  {
+                    id: `leave-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                    type: 'leave' as const,
+                    display_name: p.display_name!,
+                    timestamp: new Date().toISOString(),
+                  },
+                ]);
+                setTypingUsers(prev => prev.filter(u => u !== p.display_name));
+              }
+            });
+            const state = channel.presenceState<{ display_name?: string }>();
+            setOnlineCount(Object.values(state).flat().length);
           })
           .subscribe(status => {
             if (status === 'SUBSCRIBED') {
-              void channel.send({
-                type: 'broadcast',
-                event: 'user_join',
-                payload: { display_name: name },
-              });
+              void channel.track({ display_name: name });
             }
           });
 
@@ -264,7 +298,6 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
   );
 
   useEffect(() => {
-    // Persist name in localStorage so returning users skip the name screen
     const saved = localStorage.getItem(`group_name_${code}`);
     if (saved) {
       setDisplayName(saved);
@@ -275,14 +308,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
 
   useEffect(() => {
     return () => {
-      if (channelRef.current) {
-        void channelRef.current.send({
-          type: 'broadcast',
-          event: 'user_leave',
-          payload: { display_name: displayNameRef.current },
-        });
-        void supabase.removeChannel(channelRef.current);
-      }
+      if (channelRef.current) void supabase.removeChannel(channelRef.current);
       typingTimersRef.current.forEach(t => clearTimeout(t));
     };
   }, []);
@@ -341,32 +367,70 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
     void joinRoom(name);
   };
 
-  const handleImageFile = async (file: File) => {
-    if (!file.type.startsWith('image/')) return;
-    setImagePreview(URL.createObjectURL(file));
+  const handleFile = async (file: File) => {
+    const isImg = file.type.startsWith('image/');
+    setFilePreview(isImg ? URL.createObjectURL(file) : null);
+    setFileName(file.name);
     setUploading(true);
-    const url = await uploadImage(file);
-    setImageUrl(url);
+    const url = await uploadFile(file);
+    if (url) {
+      setFileUrl(url);
+    } else {
+      setFilePreview(null);
+      setFileName(null);
+    }
     setUploading(false);
   };
 
-  const clearImage = () => {
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImagePreview(null);
-    setImageUrl(null);
+  const clearFile = () => {
+    if (filePreview) URL.revokeObjectURL(filePreview);
+    setFilePreview(null);
+    setFileUrl(null);
+    setFileName(null);
   };
+
+  const handleLeave = useCallback(() => {
+    if (channelRef.current) {
+      void supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    router.push('/group');
+  }, [router]);
+
+  const handleDelete = useCallback(async () => {
+    if (!room) return;
+    if (!window.confirm('Delete this room for everyone? This cannot be undone.')) return;
+    await fetch(`/api/group/rooms?room_id=${room.id}`, {
+      method: 'DELETE',
+      headers: await authHeaders(),
+    });
+    try {
+      const saved = JSON.parse(localStorage.getItem('based_group_rooms') ?? '[]') as {
+        code: string;
+        name: string;
+      }[];
+      localStorage.setItem('based_group_rooms', JSON.stringify(saved.filter(r => r.code !== code)));
+      localStorage.removeItem(`group_name_${code}`);
+    } catch {}
+    if (channelRef.current) {
+      void supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+    router.push('/group');
+  }, [room, code, router]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if ((!input.trim() && !imageUrl) || !room || sending || uploading) return;
+    if ((!input.trim() && !fileUrl) || !room || sending || uploading) return;
 
     broadcastTyping(false);
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
     const content = input.trim();
-    const mediaUrl = imageUrl;
+    const mediaUrl = fileUrl;
+    const mediaFilename = fileName;
     setInput('');
-    clearImage();
+    clearFile();
     setSending(true);
 
     if (/@based/i.test(content)) setBasedTyping(true);
@@ -378,7 +442,8 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
       is_based: false,
       created_at: new Date().toISOString(),
       user_id: null,
-      media_url: mediaUrl,
+      media_url: filePreview ?? mediaUrl,
+      media_filename: mediaFilename,
     };
     setMessages(prev => [...prev, optimisticMsg]);
     setTimeout(scrollToBottom, 50);
@@ -392,6 +457,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
           content,
           display_name: displayName,
           media_url: mediaUrl,
+          media_filename: mediaFilename,
         }),
       });
       if (!res.ok) {
@@ -418,15 +484,15 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
     const file = Array.from(e.clipboardData.files).find(f => f.type.startsWith('image/'));
     if (file) {
       e.preventDefault();
-      void handleImageFile(file);
+      void handleFile(file);
     }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragging(false);
-    const file = Array.from(e.dataTransfer.files).find(f => f.type.startsWith('image/'));
-    if (file) void handleImageFile(file);
+    const file = e.dataTransfer.files[0];
+    if (file) void handleFile(file);
   };
 
   const copyInvite = () => {
@@ -451,7 +517,6 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
   const formatTime = (iso: string) =>
     new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // Merge messages and system events sorted by time
   const mergedItems = useMemo(() => {
     type Item = { kind: 'message'; data: Message } | { kind: 'system'; data: SystemEvent };
     const items: Item[] = [
@@ -509,20 +574,36 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
       onDragLeave={() => setDragging(false)}
       onDrop={handleDrop}
     >
-      {dragging && <div className="group-drop-overlay">Drop image to send</div>}
+      {dragging && <div className="group-drop-overlay">Drop file to share</div>}
 
       <div className="group-chat-header">
         <div className="group-chat-title">
           <span className="group-chat-name">{room?.name ?? code}</span>
           <span className="group-chat-code">#{code}</span>
+          {onlineCount > 0 && <span className="group-online-count">{onlineCount} online</span>}
         </div>
-        <button className="group-invite-btn" onClick={copyInvite} title="Copy invite link">
-          {copied ? '◈ Copied!' : '⬡ Invite'}
-        </button>
+        <div className="group-chat-actions">
+          <button className="group-invite-btn" onClick={copyInvite} title="Copy invite link">
+            {copied ? '◈ Copied!' : '⬡ Invite'}
+          </button>
+          <button className="group-leave-btn" onClick={handleLeave} title="Leave room">
+            Leave
+          </button>
+          {isCreator && (
+            <button
+              className="group-delete-btn"
+              onClick={() => void handleDelete()}
+              title="Delete room for everyone"
+            >
+              Delete
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="group-chat-hint">
-        Type <strong>@based</strong> to ask Based · drag, paste or attach images
+        Type <strong>@based</strong> to ask Based · chatting as <strong>{displayName}</strong> · go
+        to /group to change name
       </div>
 
       {chatError && (
@@ -555,6 +636,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
             );
           }
           const msg = item.data;
+          const fn = msg.media_filename ?? (msg.media_url ? extractFilename(msg.media_url) : null);
           return (
             <div
               key={msg.id}
@@ -573,18 +655,42 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
                 <span className="group-message-time">{formatTime(msg.created_at)}</span>
               </div>
               {msg.content && <div className="group-message-content">{msg.content}</div>}
-              {msg.media_url && (
-                <img
-                  src={msg.media_url}
-                  alt="shared image"
-                  className="group-message-img"
-                  onClick={() => {
-                    if (/^https?:\/\//i.test(msg.media_url ?? '')) {
-                      window.open(msg.media_url!, '_blank', 'noopener,noreferrer');
-                    }
-                  }}
-                />
-              )}
+              {msg.media_url &&
+                (isImageFilename(fn) ? (
+                  <img
+                    src={msg.media_url}
+                    alt={fn ?? 'image'}
+                    className="group-message-img"
+                    onClick={() => {
+                      if (/^https?:\/\//i.test(msg.media_url ?? '')) {
+                        window.open(msg.media_url!, '_blank', 'noopener,noreferrer');
+                      }
+                    }}
+                  />
+                ) : (
+                  <a
+                    href={msg.media_url}
+                    download={fn ?? undefined}
+                    className="group-file-card"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14,2 14,8 20,8" />
+                    </svg>
+                    {fn ?? 'Download file'}
+                  </a>
+                ))}
             </div>
           );
         })}
@@ -605,11 +711,30 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
 
       {typingLabel && <div className="group-typing-label">{typingLabel}</div>}
 
-      {imagePreview && (
+      {(filePreview ?? (fileName && !filePreview)) && (
         <div className="group-img-preview">
-          <img src={imagePreview} alt="preview" />
+          {filePreview ? (
+            <img src={filePreview} alt="preview" />
+          ) : (
+            <div className="group-file-pending">
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14,2 14,8 20,8" />
+              </svg>
+              <span>{fileName}</span>
+            </div>
+          )}
           {uploading && <span className="group-img-uploading">Uploading…</span>}
-          <button className="group-img-preview-remove" onClick={clearImage}>
+          <button className="group-img-preview-remove" onClick={clearFile}>
             ×
           </button>
         </div>
@@ -619,11 +744,11 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.rtf,.zip,.rar,.7z,.tar,.gz"
           style={{ display: 'none' }}
           onChange={e => {
             const file = e.target.files?.[0];
-            if (file) void handleImageFile(file);
+            if (file) void handleFile(file);
             e.target.value = '';
           }}
         />
@@ -631,7 +756,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
           type="button"
           className="group-attach-btn"
           onClick={() => fileInputRef.current?.click()}
-          title="Attach image"
+          title="Attach file or image"
         >
           <svg
             width="16"
@@ -649,9 +774,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         <textarea
           ref={inputRef}
           className="group-input"
-          placeholder={
-            room ? `Message as ${displayName} — @based to ask Based` : 'Connecting to room…'
-          }
+          placeholder={room ? `Message as ${displayName}` : 'Connecting to room…'}
           value={input}
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
@@ -662,7 +785,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         <button
           className="group-send-btn"
           type="submit"
-          disabled={(!input.trim() && !imageUrl) || sending || uploading || !room}
+          disabled={(!input.trim() && !fileUrl) || sending || uploading || !room}
         >
           →
         </button>

@@ -20,7 +20,6 @@ export async function POST(req: NextRequest) {
   const displayName = (body.displayName ?? 'You').slice(0, 40);
 
   let code = randomCode();
-  // Retry on collision (extremely unlikely)
   for (let i = 0; i < 5; i++) {
     const { data: existing } = await supabaseAdmin
       .from('group_rooms')
@@ -41,12 +40,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to create room' }, { status: 500 });
   }
 
-  // Creator auto-joins
   await supabaseAdmin
     .from('group_members')
     .insert({ room_id: room.id, user_id: userId, display_name: displayName });
 
-  return NextResponse.json({ id: room.id, name: room.name, code: room.code });
+  return NextResponse.json({ id: room.id, name: room.name, code: room.code, is_creator: true });
 }
 
 // GET /api/group/rooms?code=XXXX — look up room by invite code and auto-join
@@ -60,13 +58,13 @@ export async function GET(req: NextRequest) {
 
   const { data: room } = await supabaseAdmin
     .from('group_rooms')
-    .select('id, name, code')
+    .select('id, name, code, created_by')
     .eq('code', code)
     .single();
 
   if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 });
 
-  // Upsert membership — no-op if already a member
+  // Upsert membership — updates display_name if they rejoin with a new name
   await supabaseAdmin
     .from('group_members')
     .upsert(
@@ -74,5 +72,33 @@ export async function GET(req: NextRequest) {
       { onConflict: 'room_id,user_id' }
     );
 
-  return NextResponse.json({ id: room.id, name: room.name, code: room.code });
+  return NextResponse.json({
+    id: room.id,
+    name: room.name,
+    code: room.code,
+    is_creator: room.created_by === userId,
+  });
+}
+
+// DELETE /api/group/rooms?room_id=XXXX — delete room (creator only)
+export async function DELETE(req: NextRequest) {
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const roomId = req.nextUrl.searchParams.get('room_id');
+  if (!roomId) return NextResponse.json({ error: 'room_id required' }, { status: 400 });
+
+  const { data: room } = await supabaseAdmin
+    .from('group_rooms')
+    .select('created_by')
+    .eq('id', roomId)
+    .single();
+
+  if (!room || room.created_by !== userId) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  await supabaseAdmin.from('group_rooms').delete().eq('id', roomId);
+
+  return NextResponse.json({ success: true });
 }

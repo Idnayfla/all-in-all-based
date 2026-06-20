@@ -18594,3 +18594,67 @@ body:has(.legal-page) {
   padding: 6px 0;
   font-style: italic;
 }
+.group-chat-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.group-online-count {
+  font-size: 0.65rem;
+  color: var(--text3);
+  background: var(--surface2);
+  border-radius: 10px;
+  padding: 2px 7px;
+  margin-left: 6px;
+}
+.group-leave-btn {
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text2);
+  cursor: pointer;
+}
+.group-leave-btn:hover {
+  background: var(--surface2);
+}
+.group-delete-btn {
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #ff4d4d44;
+  background: transparent;
+  color: #ff6b6b;
+  cursor: pointer;
+}
+.group-delete-btn:hover {
+  background: #ff4d4d22;
+}
+.group-file-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text1);
+  font-size: 0.8rem;
+  text-decoration: none;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-file-card:hover {
+  background: var(--surface3);
+}
+.group-file-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--text2);
+}

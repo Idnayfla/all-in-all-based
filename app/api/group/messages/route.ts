@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 
   const { data: messages } = await supabaseAdmin
     .from('group_messages')
-    .select('id, display_name, content, is_based, created_at, user_id, media_url')
+    .select('id, display_name, content, is_based, created_at, user_id, media_url, media_filename')
     .eq('room_id', roomId)
     .order('created_at', { ascending: true })
     .limit(100);
@@ -55,8 +55,9 @@ export async function POST(req: NextRequest) {
     content?: string;
     display_name?: string;
     media_url?: string;
+    media_filename?: string;
   };
-  const { room_id, content, display_name, media_url } = body;
+  const { room_id, content, display_name, media_url, media_filename } = body;
   if (!room_id || (!content?.trim() && !media_url)) {
     return NextResponse.json(
       { error: 'room_id and content or media_url required' },
@@ -98,8 +99,9 @@ export async function POST(req: NextRequest) {
       display_name: senderName,
       content: content?.trim() ?? '',
       media_url: media_url ?? null,
+      media_filename: media_filename ?? null,
     })
-    .select('id, display_name, content, is_based, created_at, media_url')
+    .select('id, display_name, content, is_based, created_at, media_url, media_filename')
     .single();
 
   if (error || !msg) {
@@ -122,10 +124,10 @@ async function triggerBasedResponse(roomId: string, mentionedBy: string): Promis
       .eq('id', roomId)
       .single();
 
-    // Fetch last 30 messages including media_url for vision
+    // Fetch last 30 messages including media for vision
     const { data: history } = await supabaseAdmin
       .from('group_messages')
-      .select('display_name, content, is_based, created_at, media_url')
+      .select('display_name, content, is_based, created_at, media_url, media_filename')
       .eq('room_id', roomId)
       .order('created_at', { ascending: true })
       .limit(30);
@@ -138,14 +140,21 @@ async function triggerBasedResponse(roomId: string, mentionedBy: string): Promis
       : '';
     const system = BASED_SYSTEM + summaryBlock;
 
-    const hasVision = history.some(m => m.media_url);
+    const IMAGE_EXTS = /\.(jpg|jpeg|png|gif|webp)$/i;
+    const isImageMsg = (m: { media_url?: string | null; media_filename?: string | null }) => {
+      if (!m.media_url) return false;
+      const fn = m.media_filename ?? m.media_url;
+      return IMAGE_EXTS.test(fn);
+    };
+
+    const hasVision = history.some(m => isImageMsg(m));
 
     const textMessages = history.map(m => ({
       role: (m.is_based ? 'assistant' : 'user') as 'user' | 'assistant',
       content: m.is_based
         ? m.content
         : m.media_url
-          ? `${m.display_name}: ${m.content || '(sent an image)'} [image attached]`
+          ? `${m.display_name}: ${m.content || ''} [${isImageMsg(m) ? 'image' : 'file: ' + (m.media_filename ?? 'attachment')} attached]`
           : `${m.display_name}: ${m.content}`,
     }));
 
@@ -153,11 +162,14 @@ async function triggerBasedResponse(roomId: string, mentionedBy: string): Promis
       if (m.is_based) {
         return { role: 'assistant' as const, content: m.content };
       }
+      const label = isImageMsg(m)
+        ? '(sent an image)'
+        : `(sent a file: ${m.media_filename ?? 'attachment'})`;
       const textPart: Anthropic.TextBlockParam = {
         type: 'text',
-        text: `${m.display_name}: ${m.content || '(sent an image)'}`,
+        text: `${m.display_name}: ${m.content || label}`,
       };
-      if (m.media_url) {
+      if (isImageMsg(m) && m.media_url) {
         return {
           role: 'user' as const,
           content: [
