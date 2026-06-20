@@ -67,3 +67,4 @@ create policy "members can send messages" on public.group_messages
 
 -- Enable realtime for messages
 alter publication supabase_realtime add table public.group_messages;
+

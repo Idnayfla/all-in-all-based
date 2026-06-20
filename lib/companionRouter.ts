@@ -167,6 +167,50 @@ async function tryGeminiVision(
   }
 }
 
+async function tryOllama(
+  system: string,
+  messages: Array<{ role: string; content: string }>,
+  ctrl: SSEController,
+  enc: TextEncoder
+): Promise<boolean> {
+  const url = process.env.OLLAMA_URL;
+  if (!url) return false;
+  const model = process.env.OLLAMA_MODEL ?? 'llama3.2';
+  try {
+    const res = await fetch(`${url}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        stream: true,
+        messages: [{ role: 'system', content: system }, ...messages],
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+    if (!res.ok || !res.body) return false;
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const j = JSON.parse(line) as { message?: { content?: string }; done?: boolean };
+          if (j.message?.content) pushSSE(ctrl, enc, j.message.content);
+        } catch { /* skip malformed chunk */ }
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function anthropicFallback(
   client: Anthropic,
   system: string,
@@ -220,6 +264,9 @@ export async function streamCompanion(opts: {
     controller,
     encoder,
   } = opts;
+
+  // Offline / self-hosted: Ollama takes priority over all cloud providers when OLLAMA_URL is set
+  if (await tryOllama(system, textMessages, controller, encoder)) return;
 
   if (hasVision && visionBase64 && visionMediaType) {
     if (

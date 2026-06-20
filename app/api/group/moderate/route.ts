@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserId, supabaseAdmin } from '../../_auth';
+import { getUserId, supabaseAdmin, broadcastToRoom } from '../../_auth';
 
 export async function POST(req: NextRequest) {
   const userId = await getUserId(req);
@@ -63,16 +63,12 @@ export async function POST(req: NextRequest) {
     .eq('room_id', room_id)
     .eq('user_id', target_user_id);
 
-  // Single broadcast carries both the target user_id (so they redirect) and display_name
-  // (so other clients can show a system event in the feed)
-  const bc = supabaseAdmin.channel(`group:${room_id}`);
-  await bc.subscribe();
-  await bc.send({
-    type: 'broadcast',
-    event: action === 'ban' ? 'banned' : 'kicked',
-    payload: { user_id: target_user_id, display_name: displayName },
+  // Broadcast via REST API — reliable in serverless.
+  // target user_id so they redirect; display_name so others see the system event.
+  await broadcastToRoom(room_id, action === 'ban' ? 'banned' : 'kicked', {
+    user_id: target_user_id,
+    display_name: displayName,
   });
-  await supabaseAdmin.removeChannel(bc);
 
   return NextResponse.json({ success: true });
 }

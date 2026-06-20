@@ -6,9 +6,12 @@ const fixMishears = (t: string) => t.replace(/\bKen\b/g, 'can').replace(/\bken\b
 
 export async function POST(req: NextRequest) {
   let audio: File | null = null;
+  let language = 'en';
   try {
     const form = await req.formData();
     audio = form.get('audio') as File | null;
+    const langParam = form.get('language');
+    if (typeof langParam === 'string' && langParam.trim()) language = langParam.trim();
   } catch {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }
@@ -17,6 +20,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ transcript: '' });
   }
 
+  const isEnglish = language === 'en' || language.startsWith('en-');
+
   // Deepgram Nova-3: ~200ms latency, native keyword boosting for "Based"
   // Falls back to Groq Whisper if DEEPGRAM_API_KEY is absent.
   const deepgramKey = process.env.DEEPGRAM_API_KEY;
@@ -24,12 +29,14 @@ export async function POST(req: NextRequest) {
     try {
       const params = new URLSearchParams({
         model: 'nova-3',
-        language: 'en',
+        language,
         punctuate: 'true',
       });
-      // Boost wake-phrase components — repeat param for multiple keywords
-      params.append('keywords', 'Based:5');
-      params.append('keywords', 'Hey:2');
+      // Keyword boosting only works in English — skip for other languages
+      if (isEnglish) {
+        params.append('keywords', 'Based:5');
+        params.append('keywords', 'Hey:2');
+      }
       const res = await fetch(`https://api.deepgram.com/v1/listen?${params}`, {
         method: 'POST',
         headers: {
@@ -70,9 +77,9 @@ export async function POST(req: NextRequest) {
   groqForm.append('file', audio, 'audio.wav');
   groqForm.append('model', 'whisper-large-v3');
   groqForm.append('response_format', 'verbose_json');
-  groqForm.append('language', 'en');
+  groqForm.append('language', language);
   groqForm.append('temperature', '0');
-  groqForm.append('prompt', 'Hey Based. Hi Based. Okay Based. Hello Based. Based.');
+  if (isEnglish) groqForm.append('prompt', 'Hey Based. Hi Based. Okay Based. Hello Based. Based.');
 
   try {
     const res = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {

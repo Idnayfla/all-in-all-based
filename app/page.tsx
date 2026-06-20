@@ -1033,11 +1033,6 @@ export default function Home() {
 
   // ── Project CRUD ─────────────────────────────────────────────────────────
   const newProject = () => {
-    // Beta deployments are always treated as Pro — ALWAYS_PRO=true (or BETA_ACCESS_CODE set)
-    // on the server mirrors this on every gated API, so the client-side 3-project limit must
-    // also be lifted for beta users to avoid a mismatched gate.
-    // Use NEXT_PUBLIC_BUILD_ENV when set; fall back to hostname detection so the gate
-    // is skipped even if the env var is missing from the Vercel beta project settings.
     const isBetaEnv =
       process.env.NEXT_PUBLIC_BUILD_ENV === 'beta' ||
       (typeof window !== 'undefined' && window.location.hostname === 'beta.getbased.dev');
@@ -1046,7 +1041,8 @@ export default function Home() {
       setShowPricing(true);
       return;
     }
-    setProjectModal(true);
+    // Skip the name modal — create immediately and auto-name from first message
+    void createProject('New chat');
   };
 
   const quickProject = (prompt: string) => {

@@ -2,3 +2,4 @@
 -- Run in Supabase Dashboard → SQL Editor
 
 alter table public.group_messages add column if not exists media_filename text;
+

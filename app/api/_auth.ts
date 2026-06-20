@@ -17,6 +17,30 @@ export async function getUserId(req: NextRequest): Promise<string> {
   return user.id;
 }
 
+// Server-side broadcast via Supabase REST API — reliable in serverless (no WebSocket needed).
+// The WebSocket-based channel.subscribe().send() pattern is unreliable on Vercel because
+// the subscribe() call returns immediately without waiting for the connection to establish.
+export async function broadcastToRoom(
+  roomId: string,
+  event: string,
+  payload: object
+): Promise<void> {
+  await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/realtime/v1/api/broadcast`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: process.env.SUPABASE_SERVICE_KEY!,
+        Authorization: `Bearer ${process.env.SUPABASE_SERVICE_KEY!}`,
+      },
+      body: JSON.stringify({
+        messages: [{ topic: `realtime:group:${roomId}`, event, payload }],
+      }),
+    }
+  );
+}
+
 export async function requireAdmin(req: NextRequest): Promise<void> {
   const token = req.headers.get('Authorization')?.replace('Bearer ', '');
   if (!token) throw new Error('Unauthorized');

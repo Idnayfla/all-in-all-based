@@ -87,7 +87,11 @@ async function searchImagesExa(
   });
   if (!res.ok) return [];
   const data = await res.json();
-  interface ExaResult { title: string; url: string; image?: string }
+  interface ExaResult {
+    title: string;
+    url: string;
+    image?: string;
+  }
   const seen = new Set<string>();
   const images: Array<{ url: string; title: string }> = [];
   for (const r of (data.results ?? []) as ExaResult[]) {
@@ -122,16 +126,20 @@ async function wikiSummaryImage(title: string): Promise<{ url: string; title: st
   for (const candidate of candidates) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const r = await fetch(
-          `https://en.wikipedia.org/api/rest_v1/page/summary/${candidate}`,
-          { headers: { 'User-Agent': WIKI_UA }, cache: 'no-store' }
-        );
+        const r = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${candidate}`, {
+          headers: { 'User-Agent': WIKI_UA },
+          cache: 'no-store',
+        });
         if (r.status === 429) {
           await new Promise(res => setTimeout(res, 600 * (attempt + 1)));
           continue;
         }
         if (!r.ok) break;
-        const p = await r.json() as { thumbnail?: { source?: string }; originalimage?: { source?: string }; title?: string };
+        const p = (await r.json()) as {
+          thumbnail?: { source?: string };
+          originalimage?: { source?: string };
+          title?: string;
+        };
         const src = p?.thumbnail?.source ?? p?.originalimage?.source;
         const safe = src ? toHttps(src) : null;
         if (safe) return { url: safe, title: p.title ?? title };
@@ -154,7 +162,7 @@ async function searchCommonsImages(
       { headers: { 'User-Agent': WIKI_UA }, cache: 'no-store' }
     );
     if (!res.ok) return [];
-    const data = await res.json() as { query?: { search?: { title: string }[] } };
+    const data = (await res.json()) as { query?: { search?: { title: string }[] } };
     const files = (data.query?.search ?? [])
       .map(r => r.title)
       .filter(t => /\.(jpg|jpeg|png|webp)$/i.test(t));
@@ -168,15 +176,22 @@ async function searchCommonsImages(
           { headers: { 'User-Agent': WIKI_UA }, cache: 'no-store' }
         );
         if (!infoRes.ok) continue;
-        const info = await infoRes.json() as { query?: { pages?: Record<string, { imageinfo?: { thumburl?: string; url?: string }[] }> } };
+        const info = (await infoRes.json()) as {
+          query?: { pages?: Record<string, { imageinfo?: { thumburl?: string; url?: string }[] }> };
+        };
         const pages = Object.values(info.query?.pages ?? {});
         for (const page of pages) {
           const imgInfo = page.imageinfo?.[0];
           const src = imgInfo?.thumburl ?? imgInfo?.url;
           const safe = src ? toHttps(src) : null;
-          if (safe) { images.push({ url: safe, title: file.replace(/^File:/, '') }); break; }
+          if (safe) {
+            images.push({ url: safe, title: file.replace(/^File:/, '') });
+            break;
+          }
         }
-      } catch { continue; }
+      } catch {
+        continue;
+      }
     }
     return images;
   } catch {
@@ -196,7 +211,7 @@ async function searchImagesDDG(
       { headers: { 'User-Agent': WIKI_UA }, cache: 'no-store' }
     );
     if (!r.ok) return [];
-    const d = await r.json() as {
+    const d = (await r.json()) as {
       Heading?: string;
       Image?: string;
       RelatedTopics?: Array<{ Text?: string; Icon?: { URL?: string } }>;
@@ -239,7 +254,7 @@ async function searchImagesGoogle(
       { cache: 'no-store' }
     );
     if (!r.ok) return [];
-    const d = await r.json() as { items?: Array<{ title: string; link: string }> };
+    const d = (await r.json()) as { items?: Array<{ title: string; link: string }> };
     return (d.items ?? [])
       .slice(0, maxImages)
       .map(item => ({ url: item.link, title: item.title }))
@@ -264,7 +279,7 @@ async function searchImagesWikimedia(
       { headers: { 'User-Agent': WIKI_UA }, cache: 'no-store' }
     );
     if (searchRes.ok) {
-      const searchData = await searchRes.json() as { query?: { search?: { title: string }[] } };
+      const searchData = (await searchRes.json()) as { query?: { search?: { title: string }[] } };
       const titles = (searchData.query?.search ?? []).map(r => r.title);
       const images: Array<{ url: string; title: string }> = [];
       for (const title of titles.slice(0, 8)) {
@@ -274,7 +289,9 @@ async function searchImagesWikimedia(
       }
       if (images.length > 0) return images;
     }
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   // Step 3: Wikimedia Commons — works for abstract/visual queries with no Wikipedia article
   return searchCommonsImages(query, maxImages);
@@ -288,7 +305,9 @@ export async function searchImages(
   try {
     const results = await searchImagesGoogle(query, maxImages);
     if (results.length > 0) return results;
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   // 2. Exa — uses open-graph images from crawled pages
   const exaKey = process.env.EXA_API_KEY;
@@ -296,14 +315,18 @@ export async function searchImages(
     try {
       const results = await searchImagesExa(query, maxImages, exaKey);
       if (results.length > 0) return results;
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
   }
 
   // 3. Wikipedia/Wikimedia — no key needed, works for named entities
   try {
     const results = await searchImagesWikimedia(query, maxImages);
     if (results.length > 0) return results;
-  } catch { /* fall through */ }
+  } catch {
+    /* fall through */
+  }
 
   // 4. DuckDuckGo Instant Answers — no key, cloud-friendly final fallback
   try {
