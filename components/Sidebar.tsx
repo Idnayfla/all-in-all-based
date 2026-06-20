@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { FileNode, Project } from '@/app/page';
+import { FileNode, Project } from '@/lib/types';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 

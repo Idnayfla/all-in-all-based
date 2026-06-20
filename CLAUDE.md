@@ -2,6 +2,26 @@
 
 Personal AI dev studio. Users chat with "Based" (Claude-powered) and get generated HTML/JS/CSS apps rendered in a live preview panel.
 
+## Knowledge Graph (Graphify)
+
+A live knowledge graph of this codebase lives at `graphify-out/`. Use it before touching unfamiliar files.
+
+```
+/graphify query "how does the companion send a message"
+/graphify path app/api/generate/route.ts components/ChatPanel.tsx
+/graphify explain lib/companionRouter.ts
+```
+
+Run `graphify update .` after significant code changes (no API cost — AST-only diff).  
+Full report: `graphify-out/GRAPH_REPORT.md` · Interactive: `graphify-out/graph.html`
+
+**God nodes** (touch with care — 101 edges each on average):
+- `getUserId()` — auth guard called by every API route
+- `supabaseAdmin` — direct DB access, bypasses RLS
+- `FloatingBubbleService` — Android overlay, 42 dependents
+
+**Known issue:** Import cycle `app/page.tsx → SidebarTrigger → Sidebar → app/page.tsx`
+
 **Creator:** Mohamad Hus Alfyandi Bin Mohamed Tahir  
 **Stack:** Next.js 16 App Router, TypeScript, Anthropic SDK, Redis (memory)
 

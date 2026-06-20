@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import NextImage from 'next/image';
 import { AnimatePresence, motion } from 'framer-motion';
 import ChatPanel from '@/components/ChatPanel';
@@ -13,7 +14,7 @@ import ProjectNameModal from '@/components/ProjectNameModal';
 import AuthModal from '@/components/AuthModal';
 import SplashScreen from '@/components/SplashScreen';
 import PersonalityPanel from '@/components/PersonalityPanel';
-import PersonaSwitcher, { PERSONAS } from '@/components/PersonaSwitcher';
+import type { PersonaKey } from '@/components/PersonaSwitcher';
 import MemoryManager, { parseMemoryItems } from '@/components/MemoryManager';
 import ThemeCustomizer, {
   AppTheme,
@@ -47,6 +48,8 @@ import { track, identifyUser } from '@/lib/posthog';
 import { GetAppButton } from '@/components/GetAppButton';
 import InstallPrompt from '@/components/InstallPrompt';
 import { useTranslation, SUPPORTED_LANGUAGES } from '@/lib/i18n';
+import { FileNode, ContentBlock, Message, Project, contentToString } from '@/lib/types';
+export type { FileNode, ContentBlock, Message, Project };
 
 function uuid(): string {
   if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
@@ -106,48 +109,6 @@ function getStoredAccessToken(): string {
   } catch {
     return '';
   }
-}
-
-export interface FileNode {
-  name: string;
-  content: string;
-  language: string;
-}
-
-export type ContentBlock =
-  | { type: 'text'; text: string }
-  | { type: 'file'; name: string; relativePath: string; content: string }
-  | {
-      type: 'image';
-      mediaType: 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
-      data: string;
-    }
-  | { type: 'generated-image'; url: string; prompt: string }
-  | { type: 'generated-video'; url: string; prompt: string }
-  | { type: 'generated-music'; url: string; prompt: string }
-  | { type: 'clarify'; question: string; options: string[] }
-  | { type: 'error'; message: string; prompt?: string; actualError?: string };
-
-export interface Message {
-  role: 'user' | 'assistant';
-  content: string | ContentBlock[];
-}
-
-export function contentToString(content: string | ContentBlock[]): string {
-  if (typeof content === 'string') return content;
-  return content
-    .filter((b): b is Extract<ContentBlock, { type: 'text' }> => b.type === 'text')
-    .map(b => b.text)
-    .join('\n');
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  files: FileNode[];
-  messages: Message[];
-  updatedAt: number;
-  memory?: string;
 }
 
 const DEFAULT_PERSONALITY =
@@ -310,8 +271,7 @@ export default function Home() {
   } | null>(null);
   const [dueBanner, setDueBanner] = useState<{ count: number; firstTitle: string } | null>(null);
   const [aiModel, setAiModelState] = useState<'based' | 'free'>('based');
-  const [persona, setPersona] =
-    useState<import('@/components/PersonaSwitcher').PersonaKey>('based');
+  const persona: PersonaKey = 'based';
   const setAiModel = (m: 'based' | 'free') => {
     setAiModelState(m);
     try {
@@ -747,9 +707,12 @@ export default function Home() {
       if (m) setGlobalMemory(m);
       if (t && Object.keys(t).length > 0) {
         const merged = { ...DEFAULT_THEME, ...t };
-        setTheme(merged);
-        applyTheme(merged);
-        saveThemeLocally(merged);
+        // Local theme wins — only apply cloud theme on first load (no local save yet)
+        if (!localStorage.getItem('based_theme')) {
+          setTheme(merged);
+          applyTheme(merged);
+          saveThemeLocally(merged);
+        }
       }
     }
   }, [getHeaders]);
@@ -1159,7 +1122,7 @@ export default function Home() {
     setShareUrl('');
     setShareId('');
     setGalleryPublished(false);
-    setPersona('based');
+
     saveLastProject(id, name.trim());
     setTimeout(() => setPendingPrompt(''), 100);
 
@@ -1200,7 +1163,7 @@ export default function Home() {
     setShareId('');
     setGalleryPublished(false);
     setCheckin(null);
-    setPersona('based');
+
     saveLastProject(project.id, project.name);
   };
 
@@ -1430,6 +1393,24 @@ export default function Home() {
                 {subscription.tier === 'beta' ? 30 : 10}
               </button>
             )}
+            <Link
+              href="/group"
+              className="companion-header-btn"
+              title="Start or join a group chat"
+              style={{ textDecoration: 'none' }}
+            >
+              ⬡ Group
+            </Link>
+            <a
+              href="/vote"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="companion-header-btn"
+              title="Vote on what gets built next"
+              style={{ textDecoration: 'none' }}
+            >
+              ⬡ Vote
+            </a>
             {subscription.tier !== 'pro' ? (
               <button
                 className="header-upgrade-btn"
@@ -1704,12 +1685,28 @@ export default function Home() {
               >
                 <div className="settings-header">⬡ Settings</div>
                 {user && (
-                  <div className="settings-section settings-account-row">
-                    <span className="settings-hint settings-hint--flush">{user.email}</span>
-                    <button className="auth-signout-btn" onClick={signOut}>
-                      Sign Out
-                    </button>
-                  </div>
+                  <>
+                    <div className="settings-section settings-account-row">
+                      <span className="settings-hint settings-hint--flush">{user.email}</span>
+                      <button className="auth-signout-btn" onClick={signOut}>
+                        Sign Out
+                      </button>
+                    </div>
+                    <div className="settings-section">
+                      <label className="settings-label">Invite a Friend</label>
+                      <div className="settings-hint" style={{ marginBottom: 8 }}>
+                        Share Based with someone who&apos;d love it.
+                      </div>
+                      <button
+                        disabled
+                        title="Referral tracking coming soon"
+                        style={{ opacity: 0.4, cursor: 'not-allowed' }}
+                        className="auth-signout-btn"
+                      >
+                        ⬡ Invite — coming soon
+                      </button>
+                    </div>
+                  </>
                 )}
                 <div className="settings-section">
                   <label className="settings-label">Wallpaper</label>
@@ -1834,16 +1831,6 @@ export default function Home() {
                   <div className="settings-hint">
                     Free AI uses Llama 3.3 70B — no generation limits, no content restrictions.
                   </div>
-                </div>
-                <div className="settings-section">
-                  <label className="settings-label">Persona</label>
-                  <div className="settings-hint settings-hint--spaced">
-                    {(() => {
-                      const current = PERSONAS.find(pItem => pItem.key === persona);
-                      return current ? `${current.symbol} ${current.name} — ${current.desc}` : '';
-                    })()}
-                  </div>
-                  <PersonaSwitcher persona={persona} onChange={setPersona} />
                 </div>
                 <div className="settings-section settings-section--relative">
                   <label className="settings-label">AI Personality</label>

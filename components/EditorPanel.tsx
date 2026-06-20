@@ -2,7 +2,7 @@
 import dynamic from 'next/dynamic';
 import { useRef, useState } from 'react';
 import type { editor } from 'monaco-editor';
-import { FileNode } from '@/app/page';
+import { FileNode } from '@/lib/types';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), { ssr: false });
 

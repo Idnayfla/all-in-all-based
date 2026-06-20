@@ -2,7 +2,7 @@
 import { useRef, useEffect, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Message, FileNode, ContentBlock } from '@/app/page';
+import { Message, FileNode, ContentBlock } from '@/lib/types';
 import SimpleMarkdown from './SimpleMarkdown';
 import ImageEditorModal from './ImageEditorModal';
 import ImageCropModal from './ImageCropModal';

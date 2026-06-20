@@ -1,4 +1,4 @@
-import { FileNode } from '@/app/page';
+import { FileNode } from '@/lib/types';
 
 export function isScreenCaptureSupported(): boolean {
   if (typeof navigator === 'undefined') return false;

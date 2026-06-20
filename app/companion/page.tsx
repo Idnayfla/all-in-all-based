@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { captureScreen, isScreenCaptureSupported } from '@/hooks/useScreenCapture';
 import type { MicVAD } from '@ricky0123/vad-web';
 import PersonalityPanel, { buildPersonalityModifier } from '@/components/PersonalityPanel';
+import SimpleMarkdown from '@/components/SimpleMarkdown';
 import type { PersonalitySettings } from '@/components/PersonalityPanel';
 
 // Web Speech API types (not in all TS DOM libs)
@@ -309,12 +310,32 @@ export default function CompanionOverlayPage() {
   const [isClosing, setIsClosing] = useState(false);
   const [slowWarning, setSlowWarning] = useState(false);
   const [showPersonality, setShowPersonality] = useState(false);
-  const [personalityModifier, setPersonalityModifier] = useState('');
+  const [showControlsTray, setShowControlsTray] = useState(false);
+  const [personalityModifier, setPersonalityModifier] = useState(() => {
+    try {
+      if (typeof window === 'undefined') return '';
+      const raw = localStorage.getItem('based_personality');
+      if (!raw) return '';
+      const s = {
+        tone: 30,
+        length: 25,
+        humour: 65,
+        technicality: 75,
+        notes: '',
+        persona: '',
+        ...JSON.parse(raw),
+      };
+      return buildPersonalityModifier(s);
+    } catch {
+      return '';
+    }
+  });
   const [isAndroidBridge, setIsAndroidBridge] = useState(false);
   const [androidCapturing, setAndroidCapturing] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [voiceGender, setVoiceGender] = useState<'male' | 'female'>('male');
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [ttsError, setTtsError] = useState<string | null>(null);
   const [language, setLanguage] = useState(() =>
     typeof window !== 'undefined'
       ? (localStorage.getItem('based_companion_language') ?? 'en')
@@ -531,10 +552,20 @@ export default function CompanionOverlayPage() {
         currentAudioRef.current = null;
       };
       await audio.play();
+      setTtsError(null);
     } catch (err) {
       console.error('[tts error]', err);
-      // Silent fail — no robotic fallback voice
       lastSpokenRef.current = '';
+      const msg = err instanceof Error ? err.message : String(err);
+      // Surface error briefly so it's never silently broken
+      setTtsError(
+        msg.includes('tts failed')
+          ? 'Voice unavailable — check ElevenLabs credits'
+          : msg.includes('NotAllowed')
+            ? 'Voice blocked by browser — click anywhere first'
+            : 'Voice error'
+      );
+      setTimeout(() => setTtsError(null), 5000);
     }
   };
 
@@ -1223,12 +1254,16 @@ export default function CompanionOverlayPage() {
       if (messages.length === 0) {
         localStorage.removeItem('based_companion_messages');
       } else {
-        // Only persist completed messages (skip the live-streaming empty assistant bubble)
-        const toSave = messages.filter(m => m.content?.trim());
+        // Strip captureThumb (base64 images) and cap at 40 messages to stay under quota
+        const toSave = messages
+          .filter(m => m.content?.trim())
+          .slice(-40)
+          .map(({ captureThumb: _, ...m }) => m);
         localStorage.setItem('based_companion_messages', JSON.stringify(toSave));
       }
     } catch {
-      // ignore storage errors (e.g. quota exceeded)
+      // Still over quota — clear messages entirely so theme/personality saves work
+      localStorage.removeItem('based_companion_messages');
     }
   }, [messages]);
 
@@ -1287,8 +1322,6 @@ export default function CompanionOverlayPage() {
   };
 
   const sendGreeting = useCallback(async () => {
-    if (greetingFiredRef.current) return;
-
     const token = authToken;
     if (!token) return;
 
@@ -1432,7 +1465,9 @@ export default function CompanionOverlayPage() {
     if (!authReady || !authToken) return;
     if (greetingFiredRef.current) return;
     greetingFiredRef.current = true;
-    // Small delay so the UI has rendered before Based starts streaming
+    // Show thinking state immediately — no visible empty flash during the 800ms settle
+    setMessages([{ role: 'assistant', content: '' }]);
+    setIsGenerating(true);
     const t = setTimeout(() => void sendGreeting(), 800);
     return () => clearTimeout(t);
   }, [authReady, authToken]); // sendGreeting intentionally omitted — ref guards single-fire
@@ -1972,6 +2007,14 @@ export default function CompanionOverlayPage() {
           ◈
         </button>
         <button
+          className={`companion-clear${showControlsTray ? ' companion-clear--active' : ''}`}
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          onClick={() => setShowControlsTray(p => !p)}
+          title="Voice and language settings"
+        >
+          ⊙
+        </button>
+        <button
           className="companion-clear"
           style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           onClick={() => setMessages([])}
@@ -1994,6 +2037,108 @@ export default function CompanionOverlayPage() {
           <PersonalityPanel
             onPersonalityChange={(modifier, _settings) => setPersonalityModifier(modifier)}
           />
+        </div>
+      )}
+
+      {showControlsTray && (
+        <div className="companion-controls-tray">
+          <div className="companion-tray-row">
+            <label>Lang</label>
+            <select
+              className="companion-select"
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+              value={language}
+              onChange={e => {
+                setLanguage(e.target.value);
+                localStorage.setItem('based_companion_language', e.target.value);
+              }}
+              title="Response language"
+            >
+              <option value="en">English</option>
+              <option value="ms">Malay</option>
+              <option value="zh-CN">Chinese</option>
+              <option value="ta">Tamil</option>
+              <option value="ar">Arabic</option>
+              <option value="fr">French</option>
+              <option value="id">Indonesian</option>
+              <option value="ja">Japanese</option>
+              <option value="ko">Korean</option>
+            </select>
+          </div>
+          {(wakeWordEnabled || isAndroidBridge) && (
+            <div className="companion-tray-row">
+              <label>Mic</label>
+              <select
+                className="companion-select"
+                style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                value={micProfile}
+                onChange={e => {
+                  const p = e.target.value as MicProfile;
+                  setMicProfile(p);
+                  localStorage.setItem('based_mic_profile', p);
+                  if (p !== 'auto' && p !== 'custom') applyMicProfile(p as MicPreset);
+                }}
+                title="Mic input profile"
+              >
+                <option value="auto">Auto-detect</option>
+                <option value="built-in">Built-in</option>
+                <option value="headset">Headset</option>
+                <option value="external">External / USB</option>
+                <option value="mobile">Mobile</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+          )}
+          {wakeWordEnabled && (
+            <div className="companion-tray-row">
+              <label>Sensitivity</label>
+              <span className="companion-tray-hint">sensitive</span>
+              <input
+                type="range"
+                className="companion-tray-range"
+                min={0.2}
+                max={0.6}
+                step={0.05}
+                value={vadSensitivity}
+                onChange={e => {
+                  const v = parseFloat(e.target.value);
+                  setVadSensitivity(v);
+                  localStorage.setItem('based_vad_sensitivity', String(v));
+                  setMicProfile('custom');
+                  localStorage.setItem('based_mic_profile', 'custom');
+                  if (vadRestartTimerRef.current) clearTimeout(vadRestartTimerRef.current);
+                  vadRestartTimerRef.current = setTimeout(() => setVadSensitivityDebounced(v), 800);
+                }}
+                style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                title={`Mic sensitivity: ${Math.round((1 - (vadSensitivity - 0.2) / 0.4) * 100)}%`}
+              />
+              <span className="companion-tray-hint">strict</span>
+            </div>
+          )}
+          {wakeWordEnabled && (
+            <div className="companion-tray-row">
+              <label>Proximity</label>
+              <span className="companion-tray-hint">far</span>
+              <input
+                type="range"
+                className="companion-tray-range"
+                min={0.002}
+                max={0.08}
+                step={0.002}
+                value={proximityThreshold}
+                onChange={e => {
+                  const v = parseFloat(e.target.value);
+                  setProximityThreshold(v);
+                  localStorage.setItem('based_proximity_threshold', String(v));
+                  setMicProfile('custom');
+                  localStorage.setItem('based_mic_profile', 'custom');
+                }}
+                style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+                title={`Proximity: ${Math.round((proximityThreshold / 0.08) * 100)}%`}
+              />
+              <span className="companion-tray-hint">close</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -2022,7 +2167,11 @@ export default function CompanionOverlayPage() {
                 </div>
               )}
               <div className={`companion-bubble companion-bubble--${msg.role}`}>
-                <span>{msg.content}</span>
+                {msg.role === 'assistant' ? (
+                  <SimpleMarkdown>{msg.content}</SimpleMarkdown>
+                ) : (
+                  <span>{msg.content}</span>
+                )}
                 {msg.role === 'assistant' && isGenerating && i === messages.length - 1 && (
                   <span className="companion-cursor" />
                 )}
@@ -2084,6 +2233,19 @@ export default function CompanionOverlayPage() {
           >
             {voiceEnabled ? '◉ Voice' : '⊙ Voice'}
           </button>
+          {ttsError && (
+            <span
+              style={{
+                fontSize: 10,
+                color: 'var(--danger, #f87171)',
+                fontFamily: 'var(--font-mono)',
+                maxWidth: 160,
+                lineHeight: 1.3,
+              }}
+            >
+              {ttsError}
+            </span>
+          )}
           {voiceEnabled && (
             <button
               className="companion-capture-btn"
@@ -2099,7 +2261,7 @@ export default function CompanionOverlayPage() {
             </button>
           )}
           <button
-            className={`companion-capture-btn${wakeWordEnabled ? ' active' : ''}`}
+            className={`companion-capture-btn${wakeWordEnabled ? ' active' : ''}${wakeWordEnabled && wakeListening && wakeState === 'idle' ? ' wake-idle' : ''}`}
             style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
             onClick={() => {
               const next = !wakeWordEnabled;
@@ -2116,105 +2278,6 @@ export default function CompanionOverlayPage() {
             <span className="companion-capture-error">{captureError ?? wakeError}</span>
           )}
         </div>
-
-        {/* Language — always visible */}
-        <div className="companion-setting-row">
-          <label>Lang</label>
-          <select
-            className="companion-select"
-            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-            value={language}
-            onChange={e => {
-              setLanguage(e.target.value);
-              localStorage.setItem('based_companion_language', e.target.value);
-            }}
-            title="Response language"
-          >
-            <option value="en">English</option>
-            <option value="ms">Malay</option>
-            <option value="zh-CN">Chinese</option>
-            <option value="ta">Tamil</option>
-            <option value="ar">Arabic</option>
-            <option value="fr">French</option>
-            <option value="id">Indonesian</option>
-            <option value="ja">Japanese</option>
-            <option value="ko">Korean</option>
-          </select>
-        </div>
-
-        {/* Mic profile — shown when wake word is on OR on Android (affects STT quality) */}
-        {(wakeWordEnabled || isAndroidBridge) && (
-          <div className="companion-setting-row">
-            <label>Mic</label>
-            <select
-              className="companion-select"
-              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-              value={micProfile}
-              onChange={e => {
-                const p = e.target.value as MicProfile;
-                setMicProfile(p);
-                localStorage.setItem('based_mic_profile', p);
-                if (p !== 'auto' && p !== 'custom') applyMicProfile(p as MicPreset);
-              }}
-              title="Mic input profile — tunes sensitivity and proximity thresholds"
-            >
-              <option value="auto">Auto-detect</option>
-              <option value="built-in">Built-in</option>
-              <option value="headset">Headset</option>
-              <option value="external">External / USB</option>
-              <option value="mobile">Mobile</option>
-              <option value="custom">Custom</option>
-            </select>
-          </div>
-        )}
-
-        {wakeWordEnabled && (
-          <div className="companion-vad-slider">
-            <span>sensitive</span>
-            <input
-              type="range"
-              min={0.2}
-              max={0.6}
-              step={0.05}
-              value={vadSensitivity}
-              onChange={e => {
-                const v = parseFloat(e.target.value);
-                setVadSensitivity(v);
-                localStorage.setItem('based_vad_sensitivity', String(v));
-                setMicProfile('custom');
-                localStorage.setItem('based_mic_profile', 'custom');
-                if (vadRestartTimerRef.current) clearTimeout(vadRestartTimerRef.current);
-                vadRestartTimerRef.current = setTimeout(() => setVadSensitivityDebounced(v), 800);
-              }}
-              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-              title={`Mic sensitivity: ${Math.round((1 - (vadSensitivity - 0.2) / 0.4) * 100)}%`}
-            />
-            <span>strict</span>
-          </div>
-        )}
-
-        {wakeWordEnabled && (
-          <div className="companion-vad-slider">
-            <span>far</span>
-            <input
-              type="range"
-              min={0.002}
-              max={0.08}
-              step={0.002}
-              value={proximityThreshold}
-              onChange={e => {
-                const v = parseFloat(e.target.value);
-                setProximityThreshold(v);
-                localStorage.setItem('based_proximity_threshold', String(v));
-                setMicProfile('custom');
-                localStorage.setItem('based_mic_profile', 'custom');
-              }}
-              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-              title={`Proximity: ${Math.round((proximityThreshold / 0.08) * 100)}% (higher = close voice only)`}
-            />
-            <span>close</span>
-          </div>
-        )}
 
         {/* Siri-style visual indicator — listening / processing / speaking */}
         {(isSpeaking || isGenerating || (wakeWordEnabled && wakeState !== 'idle')) && (

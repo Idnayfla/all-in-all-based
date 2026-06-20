@@ -51,6 +51,19 @@ function markWeatherSurfacedAsync(userId: string): void {
   })();
 }
 
+// Fire-and-forget: mark companion_referral_nudged = true
+function markReferralNudgedAsync(userId: string): void {
+  void (async () => {
+    try {
+      await supabaseAdmin
+        .from('user_settings')
+        .upsert({ user_id: userId, companion_referral_nudged: true }, { onConflict: 'user_id' });
+    } catch {
+      // silent — column may not exist yet
+    }
+  })();
+}
+
 // Fire-and-forget: increment session count + update last_seen/first_seen in user_settings.
 // Returns the updated session count (or null on failure).
 async function trackCompanionSession(userId: string): Promise<{
@@ -59,13 +72,14 @@ async function trackCompanionSession(userId: string): Promise<{
   lastSeen: string | null;
   patternsSurfaced: boolean;
   weatherLastSurfaced: string | null;
+  referralNudged: boolean;
 } | null> {
   try {
     // Read current values
     const { data: current } = await supabaseAdmin
       .from('user_settings')
       .select(
-        'companion_session_count, companion_first_seen, companion_last_seen, companion_patterns_surfaced, companion_weather_last_surfaced'
+        'companion_session_count, companion_first_seen, companion_last_seen, companion_patterns_surfaced, companion_weather_last_surfaced, companion_referral_nudged'
       )
       .eq('user_id', userId)
       .single();
@@ -78,6 +92,7 @@ async function trackCompanionSession(userId: string): Promise<{
     const lastSeen = (current?.companion_last_seen as string | null) ?? null;
     const patternsSurfaced = (current?.companion_patterns_surfaced as boolean | null) ?? false;
     const weatherLastSurfaced = (current?.companion_weather_last_surfaced as string | null) ?? null;
+    const referralNudged = (current?.companion_referral_nudged as boolean | null) ?? false;
     const newCount = prevCount + 1;
 
     await supabaseAdmin.from('user_settings').upsert(
@@ -91,7 +106,14 @@ async function trackCompanionSession(userId: string): Promise<{
       { onConflict: 'user_id' }
     );
 
-    return { sessionCount: newCount, firstSeen, lastSeen, patternsSurfaced, weatherLastSurfaced };
+    return {
+      sessionCount: newCount,
+      firstSeen,
+      lastSeen,
+      patternsSurfaced,
+      weatherLastSurfaced,
+      referralNudged,
+    };
   } catch {
     // Columns may not exist yet — silently ignore
     return null;
@@ -310,6 +332,7 @@ export async function POST(req: NextRequest) {
   let sessionCount = 0;
   let daysSinceFirst = 0;
   let patternsSurfaced = false;
+  let referralNudged = false;
   // Hours since the user was last here (computed from the OLD companion_last_seen,
   // read before trackCompanionSession overwrites it). 0 = unknown / first session ever.
   let hoursSinceLastSeen = 0;
@@ -318,11 +341,27 @@ export async function POST(req: NextRequest) {
   // assigned once we have a confirmed DB response and weatherLastSurfaced is null.
   let daysSinceWeather = 0;
 
+  // On non-first messages, read sessionCount + referralNudged so nudge conditions work mid-conversation
+  if (jwtUserId && !isFirstMessageOfSession) {
+    try {
+      const { data } = await supabaseAdmin
+        .from('user_settings')
+        .select('companion_session_count, companion_referral_nudged')
+        .eq('user_id', jwtUserId)
+        .single();
+      if (data) {
+        sessionCount = (data.companion_session_count as number) ?? 0;
+        referralNudged = (data.companion_referral_nudged as boolean) ?? false;
+      }
+    } catch {}
+  }
+
   if (jwtUserId && isFirstMessageOfSession) {
     const tracked = await trackCompanionSession(jwtUserId);
     if (tracked) {
       sessionCount = tracked.sessionCount;
       patternsSurfaced = tracked.patternsSurfaced;
+      referralNudged = tracked.referralNudged;
       if (tracked.firstSeen) {
         daysSinceFirst = (Date.now() - new Date(tracked.firstSeen).getTime()) / 86400000;
       }
@@ -602,6 +641,23 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Referral nudge — fires once per user after session 5, mid-conversation (not gated on first message)
+  if (
+    !proactive &&
+    !referralNudged &&
+    sessionCount >= 5 &&
+    messages.length >= 3 &&
+    !patternSurfaceActive &&
+    !onboardingActive
+  ) {
+    referralNudged = true;
+    const referralLink = `getbased.dev?ref=${(jwtUserId ?? '').slice(0, 8)}`;
+    if (jwtUserId) markReferralNudgedAsync(jwtUserId);
+    dynamicInstructions.push(
+      `REFERRAL NUDGE (once only — never repeat this in any future session): At some natural point in your response, casually mention that if they know anyone who'd love having a companion like this, they can share their personal link: ${referralLink} — say it the way a friend would, not like a CTA. One sentence, woven in naturally. After this fires, never mention it again.`
+    );
+  }
+
   // User-configured personality overrides from the companion settings panel.
   if (personalityModifier?.trim()) {
     dynamicInstructions.push(
@@ -655,6 +711,9 @@ export async function POST(req: NextRequest) {
     'You do NOT generate full code or build apps. Never proactively offer to build, create, or generate anything. If the user asks you to build something, say "Use the main chat for that →" once and move on.',
     'SYSTEM CONTROL: You CAN control the user\'s computer. You can open URLs, launch apps (notepad, chrome, spotify, etc.), type text for them, copy things to their clipboard, and set their volume. When the user asks you to do any of these, do it — never say you "can\'t" or are "chat-only". Just confirm briefly what you did.',
     'Be concise and direct. Simple questions get 1-3 sentences. Complex topics get a tight bullet list (5 items max). Never use markdown headers or horizontal rules (---). No filler. No emoji.',
+    jwtUserId
+      ? `REFERRAL: Users can invite friends to Based using a personal link. This user's invite link is: getbased.dev?ref=${jwtUserId.slice(0, 8)} — if they ask about referrals, invite links, or how to share Based, give them this link directly.`
+      : '',
     'NEVER output JSON, code blocks, or structured data in responses.',
     // Feature 2 — Based Has Opinions
     `PERSONALITY — you are NOT a yes-machine:

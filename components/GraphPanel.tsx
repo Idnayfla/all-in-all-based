@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import * as THREE from 'three';
 import type { GraphData, GraphEdge, GraphNode } from '@/app/api/graph/route';
@@ -45,21 +45,6 @@ function getNodeIdStr(val: unknown): string {
   return '';
 }
 
-function getLinkColor(link: GraphEdge): string {
-  const src = getNodeIdStr(link.source);
-  const tgt = getNodeIdStr(link.target);
-  const alpha = Math.round(Math.max(0.18, link.similarity) * 200)
-    .toString(16)
-    .padStart(2, '0');
-  if (src.startsWith('m:') && tgt.startsWith('m:')) return `#4ade80${alpha}`;
-  if (
-    (src.startsWith('p:') && tgt.startsWith('e:')) ||
-    (src.startsWith('e:') && tgt.startsWith('p:'))
-  )
-    return `#a78bfa${alpha}`;
-  return `#c9a87c${alpha}`;
-}
-
 function getLinkParticleColor(link: GraphEdge): string {
   const src = getNodeIdStr(link.source);
   const tgt = getNodeIdStr(link.target);
@@ -88,6 +73,8 @@ function buildNodeMesh(
     color,
     emissive: color,
     emissiveIntensity: 0.55,
+    transparent: true,
+    opacity: 1.0,
   });
   coreMats.set(node.id, coreMat);
   group.add(new THREE.Mesh(new THREE.SphereGeometry(r, 24, 24), coreMat));
@@ -121,6 +108,36 @@ interface Props {
   onAskAbout: (label: string) => void;
 }
 
+// Star layer config — each layer has its own light density
+const STAR_LAYERS = [
+  { count: 2200, spread: 1800, size: 0.32, opacityMin: 0.1, opacityMax: 0.3, color: '#dde8ff' },
+  { count: 900, spread: 1600, size: 0.7, opacityMin: 0.35, opacityMax: 0.6, color: '#eef0ff' },
+  { count: 220, spread: 1400, size: 1.2, opacityMin: 0.6, opacityMax: 0.9, color: '#ffffff' },
+  { count: 35, spread: 1200, size: 2.6, opacityMin: 0.85, opacityMax: 1.0, color: '#c8d8ff' },
+];
+
+function buildStarLayer(cfg: (typeof STAR_LAYERS)[0]): THREE.Points {
+  const positions = new Float32Array(cfg.count * 3);
+  for (let i = 0; i < cfg.count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * cfg.spread;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * cfg.spread;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * cfg.spread;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const opacity = cfg.opacityMin + Math.random() * (cfg.opacityMax - cfg.opacityMin);
+  return new THREE.Points(
+    geo,
+    new THREE.PointsMaterial({
+      color: cfg.color,
+      size: cfg.size,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity,
+    })
+  );
+}
+
 export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Props) {
   const [data, setData] = useState<GraphData | null>(null);
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle');
@@ -132,6 +149,10 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
   const fgRef = useRef<any>(null);
   const bloomAdded = useRef(false);
   const coreMats = useRef<Map<string, THREE.MeshLambertMaterial>>(new Map());
+  const starGroupRef = useRef<THREE.Group | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const adjacencyRef = useRef<Map<string, Set<string>>>(new Map());
+  const hoveredNodeRef = useRef<string | null>(null);
 
   const loadGraph = useCallback(
     (bust = false) => {
@@ -154,6 +175,19 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
   }, [authToken, loadGraph]);
 
   useEffect(() => {
+    const map = new Map<string, Set<string>>();
+    data?.edges.forEach(e => {
+      const src = typeof e.source === 'string' ? e.source : (e.source as { id: string }).id;
+      const tgt = typeof e.target === 'string' ? e.target : (e.target as { id: string }).id;
+      if (!map.has(src)) map.set(src, new Set());
+      if (!map.has(tgt)) map.set(tgt, new Set());
+      map.get(src)!.add(tgt);
+      map.get(tgt)!.add(src);
+    });
+    adjacencyRef.current = map;
+  }, [data]);
+
+  useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const obs = new ResizeObserver(entries => {
@@ -166,11 +200,12 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
     return () => obs.disconnect();
   }, []);
 
-  // Dispose materials on unmount
+  // Dispose materials + cancel RAF on unmount
   useEffect(
     () => () => {
       coreMats.current.forEach(m => m.dispose());
       coreMats.current.clear();
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     },
     []
   );
@@ -181,82 +216,169 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
   );
 
   // Direct material mutation — no React re-render on hover
-  const handleNodeHover = useCallback((node: unknown, prevNode: unknown) => {
-    const prev = prevNode as GraphNode | null;
+  const handleNodeHover = useCallback((node: unknown, _prevNode: unknown) => {
     const curr = node as GraphNode | null;
-    if (prev) {
-      const m = coreMats.current.get(prev.id);
-      if (m) m.emissiveIntensity = 0.55;
-    }
-    if (curr) {
-      const m = coreMats.current.get(curr.id);
-      if (m) m.emissiveIntensity = 1.8;
-    }
+    hoveredNodeRef.current = curr?.id ?? null;
     document.body.style.cursor = curr ? 'pointer' : '';
+
+    if (!curr) {
+      // Restore all to base
+      coreMats.current.forEach(m => {
+        m.emissiveIntensity = 0.45;
+        m.opacity = 1.0;
+      });
+    } else {
+      const neighbors = adjacencyRef.current.get(curr.id) ?? new Set<string>();
+      coreMats.current.forEach((m, id) => {
+        if (id === curr.id) {
+          m.emissiveIntensity = 2.0;
+          m.opacity = 1.0;
+        } else if (neighbors.has(id)) {
+          m.emissiveIntensity = 1.0;
+          m.opacity = 1.0;
+        } else {
+          // Non-adjacent: near-invisible — both emissive and opacity crushed
+          m.emissiveIntensity = 0.0;
+          m.opacity = 0.04;
+        }
+      });
+    }
   }, []);
 
-  // Add bloom + star field once after simulation first settles
+  const linkColorDynamic = useCallback((link: unknown) => {
+    const l = link as GraphEdge;
+    const src = getNodeIdStr(l.source);
+    const tgt = getNodeIdStr(l.target);
+    const hovered = hoveredNodeRef.current;
+
+    let baseHex: string;
+    if (src.startsWith('m:') && tgt.startsWith('m:')) baseHex = '#4ade80';
+    else if (
+      (src.startsWith('p:') && tgt.startsWith('e:')) ||
+      (src.startsWith('e:') && tgt.startsWith('p:'))
+    )
+      baseHex = '#a78bfa';
+    else baseHex = '#c9a87c';
+
+    if (!hovered) {
+      const alpha = Math.round(Math.max(0.18, l.similarity ?? 0.5) * 200)
+        .toString(16)
+        .padStart(2, '0');
+      return `${baseHex}${alpha}`;
+    }
+
+    const touchesHovered = src === hovered || tgt === hovered;
+    return `${baseHex}${touchesHovered ? 'dd' : '08'}`;
+  }, []);
+
+  // Add bloom + layered star field + animation loop once after simulation settles
   const handleEngineStop = useCallback(() => {
     if (!fgRef.current || bloomAdded.current) return;
     bloomAdded.current = true;
 
-    // Star field — scattered points deep in the background
+    // Smooth orbit controls
+    try {
+      const controls = fgRef.current.controls?.();
+      if (controls) {
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.06;
+        controls.rotateSpeed = 0.5;
+        controls.zoomSpeed = 0.7;
+      }
+    } catch {
+      /* no-op */
+    }
+
+    // Multi-layer star field — each layer has its own light density
     try {
       const scene = fgRef.current.scene?.();
       if (scene) {
-        const count = 1600;
-        const spread = 700;
-        const positions = new Float32Array(count * 3);
-        for (let i = 0; i < count; i++) {
-          positions[i * 3] = (Math.random() - 0.5) * spread;
-          positions[i * 3 + 1] = (Math.random() - 0.5) * spread;
-          positions[i * 3 + 2] = (Math.random() - 0.5) * spread;
-        }
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        scene.add(
-          new THREE.Points(
-            geo,
-            new THREE.PointsMaterial({
-              color: '#ede8d0',
-              size: 0.5,
-              sizeAttenuation: true,
-              transparent: true,
-              opacity: 0.55,
-            })
-          )
-        );
+        const group = new THREE.Group();
+        STAR_LAYERS.forEach(cfg => group.add(buildStarLayer(cfg)));
+        scene.add(group);
+        starGroupRef.current = group;
       }
     } catch {
-      /* scene unavailable — no-op */
+      /* no-op */
     }
 
     // Bloom
     try {
       const composer = fgRef.current.postProcessingComposer?.();
-      if (!composer) return;
-      const { w, h } = dimsRef.current;
-      import('three/examples/jsm/postprocessing/UnrealBloomPass.js')
-        .then(({ UnrealBloomPass }) => {
-          composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 1.6, 0.5, 0.04));
-        })
-        .catch(() => {});
+      if (composer) {
+        const { w, h } = dimsRef.current;
+        import('three/examples/jsm/postprocessing/UnrealBloomPass.js')
+          .then(({ UnrealBloomPass }) => {
+            composer.addPass(new UnrealBloomPass(new THREE.Vector2(w, h), 1.8, 0.6, 0.03));
+          })
+          .catch(() => {});
+      }
     } catch {
-      /* bloom unavailable — no-op */
+      /* no-op */
     }
+
+    // Animation loop — star drift + node pulse
+    const nodeIds = Array.from(coreMats.current.keys());
+    const phases = nodeIds.map(() => Math.random() * Math.PI * 2);
+    const speeds = nodeIds.map(() => 0.4 + Math.random() * 0.6);
+    let t = 0;
+
+    const tick = () => {
+      t += 0.012;
+
+      // Slowly drift the star field — gives infinite-space feeling
+      if (starGroupRef.current) {
+        starGroupRef.current.rotation.y = t * 0.008;
+        starGroupRef.current.rotation.x = Math.sin(t * 0.003) * 0.04;
+      }
+
+      // Pulse each node — respect hover state so dimmed nodes stay dim
+      const hovered = hoveredNodeRef.current;
+      if (hovered) {
+        const neighbors = adjacencyRef.current.get(hovered) ?? new Set<string>();
+        nodeIds.forEach((id, i) => {
+          const mat = coreMats.current.get(id);
+          if (!mat) return;
+          if (id === hovered) {
+            mat.emissiveIntensity = 1.8 + Math.sin(t * speeds[i] + phases[i]) * 0.2;
+          } else if (neighbors.has(id)) {
+            mat.emissiveIntensity = 0.9 + Math.sin(t * speeds[i] + phases[i]) * 0.1;
+          }
+          // non-adjacent: emissive=0, opacity=0.04 — set by handleNodeHover, don't touch
+        });
+      } else {
+        nodeIds.forEach((id, i) => {
+          const mat = coreMats.current.get(id);
+          if (!mat) return;
+          mat.opacity = 1.0;
+          mat.emissiveIntensity = 0.45 + Math.sin(t * speeds[i] + phases[i]) * 0.22;
+        });
+      }
+
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
   }, []);
 
   const handleRefresh = () => {
-    // Note: bloomAdded stays true — bloom + stars are added to the scene once and persist
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+    starGroupRef.current = null;
+    bloomAdded.current = false;
     coreMats.current.forEach(m => m.dispose());
     coreMats.current.clear();
     loadGraph(true);
   };
 
-  const graphData = {
-    nodes: (data?.nodes ?? []).map(n => ({ ...n })),
-    links: (data?.edges ?? []).map(e => ({ ...e })),
-  };
+  const graphData = useMemo(
+    () => ({
+      nodes: (data?.nodes ?? []).map(n => ({ ...n })),
+      links: (data?.edges ?? []).map(e => ({ ...e })),
+    }),
+    [data]
+  );
 
   const showGraph = !!(data && data.nodes.length > 0);
   const isEmpty = !!(data && data.nodes.length === 0);
@@ -454,7 +576,7 @@ export default function GraphPanel({ authToken, onOpenProject, onAskAbout }: Pro
             nodeThreeObject={nodeThreeObject}
             nodeThreeObjectExtend={false}
             nodeLabel={(n: GraphNode) => n.label}
-            linkColor={(l: GraphEdge) => getLinkColor(l)}
+            linkColor={linkColorDynamic}
             linkWidth={(l: GraphEdge) => (l.similarity ?? 0.5) * 1.5}
             linkOpacity={0.6}
             linkCurvature={0.2}
