@@ -4,6 +4,31 @@ Significant product, technical, and business decisions. Rationale preserved so f
 
 ---
 
+## 2026-06-21 — Anthropic Prompt Caching across Based
+
+**Decision**: Split all long system prompts into stable (cached) + dynamic (uncached) blocks and pass `cache_control: { type: 'ephemeral' }` on the stable block when calling Anthropic. Groq/Cerebras receive the plain string since they don't support cache_control.
+**Rationale**: Prompt caching gives ~90% discount on cache hits vs ~25% surcharge on cache writes. The companion system prompt (~1,200 tokens stable) is identical across all turns for a given user — every turn after the first is a cache hit. Same for BASED_SYSTEM in group chat and the generate pipeline (already done). Net cost reduction estimated 60–80% on companion calls at scale.
+**What changed**: `lib/companionRouter.ts` — `anthropicFallback` and `streamCompanion` now accept `systemBlocks`; `app/api/companion/route.ts` — system split into `stableSystem` (rules/identity/personality, cached) and `dynamicSystem` (time/memory/calendar/vision, not cached); `app/api/group/messages/route.ts` — `BASED_SYSTEM` cached as `BASED_SYSTEM_BLOCKS`.
+**Owner**: Hus Alfyandi
+
+---
+
+## 2026-06-21 — AI Cost Management Framework adopted
+
+**Decision**: Adopt a 7-point AI cost management framework as a standing operating principle for Based.
+**Principles**:
+1. Track cost per active user (not total bill) — target <$0.10/active user/day
+2. Cap max output tokens aggressively (companion: 1024, generate chat: 4096)
+3. Use prompt caching properly — stable at top, variables at bottom
+4. Use sliding-window memory (already in place via Redis + vector)
+5. Rate-limit by user ID not IP (in place via companion_usage table)
+6. Route easy jobs to cheapest provider (Groq → Cerebras → Anthropic fallback)
+7. Alert on power-user spikes ($5/day threshold) — future: PostHog event
+**Long-term**: Own the model layer (Based Model fine-tune on a small open-source base) to eliminate Anthropic dependency at scale.
+**Owner**: Hus Alfyandi
+
+---
+
 ## 2026-05-19 — Comprehensive panel upgrade before stable release
 
 **Decision**: Upgrade all 7 panels (Chat, Editor, Preview, Video, Studio, Image, Notes) to professional-grade feature parity before promoting beta to stable.

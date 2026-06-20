@@ -1,6 +1,6 @@
 import { randomBytes } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserId, supabaseAdmin, broadcastToRoom } from '../../_auth';
+import { getUserId, supabaseAdmin } from '../../_auth';
 
 const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 function randomCode(): string {
@@ -107,10 +107,11 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  // Broadcast before delete so connected clients receive it while still subscribed.
-  // Uses REST API — the WebSocket channel.subscribe().send() pattern is unreliable
-  // in serverless environments because subscribe() doesn't wait for connection.
-  await broadcastToRoom(roomId, 'room_deleted', {});
+  // Broadcast before delete so connected clients are still subscribed to receive it
+  const bc = supabaseAdmin.channel(`group:${roomId}`);
+  await bc.subscribe();
+  await bc.send({ type: 'broadcast', event: 'room_deleted', payload: {} });
+  await supabaseAdmin.removeChannel(bc);
 
   await supabaseAdmin.from('group_rooms').delete().eq('id', roomId);
 
