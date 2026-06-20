@@ -1009,6 +1009,16 @@ The word "image" or "photo" in a SEARCH/SHOW context is NOT a build request — 
 CHAT DETECTION — check this first:
 If the user's message is a question, calculation, analysis, writing task, explanation request, or general conversation with NO request to build/create/make/design/animate/generate a thing — output exactly: [{"chat":true}]
 
+WORKFLOW QUESTION RULE (highest priority within chat detection):
+If the message is asking ABOUT a process, workflow, or tool — even if it contains action words like "create" or "build" — it is CHAT, not a build request.
+Key signals: "what now?", "what name?", "what file?", "what do I tell", "what should I call", "what should I name", "how do I", "where do I", "should I use", "what next", "what do I do".
+These are questions ABOUT doing something, not commands TO do something.
+- "So what now? Create a file in VS code with what name? What do i tell Claude code?" → [{"chat":true}] (asking about workflow, not asking Based to build)
+- "What file should I create?" → [{"chat":true}]
+- "What name should I give the file?" → [{"chat":true}]
+- "How do I set this up?" → [{"chat":true}]
+- "Where do I start?" → [{"chat":true}]
+
 CHAT examples (output [{"chat":true}]):
 - "what is async/await?"
 - "explain this code"
@@ -1023,6 +1033,7 @@ CHAT examples (output [{"chat":true}]):
 - "show me something scary" → chat (image search)
 - "find me images of Tokyo" → chat (image search)
 - Any message where the user pastes raw data (numbers, lists, itineraries, expenses, tables) and asks for totals, averages, summaries, or analysis — ALWAYS chat, NEVER an app
+- Any message with 2 or more question marks — almost always a chat message asking for guidance
 
 CODE examples (output a file plan):
 - "make a cat animation"
@@ -1033,7 +1044,7 @@ CODE examples (output a file plan):
 - "make a currency converter"
 - "create a trip planner tool"
 
-KEY RULE: pasting data + asking a question = CHAT. Asking to BUILD something = CODE. Never build an app when the user just wants an answer.
+KEY RULE: pasting data + asking a question = CHAT. Asking to BUILD something = CODE. Asking ABOUT building something = CHAT. Never build an app when the user just wants an answer.
 
 EXISTING PROJECT RULE (overrides chat detection):
 If the prompt ends with "Existing files: ..." — the user already has a project open. In this context:
@@ -2449,6 +2460,16 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
           const imageChatOverride =
             hasAssistantImageMarkdown && !hasImage && !BUILD_VERB_RE.test(lastUserMessage);
 
+          // Workflow questions ask ABOUT doing something, not asking Based to do it.
+          // "So what now? Create a file with what name?" → chat, not code generation.
+          // Signals: multiple question marks, or question phrases about process/tools.
+          const WORKFLOW_QUESTION_RE =
+            /\b(what (now|next|name|file|do i|should i (call|name|use|do))|how do i|where do i|what do i (tell|type|write|put)|which (file|one|tool)|what should i (call|name|create|use)|should i use)\b/i;
+          const questionMarkCount = (lastUserMessage.match(/\?/g) ?? []).length;
+          const isWorkflowQuestion =
+            !existingFiles?.length &&
+            (questionMarkCount >= 2 || WORKFLOW_QUESTION_RE.test(lastUserMessage));
+
           // Planner chain: Groq (primary, fastest) → Cerebras (second, if Groq fails) → Haiku (final).
           // Images skip fast planners — Anthropic vision is required for multimodal input.
           const useGroqPlanner = !!process.env.GROQ_API_KEY && imageBlocks.length === 0;
@@ -2464,7 +2485,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             input: lastUserMessage,
           });
           let planText: string;
-          if (imageChatOverride) {
+          if (imageChatOverride || isWorkflowQuestion) {
             planText = '[{"chat":true}]';
           } else if (useGroqPlanner) {
             try {
