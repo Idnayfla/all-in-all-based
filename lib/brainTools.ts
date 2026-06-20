@@ -8,6 +8,7 @@ import { supabaseAdmin } from '@/app/api/_auth';
 import Anthropic from '@anthropic-ai/sdk';
 import { MODEL_HAIKU } from '@/lib/models';
 import { searchImages } from '@/lib/tavily';
+import { crawl4aiExtract } from '@/lib/crawl4ai';
 import {
   getValidAccessToken,
   checkFreebusy,
@@ -382,6 +383,18 @@ export const BRAIN_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ['query'],
+    },
+  },
+  {
+    name: 'read_url',
+    description:
+      'Deep-read a URL and return its full text content. Use when the user shares a link and wants to discuss, summarise, or ask questions about the page. Requires CRAWL4AI_URL to be configured — returns null if unavailable.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'The full https URL to read.' },
+      },
+      required: ['url'],
     },
   },
   {
@@ -1016,6 +1029,11 @@ export async function runBrainTool(
         return `__SYSTEM_ACTION__${JSON.stringify({ action: 'write_clipboard', text: String(input.text ?? '') })}`;
       case 'set_volume':
         return `__SYSTEM_ACTION__${JSON.stringify({ action: 'set_volume', level: Number(input.level ?? 50) })}`;
+      case 'read_url': {
+        const content = await crawl4aiExtract(String(input.url ?? ''));
+        if (!content) return 'Could not read that URL — crawl4ai may not be configured or the page is unreachable.';
+        return `Page content from ${input.url}:\n\n${content}`;
+      }
       case 'search_images': {
         const imgs = await searchImages(String(input.query ?? ''), 5);
         if (imgs.length === 0)
