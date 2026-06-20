@@ -26,73 +26,89 @@ interface GalleryItem {
 
 const PILLARS = [
   {
+    icon: '◉',
+    title: 'Always There',
+    desc: 'Based floats on your desktop — always on top, always ready. No tab switching. No losing context. It lives where you work.',
+  },
+  {
     icon: '◈',
-    title: 'All Models',
-    desc: 'Based routes every request to the best AI model for the job — code, vision, audio, reasoning. You never choose.',
+    title: 'Knows You',
+    desc: 'Remembers your projects, your style, your preferences. Every session picks up exactly where you left off.',
   },
   {
     icon: '⬡',
-    title: 'All Tasks',
-    desc: 'Build apps, answer questions, analyse data, write content, generate media. One companion, every task.',
-  },
-  {
-    icon: '◉',
-    title: 'All Generation',
-    desc: 'Code · Images · Video · Music — describe it, Based creates it. Live preview updates as each file is written.',
+    title: 'Actually Builds',
+    desc: 'Not just chat. Based generates apps, images, video, and music — live preview updates as each file is written.',
   },
   {
     icon: '⊙',
-    title: 'Community-Driven',
-    desc: 'Hit a bug? Report it. Love a feature? Support it. Based gets better every time you use it.',
+    title: 'Gets Better',
+    desc: 'Hit a bug? Report it. Love a feature? Support it. Based ships every week, shaped by the people who use it.',
   },
 ];
 
 const MARQUEE_ITEMS = [
-  { icon: '◈', label: 'Build apps' },
-  { icon: '◉', label: 'Generate images' },
-  { icon: '⬡', label: 'Edit video' },
-  { icon: '◈', label: 'Compose music' },
-  { icon: '⊙', label: 'Answer anything' },
-  { icon: '◉', label: 'Remember everything' },
-  { icon: '⬡', label: 'Play instruments' },
-  { icon: '◈', label: 'Build games' },
-  { icon: '⊙', label: 'Export documents' },
-  { icon: '◉', label: 'Record voice' },
-  { icon: '◈', label: 'Real-time data' },
-  { icon: '⬡', label: 'Live preview' },
+  { icon: '◉', label: 'Lives on your desktop' },
+  { icon: '◈', label: 'Builds your apps' },
+  { icon: '⬡', label: 'Generates images' },
+  { icon: '◉', label: 'Composes music' },
+  { icon: '⊙', label: 'Remembers you' },
+  { icon: '◈', label: 'Edits video' },
+  { icon: '⬡', label: 'Sees your screen' },
+  { icon: '◉', label: 'Answers anything' },
+  { icon: '◈', label: 'Knows your projects' },
+  { icon: '⊙', label: 'Always on top' },
+  { icon: '⬡', label: 'Speaks and listens' },
+  { icon: '◈', label: 'Never forgets' },
 ];
 
 const BENTO = [
   {
-    icon: '⊙',
-    title: 'Everywhere',
-    desc: 'Floating on your desktop. On your phone. In your browser. Based shows up wherever you are — and never leaves.',
+    icon: '◉',
+    title: 'Lives on your desktop',
+    desc: 'A floating overlay that sits over everything you do. Open it with a hotkey, talk to it, close it. It never forgets the conversation.',
     tag: 'Windows · Web · Mobile coming',
   },
   {
     icon: '◈',
-    title: 'Everything',
-    desc: 'Code, images, video, music, data, documents. One companion that does it all — no app switching, no juggling tools.',
-    tag: '12+ capabilities',
+    title: 'Sees what you see',
+    desc: 'Share your screen, Based understands your context instantly. No copy-pasting. No explaining. It just knows.',
+    tag: 'Ambient vision',
   },
   {
-    icon: '◉',
-    title: 'Always',
-    desc: 'Remembers your name, your projects, your style. Every session picks up exactly where you left off.',
-    tag: 'Global AI memory',
+    icon: '⊙',
+    title: 'Remembers everything',
+    desc: 'Your name, your projects, your preferences, your habits. Based builds a picture of you over time and uses it on every response.',
+    tag: 'Persistent AI memory',
   },
 ];
 
 const SHIPPED_RECENT = [
-  { icon: '◈', label: 'Onboarding', desc: 'Gen counter, memory pitch, one-click quick-create' },
-  { icon: '⬡', label: 'Community Loop', desc: 'Vote on features, get notified when they ship' },
-  { icon: '◉', label: 'Gallery', desc: 'Public showcase — publish builds, remix the community' },
+  {
+    icon: '◉',
+    label: 'Windows Companion',
+    desc: 'Floating AI overlay — always on top, always ready, wake it with your voice',
+  },
+  {
+    icon: '◈',
+    label: 'Group Chat',
+    desc: 'Bring Based into a group conversation — it listens, weighs in, remembers',
+  },
+  {
+    icon: '⬡',
+    label: 'Ambient Vision',
+    desc: 'Share your screen, Based sees your context without you explaining it',
+  },
   {
     icon: '⊙',
-    label: 'Windows Companion',
-    desc: 'Floating AI overlay — always on top, always ready',
+    label: 'AI Memory',
+    desc: 'Persistent memory across every session — Based learns who you are over time',
   },
-  { icon: '▸', label: 'Music Studio', desc: 'Full DAW — piano, drums, voice recording, FX rack' },
+  {
+    icon: '▸',
+    label: 'Voice Wake Word',
+    desc: 'Say "Hey Based" — it listens, responds, speaks back',
+  },
 ];
 
 const COMING_NEXT = [
@@ -103,11 +119,11 @@ const COMING_NEXT = [
 ];
 
 const COMPARISONS = [
-  { them: 'One AI, one job', us: 'One AI, every job' },
-  { them: 'Outputs text', us: 'Outputs apps, images, video, music' },
-  { them: 'You manage the tools', us: 'Based manages everything' },
-  { them: 'Forgets you every session', us: 'Remembers your style forever' },
-  { them: 'You find the bugs', us: 'Report it — we fix it' },
+  { them: 'A tab you open and close', us: 'A companion that lives with you' },
+  { them: 'Forgets you every session', us: 'Remembers you forever' },
+  { them: 'You explain your context every time', us: 'Already knows your projects' },
+  { them: 'Outputs text', us: 'Builds apps, generates images, video, music' },
+  { them: 'You juggle 5 different AI tools', us: 'One companion, everything' },
 ];
 
 function LandingGalleryCard({ item }: { item: GalleryItem }) {
@@ -208,16 +224,15 @@ export default function LandingPage({ onSignIn }: Props) {
       {/* ── Hero ── */}
       <section className="landing-hero">
         <div className="landing-hero-glow" />
-        <div className="landing-hero-badge">Personal Assistant AI</div>
+        <div className="landing-hero-badge">Your personal AI companion</div>
         <h1 className="landing-headline">
-          <span style={{ whiteSpace: 'nowrap' }}>Never leaves</span>
-          <br />
-          your side.
+          <span style={{ whiteSpace: 'nowrap' }}>Not a chatbot.</span>
+          <br />A companion.
         </h1>
         <p className="landing-subheadline">
-          Not a tool. Not just a chatbot. Based is your personal assistant AI — it builds your apps,
-          edits your video, composes your music, answers anything, and remembers everything about
-          you.
+          Based lives on your desktop, knows your projects, and actually builds things for you.
+          Apps, images, video, music — describe it, watch it appear. And it remembers everything,
+          every time.
         </p>
         <div className="landing-ctas">
           <button
@@ -288,7 +303,7 @@ export default function LandingPage({ onSignIn }: Props) {
 
       {/* ── Comparison ── */}
       <section className="landing-comparison">
-        <div className="landing-comparison-title">Based vs everything else</div>
+        <div className="landing-comparison-title">A companion. Not another chatbot.</div>
         <div className="landing-comparison-table">
           <div className="landing-comparison-col landing-comparison-col--them">
             <div className="landing-comparison-col-header">Others</div>
