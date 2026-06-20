@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useCallback, useEffect, useRef, useState } from 'react';
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -63,12 +63,20 @@ interface Message {
   media_url?: string | null;
 }
 
+interface SystemEvent {
+  id: string;
+  type: 'join' | 'leave';
+  display_name: string;
+  timestamp: string;
+}
+
 export default function GroupChatPage({ params }: { params: Promise<{ code: string }> }) {
   const { code: rawCode } = use(params);
   const code = rawCode.toUpperCase();
 
   const [room, setRoom] = useState<{ id: string; name: string; code: string } | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [systemEvents, setSystemEvents] = useState<SystemEvent[]>([]);
   const [input, setInput] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [nameSet, setNameSet] = useState(false);
@@ -79,7 +87,6 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
   const [basedTyping, setBasedTyping] = useState(false);
   const [joining, setJoining] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-  const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -91,8 +98,8 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const roomRef = useRef<{ id: string; name: string; code: string } | null>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const typingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const displayNameRef = useRef('');
-  const presenceKeyRef = useRef('');
 
   useEffect(() => {
     displayNameRef.current = displayName;
@@ -153,13 +160,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
           channelRef.current = null;
         }
 
-        // Unique key per session to handle duplicate display names
-        const presenceKey = `${name}-${Math.random().toString(36).slice(2, 6)}`;
-        presenceKeyRef.current = presenceKey;
-
-        const channel = supabase.channel(`group:${data.id}`, {
-          config: { presence: { key: presenceKey } },
-        });
+        const channel = supabase.channel(`group:${data.id}`);
 
         channel
           .on(
@@ -191,31 +192,63 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
               setTimeout(scrollToBottom, 50);
             }
           )
-          .on('presence', { event: 'sync' }, () => {
-            const state = channel.presenceState<{ typing?: boolean; display_name?: string }>();
-            const typers = Object.values(state)
-              .flat()
-              .filter(
-                (p: { typing?: boolean; display_name?: string }) =>
-                  p.display_name !== displayNameRef.current && p.typing
-              )
-              .map((p: { display_name?: string }) => p.display_name ?? 'Someone');
-            setTypingUsers([...new Set(typers)]);
+          // Broadcast: typing
+          .on('broadcast', { event: 'typing' }, ({ payload }) => {
+            const { display_name: dn, typing } = payload as {
+              display_name: string;
+              typing: boolean;
+            };
+            if (dn === displayNameRef.current) return;
+
+            const existing = typingTimersRef.current.get(dn);
+            if (existing) clearTimeout(existing);
+
+            if (typing) {
+              setTypingUsers(prev => [...new Set([...prev, dn])]);
+              // Auto-clear after 3s if stop event is missed
+              const timer = setTimeout(() => {
+                setTypingUsers(prev => prev.filter(u => u !== dn));
+                typingTimersRef.current.delete(dn);
+              }, 3000);
+              typingTimersRef.current.set(dn, timer);
+            } else {
+              setTypingUsers(prev => prev.filter(u => u !== dn));
+              typingTimersRef.current.delete(dn);
+            }
           })
-          .on('presence', { event: 'leave' }, () => {
-            const state = channel.presenceState<{ typing?: boolean; display_name?: string }>();
-            const typers = Object.values(state)
-              .flat()
-              .filter(
-                (p: { typing?: boolean; display_name?: string }) =>
-                  p.display_name !== displayNameRef.current && p.typing
-              )
-              .map((p: { display_name?: string }) => p.display_name ?? 'Someone');
-            setTypingUsers([...new Set(typers)]);
+          // Broadcast: join / leave
+          .on('broadcast', { event: 'user_join' }, ({ payload }) => {
+            const { display_name: dn } = payload as { display_name: string };
+            if (dn === displayNameRef.current) return;
+            setSystemEvents(prev => [
+              ...prev,
+              {
+                id: `join-${Date.now()}`,
+                type: 'join',
+                display_name: dn,
+                timestamp: new Date().toISOString(),
+              },
+            ]);
+          })
+          .on('broadcast', { event: 'user_leave' }, ({ payload }) => {
+            const { display_name: dn } = payload as { display_name: string };
+            setSystemEvents(prev => [
+              ...prev,
+              {
+                id: `leave-${Date.now()}`,
+                type: 'leave',
+                display_name: dn,
+                timestamp: new Date().toISOString(),
+              },
+            ]);
           })
           .subscribe(status => {
             if (status === 'SUBSCRIBED') {
-              void channel.track({ typing: false, display_name: name });
+              void channel.send({
+                type: 'broadcast',
+                event: 'user_join',
+                payload: { display_name: name },
+              });
             }
           });
 
@@ -231,7 +264,8 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
   );
 
   useEffect(() => {
-    const saved = sessionStorage.getItem(`group_name_${code}`);
+    // Persist name in localStorage so returning users skip the name screen
+    const saved = localStorage.getItem(`group_name_${code}`);
     if (saved) {
       setDisplayName(saved);
       setNameSet(true);
@@ -241,7 +275,15 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
 
   useEffect(() => {
     return () => {
-      if (channelRef.current) void supabase.removeChannel(channelRef.current);
+      if (channelRef.current) {
+        void channelRef.current.send({
+          type: 'broadcast',
+          event: 'user_leave',
+          payload: { display_name: displayNameRef.current },
+        });
+        void supabase.removeChannel(channelRef.current);
+      }
+      typingTimersRef.current.forEach(t => clearTimeout(t));
     };
   }, []);
 
@@ -276,12 +318,11 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
 
   const broadcastTyping = useCallback((isTyping: boolean) => {
     if (!channelRef.current) return;
-    if (isTyping) {
-      void channelRef.current.track({ typing: true, display_name: displayNameRef.current });
-    } else {
-      // untrack fully removes presence — guarantees 'leave' event fires on other clients
-      void channelRef.current.untrack();
-    }
+    void channelRef.current.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { display_name: displayNameRef.current, typing: isTyping },
+    });
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -295,14 +336,13 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
     e.preventDefault();
     const name = displayName.trim();
     if (!name) return;
-    sessionStorage.setItem(`group_name_${code}`, name);
+    localStorage.setItem(`group_name_${code}`, name);
     setNameSet(true);
     void joinRoom(name);
   };
 
   const handleImageFile = async (file: File) => {
     if (!file.type.startsWith('image/')) return;
-    setImageFile(file);
     setImagePreview(URL.createObjectURL(file));
     setUploading(true);
     const url = await uploadImage(file);
@@ -312,7 +352,6 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
 
   const clearImage = () => {
     if (imagePreview) URL.revokeObjectURL(imagePreview);
-    setImageFile(null);
     setImagePreview(null);
     setImageUrl(null);
   };
@@ -339,7 +378,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
       is_based: false,
       created_at: new Date().toISOString(),
       user_id: null,
-      media_url: imagePreview ?? mediaUrl,
+      media_url: mediaUrl,
     };
     setMessages(prev => [...prev, optimisticMsg]);
     setTimeout(scrollToBottom, 50);
@@ -411,6 +450,20 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
 
   const formatTime = (iso: string) =>
     new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  // Merge messages and system events sorted by time
+  const mergedItems = useMemo(() => {
+    type Item = { kind: 'message'; data: Message } | { kind: 'system'; data: SystemEvent };
+    const items: Item[] = [
+      ...messages.map(m => ({ kind: 'message' as const, data: m })),
+      ...systemEvents.map(e => ({ kind: 'system' as const, data: e })),
+    ];
+    return items.sort((a, b) => {
+      const ta = a.kind === 'message' ? a.data.created_at : a.data.timestamp;
+      const tb = b.kind === 'message' ? b.data.created_at : b.data.timestamp;
+      return new Date(ta).getTime() - new Date(tb).getTime();
+    });
+  }, [messages, systemEvents]);
 
   const typingLabel =
     typingUsers.length === 0
@@ -490,41 +543,51 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
       {joining && !room && <div className="group-joining">Joining room…</div>}
 
       <div className="group-messages">
-        {!joining && messages.length === 0 && (
+        {!joining && mergedItems.length === 0 && (
           <div className="group-empty">No messages yet. Say something.</div>
         )}
-        {messages.map(msg => (
-          <div
-            key={msg.id}
-            className={[
-              'group-message',
-              msg.is_based ? 'group-message--based' : '',
-              msg.id.startsWith('optimistic-') ? 'group-message--optimistic' : '',
-            ]
-              .filter(Boolean)
-              .join(' ')}
-          >
-            <div className="group-message-meta">
-              <span className="group-message-name">
-                {msg.is_based ? '◈ Based' : msg.display_name}
-              </span>
-              <span className="group-message-time">{formatTime(msg.created_at)}</span>
+        {mergedItems.map(item => {
+          if (item.kind === 'system') {
+            return (
+              <div key={item.data.id} className="group-system-event">
+                {item.data.display_name} {item.data.type === 'join' ? 'joined' : 'left'} the chat
+              </div>
+            );
+          }
+          const msg = item.data;
+          return (
+            <div
+              key={msg.id}
+              className={[
+                'group-message',
+                msg.is_based ? 'group-message--based' : '',
+                msg.id.startsWith('optimistic-') ? 'group-message--optimistic' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
+            >
+              <div className="group-message-meta">
+                <span className="group-message-name">
+                  {msg.is_based ? '◈ Based' : msg.display_name}
+                </span>
+                <span className="group-message-time">{formatTime(msg.created_at)}</span>
+              </div>
+              {msg.content && <div className="group-message-content">{msg.content}</div>}
+              {msg.media_url && (
+                <img
+                  src={msg.media_url}
+                  alt="shared image"
+                  className="group-message-img"
+                  onClick={() => {
+                    if (/^https?:\/\//i.test(msg.media_url ?? '')) {
+                      window.open(msg.media_url!, '_blank', 'noopener,noreferrer');
+                    }
+                  }}
+                />
+              )}
             </div>
-            {msg.content && <div className="group-message-content">{msg.content}</div>}
-            {msg.media_url && (
-              <img
-                src={msg.media_url}
-                alt="shared image"
-                className="group-message-img"
-                onClick={() => {
-                  if (/^https?:\/\//i.test(msg.media_url ?? '')) {
-                    window.open(msg.media_url!, '_blank', 'noopener,noreferrer');
-                  }
-                }}
-              />
-            )}
-          </div>
-        ))}
+          );
+        })}
         {basedTyping && (
           <div className="group-message group-message--based group-message--typing">
             <div className="group-message-meta">

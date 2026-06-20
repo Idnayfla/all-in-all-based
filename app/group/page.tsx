@@ -60,7 +60,7 @@ export default function GroupLandingPage() {
       });
       if (!res.ok) throw new Error('Failed to create room');
       const { code } = (await res.json()) as { code: string };
-      sessionStorage.setItem(`group_name_${code}`, createName.trim());
+      localStorage.setItem(`group_name_${code}`, createName.trim());
       router.push(`/group/${code}`);
     } catch {
       setCreateError('Could not create room. Try again.');
@@ -80,7 +80,7 @@ export default function GroupLandingPage() {
         { headers: await authHeaders() }
       );
       if (!res.ok) throw new Error('Room not found');
-      sessionStorage.setItem(`group_name_${code}`, joinName.trim());
+      localStorage.setItem(`group_name_${code}`, joinName.trim());
       router.push(`/group/${code}`);
     } catch {
       setJoinError('Room not found. Check the code and try again.');

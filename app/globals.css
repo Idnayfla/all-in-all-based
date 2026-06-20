@@ -18587,3 +18587,10 @@ body:has(.legal-page) {
 .group-attach-btn:hover {
   color: var(--accent);
 }
+.group-system-event {
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--text3);
+  padding: 6px 0;
+  font-style: italic;
+}
