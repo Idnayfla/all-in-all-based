@@ -65,15 +65,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Validate media_url must come from our own Supabase Storage bucket
+  // Validate media_url: must be Supabase Storage or Tenor CDN
   if (media_url) {
-    const expectedBase = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/group-media/`;
     try {
       const parsed = new URL(media_url);
-      if (
-        !media_url.startsWith(expectedBase) ||
-        parsed.hostname !== new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).hostname
-      ) {
+      if (parsed.protocol !== 'https:') {
+        return NextResponse.json({ error: 'Invalid media_url' }, { status: 400 });
+      }
+      const supabaseHost = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).hostname;
+      const isSupabase =
+        parsed.hostname === supabaseHost &&
+        parsed.pathname.startsWith('/storage/v1/object/public/group-media/');
+      const isTenor = parsed.hostname.endsWith('.tenor.com');
+      if (!isSupabase && !isTenor) {
         return NextResponse.json({ error: 'Invalid media_url' }, { status: 400 });
       }
     } catch {

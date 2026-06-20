@@ -54,6 +54,11 @@ async function uploadFile(file: File): Promise<string | null> {
   return put.ok ? public_url : null;
 }
 
+const EMOJIS =
+  '😀 😂 🥰 😎 🤔 😭 🔥 ❤️ 👍 👎 🙏 💪 ✅ ⭐ 🎉 💡 🚀 💯 🤝 🎯 ⚡ 🌟 👀 🤣 😅 😊 🥲 😤 😩 🤯 😴 🤩 😷 🤦 🙌 👏 🫂 💀 💥 ✨ 🎈 🎊 🏆 💰 🎵 🍕 ☕ 🌈 🌙 ☀️ 🎮 🎨 📷 😆 🥹 🫡 💩 👻 🤖 😈 🦋 🐶 🍔 🍣 🥗 🧃 🥤 🍰 🎂'.split(
+    ' '
+  );
+
 const IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
 function isImageFilename(name: string | null | undefined): boolean {
   if (!name) return false;
@@ -94,7 +99,15 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
 
   const [room, setRoom] = useState<{ id: string; name: string; code: string } | null>(null);
   const [isCreator, setIsCreator] = useState(false);
-  const [onlineCount, setOnlineCount] = useState(0);
+  const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [showMembers, setShowMembers] = useState(false);
+  const [allMembers, setAllMembers] = useState<{ display_name: string }[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false);
+  const [showGifs, setShowGifs] = useState(false);
+  const [gifQuery, setGifQuery] = useState('');
+  const [gifs, setGifs] = useState<string[]>([]);
+  const [gifLoading, setGifLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [systemEvents, setSystemEvents] = useState<SystemEvent[]>([]);
   const [input, setInput] = useState('');
@@ -243,7 +256,15 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
           // Presence: reliable join/leave tied to WebSocket — auto-fires on tab close
           .on('presence', { event: 'sync' }, () => {
             const state = channel.presenceState<{ display_name?: string }>();
-            setOnlineCount(Object.values(state).flat().length);
+            const names = [
+              ...new Set(
+                Object.values(state)
+                  .flat()
+                  .map(p => p.display_name ?? '')
+                  .filter(Boolean)
+              ),
+            ];
+            setOnlineUsers(names);
           })
           .on('presence', { event: 'join' }, ({ newPresences }) => {
             (newPresences as { display_name?: string }[]).forEach(p => {
@@ -260,7 +281,15 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
               }
             });
             const state = channel.presenceState<{ display_name?: string }>();
-            setOnlineCount(Object.values(state).flat().length);
+            const names = [
+              ...new Set(
+                Object.values(state)
+                  .flat()
+                  .map(p => p.display_name ?? '')
+                  .filter(Boolean)
+              ),
+            ];
+            setOnlineUsers(names);
           })
           .on('presence', { event: 'leave' }, ({ leftPresences }) => {
             (leftPresences as { display_name?: string }[]).forEach(p => {
@@ -278,7 +307,15 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
               }
             });
             const state = channel.presenceState<{ display_name?: string }>();
-            setOnlineCount(Object.values(state).flat().length);
+            const names = [
+              ...new Set(
+                Object.values(state)
+                  .flat()
+                  .map(p => p.display_name ?? '')
+                  .filter(Boolean)
+              ),
+            ];
+            setOnlineUsers(names);
           })
           .subscribe(status => {
             if (status === 'SUBSCRIBED') {
@@ -418,6 +455,73 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
     }
     router.push('/group');
   }, [room, code, router]);
+
+  const loadMembers = useCallback(async () => {
+    if (!roomRef.current) return;
+    setMembersLoading(true);
+    const headers = await authHeaders();
+    const res = await fetch(`/api/group/members?room_id=${roomRef.current.id}`, { headers });
+    if (res.ok) {
+      const { members: data } = (await res.json()) as { members: { display_name: string }[] };
+      setAllMembers(data);
+    }
+    setMembersLoading(false);
+  }, []);
+
+  const sendGif = useCallback(
+    async (url: string) => {
+      if (!room) return;
+      const mediaFilename = `${gifQuery.trim() || 'gif'}.gif`;
+      const optimisticMsg: Message = {
+        id: `optimistic-${Date.now()}`,
+        display_name: displayName,
+        content: '',
+        is_based: false,
+        created_at: new Date().toISOString(),
+        user_id: null,
+        media_url: url,
+        media_filename: mediaFilename,
+      };
+      setMessages(prev => [...prev, optimisticMsg]);
+      setTimeout(scrollToBottom, 50);
+      const res = await fetch('/api/group/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+        body: JSON.stringify({
+          room_id: room.id,
+          content: '',
+          display_name: displayName,
+          media_url: url,
+          media_filename: mediaFilename,
+        }),
+      });
+      if (!res.ok) setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+    },
+    [room, displayName, gifQuery, scrollToBottom]
+  );
+
+  // GIF search with debounce
+  useEffect(() => {
+    if (!showGifs) return;
+    const q = gifQuery.trim();
+    const timer = setTimeout(
+      async () => {
+        setGifLoading(true);
+        const headers = await authHeaders();
+        const endpoint = q
+          ? `/api/group/gif-search?q=${encodeURIComponent(q)}`
+          : '/api/group/gif-search?trending=1';
+        const res = await fetch(endpoint, { headers });
+        if (res.ok) {
+          const { gifs: results } = (await res.json()) as { gifs: string[] };
+          setGifs(results);
+        }
+        setGifLoading(false);
+      },
+      q ? 400 : 0
+    );
+    return () => clearTimeout(timer);
+  }, [gifQuery, showGifs]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -580,9 +684,51 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         <div className="group-chat-title">
           <span className="group-chat-name">{room?.name ?? code}</span>
           <span className="group-chat-code">#{code}</span>
-          {onlineCount > 0 && <span className="group-online-count">{onlineCount} online</span>}
         </div>
         <div className="group-chat-actions">
+          <div className="group-members-container">
+            <button
+              className="group-members-btn"
+              onClick={() => {
+                setShowMembers(p => !p);
+                if (!showMembers) void loadMembers();
+              }}
+              title="See who's here"
+            >
+              {onlineUsers.length > 0 ? `${onlineUsers.length} online` : 'Members'}
+            </button>
+            {showMembers && (
+              <>
+                <div className="group-panel-backdrop" onClick={() => setShowMembers(false)} />
+                <div className="group-members-panel">
+                  <div className="group-members-section">Online ({onlineUsers.length})</div>
+                  {onlineUsers.map(name => (
+                    <div key={name} className="group-member-row">
+                      <span className="group-member-dot group-member-dot--on" />
+                      {name}
+                      {name === displayName && ' (you)'}
+                    </div>
+                  ))}
+                  <div className="group-members-section" style={{ marginTop: 8 }}>
+                    All Members ({allMembers.length})
+                  </div>
+                  {membersLoading ? (
+                    <div className="group-member-row">Loading…</div>
+                  ) : (
+                    allMembers.map(m => (
+                      <div key={m.display_name} className="group-member-row">
+                        <span
+                          className={`group-member-dot ${onlineUsers.includes(m.display_name) ? 'group-member-dot--on' : 'group-member-dot--off'}`}
+                        />
+                        {m.display_name}
+                        {m.display_name === displayName && ' (you)'}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
+          </div>
           <button className="group-invite-btn" onClick={copyInvite} title="Copy invite link">
             {copied ? '◈ Copied!' : '⬡ Invite'}
           </button>
@@ -752,6 +898,92 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
             e.target.value = '';
           }}
         />
+
+        {/* Emoji picker */}
+        <div className="group-emoji-container">
+          <button
+            type="button"
+            className="group-emoji-btn"
+            onClick={() => {
+              setShowEmoji(p => !p);
+              setShowGifs(false);
+            }}
+            title="Emoji"
+          >
+            😊
+          </button>
+          {showEmoji && (
+            <>
+              <div className="group-panel-backdrop" onClick={() => setShowEmoji(false)} />
+              <div className="group-emoji-picker">
+                {EMOJIS.map(e => (
+                  <button
+                    key={e}
+                    type="button"
+                    className="group-emoji-item"
+                    onClick={() => {
+                      setInput(prev => prev + e);
+                      inputRef.current?.focus();
+                    }}
+                  >
+                    {e}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* GIF picker */}
+        <div className="group-gif-container">
+          <button
+            type="button"
+            className="group-gif-btn"
+            onClick={() => {
+              setShowGifs(p => !p);
+              setShowEmoji(false);
+              if (!showGifs) setGifQuery('');
+            }}
+            title="GIF"
+          >
+            GIF
+          </button>
+          {showGifs && (
+            <>
+              <div className="group-panel-backdrop" onClick={() => setShowGifs(false)} />
+              <div className="group-gif-panel">
+                <input
+                  className="group-gif-search"
+                  placeholder="Search GIFs…"
+                  value={gifQuery}
+                  onChange={e => setGifQuery(e.target.value)}
+                  autoFocus
+                />
+                {gifLoading && <div className="group-gif-status">Searching…</div>}
+                {!gifLoading && gifs.length === 0 && (
+                  <div className="group-gif-status">
+                    {gifQuery ? 'No GIFs found.' : 'Type to search GIFs'}
+                  </div>
+                )}
+                <div className="group-gif-grid">
+                  {gifs.map(url => (
+                    <img
+                      key={url}
+                      src={url}
+                      alt="gif"
+                      className="group-gif-item"
+                      onClick={() => {
+                        void sendGif(url);
+                        setShowGifs(false);
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
         <button
           type="button"
           className="group-attach-btn"
