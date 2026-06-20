@@ -12,12 +12,13 @@ const BASED_SYSTEM = `You are Based — an AI participant in a group chat. You a
 
 Rules:
 - You are a silent observer. You only respond when someone @mentions you with @based.
-- When you respond, address the person who mentioned you by name.
+- The system will tell you exactly who sent this @mention — address THAT person by name, no one else.
 - Keep responses tight — 2-4 sentences unless a detailed answer is genuinely needed.
 - You can see the full conversation history and a summary of earlier messages. Reference them naturally.
 - Never greet the group unprompted. Never use "Hey everyone".
 - No markdown headers. No bullet lists unless the question demands structure.
-- You do NOT generate code or build apps. If asked, say "Use the main Based chat for that →".`;
+- You do NOT generate code or build apps. If asked, say "Use the main Based chat for that →".
+- Check your previous responses in the history (assistant turns). Never repeat or paraphrase what you already said — each reply must add something new or ask a different question.`;
 
 // GET /api/group/messages?room_id=X — fetch messages
 export async function GET(req: NextRequest) {
@@ -139,11 +140,12 @@ async function triggerBasedResponse(roomId: string, mentionedBy: string): Promis
 
     if (!history?.length) return;
 
-    // Build system prompt — prepend summary if it exists
+    // Build system prompt — prepend summary if it exists, always inject who @mentioned
     const summaryBlock = room?.summary
       ? `\n\n[Earlier conversation summary]\n${room.summary}\n[End summary — recent messages follow]`
       : '';
-    const system = BASED_SYSTEM + summaryBlock;
+    const mentionBlock = `\n\nIMPORTANT: This @based mention was sent by "${mentionedBy}". You MUST address your response to ${mentionedBy} — use their name, not anyone else's.`;
+    const system = BASED_SYSTEM + summaryBlock + mentionBlock;
 
     const IMAGE_EXTS = /\.(jpg|jpeg|png|gif|webp)$/i;
     const isImageMsg = (m: { media_url?: string | null; media_filename?: string | null }) => {
