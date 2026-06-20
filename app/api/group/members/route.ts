@@ -16,11 +16,28 @@ export async function GET(req: NextRequest) {
     .single();
   if (!self) return NextResponse.json({ error: 'Not a member' }, { status: 403 });
 
+  const { data: room } = await supabaseAdmin
+    .from('group_rooms')
+    .select('created_by')
+    .eq('id', roomId)
+    .single();
+  const isCreator = room?.created_by === userId;
+
   const { data: members } = await supabaseAdmin
     .from('group_members')
-    .select('display_name, joined_at')
+    .select('display_name, user_id, joined_at')
     .eq('room_id', roomId)
     .order('joined_at', { ascending: true });
 
-  return NextResponse.json({ members: members ?? [] });
+  let bannedUsers: { user_id: string; display_name: string | null }[] = [];
+  if (isCreator) {
+    const { data: bans } = await supabaseAdmin
+      .from('group_bans')
+      .select('user_id, display_name')
+      .eq('room_id', roomId)
+      .order('created_at', { ascending: true });
+    bannedUsers = bans ?? [];
+  }
+
+  return NextResponse.json({ members: members ?? [], bannedUsers });
 }

@@ -64,6 +64,15 @@ export async function GET(req: NextRequest) {
 
   if (!room) return NextResponse.json({ error: 'Room not found' }, { status: 404 });
 
+  // Check if user is banned
+  const { data: ban } = await supabaseAdmin
+    .from('group_bans')
+    .select('id')
+    .eq('room_id', room.id)
+    .eq('user_id', userId)
+    .single();
+  if (ban) return NextResponse.json({ error: 'Banned' }, { status: 403 });
+
   // Upsert membership — updates display_name if they rejoin with a new name
   await supabaseAdmin
     .from('group_members')
@@ -97,6 +106,12 @@ export async function DELETE(req: NextRequest) {
   if (!room || room.created_by !== userId) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
+
+  // Broadcast before delete so connected clients are still subscribed to receive it
+  const bc = supabaseAdmin.channel(`group:${roomId}`);
+  await bc.subscribe();
+  await bc.send({ type: 'broadcast', event: 'room_deleted', payload: {} });
+  await supabaseAdmin.removeChannel(bc);
 
   await supabaseAdmin.from('group_rooms').delete().eq('id', roomId);
 

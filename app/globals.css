@@ -18715,6 +18715,98 @@ body:has(.legal-page) {
 .group-member-dot--off {
   background: var(--text3);
 }
+.group-member-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.group-member-search {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg2);
+  border: 1px solid var(--border1);
+  border-radius: 6px;
+  color: var(--text1);
+  font-size: 0.78rem;
+  padding: 5px 8px;
+  margin-bottom: 8px;
+  outline: none;
+}
+.group-member-search:focus {
+  border-color: var(--accent);
+}
+.group-mod-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.group-member-row:hover .group-mod-actions,
+.group-member-row:focus-within .group-mod-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+.group-mod-btn {
+  font-size: 0.68rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  transition: opacity 0.15s;
+}
+.group-mod-btn:hover {
+  opacity: 0.8;
+}
+.group-mod-btn--kick {
+  background: #f59e0b22;
+  color: #f59e0b;
+  border: 1px solid #f59e0b44;
+}
+.group-mod-btn--ban {
+  background: #ef444422;
+  color: #ef4444;
+  border: 1px solid #ef444444;
+}
+.group-mod-btn--unban {
+  background: #22c55e22;
+  color: #22c55e;
+  border: 1px solid #22c55e44;
+}
+/* Kicked/banned overlay */
+.group-kickban-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+.group-kickban-card {
+  background: var(--bg1);
+  border: 1px solid var(--border1);
+  border-radius: 12px;
+  padding: 32px 40px;
+  text-align: center;
+  max-width: 320px;
+}
+.group-kickban-msg {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text1);
+  margin-bottom: 8px;
+}
+.group-kickban-sub {
+  font-size: 0.8rem;
+  color: var(--text3);
+}
 /* Unified + toolbar */
 .group-toolbar-root {
   position: relative;

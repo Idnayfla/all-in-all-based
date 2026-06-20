@@ -141,7 +141,7 @@ interface Message {
 
 interface SystemEvent {
   id: string;
-  type: 'join' | 'leave';
+  type: 'join' | 'leave' | 'kicked' | 'banned';
   display_name: string;
   timestamp: string;
 }
@@ -155,8 +155,12 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
   const [isCreator, setIsCreator] = useState(false);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [showMembers, setShowMembers] = useState(false);
-  const [allMembers, setAllMembers] = useState<{ display_name: string }[]>([]);
+  const [allMembers, setAllMembers] = useState<{ display_name: string; user_id: string }[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
+  const [memberSearch, setMemberSearch] = useState('');
+  const [kickBanMsg, setKickBanMsg] = useState<string | null>(null);
+  const [bannedUsers, setBannedUsers] = useState<{ user_id: string; display_name: string | null }[]>([]);
+  const [showToolbar, setShowToolbar] = useState(false);
   const [showEmoji, setShowEmoji] = useState(false);
   const [showGifs, setShowGifs] = useState(false);
   const [gifQuery, setGifQuery] = useState('');
@@ -188,6 +192,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const typingTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const displayNameRef = useRef('');
+  const myUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     displayNameRef.current = displayName;
@@ -207,6 +212,10 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
           setChatError('Could not authenticate. Try refreshing the page.');
           return;
         }
+        const {
+          data: { user: me },
+        } = await supabase.auth.getUser();
+        if (me) myUserIdRef.current = me.id;
 
         const res = await fetch(`/api/group/rooms?code=${code}&name=${encodeURIComponent(name)}`, {
           headers,
@@ -214,7 +223,6 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as { error?: string };
           if (body.error === 'Room not found') {
-            // Room was deleted — clear stale localStorage and drop back to landing
             try {
               localStorage.removeItem(`group_name_${code}`);
               const saved = JSON.parse(localStorage.getItem('based_group_rooms') ?? '[]') as {
@@ -228,6 +236,20 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
             } catch {}
             setNameSet(false);
             setJoinError('This room no longer exists — it may have been deleted by the host.');
+          } else if (body.error === 'Banned') {
+            try {
+              localStorage.removeItem(`group_name_${code}`);
+              const saved = JSON.parse(localStorage.getItem('based_group_rooms') ?? '[]') as {
+                code: string;
+                name: string;
+              }[];
+              localStorage.setItem(
+                'based_group_rooms',
+                JSON.stringify(saved.filter(r => r.code !== code))
+              );
+            } catch {}
+            setNameSet(false);
+            setJoinError('You have been banned from this room.');
           } else {
             setJoinError(`Error ${res.status} — try refreshing.`);
           }
@@ -299,6 +321,95 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
               setTimeout(scrollToBottom, 50);
             }
           )
+          // Broadcast: room deleted by host
+          .on('broadcast', { event: 'room_deleted' }, () => {
+            if (channelRef.current) {
+              void supabase.removeChannel(channelRef.current);
+              channelRef.current = null;
+            }
+            try {
+              localStorage.removeItem(`group_name_${code}`);
+              const saved = JSON.parse(
+                localStorage.getItem('based_group_rooms') ?? '[]'
+              ) as { code: string; name: string }[];
+              localStorage.setItem(
+                'based_group_rooms',
+                JSON.stringify(saved.filter(r => r.code !== code))
+              );
+            } catch {}
+            router.push('/group');
+          })
+          // Broadcast: kicked by host
+          .on('broadcast', { event: 'kicked' }, ({ payload }) => {
+            const { user_id, display_name: dn } = payload as {
+              user_id: string;
+              display_name: string;
+            };
+            if (user_id === myUserIdRef.current) {
+              if (channelRef.current) {
+                void supabase.removeChannel(channelRef.current);
+                channelRef.current = null;
+              }
+              try {
+                const saved = JSON.parse(
+                  localStorage.getItem('based_group_rooms') ?? '[]'
+                ) as { code: string; name: string }[];
+                localStorage.setItem(
+                  'based_group_rooms',
+                  JSON.stringify(saved.filter(r => r.code !== code))
+                );
+              } catch {}
+              setKickBanMsg('You were kicked from this room.');
+              setTimeout(() => router.push('/group'), 2500);
+            } else {
+              setSystemEvents(prev => [
+                ...prev,
+                {
+                  id: `kicked-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                  type: 'kicked' as const,
+                  display_name: dn,
+                  timestamp: new Date().toISOString(),
+                },
+              ]);
+              setAllMembers(prev => prev.filter(m => m.user_id !== user_id));
+            }
+          })
+          // Broadcast: banned by host
+          .on('broadcast', { event: 'banned' }, ({ payload }) => {
+            const { user_id, display_name: dn } = payload as {
+              user_id: string;
+              display_name: string;
+            };
+            if (user_id === myUserIdRef.current) {
+              if (channelRef.current) {
+                void supabase.removeChannel(channelRef.current);
+                channelRef.current = null;
+              }
+              try {
+                localStorage.removeItem(`group_name_${code}`);
+                const saved = JSON.parse(
+                  localStorage.getItem('based_group_rooms') ?? '[]'
+                ) as { code: string; name: string }[];
+                localStorage.setItem(
+                  'based_group_rooms',
+                  JSON.stringify(saved.filter(r => r.code !== code))
+                );
+              } catch {}
+              setKickBanMsg('You have been banned from this room.');
+              setTimeout(() => router.push('/group'), 2500);
+            } else {
+              setSystemEvents(prev => [
+                ...prev,
+                {
+                  id: `banned-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                  type: 'banned' as const,
+                  display_name: dn,
+                  timestamp: new Date().toISOString(),
+                },
+              ]);
+              setAllMembers(prev => prev.filter(m => m.user_id !== user_id));
+            }
+          })
           // Broadcast: typing indicator
           .on('broadcast', { event: 'typing' }, ({ payload }) => {
             const { display_name: dn, typing } = payload as {
@@ -427,6 +538,21 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
       if (!roomRef.current) return;
       const headers = await authHeaders();
       const res = await fetch(`/api/group/messages?room_id=${roomRef.current.id}`, { headers });
+      if (res.status === 403 || res.status === 404) {
+        // Room was deleted — clean up and send non-members back to landing
+        try {
+          localStorage.removeItem(`group_name_${roomRef.current.code}`);
+          const saved = JSON.parse(
+            localStorage.getItem('based_group_rooms') ?? '[]'
+          ) as { code: string; name: string }[];
+          localStorage.setItem(
+            'based_group_rooms',
+            JSON.stringify(saved.filter(r => r.code !== roomRef.current!.code))
+          );
+        } catch {}
+        router.push('/group');
+        return;
+      }
       if (!res.ok) return;
       const { messages: fresh } = (await res.json()) as { messages: Message[] };
       setMessages(prev => {
@@ -529,11 +655,56 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
     const headers = await authHeaders();
     const res = await fetch(`/api/group/members?room_id=${roomRef.current.id}`, { headers });
     if (res.ok) {
-      const { members: data } = (await res.json()) as { members: { display_name: string }[] };
+      const { members: data, bannedUsers: bans = [] } = (await res.json()) as {
+        members: { display_name: string; user_id: string }[];
+        bannedUsers: { user_id: string; display_name: string | null }[];
+      };
       setAllMembers(data);
+      setBannedUsers(bans);
     }
     setMembersLoading(false);
   }, []);
+
+  const handleKick = useCallback(
+    async (targetUserId: string, targetName: string) => {
+      if (!room) return;
+      if (!window.confirm(`Kick ${targetName}? They can rejoin with the invite link.`)) return;
+      const res = await fetch('/api/group/moderate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+        body: JSON.stringify({ room_id: room.id, target_user_id: targetUserId, action: 'kick' }),
+      });
+      if (res.ok) setAllMembers(prev => prev.filter(m => m.user_id !== targetUserId));
+    },
+    [room]
+  );
+
+  const handleBan = useCallback(
+    async (targetUserId: string, targetName: string) => {
+      if (!room) return;
+      if (!window.confirm(`Ban ${targetName}? They will not be able to rejoin this room.`)) return;
+      const res = await fetch('/api/group/moderate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+        body: JSON.stringify({ room_id: room.id, target_user_id: targetUserId, action: 'ban' }),
+      });
+      if (res.ok) setAllMembers(prev => prev.filter(m => m.user_id !== targetUserId));
+    },
+    [room]
+  );
+
+  const handleUnban = useCallback(
+    async (targetUserId: string) => {
+      if (!room) return;
+      const res = await fetch('/api/group/moderate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+        body: JSON.stringify({ room_id: room.id, target_user_id: targetUserId, action: 'unban' }),
+      });
+      if (res.ok) setBannedUsers(prev => prev.filter(b => b.user_id !== targetUserId));
+    },
+    [room]
+  );
 
   const sendGif = useCallback(
     async (url: string) => {
@@ -747,6 +918,15 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
     >
       {dragging && <div className="group-drop-overlay">Drop file to share</div>}
 
+      {kickBanMsg && (
+        <div className="group-kickban-overlay">
+          <div className="group-kickban-card">
+            <div className="group-kickban-msg">{kickBanMsg}</div>
+            <div className="group-kickban-sub">Redirecting to lobby…</div>
+          </div>
+        </div>
+      )}
+
       <div className="group-chat-header">
         <div className="group-chat-title">
           <span className="group-chat-name">{room?.name ?? code}</span>
@@ -768,29 +948,88 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
               <>
                 <div className="group-panel-backdrop" onClick={() => setShowMembers(false)} />
                 <div className="group-members-panel">
+                  <input
+                    className="group-member-search"
+                    placeholder="Search members…"
+                    value={memberSearch}
+                    onChange={e => setMemberSearch(e.target.value)}
+                  />
                   <div className="group-members-section">Online ({onlineUsers.length})</div>
-                  {onlineUsers.map(name => (
-                    <div key={name} className="group-member-row">
-                      <span className="group-member-dot group-member-dot--on" />
-                      {name}
-                      {name === displayName && ' (you)'}
-                    </div>
-                  ))}
+                  {onlineUsers
+                    .filter(name =>
+                      memberSearch ? name.toLowerCase().includes(memberSearch.toLowerCase()) : true
+                    )
+                    .map(name => (
+                      <div key={name} className="group-member-row">
+                        <span className="group-member-dot group-member-dot--on" />
+                        <span className="group-member-name">
+                          {name}
+                          {name === displayName && ' (you)'}
+                        </span>
+                      </div>
+                    ))}
                   <div className="group-members-section" style={{ marginTop: 8 }}>
                     All Members ({allMembers.length})
                   </div>
                   {membersLoading ? (
                     <div className="group-member-row">Loading…</div>
                   ) : (
-                    allMembers.map(m => (
-                      <div key={m.display_name} className="group-member-row">
-                        <span
-                          className={`group-member-dot ${onlineUsers.includes(m.display_name) ? 'group-member-dot--on' : 'group-member-dot--off'}`}
-                        />
-                        {m.display_name}
-                        {m.display_name === displayName && ' (you)'}
+                    allMembers
+                      .filter(m =>
+                        memberSearch
+                          ? m.display_name.toLowerCase().includes(memberSearch.toLowerCase())
+                          : true
+                      )
+                      .map(m => (
+                        <div key={m.user_id} className="group-member-row">
+                          <span
+                            className={`group-member-dot ${onlineUsers.includes(m.display_name) ? 'group-member-dot--on' : 'group-member-dot--off'}`}
+                          />
+                          <span className="group-member-name">
+                            {m.display_name}
+                            {m.display_name === displayName && ' (you)'}
+                          </span>
+                          {isCreator && m.user_id !== myUserIdRef.current && (
+                            <div className="group-mod-actions">
+                              <button
+                                className="group-mod-btn group-mod-btn--kick"
+                                onClick={() => void handleKick(m.user_id, m.display_name)}
+                                title={`Kick ${m.display_name}`}
+                              >
+                                Kick
+                              </button>
+                              <button
+                                className="group-mod-btn group-mod-btn--ban"
+                                onClick={() => void handleBan(m.user_id, m.display_name)}
+                                title={`Ban ${m.display_name}`}
+                              >
+                                Ban
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                  )}
+                  {isCreator && bannedUsers.length > 0 && (
+                    <>
+                      <div className="group-members-section" style={{ marginTop: 8 }}>
+                        Banned ({bannedUsers.length})
                       </div>
-                    ))
+                      {bannedUsers.map(b => (
+                        <div key={b.user_id} className="group-member-row">
+                          <span className="group-member-dot" style={{ background: '#ef4444' }} />
+                          <span className="group-member-name">{b.display_name ?? 'Unknown'}</span>
+                          <div className="group-mod-actions" style={{ opacity: 1, pointerEvents: 'auto' }}>
+                            <button
+                              className="group-mod-btn group-mod-btn--unban"
+                              onClick={() => void handleUnban(b.user_id)}
+                            >
+                              Unban
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </>
                   )}
                 </div>
               </>
@@ -842,9 +1081,18 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         )}
         {mergedItems.map(item => {
           if (item.kind === 'system') {
+            const ev = item.data;
+            const evText =
+              ev.type === 'join'
+                ? `${ev.display_name} joined the chat`
+                : ev.type === 'leave'
+                  ? `${ev.display_name} left the chat`
+                  : ev.type === 'kicked'
+                    ? `${ev.display_name} was kicked from the room`
+                    : `${ev.display_name} was banned from the room`;
             return (
-              <div key={item.data.id} className="group-system-event">
-                {item.data.display_name} {item.data.type === 'join' ? 'joined' : 'left'} the chat
+              <div key={ev.id} className="group-system-event">
+                {evText}
               </div>
             );
           }
@@ -970,12 +1218,15 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
         <div className="group-toolbar-root">
           <button
             type="button"
-            className={`group-toolbar-plus${showEmoji || showGifs ? ' is-open' : ''}`}
+            className={`group-toolbar-plus${showToolbar ? ' is-open' : ''}`}
             onClick={() => {
-              const isOpen = showEmoji || showGifs;
-              setShowEmoji(false);
-              setShowGifs(false);
-              if (!isOpen) setShowEmoji(true);
+              if (showToolbar) {
+                setShowToolbar(false);
+                setShowEmoji(false);
+                setShowGifs(false);
+              } else {
+                setShowToolbar(true);
+              }
             }}
             title="Add emoji, GIF or file"
           >
@@ -993,8 +1244,8 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
             </svg>
           </button>
 
-          {/* Sub-buttons appear when open */}
-          {(showEmoji || showGifs) && (
+          {/* Sub-buttons appear when toolbar is open */}
+          {showToolbar && (
             <div className="group-toolbar-sub">
               <button
                 type="button"
@@ -1026,6 +1277,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
                   fileInputRef.current?.click();
                   setShowEmoji(false);
                   setShowGifs(false);
+                  setShowToolbar(false);
                 }}
                 title="File"
               >
@@ -1048,15 +1300,15 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
           {/* Emoji picker panel */}
           {showEmoji && (
             <>
-              <div className="group-panel-backdrop" onClick={() => setShowEmoji(false)} />
+              <div className="group-panel-backdrop" onClick={() => { setShowEmoji(false); setShowToolbar(false); }} />
               <div className="group-emoji-picker">
                 {EMOJI_CATEGORIES.map(cat => (
                   <div key={cat.label} className="group-emoji-category">
                     <div className="group-emoji-cat-label">{cat.label}</div>
                     <div className="group-emoji-cat-grid">
-                      {cat.emojis.map(e => (
+                      {cat.emojis.map((e, i) => (
                         <button
-                          key={e}
+                          key={`${cat.label}-${i}`}
                           type="button"
                           className="group-emoji-item"
                           onClick={() => {
@@ -1077,7 +1329,7 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
           {/* GIF panel */}
           {showGifs && (
             <>
-              <div className="group-panel-backdrop" onClick={() => setShowGifs(false)} />
+              <div className="group-panel-backdrop" onClick={() => { setShowGifs(false); setShowToolbar(false); }} />
               <div className="group-gif-panel">
                 <input
                   className="group-gif-search"

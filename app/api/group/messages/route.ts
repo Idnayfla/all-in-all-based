@@ -77,7 +77,8 @@ export async function POST(req: NextRequest) {
         parsed.hostname === supabaseHost &&
         parsed.pathname.startsWith('/storage/v1/object/public/group-media/');
       const isTenor = parsed.hostname.endsWith('.tenor.com');
-      if (!isSupabase && !isTenor) {
+      const isGiphy = parsed.hostname.endsWith('.giphy.com');
+      if (!isSupabase && !isTenor && !isGiphy) {
         return NextResponse.json({ error: 'Invalid media_url' }, { status: 400 });
       }
     } catch {
