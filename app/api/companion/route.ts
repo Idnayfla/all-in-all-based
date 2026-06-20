@@ -7,6 +7,7 @@ import { getTrafficInfo } from '@/lib/traffic';
 import { exaSearch } from '@/lib/tavily';
 import { MODEL_SONNET, MODEL_HAIKU } from '@/lib/models';
 import { streamCompanion } from '@/lib/companionRouter';
+import { captureServerEvent } from '@/lib/posthog';
 import { searchMemory, extractAndStoreMemoriesAsync } from '@/lib/vectorMemory';
 import { BRAIN_TOOLS, runBrainTool, listTasks, listCalendarEvents } from '@/lib/brainTools';
 import { getSchedulingPrefs } from '@/lib/schedulingPrefs';
@@ -1034,7 +1035,7 @@ export async function POST(req: NextRequest) {
   const readable = new ReadableStream({
     async start(controller) {
       try {
-        await streamCompanion({
+        const { provider } = await streamCompanion({
           client,
           system,
           systemBlocks,
@@ -1045,6 +1046,17 @@ export async function POST(req: NextRequest) {
           visionMediaType,
           controller,
           encoder,
+        });
+        // Estimate input tokens (chars / 4 is a reliable approximation for English).
+        // Output tokens aren't tracked here — add a streaming counter if needed later.
+        const inputChars =
+          (system?.length ?? 0) + textMessages.reduce((s, m) => s + (m.content?.length ?? 0), 0);
+        captureServerEvent(jwtUserId ?? '', 'companion_turn', {
+          provider,
+          model: provider === 'anthropic' ? 'claude-sonnet-4-6' : provider,
+          input_tokens_est: Math.round(inputChars / 4),
+          message_count: textMessages.length,
+          has_vision: !!activeScreenshot,
         });
       } catch (err) {
         // Signal the client that the stream failed so it can show a proper error

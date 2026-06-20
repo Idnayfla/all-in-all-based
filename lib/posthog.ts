@@ -42,3 +42,19 @@ export function track(event: string, props?: Record<string, unknown>) {
 }
 
 export { posthog };
+
+// Server-side event capture via PostHog REST API — no posthog-node needed.
+// Fire-and-forget: never awaited, never throws.
+export function captureServerEvent(
+  distinctId: string,
+  event: string,
+  properties: Record<string, unknown>
+): void {
+  const key = process.env.NEXT_PUBLIC_POSTHOG_KEY;
+  if (!key || !distinctId) return;
+  void fetch('https://us.i.posthog.com/capture/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ api_key: key, event, distinct_id: distinctId, properties }),
+  }).catch(() => {});
+}
