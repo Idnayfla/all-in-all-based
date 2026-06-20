@@ -656,41 +656,41 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
               </div>
               {msg.content && <div className="group-message-content">{msg.content}</div>}
               {msg.media_url &&
-                (isImageFilename(fn) ? (
-                  <img
-                    src={msg.media_url}
-                    alt={fn ?? 'image'}
-                    className="group-message-img"
-                    onClick={() => {
-                      if (/^https?:\/\//i.test(msg.media_url ?? '')) {
-                        window.open(msg.media_url!, '_blank', 'noopener,noreferrer');
-                      }
-                    }}
-                  />
-                ) : (
-                  <a
-                    href={msg.media_url}
-                    download={fn ?? undefined}
-                    className="group-file-card"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                (() => {
+                  const safeUrl = /^https?:\/\//i.test(msg.media_url ?? '') ? msg.media_url : null;
+                  if (!safeUrl) return null;
+                  return isImageFilename(fn) ? (
+                    <img
+                      src={safeUrl}
+                      alt={fn ?? 'image'}
+                      className="group-message-img"
+                      onClick={() => window.open(safeUrl, '_blank', 'noopener,noreferrer')}
+                    />
+                  ) : (
+                    <a
+                      href={safeUrl}
+                      download={fn ?? undefined}
+                      className="group-file-card"
+                      target="_blank"
+                      rel="noopener noreferrer"
                     >
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                      <polyline points="14,2 14,8 20,8" />
-                    </svg>
-                    {fn ?? 'Download file'}
-                  </a>
-                ))}
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <polyline points="14,2 14,8 20,8" />
+                      </svg>
+                      {fn ?? 'Download file'}
+                    </a>
+                  );
+                })()}
             </div>
           );
         })}
