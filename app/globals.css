@@ -2861,8 +2861,8 @@ body {
   }
 
   .chat-input-area {
-    padding: 10px 16px;
-    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+    padding: 8px 12px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
   }
 
   .chat-input-row {
@@ -2871,9 +2871,9 @@ body {
 
   .chat-textarea {
     font-size: 14px !important;
-    padding: 10px 14px;
-    min-height: 40px;
-    max-height: 40px;
+    padding: 9px 12px;
+    min-height: 36px;
+    max-height: 36px;
     resize: none;
     overflow: hidden;
     cursor: pointer;
@@ -2881,10 +2881,60 @@ body {
   }
 
   .send-btn {
+    height: 44px;
     padding: 0 14px;
     min-width: 44px;
-    font-size: 16px;
+    font-size: 14px;
     letter-spacing: 0;
+  }
+
+  .message {
+    padding: 10px 14px;
+  }
+
+  .message-content {
+    font-size: 14px;
+  }
+
+  .chat-empty-logo-btn img,
+  .chat-empty-logo img {
+    width: 48px;
+    height: 48px;
+  }
+
+  .suggestion-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .suggestion-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .suggestion-chip {
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .chat-mode-toggle {
+    padding: 3px 12px 1px;
+    gap: 4px;
+  }
+
+  .chat-mode-btn {
+    font-size: 9px;
+    padding: 2px 8px;
+  }
+
+  .icon-btn {
+    min-width: 40px;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
 
   /* Settings panel: full-width sheet on tablet/phone */
@@ -2941,13 +2991,16 @@ body {
     /* Must stay visible so the Studio/Tools dropdown menus aren't clipped */
     overflow: visible;
   }
-  /* Primary tabs flex evenly */
   .tab-btn {
     flex: 1;
-    padding: 5px 6px;
-    font-size: 11px;
-    letter-spacing: 0.4px;
+    padding: 5px 4px;
+    font-size: 10px;
+    letter-spacing: 0.3px;
     min-width: 0;
+  }
+
+  .tab-btn:first-child {
+    flex: 1.6;
   }
   /* Secondary & debug hidden on mobile â€” shown in More drawer */
   .tab-btn-secondary {
