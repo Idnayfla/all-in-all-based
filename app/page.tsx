@@ -10,7 +10,6 @@ import EditorPanel from '@/components/EditorPanel';
 import PreviewPanel from '@/components/PreviewPanel';
 import SidebarTrigger from '@/components/SidebarTrigger';
 import DebugPanel from '@/components/DebugPanel';
-import ProjectNameModal from '@/components/ProjectNameModal';
 import AuthModal from '@/components/AuthModal';
 import SplashScreen from '@/components/SplashScreen';
 import PersonalityPanel from '@/components/PersonalityPanel';
@@ -148,7 +147,6 @@ export default function Home() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   useSwipePanels(activePanel, setActivePanel, !incognito && !!currentProject);
-  const [projectModal, setProjectModal] = useState(false);
   const [pendingPrompt, setPendingPrompt] = useState('');
   const [shareUrl, setShareUrl] = useState('');
   const [shareId, setShareId] = useState('');
@@ -1047,7 +1045,7 @@ export default function Home() {
       setShowPricing(true);
       return;
     }
-    setProjectModal(true);
+    void createProject('New chat');
   };
 
   const quickProject = (prompt: string) => {
@@ -1095,8 +1093,6 @@ export default function Home() {
   };
 
   const createProject = async (name: string) => {
-    setProjectModal(false);
-
     // Generate ID on client so local and cloud share the same ID from the start
     const id = uuid();
     const newProject: Project = {
@@ -2516,12 +2512,6 @@ export default function Home() {
             ))}
         </main>
       </div>
-
-      <AnimatePresence>
-        {projectModal && (
-          <ProjectNameModal onConfirm={createProject} onCancel={() => setProjectModal(false)} />
-        )}
-      </AnimatePresence>
 
       {showMemoryManager && (
         <MemoryManager
