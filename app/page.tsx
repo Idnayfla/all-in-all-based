@@ -131,6 +131,7 @@ export default function Home() {
   const [incognitoMessages, setIncognitoMessages] = useState<Message[]>([]);
   const [activePanel, setActivePanel] = useState<
     | 'chat'
+    | 'build'
     | 'editor'
     | 'preview'
     | 'debug'
@@ -144,6 +145,10 @@ export default function Home() {
     | 'brain'
     | 'graph'
   >('chat');
+  const [lastBuildActivity, setLastBuildActivity] = useState<{
+    name: string;
+    timestamp: number;
+  } | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   useSwipePanels(activePanel, setActivePanel, !incognito && !!currentProject);
@@ -1480,12 +1485,12 @@ export default function Home() {
       {/* Tab bar — its own dedicated row below the header (never shares a row with header buttons) */}
       <div className="tab-bar-row">
         <div className="tab-switcher">
-          {/* Chat — always visible */}
+          {/* Chat — companion only, never generates code */}
           <button
             className={`tab-btn ${activePanel === 'chat' ? 'active' : ''}`}
             onClick={() => {
-              if (!incognito) {
-                startChat();
+              if (activePanel === 'build' && currentProject) {
+                setLastBuildActivity({ name: currentProject.name, timestamp: Date.now() });
               }
               setActivePanel('chat');
               setShowSettings(false);
@@ -1494,6 +1499,18 @@ export default function Home() {
             }}
           >
             Chat
+          </button>
+          {/* Build — app generation, live preview */}
+          <button
+            className={`tab-btn ${activePanel === 'build' ? 'active' : ''}`}
+            onClick={() => {
+              setActivePanel('build');
+              setShowSettings(false);
+              setShowStudioMenu(false);
+              setShowToolsMenu(false);
+            }}
+          >
+            Build
           </button>
           {/* Preview — always visible */}
           <button
@@ -2431,7 +2448,9 @@ export default function Home() {
               </div>
             ) : (
               <>
-                <div className={`panel ${activePanel === 'chat' ? 'panel-active' : ''}`}>
+                <div
+                  className={`panel ${activePanel === 'chat' || activePanel === 'build' ? 'panel-active' : ''}`}
+                >
                   <ChatPanel
                     messages={messages}
                     setMessages={setMessages}
@@ -2467,10 +2486,16 @@ export default function Home() {
                     aiModel={aiModel}
                     onGenerationComplete={() => setActivePanel('preview')}
                     persona={persona}
-                    onPanelSwitch={panel =>
+                    tabMode={activePanel === 'chat' ? 'chat' : 'build'}
+                    lastBuildProject={lastBuildActivity}
+                    onPanelSwitch={panel => {
+                      if (panel === 'build' && activePanel === 'chat' && currentProject) {
+                        setLastBuildActivity({ name: currentProject.name, timestamp: Date.now() });
+                      }
                       setActivePanel(
                         panel as
                           | 'chat'
+                          | 'build'
                           | 'editor'
                           | 'preview'
                           | 'debug'
@@ -2483,8 +2508,8 @@ export default function Home() {
                           | 'tasks'
                           | 'brain'
                           | 'graph'
-                      )
-                    }
+                      );
+                    }}
                     onAutoName={
                       currentProject
                         ? (prompt: string) => handleAutoName(currentProject.id, prompt)

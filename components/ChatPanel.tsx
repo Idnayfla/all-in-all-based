@@ -238,6 +238,8 @@ export default function ChatPanel({
   onAutoName,
   onLogoClick,
   openInputTrigger,
+  tabMode,
+  lastBuildProject,
 }: {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -262,6 +264,8 @@ export default function ChatPanel({
   onAutoName?: (firstPrompt: string) => void;
   onLogoClick?: () => void;
   openInputTrigger?: number;
+  tabMode?: 'chat' | 'build';
+  lastBuildProject?: { name: string; timestamp: number } | null;
 }) {
   const [input, setInput] = useState(prefillMessage ?? '');
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
@@ -300,6 +304,10 @@ export default function ChatPanel({
   const [suggestions] = useState(getRandomSuggestions);
   const [flaggingIdx, setFlaggingIdx] = useState<number | null>(null);
   const [flaggedSet, setFlaggedSet] = useState<Set<number>>(new Set());
+  const [pendingTabSuggestion, setPendingTabSuggestion] = useState<{
+    targetTab: 'build' | 'studio';
+    originalMessage: string;
+  } | null>(null);
   const [flagReason, setFlagReason] = useState('');
   const [flagText, setFlagText] = useState('');
   const [flagSending, setFlagSending] = useState(false);
@@ -1044,10 +1052,27 @@ export default function ChatPanel({
     }
   };
 
+  const BUILD_INTENT_RE =
+    /\b(app|tool|game|website|site|dashboard|calculator|tracker|widget|extension|bot|converter|timer|quiz|form|animation|chart|visualizer|visualiser|landing page|portfolio)\b/i;
+  const YES_RE =
+    /^(yes|yeah|yep|sure|ok|okay|take me there|go|let's go|lets go|switch|open it)\.?!?\s*$/i;
+
   const send = async (text?: string) => {
     const trimmed = (text ?? input).trim();
     if (!trimmed && pendingImages.length === 0 && pendingFiles.length === 0) return;
     if (isGenerating) return;
+
+    // Yes/no handling for tab routing suggestions
+    if (pendingTabSuggestion && trimmed) {
+      if (YES_RE.test(trimmed)) {
+        onPanelSwitch?.(pendingTabSuggestion.targetTab);
+        setPendingTabSuggestion(null);
+        setInput('');
+        return;
+      }
+      // Any other message = user declined — clear suggestion and proceed normally
+      setPendingTabSuggestion(null);
+    }
 
     // Client-side pre-check so limit modal shows even if server count is stale
     // Free AI bypasses limits entirely — only gate Based AI (Claude)
@@ -1167,6 +1192,8 @@ export default function ChatPanel({
           location: locationRef.current,
           aiModel,
           persona,
+          forceChatMode: tabMode === 'chat',
+          lastBuildProject: lastBuildProject ?? null,
         }),
       });
 
@@ -1464,6 +1491,19 @@ export default function ChatPanel({
                   ...prev.slice(0, -1),
                   { role: 'assistant', content: data.reply || '✓ Done — check the editor.' },
                 ]);
+
+                // In chat mode: detect build intent in the user's message and suggest Build tab.
+                // Only suggest once — if there's already a pending suggestion, don't repeat.
+                if (
+                  tabMode === 'chat' &&
+                  !pendingTabSuggestion &&
+                  !resolvedFiles.length &&
+                  BUILD_INTENT_RE.test(trimmed) &&
+                  /\b(build|create|make|generate|code)\b/i.test(trimmed)
+                ) {
+                  setPendingTabSuggestion({ targetTab: 'build', originalMessage: trimmed });
+                }
+
                 if (resolvedFiles.length) {
                   onFilesUpdate(resolvedFiles, data.projectType);
                   onGenerationComplete?.();
@@ -1993,6 +2033,25 @@ export default function ChatPanel({
                 {s}
               </button>
             ))}
+          </div>
+        )}
+        {pendingTabSuggestion && !isGenerating && (
+          <div className="tab-suggest-pill">
+            <span className="tab-suggest-text">
+              This sounds like a Build project. Want me to open Build?
+            </span>
+            <button
+              className="tab-suggest-yes"
+              onClick={() => {
+                onPanelSwitch?.(pendingTabSuggestion.targetTab);
+                setPendingTabSuggestion(null);
+              }}
+            >
+              Yes, take me there →
+            </button>
+            <button className="tab-suggest-no" onClick={() => setPendingTabSuggestion(null)}>
+              No thanks
+            </button>
           </div>
         )}
         <div ref={bottomRef} />
