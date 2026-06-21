@@ -1907,6 +1907,7 @@ export async function POST(req: NextRequest) {
       location,
       aiModel,
       persona,
+      forceChatMode,
     } = await req.json();
 
     if (Array.isArray(existingFiles) && existingFiles.length > 50) {
@@ -2507,7 +2508,7 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             input: lastUserMessage,
           });
           let planText: string;
-          if (imageChatOverride || isWorkflowQuestion || isNonTechContent) {
+          if (forceChatMode || imageChatOverride || isWorkflowQuestion || isNonTechContent) {
             planText = '[{"chat":true}]';
           } else if (useGroqPlanner) {
             try {
