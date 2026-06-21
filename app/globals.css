@@ -8862,6 +8862,53 @@ html.has-wallpaper .editor-panel {
   background: rgba(201, 168, 124, 0.08);
 }
 
+/* -- Tab routing suggestion pill ---------------------------------- */
+.tab-suggest-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin: 8px 16px;
+  background: rgba(201, 168, 124, 0.07);
+  border: 1px solid rgba(201, 168, 124, 0.2);
+  border-radius: 10px;
+  flex-wrap: wrap;
+}
+.tab-suggest-text {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-secondary);
+  min-width: 160px;
+}
+.tab-suggest-yes {
+  padding: 6px 14px;
+  background: var(--accent);
+  color: #0a0a0f;
+  border: none;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+}
+.tab-suggest-yes:hover {
+  opacity: 0.85;
+}
+.tab-suggest-no {
+  padding: 6px 10px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 7px;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s;
+}
+.tab-suggest-no:hover {
+  color: var(--text-secondary);
+}
 /* â”€â”€ Pricing Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .pricing-overlay {
   position: fixed;

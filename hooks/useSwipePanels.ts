@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 
 type Panel =
   | 'chat'
+  | 'build'
   | 'editor'
   | 'preview'
   | 'debug'
@@ -16,6 +17,7 @@ type Panel =
   | 'graph';
 const ORDER: Panel[] = [
   'chat',
+  'build',
   'editor',
   'preview',
   'debug',
