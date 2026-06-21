@@ -280,10 +280,7 @@ body {
   background: var(--bg3);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  padding: 3px;
-  /* Dropdown menus (.tab-group-menu) are absolutely positioned children and must
-     not be clipped. The tab bar lives in its own full-width row, so horizontal
-     scrolling is no longer needed. */
+  padding: 2px;
   overflow: visible;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -299,13 +296,13 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 7px 12px;
+  padding: 4px 10px;
   background: transparent;
   border: none;
   color: var(--text3);
   font-family: var(--font-pixel);
-  font-size: 13px;
-  letter-spacing: 0.8px;
+  font-size: 11px;
+  letter-spacing: 0.6px;
   cursor: pointer;
   border-radius: var(--r-md);
   transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
@@ -322,18 +319,17 @@ body {
   background: linear-gradient(135deg, var(--accent) 0%, #d4b280 100%);
   color: var(--bg);
   font-weight: 700;
-  box-shadow: 0 2px 12px rgba(201, 168, 124, 0.35);
+  box-shadow: 0 2px 8px rgba(201, 168, 124, 0.3);
 }
 
-/* â”€â”€ Tab bar row â”€â”€ dedicated row below the header (never shares the header row) */
+/* -- Tab bar row — dedicated row below the header */
 .tab-bar-row {
   display: flex;
   align-items: center;
-  padding: 6px 16px;
+  padding: 4px 16px;
   border-bottom: 1px solid var(--border);
   background: linear-gradient(180deg, rgba(13, 12, 26, 0.85) 0%, rgba(13, 12, 26, 0.7) 100%);
   flex-shrink: 0;
-  /* The tab dropdown menus are absolutely positioned children — must not be clipped */
   overflow: visible;
   position: relative;
   z-index: 10000;
@@ -2948,8 +2944,8 @@ body {
   /* Primary tabs flex evenly */
   .tab-btn {
     flex: 1;
-    padding: 8px 6px;
-    font-size: 12px;
+    padding: 5px 6px;
+    font-size: 11px;
     letter-spacing: 0.4px;
     min-width: 0;
   }
