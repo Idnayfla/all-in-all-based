@@ -14,7 +14,7 @@ import GeneratingCard from './GeneratingCard';
 import { track } from '@/lib/posthog';
 import { useTranslation } from '@/lib/i18n';
 
-const SUGGESTION_POOL = [
+const BUILD_SUGGESTION_POOL = [
   'Build a todo app with drag & drop',
   'Create a Snake game in JS',
   'Make a real-time weather dashboard',
@@ -52,8 +52,22 @@ const SUGGESTION_POOL = [
   'Create a dice roller simulator',
 ];
 
-function getRandomSuggestions() {
-  const shuffled = [...SUGGESTION_POOL].sort(() => Math.random() - 0.5);
+const CHAT_SUGGESTION_POOL = [
+  "What's on my schedule today?",
+  'Help me think through a decision',
+  'Write me a workout plan',
+  'Explain something I am curious about',
+  'What should I focus on right now?',
+  'Help me draft a message',
+  'Give me a study plan for this week',
+  'Tell me something interesting',
+  'Help me debug my thinking',
+  'What are my options here?',
+];
+
+function getRandomSuggestions(isChatMode = false) {
+  const pool = isChatMode ? CHAT_SUGGESTION_POOL : BUILD_SUGGESTION_POOL;
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, 4);
 }
 
@@ -301,7 +315,7 @@ export default function ChatPanel({
   const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
   const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
   const [showSupportNudge, setShowSupportNudge] = useState(false);
-  const [suggestions] = useState(getRandomSuggestions);
+  const [suggestions] = useState(() => getRandomSuggestions(tabMode === 'chat'));
   const [flaggingIdx, setFlaggingIdx] = useState<number | null>(null);
   const [flaggedSet, setFlaggedSet] = useState<Set<number>>(new Set());
   const [pendingTabSuggestion, setPendingTabSuggestion] = useState<{
@@ -1070,8 +1084,33 @@ export default function ChatPanel({
         setInput('');
         return;
       }
-      // Any other message = user declined — clear suggestion and proceed normally
       setPendingTabSuggestion(null);
+    }
+
+    // Chat mode: intercept build/image/video/music requests before they hit the API.
+    // Based answers immediately and shows the routing pill — no planner roundtrip.
+    if (tabMode === 'chat' && trimmed) {
+      const lc = trimmed.toLowerCase();
+      const hasBuildVerb =
+        /\b(build|create|make|generate|code|develop|write me an? (app|game|tool|site|website|dashboard))\b/.test(
+          lc
+        );
+      if (hasBuildVerb && BUILD_INTENT_RE.test(lc)) {
+        setInput('');
+        const userMsg: Message = { role: 'user', content: trimmed };
+        setMessages(prev => [
+          ...prev,
+          userMsg,
+          {
+            role: 'assistant',
+            content:
+              "That's a Build project. Switch to the Build tab and describe it there — I'll generate it with a live preview for you.",
+          },
+        ]);
+        if (messages.length === 0 && onAutoName && trimmed) onAutoName(trimmed);
+        setPendingTabSuggestion({ targetTab: 'build', originalMessage: trimmed });
+        return;
+      }
     }
 
     // Client-side pre-check so limit modal shows even if server count is stale
@@ -1870,6 +1909,11 @@ export default function ChatPanel({
             )}
           </div>
         )}
+      {tabMode === 'chat' && (
+        <div className="chat-mode-banner">
+          ◉ Companion mode — ask anything. To generate apps, switch to Build.
+        </div>
+      )}
       <div className="chat-messages">
         {messages.length === 0 ? (
           <div className="chat-empty">
@@ -1882,7 +1926,11 @@ export default function ChatPanel({
               <img src="/brand-icon-loop.svg" alt="" width={64} height={64} />
             </button>
             <div className="chat-empty-title">BASED</div>
-            <div className="chat-empty-sub">{t('chat.empty.subtitle')}</div>
+            <div className="chat-empty-sub">
+              {tabMode === 'chat'
+                ? 'Your companion — ask anything, plan, think out loud'
+                : t('chat.empty.subtitle')}
+            </div>
           </div>
         ) : (
           <AnimatePresence initial={false}>
@@ -2490,7 +2538,9 @@ export default function ChatPanel({
                         ? t('chat.placeholder.music')
                         : generationMode !== 'chat'
                           ? t('chat.placeholder.image')
-                          : t('chat.placeholder.default')
+                          : tabMode === 'chat'
+                            ? 'Ask anything — chat, plan, think out loud'
+                            : t('chat.placeholder.default')
             }
             rows={1}
             disabled={isGenerating || isGeneratingMedia}

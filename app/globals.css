@@ -8907,6 +8907,17 @@ html.has-wallpaper .editor-panel {
   transition: color 0.15s;
 }
 .tab-suggest-no:hover {
+  /* -- Chat mode banner -------------------------------------------- */
+  .chat-mode-banner {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 6px 16px;
+    letter-spacing: 0.02em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.015);
+    user-select: none;
+  }
   color: var(--text-secondary);
 }
 /* â”€â”€ Pricing Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
