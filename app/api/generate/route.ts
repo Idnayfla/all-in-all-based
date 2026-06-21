@@ -1908,7 +1908,6 @@ export async function POST(req: NextRequest) {
       aiModel,
       persona,
       forceChatMode,
-      lastBuildProject,
     } = await req.json();
 
     if (Array.isArray(existingFiles) && existingFiles.length > 50) {
@@ -2047,14 +2046,6 @@ export async function POST(req: NextRequest) {
     if (globalMemory)
       systemBlocks.push({ type: 'text', text: `\nGLOBAL USER MEMORY:\n${globalMemory}` });
     if (memory) systemBlocks.push({ type: 'text', text: `\nPROJECT MEMORY:\n${memory}` });
-    if (lastBuildProject?.name) {
-      const mins = Math.round((Date.now() - (lastBuildProject.timestamp ?? 0)) / 60000);
-      const timeStr = mins < 2 ? 'just now' : `${mins} minutes ago`;
-      systemBlocks.push({
-        type: 'text',
-        text: `\n[Active project: ${lastBuildProject.name} — last modified in Build ${timeStr}]`,
-      });
-    }
     systemBlocks.push({
       type: 'text',
       text: '\nCRITICAL RULE (overrides everything above): When the user asks to build, create, make, design, animate, fix, or generate anything — output forge_file code immediately. Never greet, ask clarifying questions, or refuse a code request. Go straight to the files.',

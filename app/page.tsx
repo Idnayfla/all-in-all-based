@@ -10,7 +10,6 @@ import EditorPanel from '@/components/EditorPanel';
 import PreviewPanel from '@/components/PreviewPanel';
 import SidebarTrigger from '@/components/SidebarTrigger';
 import DebugPanel from '@/components/DebugPanel';
-import ProjectNameModal from '@/components/ProjectNameModal';
 import AuthModal from '@/components/AuthModal';
 import SplashScreen from '@/components/SplashScreen';
 import PersonalityPanel from '@/components/PersonalityPanel';
@@ -145,14 +144,9 @@ export default function Home() {
     | 'brain'
     | 'graph'
   >('chat');
-  const [lastBuildActivity, setLastBuildActivity] = useState<{
-    name: string;
-    timestamp: number;
-  } | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   useSwipePanels(activePanel, setActivePanel, !incognito && !!currentProject);
-  const [projectModal, setProjectModal] = useState(false);
   const [pendingPrompt, setPendingPrompt] = useState('');
   const [shareUrl, setShareUrl] = useState('');
   const [shareId, setShareId] = useState('');
@@ -1051,7 +1045,7 @@ export default function Home() {
       setShowPricing(true);
       return;
     }
-    setProjectModal(true);
+    void createProject('New chat');
   };
 
   const quickProject = (prompt: string) => {
@@ -1099,8 +1093,6 @@ export default function Home() {
   };
 
   const createProject = async (name: string) => {
-    setProjectModal(false);
-
     // Generate ID on client so local and cloud share the same ID from the start
     const id = uuid();
     const newProject: Project = {
@@ -1485,13 +1477,10 @@ export default function Home() {
       {/* Tab bar — its own dedicated row below the header (never shares a row with header buttons) */}
       <div className="tab-bar-row">
         <div className="tab-switcher">
-          {/* Chat — companion only, never generates code */}
+          {/* Chat — companion + builder in one */}
           <button
-            className={`tab-btn ${activePanel === 'chat' ? 'active' : ''}`}
+            className={`tab-btn ${activePanel === 'chat' || activePanel === 'build' ? 'active' : ''}`}
             onClick={() => {
-              if (activePanel === 'build' && currentProject) {
-                setLastBuildActivity({ name: currentProject.name, timestamp: Date.now() });
-              }
               setActivePanel('chat');
               setShowSettings(false);
               setShowStudioMenu(false);
@@ -1499,18 +1488,6 @@ export default function Home() {
             }}
           >
             Chat
-          </button>
-          {/* Build — app generation, live preview */}
-          <button
-            className={`tab-btn ${activePanel === 'build' ? 'active' : ''}`}
-            onClick={() => {
-              setActivePanel('build');
-              setShowSettings(false);
-              setShowStudioMenu(false);
-              setShowToolsMenu(false);
-            }}
-          >
-            Build
           </button>
           {/* Preview — always visible */}
           <button
@@ -2486,12 +2463,7 @@ export default function Home() {
                     aiModel={aiModel}
                     onGenerationComplete={() => setActivePanel('preview')}
                     persona={persona}
-                    tabMode={activePanel === 'chat' ? 'chat' : 'build'}
-                    lastBuildProject={lastBuildActivity}
                     onPanelSwitch={panel => {
-                      if (panel === 'build' && activePanel === 'chat' && currentProject) {
-                        setLastBuildActivity({ name: currentProject.name, timestamp: Date.now() });
-                      }
                       setActivePanel(
                         panel as
                           | 'chat'
@@ -2540,12 +2512,6 @@ export default function Home() {
             ))}
         </main>
       </div>
-
-      <AnimatePresence>
-        {projectModal && (
-          <ProjectNameModal onConfirm={createProject} onCancel={() => setProjectModal(false)} />
-        )}
-      </AnimatePresence>
 
       {showMemoryManager && (
         <MemoryManager

@@ -14,7 +14,7 @@ import GeneratingCard from './GeneratingCard';
 import { track } from '@/lib/posthog';
 import { useTranslation } from '@/lib/i18n';
 
-const BUILD_SUGGESTION_POOL = [
+const SUGGESTION_POOL = [
   'Build a todo app with drag & drop',
   'Create a Snake game in JS',
   'Make a real-time weather dashboard',
@@ -52,22 +52,8 @@ const BUILD_SUGGESTION_POOL = [
   'Create a dice roller simulator',
 ];
 
-const CHAT_SUGGESTION_POOL = [
-  "What's on my schedule today?",
-  'Help me think through a decision',
-  'Write me a workout plan',
-  'Explain something I am curious about',
-  'What should I focus on right now?',
-  'Help me draft a message',
-  'Give me a study plan for this week',
-  'Tell me something interesting',
-  'Help me debug my thinking',
-  'What are my options here?',
-];
-
-function getRandomSuggestions(isChatMode = false) {
-  const pool = isChatMode ? CHAT_SUGGESTION_POOL : BUILD_SUGGESTION_POOL;
-  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+function getRandomSuggestions() {
+  const shuffled = [...SUGGESTION_POOL].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, 4);
 }
 
@@ -252,8 +238,6 @@ export default function ChatPanel({
   onAutoName,
   onLogoClick,
   openInputTrigger,
-  tabMode,
-  lastBuildProject,
 }: {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
@@ -278,13 +262,12 @@ export default function ChatPanel({
   onAutoName?: (firstPrompt: string) => void;
   onLogoClick?: () => void;
   openInputTrigger?: number;
-  tabMode?: 'chat' | 'build';
-  lastBuildProject?: { name: string; timestamp: number } | null;
 }) {
   const [input, setInput] = useState(prefillMessage ?? '');
   const [genProgress, setGenProgress] = useState<GenerationProgress | null>(null);
   const [slowWarning, setSlowWarning] = useState(false);
   const slowWarningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [chatMode, setChatMode] = useState<'companion' | 'build'>('companion');
   const [generationMode, setGenerationMode] = useState<GenerationMode>('chat');
   const [isGeneratingMedia, setIsGeneratingMedia] = useState(false);
   const [generateAudio, setGenerateAudio] = useState(false);
@@ -315,13 +298,9 @@ export default function ChatPanel({
   const [editingImageUrl, setEditingImageUrl] = useState<string | null>(null);
   const [cropImageUrl, setCropImageUrl] = useState<string | null>(null);
   const [showSupportNudge, setShowSupportNudge] = useState(false);
-  const [suggestions] = useState(() => getRandomSuggestions(tabMode === 'chat'));
+  const [suggestions] = useState(() => getRandomSuggestions());
   const [flaggingIdx, setFlaggingIdx] = useState<number | null>(null);
   const [flaggedSet, setFlaggedSet] = useState<Set<number>>(new Set());
-  const [pendingTabSuggestion, setPendingTabSuggestion] = useState<{
-    targetTab: 'build' | 'studio';
-    originalMessage: string;
-  } | null>(null);
   const [flagReason, setFlagReason] = useState('');
   const [flagText, setFlagText] = useState('');
   const [flagSending, setFlagSending] = useState(false);
@@ -1068,47 +1047,30 @@ export default function ChatPanel({
 
   const BUILD_INTENT_RE =
     /\b(app|tool|game|website|site|dashboard|calculator|tracker|widget|extension|bot|converter|timer|quiz|form|animation|chart|visualizer|visualiser|landing page|portfolio)\b/i;
-  const YES_RE =
-    /^(yes|yeah|yep|sure|ok|okay|take me there|go|let's go|lets go|switch|open it)\.?!?\s*$/i;
+  const BUILD_VERB_RE =
+    /\b(build|create|make|generate|code|develop|write me an? (app|game|tool|site|website|dashboard))\b/i;
 
   const send = async (text?: string) => {
     const trimmed = (text ?? input).trim();
     if (!trimmed && pendingImages.length === 0 && pendingFiles.length === 0) return;
     if (isGenerating) return;
 
-    // Yes/no handling for tab routing suggestions
-    if (pendingTabSuggestion && trimmed) {
-      if (YES_RE.test(trimmed)) {
-        onPanelSwitch?.(pendingTabSuggestion.targetTab);
-        setPendingTabSuggestion(null);
-        setInput('');
-        return;
-      }
-      setPendingTabSuggestion(null);
-    }
-
-    // Chat mode: intercept build/image/video/music requests before they hit the API.
-    // Based answers immediately and shows the routing pill — no planner roundtrip.
-    if (tabMode === 'chat' && trimmed) {
+    // Companion mode: intercept build requests and nudge user to switch to Build mode
+    if (chatMode === 'companion' && trimmed) {
       const lc = trimmed.toLowerCase();
-      const hasBuildVerb =
-        /\b(build|create|make|generate|code|develop|write me an? (app|game|tool|site|website|dashboard))\b/.test(
-          lc
-        );
-      if (hasBuildVerb && BUILD_INTENT_RE.test(lc)) {
+      if (BUILD_VERB_RE.test(lc) && BUILD_INTENT_RE.test(lc)) {
         setInput('');
-        const userMsg: Message = { role: 'user', content: trimmed };
         setMessages(prev => [
           ...prev,
-          userMsg,
+          { role: 'user', content: trimmed },
           {
             role: 'assistant',
             content:
-              "That's a Build project. Switch to the Build tab and describe it there — I'll generate it with a live preview for you.",
+              "Switch to Build mode below to generate that — I'll create it with a live preview for you. ◈",
           },
         ]);
         if (messages.length === 0 && onAutoName && trimmed) onAutoName(trimmed);
-        setPendingTabSuggestion({ targetTab: 'build', originalMessage: trimmed });
+        setChatMode('build');
         return;
       }
     }
@@ -1231,8 +1193,7 @@ export default function ChatPanel({
           location: locationRef.current,
           aiModel,
           persona,
-          forceChatMode: tabMode === 'chat',
-          lastBuildProject: lastBuildProject ?? null,
+          forceChatMode: chatMode === 'companion',
         }),
       });
 
@@ -1530,18 +1491,6 @@ export default function ChatPanel({
                   ...prev.slice(0, -1),
                   { role: 'assistant', content: data.reply || '✓ Done — check the editor.' },
                 ]);
-
-                // In chat mode: detect build intent in the user's message and suggest Build tab.
-                // Only suggest once — if there's already a pending suggestion, don't repeat.
-                if (
-                  tabMode === 'chat' &&
-                  !pendingTabSuggestion &&
-                  !resolvedFiles.length &&
-                  BUILD_INTENT_RE.test(trimmed) &&
-                  /\b(build|create|make|generate|code)\b/i.test(trimmed)
-                ) {
-                  setPendingTabSuggestion({ targetTab: 'build', originalMessage: trimmed });
-                }
 
                 if (resolvedFiles.length) {
                   onFilesUpdate(resolvedFiles, data.projectType);
@@ -1909,11 +1858,6 @@ export default function ChatPanel({
             )}
           </div>
         )}
-      {tabMode === 'chat' && (
-        <div className="chat-mode-banner">
-          ◉ Companion mode — ask anything. To generate apps, switch to Build.
-        </div>
-      )}
       <div className="chat-messages">
         {messages.length === 0 ? (
           <div className="chat-empty">
@@ -1926,11 +1870,7 @@ export default function ChatPanel({
               <img src="/brand-icon-loop.svg" alt="" width={64} height={64} />
             </button>
             <div className="chat-empty-title">BASED</div>
-            <div className="chat-empty-sub">
-              {tabMode === 'chat'
-                ? 'Your companion — ask anything, plan, think out loud'
-                : t('chat.empty.subtitle')}
-            </div>
+            <div className="chat-empty-sub">{t('chat.empty.subtitle')}</div>
           </div>
         ) : (
           <AnimatePresence initial={false}>
@@ -2081,25 +2021,6 @@ export default function ChatPanel({
                 {s}
               </button>
             ))}
-          </div>
-        )}
-        {pendingTabSuggestion && !isGenerating && (
-          <div className="tab-suggest-pill">
-            <span className="tab-suggest-text">
-              This sounds like a Build project. Want me to open Build?
-            </span>
-            <button
-              className="tab-suggest-yes"
-              onClick={() => {
-                onPanelSwitch?.(pendingTabSuggestion.targetTab);
-                setPendingTabSuggestion(null);
-              }}
-            >
-              Yes, take me there →
-            </button>
-            <button className="tab-suggest-no" onClick={() => setPendingTabSuggestion(null)}>
-              No thanks
-            </button>
           </div>
         )}
         <div ref={bottomRef} />
@@ -2278,6 +2199,20 @@ export default function ChatPanel({
             />
           </div>
         )}
+        <div className="chat-mode-toggle">
+          <button
+            className={`chat-mode-btn${chatMode === 'companion' ? ' active' : ''}`}
+            onClick={() => setChatMode('companion')}
+          >
+            ◉ Chat
+          </button>
+          <button
+            className={`chat-mode-btn${chatMode === 'build' ? ' active' : ''}`}
+            onClick={() => setChatMode('build')}
+          >
+            ⬡ Build
+          </button>
+        </div>
         <div className="chat-input-row">
           <input
             type="file"
@@ -2538,7 +2473,7 @@ export default function ChatPanel({
                         ? t('chat.placeholder.music')
                         : generationMode !== 'chat'
                           ? t('chat.placeholder.image')
-                          : tabMode === 'chat'
+                          : chatMode === 'companion'
                             ? 'Ask anything — chat, plan, think out loud'
                             : t('chat.placeholder.default')
             }
