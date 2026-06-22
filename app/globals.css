@@ -492,6 +492,16 @@ body {
   color: var(--accent);
   animation: breathe 2s ease-in-out infinite;
 }
+.incognito-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.incognito-btn svg {
+  flex-shrink: 0;
+}
 .icon-btn.incognito-active {
   background: rgba(139, 118, 255, 0.15) !important;
   color: #b39dff !important;
