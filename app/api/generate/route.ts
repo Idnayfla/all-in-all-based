@@ -1907,8 +1907,9 @@ export async function POST(req: NextRequest) {
       location,
       aiModel,
       persona,
-      forceChatMode,
+      forceChatMode: rawForceChatMode,
     } = await req.json();
+    const forceChatMode = Boolean(rawForceChatMode);
 
     if (Array.isArray(existingFiles) && existingFiles.length > 50) {
       return NextResponse.json({ error: 'Too many files' }, { status: 400 });
@@ -2490,8 +2491,13 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
           // is a content request, not a software request. Never generate an app for these.
           const NON_TECH_CONTENT_RE =
             /\b(program|plan|schedule|routine|recipe|diet|workout|training|regimen|course|curriculum|essay|story|proposal|strategy|report|guide|meal.?plan|study.?plan|business.?plan|roadmap|syllabus|budget.?plan|diet.?plan)\b/i;
+          // Exclude when the message also mentions a software container — "build a meal plan tracker app" is code, not content.
+          const SOFTWARE_CONTAINER_RE =
+            /\b(app|tool|website|site|dashboard|widget|game|extension|calculator|timer|generator|tracker app|planner app|builder)\b/i;
           const isNonTechContent =
-            !existingFiles?.length && NON_TECH_CONTENT_RE.test(lastUserMessage);
+            !existingFiles?.length &&
+            NON_TECH_CONTENT_RE.test(lastUserMessage) &&
+            !SOFTWARE_CONTAINER_RE.test(lastUserMessage);
 
           // Planner chain: Groq (primary, fastest) → Cerebras (second, if Groq fails) → Haiku (final).
           // Images skip fast planners — Anthropic vision is required for multimodal input.
