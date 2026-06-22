@@ -6613,6 +6613,17 @@ body {
   .landing-hero {
     padding: 72px 20px 56px;
   }
+  /* The 75px left padding (desktop offset for the hex mark) shifts the centered
+     headline right and pushes "companion" off-screen on phones. Drop it and let
+     the long words wrap so nothing overflows the viewport. */
+  .landing-headline {
+    padding-left: 0;
+    font-size: clamp(30px, 9vw, 48px);
+    overflow-wrap: break-word;
+  }
+  .landing-headline span {
+    white-space: normal !important;
+  }
   .landing-bento-section {
     grid-template-columns: 1fr;
     margin-bottom: 48px;

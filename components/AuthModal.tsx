@@ -31,7 +31,12 @@ export default function AuthModal({ defaultTab = 'signin', onClose }: Props) {
     setError('');
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        // Force the account chooser so users aren't silently logged into whatever
+        // Google account the in-app browser already has a session for.
+        queryParams: provider === 'google' ? { prompt: 'select_account' } : {},
+      },
     });
     if (error) setError(error.message);
   };
