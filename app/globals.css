@@ -6939,6 +6939,7 @@ body {
 .image-studio-tools {
   display: flex;
   gap: 4px;
+  flex-wrap: wrap;
 }
 .image-tool-btn {
   padding: 5px 10px;
@@ -13309,6 +13310,12 @@ body:has(.beta-banner) .app-root {
     max-height: 200px;
     overflow-y: auto;
   }
+  .image-studio-tools {
+    width: 100%;
+  }
+  .image-studio-header-right {
+    margin-left: 0;
+  }
 }
 
 /* â”€â”€ Phase 15: 3D / Blueprint Studio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -18640,6 +18647,12 @@ body:has(.legal-page) {
   background: var(--bg);
   padding: 24px 16px;
   gap: 32px;
+}
+.group-landing-back {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top));
+  left: 16px;
+  z-index: 2;
 }
 .group-landing-header {
   text-align: center;
