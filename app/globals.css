@@ -18410,10 +18410,35 @@ body:has(.legal-page) {
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
+.group-chat-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.group-back-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  color: var(--text2);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.group-back-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .group-chat-title {
   display: flex;
   align-items: baseline;
   gap: 8px;
+  min-width: 0;
 }
 .group-chat-name {
   font-size: 0.95rem;
@@ -18596,6 +18621,12 @@ body:has(.legal-page) {
   }
   .group-chat-header {
     padding: 10px 12px;
+  }
+  .group-chat-header-left {
+    gap: 8px;
+  }
+  .group-back-btn {
+    padding: 8px 10px;
   }
 }
 
