@@ -15951,10 +15951,17 @@ body:has(.legal-page) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 6px 10px;
   padding: 7px 16px;
   background: var(--bg2);
   border-bottom: 1px solid var(--border);
+}
+.tasks-cal-bar-error {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: #ff8a8a;
+  font-family: var(--font-mono);
 }
 
 .tasks-cal-bar-status {

@@ -237,6 +237,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
   const [calEmail, setCalEmail] = useState('');
   const [calEvents, setCalEvents] = useState<CalEvent[]>([]);
   const [calLoading, setCalLoading] = useState(false);
+  const [calError, setCalError] = useState<string | null>(null);
 
   // Add-task form state
   const [newTitle, setNewTitle] = useState('');
@@ -356,11 +357,22 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
 
   const connectCalendar = async () => {
     if (!authToken) return;
+    setCalError(null);
     try {
       const res = await fetch('/api/calendar/auth', { headers: headers() });
-      const data = (await res.json()) as { url?: string };
-      if (data.url) window.location.href = data.url;
-    } catch {}
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setCalError(
+        data.error === 'Google Calendar not configured'
+          ? 'Google Calendar isn’t set up yet — coming soon.'
+          : data.error || 'Couldn’t start the connection. Try again.'
+      );
+    } catch {
+      setCalError('Couldn’t reach the server. Check your connection and try again.');
+    }
   };
 
   const disconnectCalendar = async () => {
@@ -1091,6 +1103,7 @@ export default function TasksPanel({ authToken }: { authToken?: string }) {
               ⊙ Connect Google Calendar
             </button>
           )}
+          {calError && <span className="tasks-cal-bar-error">{calError}</span>}
         </div>
       )}
 
