@@ -6610,6 +6610,15 @@ body {
   .landing-header {
     padding: 14px 20px;
   }
+  /* The four text links + Sign In overflow the sticky bar on phones (clipped by
+     the root's overflow-x:hidden, pushing Sign In off-screen). Keep only Sign In;
+     the same destinations live in the hero CTAs and footer. */
+  .landing-header-nav {
+    gap: 12px;
+  }
+  .landing-nav-link {
+    display: none;
+  }
   .landing-hero {
     padding: 72px 20px 56px;
   }
