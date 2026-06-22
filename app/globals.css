@@ -470,6 +470,9 @@ body {
   gap: 6px;
 }
 .icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 5px 8px;
   background: transparent;
   border: 1px solid transparent;
@@ -8389,6 +8392,9 @@ html.has-wallpaper .editor-panel {
   font-family: var(--font-mono);
 }
 .companion-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   color: #4a4a6a;
@@ -15945,10 +15951,17 @@ body:has(.legal-page) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  flex-wrap: wrap;
+  gap: 6px 10px;
   padding: 7px 16px;
   background: var(--bg2);
   border-bottom: 1px solid var(--border);
+}
+.tasks-cal-bar-error {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: #ff8a8a;
+  font-family: var(--font-mono);
 }
 
 .tasks-cal-bar-status {
@@ -16215,6 +16228,8 @@ body:has(.legal-page) {
 }
 
 .tasks-row-cal-badge {
+  display: inline-flex;
+  align-items: center;
   font-size: 11px;
   color: #64b4ff;
   opacity: 0.7;
