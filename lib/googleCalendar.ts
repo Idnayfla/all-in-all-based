@@ -54,7 +54,9 @@ export function buildAuthUrl(state: string): string {
     response_type: 'code',
     scope: SCOPE,
     access_type: 'offline',
-    prompt: 'consent',
+    // select_account forces the chooser (so the in-app browser's existing Google
+    // session doesn't silently pick an account); consent ensures a refresh token.
+    prompt: 'select_account consent',
     state,
   });
   return `${OAUTH_URL}?${params.toString()}`;

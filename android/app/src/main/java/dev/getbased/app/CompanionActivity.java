@@ -192,8 +192,13 @@ public class CompanionActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, android.webkit.WebResourceRequest request) {
-                view.loadUrl(request.getUrl().toString());
-                return true;
+                String url = request.getUrl().toString();
+                if (ExternalLinks.isExternal(url)) {
+                    // OAuth / external sites must open in a real browser (Custom Tab).
+                    ExternalLinks.open(CompanionActivity.this, url);
+                    return true;
+                }
+                return false; // let the WebView load getbased.dev itself
             }
 
             @Override

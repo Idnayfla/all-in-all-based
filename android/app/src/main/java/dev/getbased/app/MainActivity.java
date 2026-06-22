@@ -44,9 +44,14 @@ public class MainActivity extends AppCompatActivity {
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
-            public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                view.loadUrl(url);
-                return true;
+            public boolean shouldOverrideUrlLoading(WebView view, android.webkit.WebResourceRequest request) {
+                String url = request.getUrl().toString();
+                if (ExternalLinks.isExternal(url)) {
+                    // OAuth / external sites must open in a real browser (Custom Tab).
+                    ExternalLinks.open(MainActivity.this, url);
+                    return true;
+                }
+                return false; // let the WebView load getbased.dev itself
             }
         });
 
@@ -58,9 +63,34 @@ public class MainActivity extends AppCompatActivity {
         });
 
         webView.setBackgroundColor(Color.parseColor("#0a0a0f"));
-        webView.loadUrl(MAIN_URL);
+        // If launched via an App Link (e.g. the OAuth return getbased.dev/auth/callback),
+        // load that URL so the WebView's Supabase client can complete the session.
+        String deepLink = deepLinkFromIntent(getIntent());
+        webView.loadUrl(deepLink != null ? deepLink : MAIN_URL);
         setContentView(webView);
         startBubbleService();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        String deepLink = deepLinkFromIntent(intent);
+        if (deepLink != null && webView != null) {
+            webView.loadUrl(deepLink);
+        }
+    }
+
+    /** Returns the getbased.dev URL if this intent is an App Link redirect, else null. */
+    private String deepLinkFromIntent(Intent intent) {
+        if (intent == null || !Intent.ACTION_VIEW.equals(intent.getAction())) return null;
+        Uri data = intent.getData();
+        if (data == null) return null;
+        String host = data.getHost();
+        if (host != null && (host.equals("getbased.dev") || host.endsWith(".getbased.dev"))) {
+            return data.toString();
+        }
+        return null;
     }
 
     @Override
