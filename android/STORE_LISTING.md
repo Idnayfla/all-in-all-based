@@ -93,7 +93,3 @@ Collected/used (must match privacy policy at getbased.dev/privacy):
 - After creating the app in Play Console, copy the Play App Signing SHA-256 into
   `public/.well-known/assetlinks.json` (second fingerprint) and redeploy, or the App Link / OAuth breaks in the Play-signed build.
 - Upload to the Internal testing track first; promote to Production after QA.
-
-```
-
-```
