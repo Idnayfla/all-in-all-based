@@ -339,22 +339,6 @@ body {
   min-width: 0;
 }
 
-.tab-btn-debug {
-  color: var(--text3);
-  border-left: 1px solid var(--border);
-  margin-left: 4px;
-  padding-left: 12px;
-  letter-spacing: 0;
-}
-.tab-btn-debug:hover:not(.active) {
-  color: var(--text2);
-  background: rgba(255, 255, 255, 0.04);
-}
-.tab-btn-debug.active {
-  background: rgba(106, 247, 200, 0.1);
-  color: var(--accent3);
-}
-
 /* â”€â”€ Debug Panel â”€â”€ */
 .debug-panel {
   height: 100%;
@@ -3057,39 +3041,8 @@ body {
   .tab-btn:first-child {
     flex: 1.6;
   }
-  /* Secondary & debug hidden on mobile â€” shown in More drawer */
-  .tab-btn-secondary {
-    display: none;
-  }
-  /* More toggle â€” visible on mobile, same flex weight as primaries */
-  .tab-btn-more {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 3px;
-    flex: 1;
-    padding: 8px 6px;
-    font-size: 12px;
-    letter-spacing: 0.4px;
-    min-width: 0;
-  }
-  .tab-btn-more--highlight {
-    background: var(--accent-muted);
-    color: var(--accent);
-  }
 }
 
-/* More toggle hidden on desktop */
-@media (min-width: 601px) {
-  .tab-btn-more {
-    display: none;
-  }
-  .tab-btn-secondary {
-    display: inline-flex;
-  }
-}
-
-/* â”€â”€ More-tabs drawer (mobile only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 /* ── Due-task banner ──────────────────────────────────────────────────────── */
 .due-task-banner {
   display: flex;
