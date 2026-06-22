@@ -54,6 +54,16 @@ export default function PrivacyPage() {
               preferences to personalise future sessions. You can clear this at any time from
               Settings.
             </li>
+            <li>
+              <strong>Device permissions (mobile &amp; desktop apps):</strong> with your explicit
+              consent, Based may access your <strong>camera</strong> and <strong>microphone</strong>{' '}
+              (for voice and vision features), your approximate <strong>location</strong> (to answer
+              location-aware questions like weather), and your <strong>screen</strong> (only when
+              you tap to share it, so the companion can see what you&apos;re looking at). Camera,
+              microphone, and screen data are processed for the active request and are not recorded
+              or stored by us. You can revoke any of these permissions in your device settings at
+              any time.
+            </li>
           </ul>
         </section>
 
@@ -131,11 +141,19 @@ export default function PrivacyPage() {
         </section>
 
         <section>
-          <h2>5. Data Retention</h2>
+          <h2>5. Data Retention &amp; Account Deletion</h2>
+          <p>
+            You can permanently delete your account at any time from{' '}
+            <strong>Settings &rarr; Delete account</strong> inside the app. This immediately and
+            irreversibly removes your account and associated data — projects, tasks, notes, memory,
+            and settings.
+          </p>
           <p>
             We retain your data for as long as your account is active. If you delete your account,
             we will delete your personal data within 30 days, except where we are required to retain
-            it for legal or financial compliance purposes (e.g. Stripe transaction records).
+            it for legal or financial compliance purposes (e.g. Stripe transaction records). To
+            request deletion without signing in, email{' '}
+            <a href="mailto:husgogogo@gmail.com">husgogogo@gmail.com</a>.
           </p>
         </section>
 

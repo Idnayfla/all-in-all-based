@@ -125,6 +125,9 @@ export default function Home() {
     import('@/components/PersonalityPanel').PersonalitySettings | undefined
   >(undefined);
   const [showSettings, setShowSettings] = useState(false);
+  const [confirmDeleteAccount, setConfirmDeleteAccount] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [globalMemory, setGlobalMemory] = useState('');
   const [incognito, setIncognito] = useState(false);
   const [incognitoMessages, setIncognitoMessages] = useState<Message[]>([]);
@@ -1272,6 +1275,30 @@ export default function Home() {
     window.location.href = '/';
   };
 
+  const deleteAccount = async () => {
+    setDeletingAccount(true);
+    try {
+      const headers = await getHeaders();
+      const res = await fetch('/api/account/delete', { method: 'DELETE', headers });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setDeleteError(data.error || 'Could not delete account. Please try again.');
+        setDeletingAccount(false);
+        return;
+      }
+      // Account gone — clear local state and sign out fully.
+      isExplicitSignOut.current = true;
+      await supabase.auth.signOut().catch(() => {});
+      try {
+        localStorage.clear();
+      } catch {}
+      window.location.href = '/';
+    } catch {
+      setDeleteError('Could not reach the server. Please try again.');
+      setDeletingAccount(false);
+    }
+  };
+
   // Avatar: show provider picture or initials
   const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
   const avatarInitial = (user?.email as string | undefined)?.[0]?.toUpperCase() ?? '?';
@@ -1739,6 +1766,43 @@ export default function Home() {
                       <button className="auth-signout-btn" onClick={signOut}>
                         Sign Out
                       </button>
+                    </div>
+                    <div className="settings-section">
+                      {!confirmDeleteAccount ? (
+                        <button
+                          className="account-delete-btn"
+                          onClick={() => {
+                            setDeleteError(null);
+                            setConfirmDeleteAccount(true);
+                          }}
+                        >
+                          Delete account
+                        </button>
+                      ) : (
+                        <div className="account-delete-confirm">
+                          <div className="settings-hint" style={{ marginBottom: 8 }}>
+                            This permanently deletes your account and all your projects, tasks,
+                            notes, and memory. This cannot be undone.
+                          </div>
+                          <div className="account-delete-actions">
+                            <button
+                              className="account-delete-btn account-delete-btn--danger"
+                              onClick={deleteAccount}
+                              disabled={deletingAccount}
+                            >
+                              {deletingAccount ? 'Deleting…' : 'Yes, delete everything'}
+                            </button>
+                            <button
+                              className="auth-signout-btn"
+                              onClick={() => setConfirmDeleteAccount(false)}
+                              disabled={deletingAccount}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                          {deleteError && <div className="account-delete-error">{deleteError}</div>}
+                        </div>
+                      )}
                     </div>
                     <div className="settings-section">
                       <label className="settings-label">Invite a Friend</label>

@@ -4903,6 +4903,48 @@ body {
 .auth-signout-btn:hover {
   background: rgba(255, 107, 107, 0.15);
 }
+.account-delete-btn {
+  width: 100%;
+  padding: 9px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  color: var(--text3);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+.account-delete-btn:hover {
+  color: #ff6b6b;
+  border-color: rgba(255, 107, 107, 0.35);
+}
+.account-delete-btn--danger {
+  background: rgba(255, 107, 107, 0.12);
+  border-color: rgba(255, 107, 107, 0.4);
+  color: #ff6b6b;
+  font-weight: 600;
+}
+.account-delete-btn--danger:hover {
+  background: rgba(255, 107, 107, 0.2);
+  color: #ff6b6b;
+}
+.account-delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.account-delete-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.account-delete-error {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #ff6b6b;
+}
 
 /* â”€â”€â”€ Splash Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .splash-root {
