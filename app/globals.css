@@ -597,6 +597,48 @@ body {
   color: #f5f0e8;
 }
 
+/* -- Header "More" overflow menu — holds secondary actions (Get App, Vote, Support) */
+.header-more-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.header-more-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--surface-1, #1a1a1f);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  z-index: 300;
+  min-width: 160px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+}
+.header-more-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: var(--font-pixel);
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.header-more-item:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--accent);
+}
+
 .share-btn {
   padding: 5px 12px;
   background: var(--accent);
@@ -2126,6 +2168,15 @@ body {
   line-height: 1.7;
   color: var(--text3);
 }
+@media (max-width: 600px) {
+  .editor-action-btn {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+  .editor-header {
+    padding: 8px 12px;
+  }
+}
 
 .preview-panel {
   display: flex;
@@ -2964,14 +3015,18 @@ body {
   }
 
   .logo {
-    height: 52px;
+    height: 48px;
     padding-left: 12px;
     flex-shrink: 0;
     display: flex;
     align-items: center;
   }
+  /* Early Access chip is redundant on mobile (also shown in Settings) — hide to free row space */
+  .early-access-chip {
+    display: none;
+  }
   .header-controls {
-    height: 52px;
+    height: 48px;
     margin-left: auto;
     padding-right: 8px;
     display: flex;
@@ -4374,6 +4429,29 @@ body {
 }
 .image-editor-prompt:focus {
   border-color: var(--accent);
+}
+@media (max-width: 600px) {
+  .image-editor-canvas-area {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .image-editor-pane + .image-editor-pane {
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+  .image-editor-pane {
+    padding: 12px;
+  }
+  .image-editor-header {
+    padding: 10px 14px;
+  }
+  .image-editor-footer {
+    padding: 10px 14px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom));
+  }
+  .image-editor-prompt {
+    font-size: 16px;
+  }
 }
 .image-editor-generate-btn {
   padding: 10px 20px;
@@ -6861,6 +6939,7 @@ body {
 .image-studio-tools {
   display: flex;
   gap: 4px;
+  flex-wrap: wrap;
 }
 .image-tool-btn {
   padding: 5px 10px;
@@ -13231,6 +13310,12 @@ body:has(.beta-banner) .app-root {
     max-height: 200px;
     overflow-y: auto;
   }
+  .image-studio-tools {
+    width: 100%;
+  }
+  .image-studio-header-right {
+    margin-left: 0;
+  }
 }
 
 /* â”€â”€ Phase 15: 3D / Blueprint Studio â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -18332,10 +18417,35 @@ body:has(.legal-page) {
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
+.group-chat-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.group-back-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  color: var(--text2);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+.group-back-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
 .group-chat-title {
   display: flex;
   align-items: baseline;
   gap: 8px;
+  min-width: 0;
 }
 .group-chat-name {
   font-size: 0.95rem;
@@ -18493,6 +18603,39 @@ body:has(.legal-page) {
   opacity: 0.35;
   cursor: default;
 }
+@media (max-width: 600px) {
+  .group-messages {
+    padding: 12px 12px 6px;
+    gap: 10px;
+  }
+  .group-message {
+    max-width: 85%;
+  }
+  .group-message--based {
+    max-width: 90%;
+  }
+  .group-input-form {
+    padding: 8px 12px;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
+  }
+  .group-input {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  .group-send-btn {
+    width: 44px;
+    min-height: 44px;
+  }
+  .group-chat-header {
+    padding: 10px 12px;
+  }
+  .group-chat-header-left {
+    gap: 8px;
+  }
+  .group-back-btn {
+    padding: 8px 10px;
+  }
+}
 
 /* ── Group Landing ─────────────────────────────────────────────────────── */
 .group-landing-root {
@@ -18504,6 +18647,12 @@ body:has(.legal-page) {
   background: var(--bg);
   padding: 24px 16px;
   gap: 32px;
+}
+.group-landing-back {
+  position: absolute;
+  top: calc(16px + env(safe-area-inset-top));
+  left: 16px;
+  z-index: 2;
 }
 .group-landing-header {
   text-align: center;

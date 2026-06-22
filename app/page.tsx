@@ -153,8 +153,10 @@ export default function Home() {
   const [isSharing, setIsSharing] = useState(false);
   const [showStudioMenu, setShowStudioMenu] = useState(false);
   const [showToolsMenu, setShowToolsMenu] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const studioMenuRef = useRef<HTMLDivElement>(null);
   const toolsMenuRef = useRef<HTMLDivElement>(null);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
   const [showGalleryPublish, setShowGalleryPublish] = useState(false);
   const [galleryAuthorName, setGalleryAuthorName] = useState('');
   const [galleryPublished, setGalleryPublished] = useState(false);
@@ -207,6 +209,9 @@ export default function Home() {
       }
       if (toolsMenuRef.current && !toolsMenuRef.current.contains(target)) {
         setShowToolsMenu(false);
+      }
+      if (moreMenuRef.current && !moreMenuRef.current.contains(target)) {
+        setShowMoreMenu(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -1376,7 +1381,6 @@ export default function Home() {
             >
               {incognito ? '⊙ Incognito' : '⊙'}
             </button>
-            <GetAppButton className="companion-header-btn" />
             {user && subscription.tier !== 'pro' && (
               <button
                 className={`gen-counter-badge${subscription.generationsUsed >= (subscription.tier === 'beta' ? 27 : 9) ? ' gen-counter--danger' : subscription.generationsUsed >= (subscription.tier === 'beta' ? 24 : 7) ? ' gen-counter--warn' : ''}${subscription.tier === 'beta' ? ' gen-counter--beta' : ''}`}
@@ -1398,17 +1402,7 @@ export default function Home() {
             >
               ⬡ Group
             </Link>
-            <a
-              href="/vote"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="companion-header-btn"
-              title="Vote on what gets built next"
-              style={{ textDecoration: 'none' }}
-            >
-              ⬡ Vote
-            </a>
-            {subscription.tier !== 'pro' ? (
+            {subscription.tier !== 'pro' && (
               <button
                 className="header-upgrade-btn"
                 onClick={() => {
@@ -1419,17 +1413,47 @@ export default function Home() {
               >
                 ⬡ Go Pro
               </button>
-            ) : (
-              <a
-                href="https://ko-fi.com/basedfund"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="donate-header-btn"
-                title="Support Based on Ko-fi"
-              >
-                ◈ Support
-              </a>
             )}
+            {/* More — overflow menu for secondary actions (keeps the header from wrapping) */}
+            <div className="header-more-wrap" ref={moreMenuRef}>
+              <button
+                className={`icon-btn${showMoreMenu ? ' active' : ''}`}
+                onClick={() => {
+                  setShowMoreMenu(s => !s);
+                  setShowStudioMenu(false);
+                  setShowToolsMenu(false);
+                }}
+                title="More"
+                aria-label="More options"
+              >
+                ⋯
+              </button>
+              {showMoreMenu && (
+                <div className="header-more-menu">
+                  <GetAppButton className="header-more-item" />
+                  <a
+                    href="/vote"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="header-more-item"
+                    title="Vote on what gets built next"
+                    onClick={() => setShowMoreMenu(false)}
+                  >
+                    ⬡ Vote
+                  </a>
+                  <a
+                    href="https://ko-fi.com/basedfund"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="header-more-item"
+                    title="Support Based on Ko-fi"
+                    onClick={() => setShowMoreMenu(false)}
+                  >
+                    ◈ Support
+                  </a>
+                </div>
+              )}
+            </div>
             <button
               className={`icon-btn ${showSettings ? 'active' : ''}`}
               onClick={() => {

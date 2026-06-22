@@ -90,6 +90,13 @@ export default function GroupLandingPage() {
 
   return (
     <div className="group-landing-root">
+      <button
+        className="group-back-btn group-landing-back"
+        onClick={() => router.push('/')}
+        title="Back to Based"
+      >
+        ← Based
+      </button>
       <div className="group-landing-header">
         <div className="group-landing-title">⬡ Group Chat</div>
         <div className="group-landing-sub">

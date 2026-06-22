@@ -934,9 +934,14 @@ export default function GroupChatPage({ params }: { params: Promise<{ code: stri
       )}
 
       <div className="group-chat-header">
-        <div className="group-chat-title">
-          <span className="group-chat-name">{room?.name ?? code}</span>
-          <span className="group-chat-code">#{code}</span>
+        <div className="group-chat-header-left">
+          <button className="group-back-btn" onClick={() => router.push('/')} title="Back to Based">
+            ← Based
+          </button>
+          <div className="group-chat-title">
+            <span className="group-chat-name">{room?.name ?? code}</span>
+            <span className="group-chat-code">#{code}</span>
+          </div>
         </div>
         <div className="group-chat-actions">
           <div className="group-members-container">
