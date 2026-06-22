@@ -492,6 +492,16 @@ body {
   color: var(--accent);
   animation: breathe 2s ease-in-out infinite;
 }
+.incognito-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.incognito-btn svg {
+  flex-shrink: 0;
+}
 .icon-btn.incognito-active {
   background: rgba(139, 118, 255, 0.15) !important;
   color: #b39dff !important;
@@ -5297,6 +5307,7 @@ body {
   border-radius: var(--r-xl);
   padding: 20px;
   width: 320px;
+  max-width: calc(100vw - 32px);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -8348,7 +8359,7 @@ html.has-wallpaper .editor-panel {
     padding: 4px 8px;
   }
   .companion-textarea {
-    font-size: 13px;
+    font-size: 16px;
   }
 }
 .companion-header {
@@ -14297,6 +14308,10 @@ body:has(.beta-banner) .app-root {
     overflow-y: unset;
   }
 
+  .spec-textarea {
+    font-size: 16px;
+  }
+
   .spec-output-col {
     overflow-y: unset;
     flex: unset;
@@ -18314,6 +18329,7 @@ body:has(.legal-page) {
   border-radius: 12px;
   padding: 32px 28px;
   width: 340px;
+  max-width: calc(100vw - 32px);
   display: flex;
   flex-direction: column;
   gap: 16px;

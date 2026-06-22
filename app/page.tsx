@@ -1362,7 +1362,7 @@ export default function Home() {
               </>
             )}
             <button
-              className={`icon-btn ${incognito ? 'incognito-active' : ''}`}
+              className={`icon-btn incognito-btn ${incognito ? 'incognito-active' : ''}`}
               onClick={() => {
                 if (subscription.tier === 'free') {
                   setPricingReason('upgrade');
@@ -1375,11 +1375,28 @@ export default function Home() {
               }}
               title={
                 subscription.tier === 'free'
-                  ? 'Incognito — Pro feature'
-                  : 'Temp chat — no memory saved'
+                  ? 'Incognito — no memory saved (Pro feature)'
+                  : 'Incognito — no memory saved this session'
               }
             >
-              {incognito ? '⊙ Incognito' : '⊙'}
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M2 13h20" />
+                <path d="M5 13l1.6-5.1A2 2 0 0 1 8.5 6.5h7a2 2 0 0 1 1.9 1.4L19 13" />
+                <circle cx="7" cy="16.5" r="2.9" />
+                <circle cx="17" cy="16.5" r="2.9" />
+                <path d="M9.9 16.2c1.3-1 2.9-1 4.2 0" />
+              </svg>
+              <span>Incognito</span>
             </button>
             {user && subscription.tier !== 'pro' && (
               <button
