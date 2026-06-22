@@ -18319,6 +18319,7 @@ body:has(.legal-page) {
   border-radius: 12px;
   padding: 32px 28px;
   width: 340px;
+  max-width: calc(100vw - 32px);
   display: flex;
   flex-direction: column;
   gap: 16px;
