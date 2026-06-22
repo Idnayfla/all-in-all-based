@@ -57,6 +57,11 @@ function getRandomSuggestions() {
   return shuffled.slice(0, 4);
 }
 
+const BUILD_INTENT_RE =
+  /\b(app|tool|game|website|site|dashboard|calculator|tracker|widget|extension|bot|converter|timer|quiz|form|animation|chart|visualizer|visualiser|landing page|portfolio|script|cli|api|webpage|clone)\b/i;
+const BUILD_VERB_RE =
+  /\b(build|create|make|generate|code|develop|write me an? (app|game|tool|site|website|dashboard))\b/i;
+
 function detectIntentMode(text: string): GenerationMode {
   const t = text.toLowerCase().trim();
   if (!t) return 'chat';
@@ -1045,28 +1050,23 @@ export default function ChatPanel({
     }
   };
 
-  const BUILD_INTENT_RE =
-    /\b(app|tool|game|website|site|dashboard|calculator|tracker|widget|extension|bot|converter|timer|quiz|form|animation|chart|visualizer|visualiser|landing page|portfolio)\b/i;
-  const BUILD_VERB_RE =
-    /\b(build|create|make|generate|code|develop|write me an? (app|game|tool|site|website|dashboard))\b/i;
-
   const send = async (text?: string) => {
     const trimmed = (text ?? input).trim();
     if (!trimmed && pendingImages.length === 0 && pendingFiles.length === 0) return;
     if (isGenerating) return;
 
-    // Companion mode: intercept build requests and nudge user to switch to Build mode
+    // Companion mode: intercept build requests, switch to Build mode, nudge user to send again
     if (chatMode === 'companion' && trimmed) {
       const lc = trimmed.toLowerCase();
       if (BUILD_VERB_RE.test(lc) && BUILD_INTENT_RE.test(lc)) {
-        setInput('');
+        setInput(trimmed);
         setMessages(prev => [
           ...prev,
           { role: 'user', content: trimmed },
           {
             role: 'assistant',
             content:
-              "Switch to Build mode below to generate that — I'll create it with a live preview for you. ◈",
+              "Switched to Build mode — hit send again and I'll generate it with a live preview. ◈",
           },
         ]);
         if (messages.length === 0 && onAutoName && trimmed) onAutoName(trimmed);
