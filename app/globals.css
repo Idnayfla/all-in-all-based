@@ -8378,18 +8378,26 @@ html.has-wallpaper .editor-panel {
   font-family: var(--font-mono);
 }
 .companion-clear {
-  margin-left: auto;
   background: none;
   border: none;
   color: #4a4a6a;
   cursor: pointer;
   font-size: 14px;
-  padding: 4px;
+  padding: 5px 7px;
+  margin-left: 2px;
+  border-radius: 6px;
   line-height: 1;
-  transition: color 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+/* First icon button carries the auto margin that pushes the cluster right */
+.companion-clear:nth-of-type(1) {
+  margin-left: auto;
 }
 .companion-clear:hover {
   color: #e8e8f0;
+  background: rgba(255, 255, 255, 0.06);
 }
 .companion-clear:disabled {
   opacity: 0.3;
