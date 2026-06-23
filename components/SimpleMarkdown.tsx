@@ -59,6 +59,18 @@ function parseInline(text: string, prefix: string): React.ReactNode {
   return <React.Fragment key={prefix}>{parts}</React.Fragment>;
 }
 
+// GFM table helpers
+function splitTableRow(row: string): string[] {
+  let r = row.trim();
+  if (r.startsWith('|')) r = r.slice(1);
+  if (r.endsWith('|')) r = r.slice(0, -1);
+  return r.split('|').map(c => c.trim());
+}
+function isTableDelimiter(s: string): boolean {
+  // e.g. |----|:---:|---| — only pipes, dashes, colons, spaces, and at least one dash
+  return /^[\s|:-]+$/.test(s) && s.includes('-') && s.includes('|');
+}
+
 export default function SimpleMarkdown({ children }: { children: string }) {
   const lines = children.split('\n');
   const out: React.ReactNode[] = [];
@@ -118,6 +130,41 @@ export default function SimpleMarkdown({ children }: { children: string }) {
       continue;
     }
 
+    // GFM table — header row, delimiter row, then body rows
+    if (line.includes('|') && i + 1 < lines.length && isTableDelimiter(lines[i + 1])) {
+      const header = splitTableRow(line);
+      i += 2; // skip header + delimiter
+      const rows: string[][] = [];
+      while (i < lines.length && lines[i].trim() !== '' && lines[i].includes('|')) {
+        rows.push(splitTableRow(lines[i]));
+        i++;
+      }
+      const tKey = key++;
+      out.push(
+        <div className="md-table-wrap" key={tKey}>
+          <table className="md-table">
+            <thead>
+              <tr>
+                {header.map((c, ci) => (
+                  <th key={ci}>{parseInline(c, `th-${tKey}-${ci}`)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((cells, ri) => (
+                <tr key={ri}>
+                  {cells.map((c, ci) => (
+                    <td key={ci}>{parseInline(c, `td-${tKey}-${ri}-${ci}`)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
     // Blank line
     if (line.trim() === '') {
       i++;
@@ -132,7 +179,9 @@ export default function SimpleMarkdown({ children }: { children: string }) {
       !/^#{1,3} /.test(lines[i]) &&
       !lines[i].startsWith('```') &&
       !/^[-*•] /.test(lines[i]) &&
-      !/^\d+\. /.test(lines[i])
+      !/^\d+\. /.test(lines[i]) &&
+      // don't absorb a table header (line with | followed by a delimiter row)
+      !(lines[i].includes('|') && i + 1 < lines.length && isTableDelimiter(lines[i + 1]))
     ) {
       para.push(lines[i]);
       i++;

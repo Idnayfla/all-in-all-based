@@ -3677,6 +3677,43 @@ body {
   padding: 0;
   color: var(--text2);
 }
+/* Markdown tables — scroll horizontally on narrow screens instead of breaking */
+.md-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 10px 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.md-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+.md-table th,
+.md-table td {
+  padding: 7px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  white-space: nowrap;
+  vertical-align: top;
+}
+.md-table th:last-child,
+.md-table td:last-child {
+  border-right: none;
+}
+.md-table tr:last-child td {
+  border-bottom: none;
+}
+.md-table thead th {
+  background: var(--bg2);
+  color: var(--text);
+  font-weight: 600;
+}
+.md-table tbody td {
+  color: var(--text2);
+}
 .message-content ul,
 .message-content ol {
   padding-left: 20px;
