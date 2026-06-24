@@ -182,6 +182,8 @@ public class CompanionActivity extends AppCompatActivity {
         ws.setAllowContentAccess(true);
         ws.setCacheMode(WebSettings.LOAD_DEFAULT);
         ws.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+        // Marker so the web app can detect the Android app (hides in-app purchase CTAs).
+        ws.setUserAgentString(ws.getUserAgentString() + " BasedApp");
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);

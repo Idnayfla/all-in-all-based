@@ -1,7 +1,8 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { track } from '@/lib/posthog';
+import { isBasedApp } from '@/lib/appPlatform';
 
 interface PricingModalProps {
   reason?: 'generations' | 'projects' | 'companion' | 'upgrade';
@@ -45,6 +46,10 @@ export default function PricingModal({
 }: PricingModalProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // In the native app, we can't sell digital subscriptions via Stripe (Play/App
+  // Store billing rules). Hide the checkout CTA and point users to the web instead.
+  const [inApp, setInApp] = useState(false);
+  useEffect(() => setInApp(isBasedApp()), []);
 
   const upgrade = async () => {
     track('pro_upgrade_clicked', { reason });
@@ -179,15 +184,22 @@ export default function PricingModal({
           .
         </p>
 
-        <button className="pricing-upgrade-btn" onClick={upgrade} disabled={loading}>
-          {loading ? 'Redirecting to Stripe...' : 'Keep building — $12/month  ·  was $20'}
-        </button>
+        {inApp ? (
+          <div className="pricing-web-note">
+            Pro is managed on the web. Visit <strong>getbased.dev</strong> on your browser to
+            upgrade — your Pro unlocks everywhere, including this app.
+          </div>
+        ) : (
+          <button className="pricing-upgrade-btn" onClick={upgrade} disabled={loading}>
+            {loading ? 'Redirecting to Stripe...' : 'Keep building — $12/month  ·  was $20'}
+          </button>
+        )}
         {onSwitchToFreeAI && (
           <button className="pricing-free-ai-btn" onClick={onSwitchToFreeAI}>
             Not ready? Use Llama 3.3 instead — slower, no memory, no Claude
           </button>
         )}
-        <p className="pricing-note">Cancel anytime. Powered by Stripe.</p>
+        {!inApp && <p className="pricing-note">Cancel anytime. Powered by Stripe.</p>}
       </motion.div>
     </motion.div>
   );

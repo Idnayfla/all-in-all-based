@@ -9321,6 +9321,19 @@ html.has-wallpaper .editor-panel {
   color: var(--text3);
   margin: var(--sp-2) 0 0;
 }
+.pricing-web-note {
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--text2);
+  line-height: 1.6;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: rgba(255, 255, 255, 0.03);
+}
+.pricing-web-note strong {
+  color: var(--accent);
+}
 .pricing-payment-methods {
   display: flex;
   flex-wrap: wrap;
