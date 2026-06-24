@@ -86,6 +86,33 @@ Collected/used (must match privacy policy at getbased.dev/privacy):
 - SYSTEM_ALERT_WINDOW (overlay): the floating companion bubble that lets users reach Based from any screen.
 - MediaProjection (screen capture): so the companion can see what the user is looking at — only on explicit tap, single frame, not recorded.
 
+## Billing model (Option A — gated, not Play Billing)
+
+Based does NOT sell digital subscriptions inside the Android app. The in-app
+purchase CTA is hidden (native WebView UA marker → web hides the checkout button,
+shows "upgrade on getbased.dev"). Users subscribe on the web; entitlement is
+server-side, so Pro works in the app for web purchasers. No non-Play billing is
+initiated in-app. (If full in-app purchasing is wanted later, integrate Google
+Play Billing — Option B.)
+
+## App access / Reviewer notes (paste into Play Console "App access")
+
+The app requires sign-in. Provide a test account so the reviewer can access all features:
+
+```
+Reviewer notes:
+Based is a personal AI companion. Sign in with the test account below
+(or "Continue with Google"). The floating bubble requires the "Display over
+other apps" permission — tap Allow when prompted.
+
+Subscriptions: Pro is sold only on our website (getbased.dev), not inside the
+app. The app shows a "manage on web" note instead of a purchase flow, so no
+non-Google-Play billing occurs in the app. Free features are fully usable
+without subscribing.
+
+Test account:  <CREATE A TEST EMAIL + PASSWORD AND PUT IT HERE>
+```
+
 ## Release build
 
 - `android/app/build.gradle`: versionCode 1, versionName "1.0", targetSdk 35 — release-ready.
