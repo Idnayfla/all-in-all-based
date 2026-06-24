@@ -37,6 +37,9 @@ public class MainActivity extends AppCompatActivity {
         ws.setAllowContentAccess(true);
         ws.setLoadsImagesAutomatically(true);
         ws.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+        // Marker so the web app can detect it's running inside the Android app
+        // (used to hide in-app purchase CTAs for Play Billing compliance).
+        ws.setUserAgentString(ws.getUserAgentString() + " BasedApp");
 
         CookieManager cm = CookieManager.getInstance();
         cm.setAcceptCookie(true);

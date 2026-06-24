@@ -1,5 +1,13 @@
 export type AppPlatform = 'ios' | 'android' | 'mac' | 'windows' | 'linux' | 'unknown';
 
+// True when running inside the native Based app shell (Android/iOS WebView).
+// The native WebView appends " BasedApp" to its user-agent. Used to hide in-app
+// purchase CTAs so the store builds comply with Google Play / App Store billing rules.
+export function isBasedApp(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return / BasedApp\b/.test(navigator.userAgent);
+}
+
 export function detectPlatform(): AppPlatform {
   if (typeof navigator === 'undefined') return 'unknown';
   const ua = navigator.userAgent;
