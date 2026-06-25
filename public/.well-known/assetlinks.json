@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "dev.getbased.app",
       "sha256_cert_fingerprints": [
-        "E4:C5:33:18:B4:E3:2C:E7:59:20:0F:47:A2:73:66:5D:81:6D:96:F7:44:D1:BF:EE:00:17:63:B7:C1:CF:33:CB"
+        "E4:C5:33:18:B4:E3:2C:E7:59:20:0F:47:A2:73:66:5D:81:6D:96:F7:44:D1:BF:EE:00:17:63:B7:C1:CF:33:CB",
+        "14:AA:8C:B0:0F:4C:0E:D0:4F:97:2A:BF:24:9C:51:98:01:4D:D1:8C:79:4B:3D:56:DE:C1:62:BF:61:40:46:AC"
       ]
     }
   }
