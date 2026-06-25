@@ -17,14 +17,14 @@
 
   <!-- Hex outline — always drawn, gentle opacity pulse -->
   <polygon points="60,14 97,35 97,79 60,100 23,79 23,35"
-    fill="none" stroke="#c9a87c" stroke-width="2.5" filter="url(#lglow)"
+    fill="none" stroke="#c9a87c" stroke-width="2.5"
     stroke-linejoin="round">
     <animate attributeName="opacity" values="0.7;1;0.7" dur="3s" repeatCount="indefinite"
       calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
   </polygon>
 
   <!-- Corner dot — steady glow pulse -->
-  <circle cx="97" cy="35" r="3" fill="#c9a87c" filter="url(#lglow)">
+  <circle cx="97" cy="35" r="3" fill="#c9a87c">
     <animate attributeName="opacity" values="0.5;1;0.5" dur="3s" repeatCount="indefinite"
       calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
   </circle>
@@ -32,7 +32,7 @@
   <!-- B> always visible -->
   <text x="60" y="65" text-anchor="middle"
     font-family="'Space Mono','Courier New',monospace" font-weight="700" font-size="20"
-    fill="#c9a87c" filter="url(#lglow)" letter-spacing="1">
+    fill="#c9a87c" letter-spacing="1">
     B&gt;
   </text>
 

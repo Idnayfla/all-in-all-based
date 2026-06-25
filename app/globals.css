@@ -972,7 +972,6 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
 }
 .chat-empty-logo img {
   width: 80px;
@@ -8479,7 +8478,6 @@ html.has-wallpaper .editor-panel {
   width: 24px;
   height: 24px;
   flex-shrink: 0;
-  overflow: hidden;
 }
 .companion-title {
   font-size: 14px;
