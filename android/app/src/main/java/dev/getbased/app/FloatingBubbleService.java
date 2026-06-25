@@ -456,7 +456,11 @@ public class FloatingBubbleService extends Service {
 
                     case MotionEvent.ACTION_UP:
                         long duration = System.currentTimeMillis() - touchDownTime;
-                        if (duration < 200 && totalMoveX < dpToPx(10) && totalMoveY < dpToPx(10)) {
+                        if (duration < 400 && totalMoveX < dpToPx(10) && totalMoveY < dpToPx(10)) {
+                            // Auto-unstick: if flag says open but activity is gone, reset
+                            if (companionOpen && !isCompanionInTaskStack()) {
+                                companionOpen = false;
+                            }
                             if (!companionOpen) {
                                 // Anim 3: tap ripple — run concurrently, don't delay open
                                 playTapRipple();
@@ -550,8 +554,15 @@ public class FloatingBubbleService extends Service {
         companionOpen = true;
         hideSpeechBubble();
         Intent intent = new Intent(this, CompanionActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-        startActivity(intent);
+        // singleTask in manifest already handles bring-to-front; FLAG_ACTIVITY_REORDER_TO_FRONT
+        // conflicts with excludeFromRecents="true" on Android 12+ and can silently fail.
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startActivity(intent);
+        } catch (Exception e) {
+            // Android 12+ may block background launches — reset flag so next tap retries
+            companionOpen = false;
+        }
     }
 
     private void closeCompanion() {
@@ -560,6 +571,22 @@ public class FloatingBubbleService extends Service {
         Intent closeIntent = new Intent(CompanionActivity.ACTION_CLOSE_REQUEST);
         closeIntent.setPackage(getPackageName());
         sendBroadcast(closeIntent);
+    }
+
+    /** Returns true if CompanionActivity is currently in the app's task stack. */
+    private boolean isCompanionInTaskStack() {
+        android.app.ActivityManager am =
+                (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
+        if (am == null) return false;
+        String companionClass = CompanionActivity.class.getName();
+        for (android.app.ActivityManager.AppTask task : am.getAppTasks()) {
+            android.app.ActivityManager.RecentTaskInfo info = task.getTaskInfo();
+            if (info != null && info.numActivities > 0 && info.baseActivity != null
+                    && companionClass.equals(info.baseActivity.getClassName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ── Logo helpers ──────────────────────────────────────────────────────────

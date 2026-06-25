@@ -316,6 +316,9 @@ public class CompanionActivity extends AppCompatActivity {
                     // Only restore if React rendered an empty messages list
                     "    var existingBubbles=container.querySelectorAll('.companion-bubble');" +
                     "    if(existingBubbles.length>0)return;" +
+                    // Skip restore if messages are older than 2 hours (stale session)
+                    "    var ts=parseInt(localStorage.getItem('based_companion_messages_ts')||'0');" +
+                    "    if(Date.now()-ts>7200000){localStorage.removeItem('based_companion_messages');localStorage.removeItem('based_companion_messages_ts');return;}" +
                     "    var stored=null;" +
                     "    try{var raw=localStorage.getItem('based_companion_messages');if(raw)stored=JSON.parse(raw);}catch(e){}" +
                     "    if(!stored||!Array.isArray(stored)||stored.length===0)return;" +
@@ -356,9 +359,9 @@ public class CompanionActivity extends AppCompatActivity {
                     "        if(text.trim())msgs.push({role:role,content:text.trim()});" +
                     "      });" +
                     "      if(msgs.length>0){" +
-                    "        try{localStorage.setItem('based_companion_messages',JSON.stringify(msgs));}catch(e){}" +
+                    "        try{localStorage.setItem('based_companion_messages',JSON.stringify(msgs));localStorage.setItem('based_companion_messages_ts',Date.now().toString());}catch(e){}" +
                     "      } else {" +
-                    "        localStorage.removeItem('based_companion_messages');" +
+                    "        localStorage.removeItem('based_companion_messages');localStorage.removeItem('based_companion_messages_ts');" +
                     "      }" +
                     "    }" +
                     "    var obs=new MutationObserver(saveMsgs);" +
