@@ -251,7 +251,9 @@ body {
   -webkit-backdrop-filter: blur(12px);
   flex-shrink: 0;
   position: relative;
-  z-index: 10000;
+  /* Above .tab-bar-row (10000) so the header's "More" dropdown paints over the
+     tab row instead of being covered by it. */
+  z-index: 10001;
 }
 
 .logo {
