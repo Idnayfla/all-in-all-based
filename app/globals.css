@@ -972,6 +972,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 .chat-empty-logo img {
   width: 80px;
@@ -8478,6 +8479,7 @@ html.has-wallpaper .editor-panel {
   width: 24px;
   height: 24px;
   flex-shrink: 0;
+  overflow: hidden;
 }
 .companion-title {
   font-size: 14px;
@@ -8805,8 +8807,8 @@ html.has-wallpaper .editor-panel {
 /* Listening — pulsing concentric rings */
 .companion-siri-orb {
   position: relative;
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -13887,6 +13889,10 @@ body:has(.beta-banner) .app-root {
   background: var(--bg2);
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  max-height: 55vh;
 }
 
 .companion-overlay-empty {
