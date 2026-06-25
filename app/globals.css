@@ -8805,14 +8805,6 @@ html.has-wallpaper .editor-panel {
 }
 
 /* Listening — pulsing concentric rings */
-.companion-siri-orb {
-  position: relative;
-  width: 64px;
-  height: 64px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 .siri-core {
   width: 14px;
   height: 14px;
@@ -8821,38 +8813,6 @@ html.has-wallpaper .editor-panel {
   box-shadow: 0 0 10px rgba(124, 58, 237, 0.9);
   z-index: 2;
   position: relative;
-}
-.siri-ring {
-  position: absolute;
-  border-radius: 50%;
-  border: 1.5px solid rgba(167, 139, 250, 0.55);
-  animation: siri-ring-expand 1.8s ease-out infinite;
-}
-.siri-ring:nth-child(1) {
-  width: 22px;
-  height: 22px;
-  animation-delay: 0s;
-}
-.siri-ring:nth-child(2) {
-  width: 34px;
-  height: 34px;
-  animation-delay: 0.45s;
-}
-.siri-ring:nth-child(3) {
-  width: 46px;
-  height: 46px;
-  animation-delay: 0.9s;
-}
-
-@keyframes siri-ring-expand {
-  0% {
-    opacity: 0.85;
-    transform: scale(0.6);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.3);
-  }
 }
 
 /* Processing — spinning arc */

@@ -2343,12 +2343,7 @@ export default function CompanionOverlayPage() {
               </>
             ) : wakeState === 'listening' ? (
               <>
-                <div className="companion-siri-orb">
-                  <span className="siri-ring" />
-                  <span className="siri-ring" />
-                  <span className="siri-ring" />
-                  <span className="siri-core" />
-                </div>
+                <span className="siri-core" />
                 <span className="companion-siri-label">listening</span>
               </>
             ) : null}
