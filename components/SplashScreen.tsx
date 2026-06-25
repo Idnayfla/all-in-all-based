@@ -105,7 +105,7 @@ export default function SplashScreen({ onDone }: Props) {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  /* ── Reveal timers — no auto-exit, wait for tap ── */
+  /* ── Reveal timers — auto-exit on Android WebView, tap-to-enter on web ── */
   useEffect(() => {
     const t1 = setTimeout(() => {
       setLogoIn(true);
@@ -114,13 +114,17 @@ export default function SplashScreen({ onDone }: Props) {
     const t2 = setTimeout(() => setTaglineIn(true), 1800);
     const t3 = setTimeout(() => setSubIn(true), 2200);
     const t4 = setTimeout(() => setTapHintIn(true), 2800);
+    // On Android WebView (BasedApp UA), skip the tap gate and auto-exit
+    const isAndroid = typeof navigator !== 'undefined' && /BasedApp/.test(navigator.userAgent);
+    const t5 = isAndroid ? setTimeout(() => exit(), 3200) : undefined;
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
       clearTimeout(t3);
       clearTimeout(t4);
+      if (t5) clearTimeout(t5);
     };
-  }, []);
+  }, [exit]);
 
   return (
     <div className={`splash-root${exiting ? ' exiting' : ''}`} onClick={exit}>
