@@ -1364,11 +1364,7 @@ export default function CompanionOverlayPage() {
       });
 
       if (!res.ok || !res.body) {
-        setMessages(prev => {
-          const next = [...prev];
-          next[next.length - 1] = { ...next[next.length - 1], content: '' };
-          return next;
-        });
+        setMessages([]);
         return;
       }
 
@@ -1434,18 +1430,10 @@ export default function CompanionOverlayPage() {
       }
 
       if (streamError) {
-        setMessages(prev => {
-          const next = [...prev];
-          next[next.length - 1] = { ...next[next.length - 1], content: '' };
-          return next;
-        });
+        setMessages([]);
       }
     } catch {
-      setMessages(prev => {
-        const next = [...prev];
-        next[next.length - 1] = { ...next[next.length - 1], content: '' };
-        return next;
-      });
+      setMessages([]);
     } finally {
       clearTimeout(fetchTimeoutId);
       if (slowWarningTimerRef.current) {
