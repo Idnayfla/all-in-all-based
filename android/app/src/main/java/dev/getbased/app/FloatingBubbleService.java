@@ -458,7 +458,7 @@ public class FloatingBubbleService extends Service {
                         long duration = System.currentTimeMillis() - touchDownTime;
                         if (duration < 400 && totalMoveX < dpToPx(10) && totalMoveY < dpToPx(10)) {
                             // Auto-unstick: if flag says open but activity is gone, reset
-                            if (companionOpen && !isCompanionInTaskStack()) {
+                            if (companionOpen && !isCompanionRunning()) {
                                 companionOpen = false;
                             }
                             if (!companionOpen) {
@@ -573,20 +573,9 @@ public class FloatingBubbleService extends Service {
         sendBroadcast(closeIntent);
     }
 
-    /** Returns true if CompanionActivity is currently in the app's task stack. */
-    private boolean isCompanionInTaskStack() {
-        android.app.ActivityManager am =
-                (android.app.ActivityManager) getSystemService(ACTIVITY_SERVICE);
-        if (am == null) return false;
-        String companionClass = CompanionActivity.class.getName();
-        for (android.app.ActivityManager.AppTask task : am.getAppTasks()) {
-            android.app.ActivityManager.RecentTaskInfo info = task.getTaskInfo();
-            if (info != null && info.numActivities > 0 && info.baseActivity != null
-                    && companionClass.equals(info.baseActivity.getClassName())) {
-                return true;
-            }
-        }
-        return false;
+    /** Returns true if CompanionActivity is currently running. */
+    private boolean isCompanionRunning() {
+        return CompanionActivity.isRunning;
     }
 
     // ── Logo helpers ──────────────────────────────────────────────────────────
