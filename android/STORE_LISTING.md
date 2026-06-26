@@ -48,12 +48,12 @@ Free to start. Pro unlocks unlimited use.
 
 ## Required assets
 
-| Asset                            | Spec                                              | Status                                    |
-| -------------------------------- | ------------------------------------------------- | ----------------------------------------- |
-| App icon                         | 512×512 PNG, 32-bit                               | have (`ic_launcher`) — export 512 version |
-| Feature graphic                  | 1024×500 PNG/JPG, no transparency                 | NEEDED                                    |
-| Phone screenshots                | 2–8 images, min 320px side, 16:9 or 9:16, PNG/JPG | NEEDED                                    |
-| (optional) 7" / 10" tablet shots | —                                                 | optional                                  |
+| Asset                            | Spec                                              | Status                                          |
+| -------------------------------- | ------------------------------------------------- | ----------------------------------------------- |
+| App icon                         | 512×512 PNG, 32-bit                               | DONE — `store-assets/icon-512.png`              |
+| Feature graphic                  | 1024×500 PNG/JPG, no transparency                 | DONE — `store-assets/feature-graphic.png`       |
+| Phone screenshots                | 2–8 images, min 320px side, 16:9 or 9:16, PNG/JPG | DONE — `store-assets/screenshot-1..4.png` (4×) |
+| (optional) 7" / 10" tablet shots | —                                                 | optional                                        |
 
 ### Feature graphic (1024×500) — content idea
 
@@ -110,7 +110,7 @@ app. The app shows a "manage on web" note instead of a purchase flow, so no
 non-Google-Play billing occurs in the app. Free features are fully usable
 without subscribing.
 
-Test account:  <CREATE A TEST EMAIL + PASSWORD AND PUT IT HERE>
+Test account:  reviewer@getbased.dev / BasedReview2026!
 ```
 
 ## Release build
