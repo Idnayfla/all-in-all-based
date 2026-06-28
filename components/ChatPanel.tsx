@@ -298,6 +298,8 @@ export default function ChatPanel({
   const [pendingDocuments, setPendingDocuments] = useState<
     Array<{ name: string; storageKey: string }>
   >([]);
+  const [docUploading, setDocUploading] = useState(false);
+  const [docError, setDocError] = useState('');
   const [pendingImages, setPendingImages] = useState<
     Array<{
       data: string;
@@ -835,10 +837,12 @@ export default function ChatPanel({
   ): Promise<{
     textFiles: { name: string; relativePath: string; content: string }[];
     pdfFiles: { name: string; storageKey: string }[];
+    failedCount: number;
   }> => {
     const zip = await JSZip.loadAsync(file);
     const textFiles: { name: string; relativePath: string; content: string }[] = [];
     const pdfFiles: { name: string; storageKey: string }[] = [];
+    let failedCount = 0;
     const entries = Object.entries(zip.files).filter(([, f]) => !f.dir);
     for (const [path, entry] of entries.slice(0, 100)) {
       if (isIgnoredPath(path)) continue;
@@ -856,17 +860,20 @@ export default function ChatPanel({
           const content = await entry.async('text');
           if (content.length < 500_000) textFiles.push({ name, relativePath: path, content });
         }
-      } catch {
-        /* skip unreadable entry */
+      } catch (err) {
+        if (ext === '.pdf') failedCount++;
+        console.error(`[Based/zip] failed to process ${name}:`, err);
       }
     }
-    return { textFiles, pdfFiles };
+    return { textFiles, pdfFiles, failedCount };
   };
 
   const handleDocFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     setShowAttachMenu(false);
+    setDocError('');
+    setDocUploading(true);
     for (const file of Array.from(files)) {
       const lower = file.name.toLowerCase();
       try {
@@ -874,7 +881,7 @@ export default function ChatPanel({
           const doc = await processPdfFile(file);
           setPendingDocuments(prev => [...prev, doc].slice(0, 25));
         } else if (lower.endsWith('.zip')) {
-          const { textFiles, pdfFiles } = await processZipFile(file);
+          const { textFiles, pdfFiles, failedCount } = await processZipFile(file);
           if (pdfFiles.length > 0) setPendingDocuments(prev => [...prev, ...pdfFiles].slice(0, 25));
           if (textFiles.length > 0) {
             let budget = MAX_TOTAL_FILE_CHARS;
@@ -892,23 +899,20 @@ export default function ChatPanel({
             setPendingFiles(prev => [...prev, ...trimmed].slice(0, MAX_FILES));
           }
           if (pdfFiles.length === 0 && textFiles.length === 0) {
-            // Nothing readable — show a placeholder so the user sees it registered
-            setPendingFiles(prev =>
-              [
-                ...prev,
-                {
-                  name: file.name,
-                  relativePath: file.name,
-                  content: `[ZIP: no readable files found in ${file.name}]`,
-                },
-              ].slice(0, MAX_FILES)
+            setDocError(`No readable files found in ${file.name}`);
+          } else if (failedCount > 0) {
+            setDocError(
+              `${failedCount} PDF${failedCount > 1 ? 's' : ''} failed to upload — check the pdf-uploads bucket exists in Supabase.`
             );
           }
         }
       } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Upload failed';
         console.error('[Based] document processing failed:', err);
+        setDocError(msg);
       }
     }
+    setDocUploading(false);
     e.target.value = '';
   };
 
@@ -2348,6 +2352,18 @@ export default function ChatPanel({
                 </button>
               </div>
             ))}
+          </div>
+        )}
+        {docUploading && (
+          <div className="chat-pending-files">
+            <span className="chat-pending-files-meta">◈ Uploading PDFs...</span>
+          </div>
+        )}
+        {docError && (
+          <div className="chat-pending-files">
+            <span className="chat-pending-files-meta" style={{ color: 'var(--color-error, #e05)' }}>
+              ⚠ {docError}
+            </span>
           </div>
         )}
         {pendingDocuments.length > 0 && (
