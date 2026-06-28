@@ -966,10 +966,11 @@ export async function POST(req: NextRequest) {
   }>;
 
   // Convert app content blocks to Anthropic-compatible blocks (handles pdf → document).
-  // stripDocuments: replace pdf base64 with a [PDF: name] placeholder (for history messages).
+  // stripDocuments: replace pdf with a [PDF: name] placeholder (for history messages).
   function toAnthropicContent(
     content: string | Array<{ type: string; [key: string]: unknown }>,
-    stripDocuments = false
+    stripDocuments = false,
+    pdfDataMap?: Map<string, string>
   ): Anthropic.MessageParam['content'] {
     if (typeof content === 'string') return content;
     const result: Anthropic.MessageParam['content'] = [];
@@ -980,11 +981,19 @@ export async function POST(req: NextRequest) {
             type: 'text',
             text: `[PDF: ${(b.name as string) ?? 'document'}]`,
           });
-        } else if (typeof b.data === 'string' && b.data) {
-          (result as Anthropic.ContentBlockParam[]).push({
-            type: 'document',
-            source: { type: 'base64', media_type: 'application/pdf', data: b.data as string },
-          } as unknown as Anthropic.ContentBlockParam);
+        } else {
+          const base64 = pdfDataMap?.get(b.storageKey as string);
+          if (base64) {
+            (result as Anthropic.ContentBlockParam[]).push({
+              type: 'document',
+              source: { type: 'base64', media_type: 'application/pdf', data: base64 },
+            } as unknown as Anthropic.ContentBlockParam);
+          } else {
+            (result as Anthropic.ContentBlockParam[]).push({
+              type: 'text',
+              text: `[PDF: ${(b.name as string) ?? 'document'}]`,
+            });
+          }
         }
       } else if (b.type === 'text' && typeof b.text === 'string' && b.text) {
         (result as Anthropic.ContentBlockParam[]).push({ type: 'text', text: b.text as string });
@@ -1041,10 +1050,29 @@ export async function POST(req: NextRequest) {
     visionBase64 = activeScreenshot.replace(/^data:image\/\w+;base64,/, '');
   }
 
+  // Pre-download PDFs from Supabase Storage for the current (last) message.
+  const pdfDataMap = new Map<string, string>();
+  if (hasDocument) {
+    const lastMsg = typedMessages[typedMessages.length - 1];
+    const keys: string[] = [];
+    if (Array.isArray(lastMsg?.content)) {
+      for (const b of lastMsg.content) {
+        if (b.type === 'pdf' && typeof b.storageKey === 'string') keys.push(b.storageKey as string);
+      }
+    }
+    await Promise.all(
+      keys.map(async key => {
+        const { data, error } = await supabaseAdmin.storage.from('pdf-uploads').download(key);
+        if (error || !data) return;
+        const buf = await data.arrayBuffer();
+        pdfDataMap.set(key, Buffer.from(buf).toString('base64'));
+      })
+    );
+  }
+
   // Anthropic-format messages — vision content blocks for screenshot/ambientFrame, previewSource as text, pdf → document.
   const apiMessages = typedMessages.map((m, i) => {
     if (i !== messages.length - 1 || m.role !== 'user') {
-      // Strip PDF base64 from history — data already consumed in the turn it was sent
       return { role: m.role as 'user' | 'assistant', content: toAnthropicContent(m.content, true) };
     }
 
@@ -1093,7 +1121,7 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    return { role: 'user' as const, content: toAnthropicContent(m.content) };
+    return { role: 'user' as const, content: toAnthropicContent(m.content, false, pdfDataMap) };
   });
 
   const encoder = new TextEncoder();

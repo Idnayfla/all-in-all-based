@@ -20,7 +20,6 @@ import { BRAIN_TOOLS, runBrainTool } from '@/lib/brainTools';
 import { checkAndIncrementGeneration } from '@/lib/tiers';
 
 export const maxDuration = 300;
-export const maxBodySize = '50mb';
 
 // Resolve the Anthropic key from either env var name so prod (which may set
 // APP_ANTHROPIC_API_KEY) and beta (ANTHROPIC_API_KEY) behave identically.
@@ -1561,7 +1560,7 @@ function stripTags(text: string) {
 type ApiContentBlock =
   | { type: 'text'; text: string }
   | { type: 'image'; mediaType: string; data: string }
-  | { type: 'pdf'; name: string; data: string }
+  | { type: 'pdf'; name: string; storageKey: string }
   | { type: 'clarify'; question: string }
   | { type: 'error'; message: string }
   | { type: string; [key: string]: unknown };
@@ -1590,10 +1589,31 @@ type ClaudeDocumentBlock = {
 };
 type ClaudeContentBlock = ClaudeTextBlock | ClaudeImageBlock | ClaudeDocumentBlock;
 
+async function prefetchPdfs(messages: ApiMessage[]): Promise<Map<string, string>> {
+  const keys = new Set<string>();
+  for (const msg of messages) {
+    if (!Array.isArray(msg.content)) continue;
+    for (const b of msg.content as ApiContentBlock[]) {
+      if (b.type === 'pdf' && 'storageKey' in b) keys.add((b as { storageKey: string }).storageKey);
+    }
+  }
+  const map = new Map<string, string>();
+  await Promise.all(
+    [...keys].map(async key => {
+      const { data, error } = await supabaseAdmin.storage.from('pdf-uploads').download(key);
+      if (error || !data) return;
+      const buf = await data.arrayBuffer();
+      map.set(key, Buffer.from(buf).toString('base64'));
+    })
+  );
+  return map;
+}
+
 function toClaudeContent(
   content: string | ApiContentBlock[],
   appendText?: string,
-  stripDocuments = false
+  stripDocuments = false,
+  pdfDataMap?: Map<string, string>
 ): string | ClaudeContentBlock[] {
   if (typeof content === 'string') {
     return appendText ? content + appendText : content;
@@ -1617,19 +1637,23 @@ function toClaudeContent(
         });
       }
     } else if (block.type === 'pdf') {
-      const b = block as { type: 'pdf'; name: string; data: string };
+      const b = block as { type: 'pdf'; name: string; storageKey: string };
       if (stripDocuments) {
-        // Replace with a lightweight placeholder — base64 data already consumed in the turn it was sent
         blocks.push({ type: 'text', text: `[PDF: ${b.name}]` });
-      } else if (b.data) {
-        blocks.push({
-          type: 'document',
-          source: {
-            type: 'base64' as const,
-            media_type: 'application/pdf' as const,
-            data: b.data,
-          },
-        });
+      } else {
+        const base64 = pdfDataMap?.get(b.storageKey);
+        if (base64) {
+          blocks.push({
+            type: 'document',
+            source: {
+              type: 'base64' as const,
+              media_type: 'application/pdf' as const,
+              data: base64,
+            },
+          });
+        } else {
+          blocks.push({ type: 'text', text: `[PDF: ${b.name}]` });
+        }
       }
     } else if (block.type === 'clarify') {
       const b = block as { type: 'clarify'; question: string };
@@ -1924,8 +1948,6 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const rawText = await req.text();
-    console.log(`[Based/generate] body size: ${(rawText.length / 1024 / 1024).toFixed(1)} MB`);
     const {
       messages,
       existingFiles,
@@ -1936,7 +1958,7 @@ export async function POST(req: NextRequest) {
       aiModel,
       persona,
       forceChatMode: rawForceChatMode,
-    } = JSON.parse(rawText);
+    } = await req.json();
     const forceChatMode = Boolean(rawForceChatMode);
 
     if (Array.isArray(existingFiles) && existingFiles.length > 50) {
@@ -2052,12 +2074,17 @@ export async function POST(req: NextRequest) {
       ? `\n\nCurrent project files:\n${(existingFiles as ProjectFile[]).map(f => `--- ${f.name} (${f.language}) ---\n${f.content}`).join('\n\n')}`
       : '';
 
+    // Download PDFs from Supabase Storage for the current message only; history uses placeholders.
+    const pdfDataMap = hasDocument
+      ? await prefetchPdfs(recentMessages.slice(-1))
+      : new Map<string, string>();
+
     const anthropicMessages = recentMessages.map((m, i) => ({
       role: m.role as 'user' | 'assistant',
       content:
         i === recentMessages.length - 1 && m.role === 'user'
-          ? toClaudeContent(m.content, context || undefined) // current message — include PDFs
-          : toClaudeContent(m.content, undefined, true), // history — strip PDF data, keep [PDF: name] placeholder
+          ? toClaudeContent(m.content, context || undefined, false, pdfDataMap)
+          : toClaudeContent(m.content, undefined, true), // history — replace PDFs with [PDF: name]
     }));
 
     // Static SYSTEM is first so it caches across all requests; dynamic parts appended after.

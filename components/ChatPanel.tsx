@@ -295,9 +295,9 @@ export default function ChatPanel({
   const [pendingFiles, setPendingFiles] = useState<
     Array<{ name: string; relativePath: string; content: string }>
   >([]);
-  const [pendingDocuments, setPendingDocuments] = useState<Array<{ name: string; data: string }>>(
-    []
-  );
+  const [pendingDocuments, setPendingDocuments] = useState<
+    Array<{ name: string; storageKey: string }>
+  >([]);
   const [pendingImages, setPendingImages] = useState<
     Array<{
       data: string;
@@ -771,19 +771,33 @@ export default function ChatPanel({
       reader.readAsText(file);
     });
 
-  const processPdfFile = (file: File): Promise<{ name: string; data: string }> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = e => {
-        const arrayBuffer = e.target?.result as ArrayBuffer;
-        const bytes = new Uint8Array(arrayBuffer);
-        let binary = '';
-        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-        resolve({ name: file.name, data: btoa(binary) });
-      };
-      reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
-      reader.readAsArrayBuffer(file);
+  const processPdfFile = async (
+    file: File | { name: string; buffer: ArrayBuffer }
+  ): Promise<{ name: string; storageKey: string }> => {
+    const name = file instanceof File ? file.name : file.name;
+    const buffer = file instanceof File ? await file.arrayBuffer() : file.buffer;
+    const blob = new Blob([buffer], { type: 'application/pdf' });
+
+    const urlRes = await fetch('/api/pdf-upload-url', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      },
+      body: JSON.stringify({ filename: name }),
     });
+    if (!urlRes.ok) throw new Error(`PDF upload URL failed for ${name}`);
+    const { signedUrl, key } = (await urlRes.json()) as { signedUrl: string; key: string };
+
+    const uploadRes = await fetch(signedUrl, {
+      method: 'PUT',
+      body: blob,
+      headers: { 'Content-Type': 'application/pdf' },
+    });
+    if (!uploadRes.ok) throw new Error(`PDF upload failed for ${name}`);
+
+    return { name, storageKey: key };
+  };
 
   // Extensions that are definitely binary — skip in ZIP extraction
   const BINARY_EXTS = new Set([
@@ -820,11 +834,11 @@ export default function ChatPanel({
     file: File
   ): Promise<{
     textFiles: { name: string; relativePath: string; content: string }[];
-    pdfFiles: { name: string; data: string }[];
+    pdfFiles: { name: string; storageKey: string }[];
   }> => {
     const zip = await JSZip.loadAsync(file);
     const textFiles: { name: string; relativePath: string; content: string }[] = [];
-    const pdfFiles: { name: string; data: string }[] = [];
+    const pdfFiles: { name: string; storageKey: string }[] = [];
     const entries = Object.entries(zip.files).filter(([, f]) => !f.dir);
     for (const [path, entry] of entries.slice(0, 100)) {
       if (isIgnoredPath(path)) continue;
@@ -836,16 +850,14 @@ export default function ChatPanel({
       try {
         if (ext === '.pdf') {
           const ab = await entry.async('arraybuffer');
-          const bytes = new Uint8Array(ab);
-          let binary = '';
-          for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
-          pdfFiles.push({ name, data: btoa(binary) });
+          const doc = await processPdfFile({ name, buffer: ab });
+          pdfFiles.push(doc);
         } else {
           const content = await entry.async('text');
           if (content.length < 500_000) textFiles.push({ name, relativePath: path, content });
         }
       } catch {
-        /* skip unreadable entries */
+        /* skip unreadable entry */
       }
     }
     return { textFiles, pdfFiles };
@@ -1235,7 +1247,7 @@ export default function ChatPanel({
     const documentBlocks = pendingDocuments.map(doc => ({
       type: 'pdf' as const,
       name: doc.name,
-      data: doc.data,
+      storageKey: doc.storageKey,
     }));
 
     const messageContent: Message['content'] =
@@ -1294,11 +1306,10 @@ export default function ChatPanel({
       track('generation_started');
 
       // Strip base64 image data from all but the most recent image-bearing message.
-      // The server only uses the last image anyway — keeping old ones re-sends MBs each turn.
       // File blocks are converted to fenced code blocks for the API.
+      // PDFs are now stored by key in Supabase — no stripping needed.
       const msgsForApi = (() => {
         let imageKept = false;
-        let pdfMsgKept = false;
         return [...newMessages]
           .reverse()
           .map(msg => {
@@ -1306,11 +1317,7 @@ export default function ChatPanel({
             const blocks = msg.content as ContentBlock[];
             const hasImg = blocks.some(b => b.type === 'image');
             const hasFile = blocks.some(b => b.type === 'file');
-            const hasPdf = blocks.some(b => b.type === 'pdf');
-            if (!hasImg && !hasFile && !hasPdf) return msg;
-            // Most-recent PDF message keeps full base64; all older turns use a placeholder
-            const keepPdfs = hasPdf && !pdfMsgKept;
-            if (hasPdf) pdfMsgKept = true;
+            if (!hasImg && !hasFile) return msg;
             const converted = blocks.map(b => {
               if (b.type === 'file') {
                 const ext = b.name.split('.').pop() || '';
@@ -1326,38 +1333,12 @@ export default function ChatPanel({
                 }
                 return { type: 'text' as const, text: '[reference image]' };
               }
-              if (b.type === 'pdf') {
-                if (keepPdfs) return b;
-                const pdfBlock = b as { type: 'pdf'; name: string; data: string };
-                return { type: 'text' as const, text: `[PDF: ${pdfBlock.name}]` };
-              }
               return b;
             });
             return { ...msg, content: converted };
           })
           .reverse();
       })();
-
-      const requestBody = JSON.stringify({
-        messages: msgsForApi,
-        existingFiles: files,
-        personality,
-        memory,
-        globalMemory,
-        location: locationRef.current,
-        aiModel,
-        persona,
-        forceChatMode: chatMode === 'companion',
-      });
-
-      const bodySizeMB = requestBody.length / 1024 / 1024;
-      console.log(`[Based] request body: ${bodySizeMB.toFixed(1)} MB`);
-
-      if (bodySizeMB > 45) {
-        throw new Error(
-          `Attached PDFs are too large to send (${bodySizeMB.toFixed(0)} MB total). Try attaching fewer or smaller PDFs — aim for under 40 MB total.`
-        );
-      }
 
       const res = await fetch('/api/generate', {
         method: 'POST',
@@ -1366,7 +1347,17 @@ export default function ChatPanel({
           'Content-Type': 'application/json',
           ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
-        body: requestBody,
+        body: JSON.stringify({
+          messages: msgsForApi,
+          existingFiles: files,
+          personality,
+          memory,
+          globalMemory,
+          location: locationRef.current,
+          aiModel,
+          persona,
+          forceChatMode: chatMode === 'companion',
+        }),
       });
 
       if (res.status === 402) {
