@@ -772,7 +772,7 @@ export async function POST(req: NextRequest) {
 
   // Task management + brain cleanup from companion — detect and run tool loop
   const COMPANION_TASK_RE =
-    /\b(add\s+a?\s*(task|meeting|call|appointment|event|reminder)|create\s+a?\s*(task|meeting|call|appointment|event)|new\s+(task|meeting|call|appointment)|book\s+(a\s+)?(meeting|call|slot|appointment|time)|set\s+(up\s+)?(a\s+)?(meeting|call|appointment)|put\s+.{0,30}(in|on|into)\s+(my\s+)?(calendar|schedule)|block\s+(out|off)|remind\s+me\s+to|add\s+to\s+(my\s+)?tasks?|what(?:'?s|\s+is)?\s+(due|on my|my)\s+(today|list|tasks?)|what\s+do\s+i\s+have\s+due|list\s+(my\s+)?tasks?|show\s+(my\s+)?tasks?|mark\s+.{0,40}\s+as\s+done|complete\s+task|finish\s+task|task\s+done|clean\s+(up\s+)?(my\s+)?(brain|memory)|fix\s+(my\s+)?(brain|memory)|revamp\s+(my\s+)?(brain|memory)|reorgani[sz]e\s+(my\s+)?(brain|memory)|rewrite\s+(my\s+)?(brain|memory)|update\s+(my\s+)?(brain|memory)|my\s+(brain|memory)\s+(is\s+)?(wrong|messy|broken|off|outdated|incorrect)|schedule\s+(a\s+)?(meeting|call|task|session|appointment)|i('?m|\s+am)\s+(usually\s+free|busy|available|not\s+available)|i('?ll|\s+will)\s+be\s+in\s+\w|i\s+work\s+(from\s+)?\d|going\s+to\s+\w+\s+(from|on)|i\s+won't\s+be\s+(around|available)|my\s+timezone|i('?m|\s+am)\s+in\s+\w+\s+time|remove.{0,30}from.{0,20}calendar|delete.{0,20}event|cancel.{0,20}(meeting|appointment)|remove.{0,20}(meeting|appointment)|(remove|delete)\s+all|(shift|reschedule)\s+\w+|move\s+(my\s+)?[\w\s]{1,30}(to|by|\d|ahead|forward|back)|what.{0,20}(on|have).{0,20}(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|\d{1,2}(st|nd|rd|th))|what.{0,15}my.{0,15}(schedule|calendar|events?)|(?:change|update|edit|rename)\s+(?:the\s+)?(?:task|meeting|event|appointment)|(?:change|set|update)\s+(?:the\s+)?(?:duration|time|date|title|name)|make\s+it\s+\d+\s+(?:hours?|minutes?|mins?|hrs?))\b/i;
+    /\b(add\s+a?\s*(task|meeting|call|appointment|event|reminder)|create\s+a?\s*(task|meeting|call|appointment|event)|new\s+(task|meeting|call|appointment)|book\s+(a\s+)?(meeting|call|slot|appointment|time)|set\s+(up\s+)?(a\s+)?(meeting|call|appointment)|put\s+.{0,30}(in|on|into)\s+(my\s+)?(calendar|schedule)|block\s+(out|off)|remind\s+me\s+to|add\s+to\s+(my\s+)?tasks?|what(?:'?s|\s+is)?\s+(due|on my|my)\s+(today|list|tasks?)|what\s+do\s+i\s+have\s+due|list\s+(my\s+)?tasks?|show\s+(my\s+)?tasks?|mark\s+.{0,40}\s+as\s+done|complete\s+task|finish\s+task|task\s+done|clean\s+(up\s+)?(my\s+)?(brain|memory)|fix\s+(my\s+)?(brain|memory)|revamp\s+(my\s+)?(brain|memory)|reorgani[sz]e\s+(my\s+)?(brain|memory)|rewrite\s+(my\s+)?(brain|memory)|update\s+(my\s+)?(brain|memory)|save\s+(?:it|this|that|them)?\s*(?:in|into|to)\s+(?:your|my)\s*(brain|memory)|remember\s+(?:it|this|that|these)\s+(?:for\s+me|please)?|store\s+(?:it|this|that)\s+in\s+(?:your|my)\s*(brain|memory)|keep\s+(?:it|this|that)\s+in\s+(?:your|my)\s*(brain|memory)|my\s+(brain|memory)\s+(is\s+)?(wrong|messy|broken|off|outdated|incorrect)|schedule\s+(a\s+)?(meeting|call|task|session|appointment)|i('?m|\s+am)\s+(usually\s+free|busy|available|not\s+available)|i('?ll|\s+will)\s+be\s+in\s+\w|i\s+work\s+(from\s+)?\d|going\s+to\s+\w+\s+(from|on)|i\s+won't\s+be\s+(around|available)|my\s+timezone|i('?m|\s+am)\s+in\s+\w+\s+time|remove.{0,30}from.{0,20}calendar|delete.{0,20}event|cancel.{0,20}(meeting|appointment)|remove.{0,20}(meeting|appointment)|(remove|delete)\s+all|(shift|reschedule)\s+\w+|move\s+(my\s+)?[\w\s]{1,30}(to|by|\d|ahead|forward|back)|what.{0,20}(on|have).{0,20}(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|\d{1,2}(st|nd|rd|th))|what.{0,15}my.{0,15}(schedule|calendar|events?)|(?:change|update|edit|rename)\s+(?:the\s+)?(?:task|meeting|event|appointment)|(?:change|set|update)\s+(?:the\s+)?(?:duration|time|date|title|name)|make\s+it\s+\d+\s+(?:hours?|minutes?|mins?|hrs?))\b/i;
 
   // Re-trigger the tool loop when the user is mid-scheduling-negotiation.
   // Catches short affirmatives, time picks, and rescheduling words.
@@ -873,9 +873,17 @@ export async function POST(req: NextRequest) {
     ]
       .filter(Boolean)
       .join('\n\n');
+    // Strip PDF blocks — the tool loop doesn't prefetch Supabase docs,
+    // so raw { type:'pdf' } blocks would cause an Anthropic 400 error.
     const convo: Anthropic.MessageParam[] = (
-      messages as Array<{ role: string; content: string }>
-    ).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+      messages as Array<{
+        role: string;
+        content: string | Array<{ type: string; [key: string]: unknown }>;
+      }>
+    ).map(m => ({
+      role: m.role as 'user' | 'assistant',
+      content: toAnthropicContent(m.content, true),
+    }));
 
     let finalReply = '';
     const collectedSystemActions: Array<Record<string, unknown>> = [];
