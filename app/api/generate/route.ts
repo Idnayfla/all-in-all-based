@@ -1589,12 +1589,15 @@ type ClaudeDocumentBlock = {
 };
 type ClaudeContentBlock = ClaudeTextBlock | ClaudeImageBlock | ClaudeDocumentBlock;
 
-async function prefetchPdfs(messages: ApiMessage[]): Promise<Map<string, string>> {
+async function prefetchPdfs(messages: ApiMessage[], userId: string): Promise<Map<string, string>> {
   const keys = new Set<string>();
   for (const msg of messages) {
     if (!Array.isArray(msg.content)) continue;
     for (const b of msg.content as ApiContentBlock[]) {
-      if (b.type === 'pdf' && 'storageKey' in b) keys.add((b as { storageKey: string }).storageKey);
+      if (b.type === 'pdf' && 'storageKey' in b) {
+        const key = (b as { storageKey: string }).storageKey;
+        if (key.startsWith(`${userId}/`)) keys.add(key);
+      }
     }
   }
   const map = new Map<string, string>();
@@ -2076,7 +2079,7 @@ export async function POST(req: NextRequest) {
 
     // Download PDFs from Supabase Storage for the current message only; history uses placeholders.
     const pdfDataMap = hasDocument
-      ? await prefetchPdfs(recentMessages.slice(-1))
+      ? await prefetchPdfs(recentMessages.slice(-1), userId)
       : new Map<string, string>();
 
     const anthropicMessages = recentMessages.map((m, i) => ({

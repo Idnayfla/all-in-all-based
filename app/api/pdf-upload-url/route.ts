@@ -22,13 +22,16 @@ export async function POST(req: NextRequest) {
   if (!filename || typeof filename !== 'string') {
     return NextResponse.json({ error: 'filename required' }, { status: 400 });
   }
+  if (!filename.toLowerCase().endsWith('.pdf')) {
+    return NextResponse.json({ error: 'Only PDF files are allowed' }, { status: 400 });
+  }
 
   await ensureBucket();
 
   const key = `${userId}/${Date.now()}-${filename.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-  const { data, error } = await supabaseAdmin.storage
-    .from(BUCKET)
-    .createSignedUploadUrl(key, { upsert: true });
+  const { data, error } = await supabaseAdmin.storage.from(BUCKET).createSignedUploadUrl(key, {
+    upsert: true,
+  });
 
   if (error || !data) {
     return NextResponse.json(

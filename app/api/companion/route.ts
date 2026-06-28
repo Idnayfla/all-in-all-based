@@ -1052,12 +1052,16 @@ export async function POST(req: NextRequest) {
 
   // Pre-download PDFs from Supabase Storage for the current (last) message.
   const pdfDataMap = new Map<string, string>();
-  if (hasDocument) {
+  if (hasDocument && jwtUserId) {
     const lastMsg = typedMessages[typedMessages.length - 1];
     const keys: string[] = [];
     if (Array.isArray(lastMsg?.content)) {
       for (const b of lastMsg.content) {
-        if (b.type === 'pdf' && typeof b.storageKey === 'string') keys.push(b.storageKey as string);
+        if (b.type === 'pdf' && typeof b.storageKey === 'string') {
+          const key = b.storageKey as string;
+          // Ownership check: key must be scoped to the requesting user
+          if (key.startsWith(`${jwtUserId}/`)) keys.push(key);
+        }
       }
     }
     await Promise.all(
