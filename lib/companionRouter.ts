@@ -209,6 +209,7 @@ export async function streamCompanion(opts: {
   textMessages: Array<{ role: string; content: string }>;
   anthropicMessages: Anthropic.MessageParam[];
   hasVision: boolean;
+  hasDocument?: boolean;
   visionBase64?: string;
   visionMediaType?: string;
   controller: SSEController;
@@ -221,6 +222,7 @@ export async function streamCompanion(opts: {
     textMessages,
     anthropicMessages,
     hasVision,
+    hasDocument,
     visionBase64,
     visionMediaType,
     controller,
@@ -239,7 +241,7 @@ export async function streamCompanion(opts: {
       )
     )
       return { provider: 'gemini' };
-  } else if (!hasVision) {
+  } else if (!hasVision && !hasDocument) {
     if (await tryGroq(system, textMessages, controller, encoder)) return { provider: 'groq' };
     if (await tryCerebras(system, textMessages, controller, encoder))
       return { provider: 'cerebras' };

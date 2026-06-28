@@ -20,6 +20,7 @@ import { BRAIN_TOOLS, runBrainTool } from '@/lib/brainTools';
 import { checkAndIncrementGeneration } from '@/lib/tiers';
 
 export const maxDuration = 300;
+export const maxBodySize = '50mb';
 
 // Resolve the Anthropic key from either env var name so prod (which may set
 // APP_ANTHROPIC_API_KEY) and beta (ANTHROPIC_API_KEY) behave identically.
@@ -1560,6 +1561,7 @@ function stripTags(text: string) {
 type ApiContentBlock =
   | { type: 'text'; text: string }
   | { type: 'image'; mediaType: string; data: string }
+  | { type: 'pdf'; name: string; data: string }
   | { type: 'clarify'; question: string }
   | { type: 'error'; message: string }
   | { type: string; [key: string]: unknown };
@@ -1582,11 +1584,16 @@ type ClaudeImageBlock = {
   type: 'image';
   source: { type: 'base64'; media_type: ImageMediaType; data: string };
 };
-type ClaudeContentBlock = ClaudeTextBlock | ClaudeImageBlock;
+type ClaudeDocumentBlock = {
+  type: 'document';
+  source: { type: 'base64'; media_type: 'application/pdf'; data: string };
+};
+type ClaudeContentBlock = ClaudeTextBlock | ClaudeImageBlock | ClaudeDocumentBlock;
 
 function toClaudeContent(
   content: string | ApiContentBlock[],
-  appendText?: string
+  appendText?: string,
+  stripDocuments = false
 ): string | ClaudeContentBlock[] {
   if (typeof content === 'string') {
     return appendText ? content + appendText : content;
@@ -1609,6 +1616,21 @@ function toClaudeContent(
           },
         });
       }
+    } else if (block.type === 'pdf') {
+      const b = block as { type: 'pdf'; name: string; data: string };
+      if (stripDocuments) {
+        // Replace with a lightweight placeholder — base64 data already consumed in the turn it was sent
+        blocks.push({ type: 'text', text: `[PDF: ${b.name}]` });
+      } else if (b.data) {
+        blocks.push({
+          type: 'document',
+          source: {
+            type: 'base64' as const,
+            media_type: 'application/pdf' as const,
+            data: b.data,
+          },
+        });
+      }
     } else if (block.type === 'clarify') {
       const b = block as { type: 'clarify'; question: string };
       // clarify blocks become a plain-text summary so conversation history stays coherent
@@ -1623,7 +1645,11 @@ function toClaudeContent(
   if (appendText && appendText.trim()) blocks.push({ type: 'text', text: appendText });
   // if all we have is appendText and no real content, return as string
   if (blocks.length === 0) return appendText ?? '';
-  if (blocks.length === 1 && blocks[0].type === 'text' && !blocks.some(b => b.type === 'image')) {
+  if (
+    blocks.length === 1 &&
+    blocks[0].type === 'text' &&
+    !blocks.some(b => b.type === 'image' || b.type === 'document')
+  ) {
     return blocks[0].text;
   }
   return blocks;
@@ -1898,6 +1924,8 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const rawText = await req.text();
+    console.log(`[Based/generate] body size: ${(rawText.length / 1024 / 1024).toFixed(1)} MB`);
     const {
       messages,
       existingFiles,
@@ -1908,7 +1936,7 @@ export async function POST(req: NextRequest) {
       aiModel,
       persona,
       forceChatMode: rawForceChatMode,
-    } = await req.json();
+    } = JSON.parse(rawText);
     const forceChatMode = Boolean(rawForceChatMode);
 
     if (Array.isArray(existingFiles) && existingFiles.length > 50) {
@@ -2006,6 +2034,11 @@ export async function POST(req: NextRequest) {
         Array.isArray(m.content) && (m.content as ApiContentBlock[]).some(b => b.type === 'image')
     );
 
+    // True if any recent message contains a PDF document — forces Anthropic routing.
+    const hasDocument = recentMessages.some(
+      m => Array.isArray(m.content) && (m.content as ApiContentBlock[]).some(b => b.type === 'pdf')
+    );
+
     // Edit-intent detection: append Image Studio tip when image + edit keyword
     const EDIT_INTENT_RE =
       /\b(darken|brighten|lighten|darker|brighter|crop|filter|rotate|flip|blur|sharpen|resize|adjust|enhance|edit|retouch|remove\s+background|color|saturate|exposure)\b/i;
@@ -2023,8 +2056,8 @@ export async function POST(req: NextRequest) {
       role: m.role as 'user' | 'assistant',
       content:
         i === recentMessages.length - 1 && m.role === 'user'
-          ? toClaudeContent(m.content, context || undefined)
-          : toClaudeContent(m.content),
+          ? toClaudeContent(m.content, context || undefined) // current message — include PDFs
+          : toClaudeContent(m.content, undefined, true), // history — strip PDF data, keep [PDF: name] placeholder
     }));
 
     // Static SYSTEM is first so it caches across all requests; dynamic parts appended after.
@@ -2614,8 +2647,8 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             if (!routeToChat) {
               // Planner parse failed — stream via vision model (images) or text model (no images)
               let fullText = '';
-              if (imageBlocks.length > 0 || hasRecentImage) {
-                if (usingFreeModel && HAS_GEMINI_KEY) {
+              if (imageBlocks.length > 0 || hasRecentImage || hasDocument) {
+                if (usingFreeModel && HAS_GEMINI_KEY && !hasDocument) {
                   fullText = await streamGeminiVisionCollecting(
                     GEMINI_IMAGE_SYSTEM,
                     anthropicMessages,
@@ -2684,11 +2717,11 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
 
           if (routeToChat) {
             let fullText = '';
-            if (imageBlocks.length > 0 || hasRecentImage) {
-              // Image in current or recent message — Groq/Cerebras have no vision support.
-              // Free tier → Gemini Flash 2.0 (multimodal, free quota).
-              // Based AI (or no Gemini key) → Anthropic Opus with full conversation history.
-              if (usingFreeModel && HAS_GEMINI_KEY) {
+            if (imageBlocks.length > 0 || hasRecentImage || hasDocument) {
+              // Image/document in current or recent message — Groq/Cerebras have no vision/document support.
+              // Free tier → Gemini Flash 2.0 (multimodal, free quota) — but not for PDFs (Gemini path can't handle document blocks).
+              // Based AI (or PDF, or no Gemini key) → Anthropic Opus with full conversation history.
+              if (usingFreeModel && HAS_GEMINI_KEY && !hasDocument) {
                 fullText = await streamGeminiVisionCollecting(
                   GEMINI_IMAGE_SYSTEM,
                   anthropicMessages,

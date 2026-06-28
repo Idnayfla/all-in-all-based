@@ -13,6 +13,7 @@ import GeneratedMusicCard from './GeneratedMusicCard';
 import GeneratingCard from './GeneratingCard';
 import { track } from '@/lib/posthog';
 import { useTranslation } from '@/lib/i18n';
+import JSZip from 'jszip';
 
 const SUGGESTION_POOL = [
   'Build a todo app with drag & drop',
@@ -282,6 +283,7 @@ export default function ChatPanel({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const textFileInputRef = useRef<HTMLInputElement>(null);
+  const docFileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const locationRef = useRef<{ lat: number; lon: number } | null>(null);
 
@@ -293,6 +295,9 @@ export default function ChatPanel({
   const [pendingFiles, setPendingFiles] = useState<
     Array<{ name: string; relativePath: string; content: string }>
   >([]);
+  const [pendingDocuments, setPendingDocuments] = useState<Array<{ name: string; data: string }>>(
+    []
+  );
   const [pendingImages, setPendingImages] = useState<
     Array<{
       data: string;
@@ -766,6 +771,135 @@ export default function ChatPanel({
       reader.readAsText(file);
     });
 
+  const processPdfFile = (file: File): Promise<{ name: string; data: string }> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const arrayBuffer = e.target?.result as ArrayBuffer;
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+        resolve({ name: file.name, data: btoa(binary) });
+      };
+      reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+      reader.readAsArrayBuffer(file);
+    });
+
+  // Extensions that are definitely binary — skip in ZIP extraction
+  const BINARY_EXTS = new Set([
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.webp',
+    '.bmp',
+    '.ico',
+    '.mp4',
+    '.mp3',
+    '.wav',
+    '.mov',
+    '.avi',
+    '.webm',
+    '.zip',
+    '.gz',
+    '.tar',
+    '.rar',
+    '.7z',
+    '.exe',
+    '.dll',
+    '.so',
+    '.dylib',
+    '.woff',
+    '.woff2',
+    '.ttf',
+    '.otf',
+    '.eot',
+  ]);
+
+  const processZipFile = async (
+    file: File
+  ): Promise<{
+    textFiles: { name: string; relativePath: string; content: string }[];
+    pdfFiles: { name: string; data: string }[];
+  }> => {
+    const zip = await JSZip.loadAsync(file);
+    const textFiles: { name: string; relativePath: string; content: string }[] = [];
+    const pdfFiles: { name: string; data: string }[] = [];
+    const entries = Object.entries(zip.files).filter(([, f]) => !f.dir);
+    for (const [path, entry] of entries.slice(0, 100)) {
+      if (isIgnoredPath(path)) continue;
+      const name = path.split('/').pop() || path;
+      const lower = name.toLowerCase();
+      const dot = lower.lastIndexOf('.');
+      const ext = dot !== -1 ? lower.slice(dot) : '';
+      if (BINARY_EXTS.has(ext)) continue;
+      try {
+        if (ext === '.pdf') {
+          const ab = await entry.async('arraybuffer');
+          const bytes = new Uint8Array(ab);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+          pdfFiles.push({ name, data: btoa(binary) });
+        } else {
+          const content = await entry.async('text');
+          if (content.length < 500_000) textFiles.push({ name, relativePath: path, content });
+        }
+      } catch {
+        /* skip unreadable entries */
+      }
+    }
+    return { textFiles, pdfFiles };
+  };
+
+  const handleDocFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setShowAttachMenu(false);
+    for (const file of Array.from(files)) {
+      const lower = file.name.toLowerCase();
+      try {
+        if (lower.endsWith('.pdf')) {
+          const doc = await processPdfFile(file);
+          setPendingDocuments(prev => [...prev, doc].slice(0, 25));
+        } else if (lower.endsWith('.zip')) {
+          const { textFiles, pdfFiles } = await processZipFile(file);
+          if (pdfFiles.length > 0) setPendingDocuments(prev => [...prev, ...pdfFiles].slice(0, 25));
+          if (textFiles.length > 0) {
+            let budget = MAX_TOTAL_FILE_CHARS;
+            const trimmed = textFiles.reduce<typeof textFiles>((acc, f) => {
+              if (budget <= 0) return acc;
+              if (f.content.length <= budget) {
+                budget -= f.content.length;
+                acc.push(f);
+              } else {
+                acc.push({ ...f, content: f.content.slice(0, budget) + '\n... [truncated]' });
+                budget = 0;
+              }
+              return acc;
+            }, []);
+            setPendingFiles(prev => [...prev, ...trimmed].slice(0, MAX_FILES));
+          }
+          if (pdfFiles.length === 0 && textFiles.length === 0) {
+            // Nothing readable — show a placeholder so the user sees it registered
+            setPendingFiles(prev =>
+              [
+                ...prev,
+                {
+                  name: file.name,
+                  relativePath: file.name,
+                  content: `[ZIP: no readable files found in ${file.name}]`,
+                },
+              ].slice(0, MAX_FILES)
+            );
+          }
+        }
+      } catch (err) {
+        console.error('[Based] document processing failed:', err);
+      }
+    }
+    e.target.value = '';
+  };
+
   const handleFilesOrFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -799,6 +933,9 @@ export default function ChatPanel({
 
   const clearPendingFile = (index: number) =>
     setPendingFiles(prev => prev.filter((_, i) => i !== index));
+
+  const clearPendingDocument = (index: number) =>
+    setPendingDocuments(prev => prev.filter((_, i) => i !== index));
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = Array.from(e.clipboardData.items);
@@ -1052,7 +1189,13 @@ export default function ChatPanel({
 
   const send = async (text?: string) => {
     const trimmed = (text ?? input).trim();
-    if (!trimmed && pendingImages.length === 0 && pendingFiles.length === 0) return;
+    if (
+      !trimmed &&
+      pendingImages.length === 0 &&
+      pendingFiles.length === 0 &&
+      pendingDocuments.length === 0
+    )
+      return;
     if (isGenerating) return;
 
     // Companion mode: intercept build requests, switch to Build mode, nudge user to send again
@@ -1089,8 +1232,14 @@ export default function ChatPanel({
       content: f.content,
     }));
 
+    const documentBlocks = pendingDocuments.map(doc => ({
+      type: 'pdf' as const,
+      name: doc.name,
+      data: doc.data,
+    }));
+
     const messageContent: Message['content'] =
-      pendingImages.length > 0 || fileBlocks.length > 0
+      pendingImages.length > 0 || fileBlocks.length > 0 || documentBlocks.length > 0
         ? [
             ...pendingImages.map(img => ({
               type: 'image' as const,
@@ -1098,6 +1247,7 @@ export default function ChatPanel({
               data: img.data,
             })),
             ...fileBlocks,
+            ...documentBlocks,
             ...(trimmed ? [{ type: 'text' as const, text: trimmed }] : []),
           ]
         : trimmed;
@@ -1105,6 +1255,7 @@ export default function ChatPanel({
     setInput('');
     setPendingImages([]);
     setPendingFiles([]);
+    setPendingDocuments([]);
     setGenProgress(null);
     setLastSuggestions([]);
 
@@ -1147,6 +1298,7 @@ export default function ChatPanel({
       // File blocks are converted to fenced code blocks for the API.
       const msgsForApi = (() => {
         let imageKept = false;
+        let pdfMsgKept = false;
         return [...newMessages]
           .reverse()
           .map(msg => {
@@ -1154,7 +1306,11 @@ export default function ChatPanel({
             const blocks = msg.content as ContentBlock[];
             const hasImg = blocks.some(b => b.type === 'image');
             const hasFile = blocks.some(b => b.type === 'file');
-            if (!hasImg && !hasFile) return msg;
+            const hasPdf = blocks.some(b => b.type === 'pdf');
+            if (!hasImg && !hasFile && !hasPdf) return msg;
+            // Most-recent PDF message keeps full base64; all older turns use a placeholder
+            const keepPdfs = hasPdf && !pdfMsgKept;
+            if (hasPdf) pdfMsgKept = true;
             const converted = blocks.map(b => {
               if (b.type === 'file') {
                 const ext = b.name.split('.').pop() || '';
@@ -1170,12 +1326,38 @@ export default function ChatPanel({
                 }
                 return { type: 'text' as const, text: '[reference image]' };
               }
+              if (b.type === 'pdf') {
+                if (keepPdfs) return b;
+                const pdfBlock = b as { type: 'pdf'; name: string; data: string };
+                return { type: 'text' as const, text: `[PDF: ${pdfBlock.name}]` };
+              }
               return b;
             });
             return { ...msg, content: converted };
           })
           .reverse();
       })();
+
+      const requestBody = JSON.stringify({
+        messages: msgsForApi,
+        existingFiles: files,
+        personality,
+        memory,
+        globalMemory,
+        location: locationRef.current,
+        aiModel,
+        persona,
+        forceChatMode: chatMode === 'companion',
+      });
+
+      const bodySizeMB = requestBody.length / 1024 / 1024;
+      console.log(`[Based] request body: ${bodySizeMB.toFixed(1)} MB`);
+
+      if (bodySizeMB > 45) {
+        throw new Error(
+          `Attached PDFs are too large to send (${bodySizeMB.toFixed(0)} MB total). Try attaching fewer or smaller PDFs — aim for under 40 MB total.`
+        );
+      }
 
       const res = await fetch('/api/generate', {
         method: 'POST',
@@ -1184,17 +1366,7 @@ export default function ChatPanel({
           'Content-Type': 'application/json',
           ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
         },
-        body: JSON.stringify({
-          messages: msgsForApi,
-          existingFiles: files,
-          personality,
-          memory,
-          globalMemory,
-          location: locationRef.current,
-          aiModel,
-          persona,
-          forceChatMode: chatMode === 'companion',
-        }),
+        body: requestBody,
       });
 
       if (res.status === 402) {
@@ -2187,6 +2359,25 @@ export default function ChatPanel({
             ))}
           </div>
         )}
+        {pendingDocuments.length > 0 && (
+          <div className="chat-pending-files">
+            <span className="chat-pending-files-meta">
+              ◈ {pendingDocuments.length} PDF{pendingDocuments.length !== 1 ? 's' : ''} attached
+            </span>
+            {pendingDocuments.map((doc, idx) => (
+              <div key={idx} className="chat-file-pending-pill">
+                <span className="chat-file-pending-name">{doc.name}</span>
+                <button
+                  className="chat-file-pending-remove"
+                  onClick={() => clearPendingDocument(idx)}
+                  title="Remove PDF"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         {generationMode !== 'chat' && (
           <div className="chat-mode-bar chat-mode-bar--active">
             <ModeDropdown
@@ -2238,6 +2429,14 @@ export default function ChatPanel({
             webkitdirectory=""
             multiple
             onChange={handleFilesOrFolderSelect}
+          />
+          <input
+            type="file"
+            ref={docFileInputRef}
+            style={{ display: 'none' }}
+            accept=".pdf,.zip"
+            multiple
+            onChange={handleDocFileSelect}
           />
           <button
             className="upload-btn"
@@ -2306,6 +2505,16 @@ export default function ChatPanel({
                   }}
                 >
                   Folder
+                </button>
+                <button
+                  className="attach-menu-item"
+                  onMouseDown={e => {
+                    e.preventDefault();
+                    docFileInputRef.current?.click();
+                    setShowAttachMenu(false);
+                  }}
+                >
+                  PDF / ZIP
                 </button>
               </div>
             )}
@@ -2486,7 +2695,10 @@ export default function ChatPanel({
             disabled={
               isGenerating ||
               isGeneratingMedia ||
-              (!input.trim() && pendingImages.length === 0 && pendingFiles.length === 0)
+              (!input.trim() &&
+                pendingImages.length === 0 &&
+                pendingFiles.length === 0 &&
+                pendingDocuments.length === 0)
             }
             whileTap={{ scale: 0.95 }}
           >

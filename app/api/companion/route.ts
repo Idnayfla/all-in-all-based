@@ -960,11 +960,65 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const typedMessages = messages as Array<{ role: string; content: string }>;
+  const typedMessages = messages as Array<{
+    role: string;
+    content: string | Array<{ type: string; [key: string]: unknown }>;
+  }>;
+
+  // Convert app content blocks to Anthropic-compatible blocks (handles pdf → document).
+  // stripDocuments: replace pdf base64 with a [PDF: name] placeholder (for history messages).
+  function toAnthropicContent(
+    content: string | Array<{ type: string; [key: string]: unknown }>,
+    stripDocuments = false
+  ): Anthropic.MessageParam['content'] {
+    if (typeof content === 'string') return content;
+    const result: Anthropic.MessageParam['content'] = [];
+    for (const b of content) {
+      if (b.type === 'pdf') {
+        if (stripDocuments) {
+          (result as Anthropic.ContentBlockParam[]).push({
+            type: 'text',
+            text: `[PDF: ${(b.name as string) ?? 'document'}]`,
+          });
+        } else if (typeof b.data === 'string' && b.data) {
+          (result as Anthropic.ContentBlockParam[]).push({
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: b.data as string },
+          } as unknown as Anthropic.ContentBlockParam);
+        }
+      } else if (b.type === 'text' && typeof b.text === 'string' && b.text) {
+        (result as Anthropic.ContentBlockParam[]).push({ type: 'text', text: b.text as string });
+      } else if (b.type === 'image' && typeof b.data === 'string') {
+        const mt = (b.mediaType ?? 'image/jpeg') as
+          | 'image/jpeg'
+          | 'image/png'
+          | 'image/webp'
+          | 'image/gif';
+        (result as Anthropic.ContentBlockParam[]).push({
+          type: 'image',
+          source: { type: 'base64', media_type: mt, data: b.data as string },
+        });
+      }
+    }
+    return result;
+  }
+
+  // True if any message contains a PDF document — forces Anthropic routing.
+  const hasDocument = typedMessages.some(
+    m => Array.isArray(m.content) && m.content.some(b => b.type === 'pdf')
+  );
 
   // Text-only messages for Groq/Cerebras — previewSource injected as text, screenshot excluded.
   const textMessages = typedMessages.map((m, i) => {
-    if (i !== messages.length - 1 || m.role !== 'user') return { role: m.role, content: m.content };
+    const textContent =
+      typeof m.content === 'string'
+        ? m.content
+        : m.content
+            .filter(b => b.type === 'text')
+            .map(b => b['text'] as string)
+            .join('\n');
+    if (i !== messages.length - 1 || m.role !== 'user')
+      return { role: m.role, content: textContent };
     if (previewSource) {
       const safeSrc =
         previewSource.length > 40000
@@ -972,10 +1026,10 @@ export async function POST(req: NextRequest) {
           : previewSource;
       return {
         role: 'user',
-        content: `Here is the current preview source:\n\n${safeSrc}\n\n${m.content}`,
+        content: `Here is the current preview source:\n\n${safeSrc}\n\n${textContent}`,
       };
     }
-    return { role: m.role, content: m.content };
+    return { role: m.role, content: textContent };
   });
 
   // Extract vision data once — used by both apiMessages (Anthropic) and streamCompanion (Gemini).
@@ -987,15 +1041,26 @@ export async function POST(req: NextRequest) {
     visionBase64 = activeScreenshot.replace(/^data:image\/\w+;base64,/, '');
   }
 
-  // Anthropic-format messages — vision content blocks for screenshot/ambientFrame, previewSource as text.
+  // Anthropic-format messages — vision content blocks for screenshot/ambientFrame, previewSource as text, pdf → document.
   const apiMessages = typedMessages.map((m, i) => {
-    if (i !== messages.length - 1 || m.role !== 'user') return m;
+    if (i !== messages.length - 1 || m.role !== 'user') {
+      // Strip PDF base64 from history — data already consumed in the turn it was sent
+      return { role: m.role as 'user' | 'assistant', content: toAnthropicContent(m.content, true) };
+    }
+
+    const lastMsgText =
+      typeof m.content === 'string'
+        ? m.content
+        : (m.content as Array<{ type: string; text?: string }>)
+            .filter(b => b.type === 'text')
+            .map(b => b.text ?? '')
+            .join('\n');
 
     if (activeScreenshot && visionBase64) {
       const media_type = visionMediaType as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
       // Only include the text block when the user actually typed something.
       // Anthropic rejects { type: 'text', text: '' } with a 400 error.
-      const textContent = m.content?.trim();
+      const textContent = lastMsgText.trim();
       return {
         role: 'user' as const,
         content: [
@@ -1024,11 +1089,11 @@ export async function POST(req: NextRequest) {
           : previewSource;
       return {
         role: 'user' as const,
-        content: `Here is the current preview source:\n\n${safeSrc}\n\n${m.content}`,
+        content: `Here is the current preview source:\n\n${safeSrc}\n\n${lastMsgText}`,
       };
     }
 
-    return m;
+    return { role: 'user' as const, content: toAnthropicContent(m.content) };
   });
 
   const encoder = new TextEncoder();
@@ -1042,6 +1107,7 @@ export async function POST(req: NextRequest) {
           textMessages,
           anthropicMessages: apiMessages as Anthropic.MessageParam[],
           hasVision: !!activeScreenshot,
+          hasDocument,
           visionBase64,
           visionMediaType,
           controller,
