@@ -76,7 +76,6 @@ public class FloatingBubbleService extends Service {
     private final java.util.Random   blinkRandom  = new java.util.Random();
     private TextView      nameLabel;        // Feature 7 — name shown under bubble icon (hidden)
     private TextView      crownLabel;       // Feature 8 stage 6 — crown decoration
-    private View          outerRing;        // Feature 8 stage 2+ — outer pulsing ring
     private boolean       companionOpen       = false;
     private boolean       screenCaptureActive = false;
 
@@ -85,7 +84,6 @@ public class FloatingBubbleService extends Service {
     private long    breatheDuration  = 2800;     // ms per breathing cycle
     private int     strokeWidthDp    = 2;        // bubble border stroke
     private String  strokeColorIdle  = "#e0e0e0"; // idle stroke colour
-    private boolean outerRingVisible = false;    // whether outer ring is shown
 
     // ── Proactive engine ───────────────────────────────────────────────────────
     private long lastInteractionTime  = System.currentTimeMillis();
@@ -109,7 +107,6 @@ public class FloatingBubbleService extends Service {
     private AnimatorSet exitAnimator;        // exit shrink (anim 2b) — guard against double-dismiss
     private ObjectAnimator rippleAnimator;   // tap ripple (anim 3) — stored to cancel on double-tap
     private AnimatorSet glowAnimator;        // thinking glow (anim 4)
-    private AnimatorSet outerRingAnimator;   // outer ring pulse (anim 5) — feature 8
     private boolean     isThinking          = false;
     private int         thinkingRefCount    = 0; // counts in-flight /api/companion fetches
     private boolean     isDestroyed         = false; // set in onDestroy; guards post-destroy callbacks
@@ -283,7 +280,6 @@ public class FloatingBubbleService extends Service {
         cancelGlow();
         cancelRipple();
         cancelExit();
-        cancelOuterRing();
 
         try { unregisterReceiver(companionClosedReceiver); } catch (Exception ignored) {}
         try { unregisterReceiver(screenCaptureReceiver);   } catch (Exception ignored) {}
@@ -338,24 +334,6 @@ public class FloatingBubbleService extends Service {
 
         // ── Root container: bubble circle + name label + optional decorations ─
         FrameLayout container = new FrameLayout(this);
-
-        // ── Feature 8 stage 2+: outer ring view (behind everything) ───────────
-        outerRing = new View(this);
-        android.graphics.drawable.GradientDrawable ringDrawable =
-                new android.graphics.drawable.GradientDrawable();
-        ringDrawable.setShape(android.graphics.drawable.GradientDrawable.OVAL);
-        ringDrawable.setColor(Color.TRANSPARENT);
-        ringDrawable.setStroke(dpToPx(2), Color.parseColor("#f5c842"));
-        outerRing.setBackground(ringDrawable);
-        outerRing.setAlpha(0f); // hidden until applyEvolutionStage shows it
-        // Position: centered horizontally, vertically aligned with bubble circle
-        FrameLayout.LayoutParams ringParams = new FrameLayout.LayoutParams(
-                (int) (sizePx * 1.25f), (int) (sizePx * 1.25f));
-        // Centre the ring on the bubble circle centre (top of container)
-        int ringOffset = -(int) (sizePx * 0.125f); // (sizePx * 1.25 - sizePx) / 2 = sizePx * 0.125
-        ringParams.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        ringParams.topMargin = ringOffset;
-        container.addView(outerRing, ringParams);
 
         // ── Bubble circle ─────────────────────────────────────────────────────
         bubbleCircle = new FrameLayout(this);
@@ -429,8 +407,7 @@ public class FloatingBubbleService extends Service {
         crownParams.topMargin = 0; // sits at top edge of window (negative margin would clip outside window bounds)
         container.addView(crownLabel, crownParams);
 
-        // Window width must accommodate the outer ring (sizePx * 1.25) so it is not clipped.
-        int windowWidthPx = (int) (sizePx * 1.25f);
+        int windowWidthPx = sizePx;
         final WindowManager.LayoutParams params = new WindowManager.LayoutParams(
                 windowWidthPx, totalHeightPx,
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
@@ -479,7 +456,11 @@ public class FloatingBubbleService extends Service {
 
                     case MotionEvent.ACTION_UP:
                         long duration = System.currentTimeMillis() - touchDownTime;
-                        if (duration < 200 && totalMoveX < 10 && totalMoveY < 10) {
+                        if (duration < 400 && totalMoveX < dpToPx(10) && totalMoveY < dpToPx(10)) {
+                            // Auto-unstick: if flag says open but activity is gone, reset
+                            if (companionOpen && !isCompanionRunning()) {
+                                companionOpen = false;
+                            }
                             if (!companionOpen) {
                                 // Anim 3: tap ripple — run concurrently, don't delay open
                                 playTapRipple();
@@ -530,96 +511,40 @@ public class FloatingBubbleService extends Service {
             breatheDuration = 3500;
             strokeWidthDp   = 3;
             strokeColorIdle = "#ffd700";
-            outerRingVisible = true;
-            // Show crown
             if (crownLabel != null) crownLabel.setAlpha(1f);
-            // Ring: always visible, full amber glow
-            applyOuterRingAlpha(0.55f);
         } else if (days >= 60) {
             // Stage 5
             breatheMax      = 1.08f;
             breatheDuration = 2800;
             strokeWidthDp   = 3;
             strokeColorIdle = "#f5c842";
-            outerRingVisible = true;
-            applyOuterRingAlpha(0.30f);
         } else if (days >= 30) {
             // Stage 4
             breatheMax      = 1.08f;
             breatheDuration = 2800;
             strokeWidthDp   = 3;
             strokeColorIdle = "#ffd700";
-            outerRingVisible = true;
-            applyOuterRingAlpha(0.25f);
         } else if (days >= 14) {
             // Stage 3
             breatheMax      = 1.08f;
             breatheDuration = 2800;
             strokeWidthDp   = 3;
             strokeColorIdle = "#ffd700";
-            outerRingVisible = true;
-            applyOuterRingAlpha(0.20f);
         } else if (days >= 7) {
             // Stage 2
             breatheMax      = 1.10f;
             breatheDuration = 2800;
             strokeWidthDp   = 2;
             strokeColorIdle = "#f5c842";
-            outerRingVisible = true;
-            applyOuterRingAlpha(0.10f);
         } else {
             // Stage 1 — default
             breatheMax      = 1.08f;
             breatheDuration = 2800;
             strokeWidthDp   = 2;
             strokeColorIdle = "#e0e0e0";
-            outerRingVisible = false;
-            applyOuterRingAlpha(0f);
         }
 
-        // Rebuild bubble background with correct stroke from stage
         updateBubbleStroke();
-
-        // Start outer ring pulse animation for stages that need it
-        if (outerRingVisible && outerRing != null) {
-            startOuterRingPulse(days);
-        }
-    }
-
-    private void applyOuterRingAlpha(float alpha) {
-        if (outerRing != null) outerRing.setAlpha(alpha);
-    }
-
-    // ── Outer ring pulse animation ─────────────────────────────────────────────
-
-    private void startOuterRingPulse(long days) {
-        if (outerRing == null || !outerRingVisible) return;
-        cancelOuterRing();
-
-        // Stage 5+: faster ring at 1400ms; others at 2800ms (opposite phase to breathing)
-        long ringDuration = (days >= 60) ? 1400 : 2800;
-
-        // Opposite phase: when bubble inhales (1.0→breatheMax), ring exhales (1.0→0.85)
-        ObjectAnimator ringScaleX = ObjectAnimator.ofFloat(outerRing, "scaleX", 1.0f, 0.85f, 1.0f);
-        ObjectAnimator ringScaleY = ObjectAnimator.ofFloat(outerRing, "scaleY", 1.0f, 0.85f, 1.0f);
-
-        ringScaleX.setDuration(ringDuration);
-        ringScaleY.setDuration(ringDuration);
-        ringScaleX.setRepeatCount(ObjectAnimator.INFINITE);
-        ringScaleY.setRepeatCount(ObjectAnimator.INFINITE);
-        ringScaleX.setInterpolator(new AccelerateDecelerateInterpolator());
-        ringScaleY.setInterpolator(new AccelerateDecelerateInterpolator());
-
-        outerRingAnimator = new AnimatorSet();
-        outerRingAnimator.playTogether(ringScaleX, ringScaleY);
-        outerRingAnimator.start();
-    }
-
-    private void cancelOuterRing() {
-        if (outerRingAnimator != null) {
-            outerRingAnimator.cancel();
-            outerRingAnimator = null;
-        }
     }
 
     // ── Companion open/close ───────────────────────────────────────────────────
@@ -629,8 +554,15 @@ public class FloatingBubbleService extends Service {
         companionOpen = true;
         hideSpeechBubble();
         Intent intent = new Intent(this, CompanionActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-        startActivity(intent);
+        // singleTask in manifest already handles bring-to-front; FLAG_ACTIVITY_REORDER_TO_FRONT
+        // conflicts with excludeFromRecents="true" on Android 12+ and can silently fail.
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        try {
+            startActivity(intent);
+        } catch (Exception e) {
+            // Android 12+ may block background launches — reset flag so next tap retries
+            companionOpen = false;
+        }
     }
 
     private void closeCompanion() {
@@ -639,6 +571,11 @@ public class FloatingBubbleService extends Service {
         Intent closeIntent = new Intent(CompanionActivity.ACTION_CLOSE_REQUEST);
         closeIntent.setPackage(getPackageName());
         sendBroadcast(closeIntent);
+    }
+
+    /** Returns true if CompanionActivity is currently running. */
+    private boolean isCompanionRunning() {
+        return CompanionActivity.isRunning;
     }
 
     // ── Logo helpers ──────────────────────────────────────────────────────────
@@ -847,7 +784,6 @@ public class FloatingBubbleService extends Service {
         cancelBreathing();
         cancelGlow();
         cancelRipple();
-        cancelOuterRing();
         cancelLipSync();
         hideSpeechBubble();
 

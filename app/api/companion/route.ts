@@ -13,6 +13,52 @@ import { BRAIN_TOOLS, runBrainTool, listTasks, listCalendarEvents } from '@/lib/
 import { getSchedulingPrefs } from '@/lib/schedulingPrefs';
 import { getEffectiveTier, TIER_LIMITS } from '@/lib/tiers';
 
+const PDF_CHUNK_PAGES = 300;
+const PDF_MAX_CHUNK_B64 = 20_000_000;
+
+type PdfEntry = {
+  chunks: string[];
+  pageRanges: Array<[number, number]>;
+  pagesIncluded: number;
+  totalPages: number;
+};
+
+async function splitPdfToChunks(buf: ArrayBuffer): Promise<PdfEntry> {
+  const { PDFDocument } = await import('pdf-lib');
+  const src = await PDFDocument.load(buf, { ignoreEncryption: true });
+  const totalPages = src.getPageCount();
+
+  const makeChunk = async (start: number, count: number): Promise<string> => {
+    if (start === 0 && count >= totalPages) return Buffer.from(buf).toString('base64');
+    const out = await PDFDocument.create();
+    const pages = await out.copyPages(src, Array.from({ length: count }, (_, i) => start + i));
+    pages.forEach(p => out.addPage(p));
+    return Buffer.from(await out.save({ useObjectStreams: true })).toString('base64');
+  };
+
+  const chunks: string[] = [];
+  const pageRanges: Array<[number, number]> = [];
+  let pagesIncluded = 0;
+  let start = 0;
+
+  while (start < totalPages) {
+    let count = Math.min(PDF_CHUNK_PAGES, totalPages - start);
+    let b64 = await makeChunk(start, count);
+
+    while (b64.length > PDF_MAX_CHUNK_B64 && count > 10) {
+      count = Math.floor(count / 2);
+      b64 = await makeChunk(start, count);
+    }
+
+    chunks.push(b64);
+    pageRanges.push([start + 1, start + count]);
+    pagesIncluded += count;
+    start += count;
+  }
+
+  return { chunks, pageRanges, pagesIncluded, totalPages };
+}
+
 export const maxDuration = 60;
 // Screenshots sent from the desktop companion can be several MB as base64.
 // Raise the per-route body size limit to 20 MB so they are not rejected.
@@ -772,7 +818,7 @@ export async function POST(req: NextRequest) {
 
   // Task management + brain cleanup from companion — detect and run tool loop
   const COMPANION_TASK_RE =
-    /\b(add\s+a?\s*(task|meeting|call|appointment|event|reminder)|create\s+a?\s*(task|meeting|call|appointment|event)|new\s+(task|meeting|call|appointment)|book\s+(a\s+)?(meeting|call|slot|appointment|time)|set\s+(up\s+)?(a\s+)?(meeting|call|appointment)|put\s+.{0,30}(in|on|into)\s+(my\s+)?(calendar|schedule)|block\s+(out|off)|remind\s+me\s+to|add\s+to\s+(my\s+)?tasks?|what(?:'?s|\s+is)?\s+(due|on my|my)\s+(today|list|tasks?)|what\s+do\s+i\s+have\s+due|list\s+(my\s+)?tasks?|show\s+(my\s+)?tasks?|mark\s+.{0,40}\s+as\s+done|complete\s+task|finish\s+task|task\s+done|clean\s+(up\s+)?(my\s+)?(brain|memory)|fix\s+(my\s+)?(brain|memory)|revamp\s+(my\s+)?(brain|memory)|reorgani[sz]e\s+(my\s+)?(brain|memory)|rewrite\s+(my\s+)?(brain|memory)|update\s+(my\s+)?(brain|memory)|my\s+(brain|memory)\s+(is\s+)?(wrong|messy|broken|off|outdated|incorrect)|schedule\s+(a\s+)?(meeting|call|task|session|appointment)|i('?m|\s+am)\s+(usually\s+free|busy|available|not\s+available)|i('?ll|\s+will)\s+be\s+in\s+\w|i\s+work\s+(from\s+)?\d|going\s+to\s+\w+\s+(from|on)|i\s+won't\s+be\s+(around|available)|my\s+timezone|i('?m|\s+am)\s+in\s+\w+\s+time|remove.{0,30}from.{0,20}calendar|delete.{0,20}event|cancel.{0,20}(meeting|appointment)|remove.{0,20}(meeting|appointment)|(remove|delete)\s+all|(shift|reschedule)\s+\w+|move\s+(my\s+)?[\w\s]{1,30}(to|by|\d|ahead|forward|back)|what.{0,20}(on|have).{0,20}(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|\d{1,2}(st|nd|rd|th))|what.{0,15}my.{0,15}(schedule|calendar|events?)|(?:change|update|edit|rename)\s+(?:the\s+)?(?:task|meeting|event|appointment)|(?:change|set|update)\s+(?:the\s+)?(?:duration|time|date|title|name)|make\s+it\s+\d+\s+(?:hours?|minutes?|mins?|hrs?))\b/i;
+    /\b(add\s+a?\s*(task|meeting|call|appointment|event|reminder)|create\s+a?\s*(task|meeting|call|appointment|event)|new\s+(task|meeting|call|appointment)|book\s+(a\s+)?(meeting|call|slot|appointment|time)|set\s+(up\s+)?(a\s+)?(meeting|call|appointment)|put\s+.{0,30}(in|on|into)\s+(my\s+)?(calendar|schedule)|block\s+(out|off)|remind\s+me\s+to|add\s+to\s+(my\s+)?tasks?|what(?:'?s|\s+is)?\s+(due|on my|my)\s+(today|list|tasks?)|what\s+do\s+i\s+have\s+due|list\s+(my\s+)?tasks?|show\s+(my\s+)?tasks?|mark\s+.{0,40}\s+as\s+done|complete\s+task|finish\s+task|task\s+done|clean\s+(up\s+)?(my\s+)?(brain|memory)|fix\s+(my\s+)?(brain|memory)|revamp\s+(my\s+)?(brain|memory)|reorgani[sz]e\s+(my\s+)?(brain|memory)|rewrite\s+(my\s+)?(brain|memory)|update\s+(my\s+)?(brain|memory)|save\s+(?:it|this|that|them)?\s*(?:in|into|to)\s+(?:your|my)\s*(brain|memory)|remember\s+(?:it|this|that|these)\s+(?:for\s+me|please)?|store\s+(?:it|this|that)\s+in\s+(?:your|my)\s*(brain|memory)|keep\s+(?:it|this|that)\s+in\s+(?:your|my)\s*(brain|memory)|my\s+(brain|memory)\s+(is\s+)?(wrong|messy|broken|off|outdated|incorrect)|schedule\s+(a\s+)?(meeting|call|task|session|appointment)|i('?m|\s+am)\s+(usually\s+free|busy|available|not\s+available)|i('?ll|\s+will)\s+be\s+in\s+\w|i\s+work\s+(from\s+)?\d|going\s+to\s+\w+\s+(from|on)|i\s+won't\s+be\s+(around|available)|my\s+timezone|i('?m|\s+am)\s+in\s+\w+\s+time|remove.{0,30}from.{0,20}calendar|delete.{0,20}event|cancel.{0,20}(meeting|appointment)|remove.{0,20}(meeting|appointment)|(remove|delete)\s+all|(shift|reschedule)\s+\w+|move\s+(my\s+)?[\w\s]{1,30}(to|by|\d|ahead|forward|back)|what.{0,20}(on|have).{0,20}(monday|tuesday|wednesday|thursday|friday|saturday|sunday|today|tomorrow|\d{1,2}(st|nd|rd|th))|what.{0,15}my.{0,15}(schedule|calendar|events?)|(?:change|update|edit|rename)\s+(?:the\s+)?(?:task|meeting|event|appointment)|(?:change|set|update)\s+(?:the\s+)?(?:duration|time|date|title|name)|make\s+it\s+\d+\s+(?:hours?|minutes?|mins?|hrs?))\b/i;
 
   // Re-trigger the tool loop when the user is mid-scheduling-negotiation.
   // Catches short affirmatives, time picks, and rescheduling words.
@@ -873,12 +919,21 @@ export async function POST(req: NextRequest) {
     ]
       .filter(Boolean)
       .join('\n\n');
+    // Strip PDF blocks — the tool loop doesn't prefetch Supabase docs,
+    // so raw { type:'pdf' } blocks would cause an Anthropic 400 error.
     const convo: Anthropic.MessageParam[] = (
-      messages as Array<{ role: string; content: string }>
-    ).map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+      messages as Array<{
+        role: string;
+        content: string | Array<{ type: string; [key: string]: unknown }>;
+      }>
+    ).map(m => ({
+      role: m.role as 'user' | 'assistant',
+      content: toAnthropicContent(m.content, true),
+    }));
 
     let finalReply = '';
     const collectedSystemActions: Array<Record<string, unknown>> = [];
+    let memorySaved = false;
 
     for (let round = 0; round < 6; round++) {
       const response = await client.messages.create({
@@ -912,6 +967,8 @@ export async function POST(req: NextRequest) {
           tu.name,
           tu.input as Record<string, unknown>
         );
+        // Track memory saves for client indicator
+        if (tu.name === 'rewrite_memory' || tu.name === 'upsert_entity') memorySaved = true;
         // Intercept system control sentinels — collect for client-side execution.
         if (out.startsWith('__SYSTEM_ACTION__')) {
           try {
@@ -946,6 +1003,9 @@ export async function POST(req: NextRequest) {
               enc.encode(`data: ${JSON.stringify({ system_actions: collectedSystemActions })}\n\n`)
             );
           }
+          if (memorySaved) {
+            controller.enqueue(enc.encode(`data: ${JSON.stringify({ memory_saved: true })}\n\n`));
+          }
           controller.enqueue(enc.encode('data: [DONE]\n\n'));
           controller.close();
         },
@@ -960,11 +1020,82 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const typedMessages = messages as Array<{ role: string; content: string }>;
+  const typedMessages = messages as Array<{
+    role: string;
+    content: string | Array<{ type: string; [key: string]: unknown }>;
+  }>;
+
+  // Convert app content blocks to Anthropic-compatible blocks (handles pdf → document).
+  // stripDocuments: replace pdf with a [PDF: name] placeholder (for history messages).
+  function toAnthropicContent(
+    content: string | Array<{ type: string; [key: string]: unknown }>,
+    stripDocuments = false,
+    pdfDataMap?: Map<string, PdfEntry>
+  ): Anthropic.MessageParam['content'] {
+    if (typeof content === 'string') return content;
+    const result: Anthropic.MessageParam['content'] = [];
+    for (const b of content) {
+      if (b.type === 'pdf') {
+        if (stripDocuments) {
+          (result as Anthropic.ContentBlockParam[]).push({
+            type: 'text',
+            text: `[PDF: ${(b.name as string) ?? 'document'}]`,
+          });
+        } else {
+          const entry = pdfDataMap?.get(b.storageKey as string);
+          if (entry) {
+            if (entry.pagesIncluded < entry.totalPages) {
+              (result as Anthropic.ContentBlockParam[]).push({
+                type: 'text',
+                text: `[PDF: pages 1–${entry.pagesIncluded} of ${entry.totalPages} loaded across ${entry.chunks.length} section(s). Content beyond page ${entry.pagesIncluded} is not available.]`,
+              });
+            }
+            for (const chunk of entry.chunks) {
+              (result as Anthropic.ContentBlockParam[]).push({
+                type: 'document',
+                source: { type: 'base64', media_type: 'application/pdf', data: chunk },
+              } as unknown as Anthropic.ContentBlockParam);
+            }
+          } else {
+            (result as Anthropic.ContentBlockParam[]).push({
+              type: 'text',
+              text: `[PDF: ${(b.name as string) ?? 'document'}]`,
+            });
+          }
+        }
+      } else if (b.type === 'text' && typeof b.text === 'string' && b.text) {
+        (result as Anthropic.ContentBlockParam[]).push({ type: 'text', text: b.text as string });
+      } else if (b.type === 'image' && typeof b.data === 'string') {
+        const mt = (b.mediaType ?? 'image/jpeg') as
+          | 'image/jpeg'
+          | 'image/png'
+          | 'image/webp'
+          | 'image/gif';
+        (result as Anthropic.ContentBlockParam[]).push({
+          type: 'image',
+          source: { type: 'base64', media_type: mt, data: b.data as string },
+        });
+      }
+    }
+    return result;
+  }
+
+  // True if any message contains a PDF document — forces Anthropic routing.
+  const hasDocument = typedMessages.some(
+    m => Array.isArray(m.content) && m.content.some(b => b.type === 'pdf')
+  );
 
   // Text-only messages for Groq/Cerebras — previewSource injected as text, screenshot excluded.
   const textMessages = typedMessages.map((m, i) => {
-    if (i !== messages.length - 1 || m.role !== 'user') return { role: m.role, content: m.content };
+    const textContent =
+      typeof m.content === 'string'
+        ? m.content
+        : m.content
+            .filter(b => b.type === 'text')
+            .map(b => b['text'] as string)
+            .join('\n');
+    if (i !== messages.length - 1 || m.role !== 'user')
+      return { role: m.role, content: textContent };
     if (previewSource) {
       const safeSrc =
         previewSource.length > 40000
@@ -972,10 +1103,10 @@ export async function POST(req: NextRequest) {
           : previewSource;
       return {
         role: 'user',
-        content: `Here is the current preview source:\n\n${safeSrc}\n\n${m.content}`,
+        content: `Here is the current preview source:\n\n${safeSrc}\n\n${textContent}`,
       };
     }
-    return { role: m.role, content: m.content };
+    return { role: m.role, content: textContent };
   });
 
   // Extract vision data once — used by both apiMessages (Anthropic) and streamCompanion (Gemini).
@@ -987,15 +1118,48 @@ export async function POST(req: NextRequest) {
     visionBase64 = activeScreenshot.replace(/^data:image\/\w+;base64,/, '');
   }
 
-  // Anthropic-format messages — vision content blocks for screenshot/ambientFrame, previewSource as text.
+  // Pre-download PDFs from Supabase Storage for the current (last) message.
+  const pdfDataMap = new Map<string, PdfEntry>();
+  if (hasDocument && jwtUserId) {
+    const lastMsg = typedMessages[typedMessages.length - 1];
+    const keys: string[] = [];
+    if (Array.isArray(lastMsg?.content)) {
+      for (const b of lastMsg.content) {
+        if (b.type === 'pdf' && typeof b.storageKey === 'string') {
+          const key = b.storageKey as string;
+          // Ownership check: key must be scoped to the requesting user
+          if (key.startsWith(`${jwtUserId}/`)) keys.push(key);
+        }
+      }
+    }
+    await Promise.all(
+      keys.map(async key => {
+        const { data, error } = await supabaseAdmin.storage.from('pdf-uploads').download(key);
+        if (error || !data) return;
+        pdfDataMap.set(key, await splitPdfToChunks(await data.arrayBuffer()));
+      })
+    );
+  }
+
+  // Anthropic-format messages — vision content blocks for screenshot/ambientFrame, previewSource as text, pdf → document.
   const apiMessages = typedMessages.map((m, i) => {
-    if (i !== messages.length - 1 || m.role !== 'user') return m;
+    if (i !== messages.length - 1 || m.role !== 'user') {
+      return { role: m.role as 'user' | 'assistant', content: toAnthropicContent(m.content, true) };
+    }
+
+    const lastMsgText =
+      typeof m.content === 'string'
+        ? m.content
+        : (m.content as Array<{ type: string; text?: string }>)
+            .filter(b => b.type === 'text')
+            .map(b => b.text ?? '')
+            .join('\n');
 
     if (activeScreenshot && visionBase64) {
       const media_type = visionMediaType as 'image/jpeg' | 'image/png' | 'image/webp' | 'image/gif';
       // Only include the text block when the user actually typed something.
       // Anthropic rejects { type: 'text', text: '' } with a 400 error.
-      const textContent = m.content?.trim();
+      const textContent = lastMsgText.trim();
       return {
         role: 'user' as const,
         content: [
@@ -1024,11 +1188,11 @@ export async function POST(req: NextRequest) {
           : previewSource;
       return {
         role: 'user' as const,
-        content: `Here is the current preview source:\n\n${safeSrc}\n\n${m.content}`,
+        content: `Here is the current preview source:\n\n${safeSrc}\n\n${lastMsgText}`,
       };
     }
 
-    return m;
+    return { role: 'user' as const, content: toAnthropicContent(m.content, false, pdfDataMap) };
   });
 
   const encoder = new TextEncoder();
@@ -1042,6 +1206,7 @@ export async function POST(req: NextRequest) {
           textMessages,
           anthropicMessages: apiMessages as Anthropic.MessageParam[],
           hasVision: !!activeScreenshot,
+          hasDocument,
           visionBase64,
           visionMediaType,
           controller,

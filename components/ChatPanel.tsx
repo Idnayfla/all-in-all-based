@@ -13,6 +13,7 @@ import GeneratedMusicCard from './GeneratedMusicCard';
 import GeneratingCard from './GeneratingCard';
 import { track } from '@/lib/posthog';
 import { useTranslation } from '@/lib/i18n';
+import JSZip from 'jszip';
 
 const SUGGESTION_POOL = [
   'Build a todo app with drag & drop',
@@ -282,6 +283,7 @@ export default function ChatPanel({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const textFileInputRef = useRef<HTMLInputElement>(null);
+  const docFileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const locationRef = useRef<{ lat: number; lon: number } | null>(null);
 
@@ -293,6 +295,11 @@ export default function ChatPanel({
   const [pendingFiles, setPendingFiles] = useState<
     Array<{ name: string; relativePath: string; content: string }>
   >([]);
+  const [pendingDocuments, setPendingDocuments] = useState<
+    Array<{ name: string; storageKey: string }>
+  >([]);
+  const [docUploading, setDocUploading] = useState(false);
+  const [docError, setDocError] = useState('');
   const [pendingImages, setPendingImages] = useState<
     Array<{
       data: string;
@@ -326,6 +333,7 @@ export default function ChatPanel({
   const micPickerRef = useRef<HTMLDivElement>(null);
   const [mobileInputOpen, setMobileInputOpen] = useState(false);
   const [studioBannerDismissed, setStudioBannerDismissed] = useState(false);
+  const [memorySavedFlash, setMemorySavedFlash] = useState(false);
   const mobileTextareaRef = useRef<HTMLTextAreaElement>(null);
   const recordingStartRef = useRef<number>(0);
   const stopRecordingRef = useRef<boolean>(false);
@@ -337,6 +345,15 @@ export default function ChatPanel({
       setTimeout(() => mobileTextareaRef.current?.focus(), 50);
     }
   }, [openInputTrigger]);
+
+  useEffect(() => {
+    const handler = () => {
+      setMemorySavedFlash(true);
+      setTimeout(() => setMemorySavedFlash(false), 3000);
+    };
+    window.addEventListener('memory-updated', handler);
+    return () => window.removeEventListener('memory-updated', handler);
+  }, []);
 
   const submitFlag = async (msgIdx: number, _msgContent: string, _userPrompt: string) => {
     if (flagSending) return;
@@ -766,6 +783,149 @@ export default function ChatPanel({
       reader.readAsText(file);
     });
 
+  const processPdfFile = async (
+    file: File | { name: string; buffer: ArrayBuffer }
+  ): Promise<{ name: string; storageKey: string }> => {
+    const name = file instanceof File ? file.name : file.name;
+    const buffer = file instanceof File ? await file.arrayBuffer() : file.buffer;
+    const blob = new Blob([buffer], { type: 'application/pdf' });
+
+    const urlRes = await fetch('/api/pdf-upload-url', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      },
+      body: JSON.stringify({ filename: name }),
+    });
+    if (!urlRes.ok) throw new Error(`PDF upload URL failed for ${name}`);
+    const { signedUrl, key } = (await urlRes.json()) as { signedUrl: string; key: string };
+
+    const uploadRes = await fetch(signedUrl, {
+      method: 'PUT',
+      body: blob,
+      headers: { 'Content-Type': 'application/pdf' },
+    });
+    if (!uploadRes.ok) throw new Error(`PDF upload failed for ${name}`);
+
+    return { name, storageKey: key };
+  };
+
+  // Extensions that are definitely binary — skip in ZIP extraction
+  const BINARY_EXTS = new Set([
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.webp',
+    '.bmp',
+    '.ico',
+    '.mp4',
+    '.mp3',
+    '.wav',
+    '.mov',
+    '.avi',
+    '.webm',
+    '.zip',
+    '.gz',
+    '.tar',
+    '.rar',
+    '.7z',
+    '.exe',
+    '.dll',
+    '.so',
+    '.dylib',
+    '.woff',
+    '.woff2',
+    '.ttf',
+    '.otf',
+    '.eot',
+  ]);
+
+  const processZipFile = async (
+    file: File
+  ): Promise<{
+    textFiles: { name: string; relativePath: string; content: string }[];
+    pdfFiles: { name: string; storageKey: string }[];
+    failedCount: number;
+  }> => {
+    const zip = await JSZip.loadAsync(file);
+    const textFiles: { name: string; relativePath: string; content: string }[] = [];
+    const pdfFiles: { name: string; storageKey: string }[] = [];
+    let failedCount = 0;
+    const entries = Object.entries(zip.files).filter(([, f]) => !f.dir);
+    for (const [path, entry] of entries.slice(0, 100)) {
+      if (isIgnoredPath(path)) continue;
+      const name = path.split('/').pop() || path;
+      const lower = name.toLowerCase();
+      const dot = lower.lastIndexOf('.');
+      const ext = dot !== -1 ? lower.slice(dot) : '';
+      if (BINARY_EXTS.has(ext)) continue;
+      try {
+        if (ext === '.pdf') {
+          const ab = await entry.async('arraybuffer');
+          const doc = await processPdfFile({ name, buffer: ab });
+          pdfFiles.push(doc);
+        } else {
+          const content = await entry.async('text');
+          if (content.length < 500_000) textFiles.push({ name, relativePath: path, content });
+        }
+      } catch (err) {
+        if (ext === '.pdf') failedCount++;
+        console.error(`[Based/zip] failed to process ${name}:`, err);
+      }
+    }
+    return { textFiles, pdfFiles, failedCount };
+  };
+
+  const handleDocFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    setShowAttachMenu(false);
+    setDocError('');
+    setDocUploading(true);
+    for (const file of Array.from(files)) {
+      const lower = file.name.toLowerCase();
+      try {
+        if (lower.endsWith('.pdf')) {
+          const doc = await processPdfFile(file);
+          setPendingDocuments(prev => [...prev, doc].slice(0, 25));
+        } else if (lower.endsWith('.zip')) {
+          const { textFiles, pdfFiles, failedCount } = await processZipFile(file);
+          if (pdfFiles.length > 0) setPendingDocuments(prev => [...prev, ...pdfFiles].slice(0, 25));
+          if (textFiles.length > 0) {
+            let budget = MAX_TOTAL_FILE_CHARS;
+            const trimmed = textFiles.reduce<typeof textFiles>((acc, f) => {
+              if (budget <= 0) return acc;
+              if (f.content.length <= budget) {
+                budget -= f.content.length;
+                acc.push(f);
+              } else {
+                acc.push({ ...f, content: f.content.slice(0, budget) + '\n... [truncated]' });
+                budget = 0;
+              }
+              return acc;
+            }, []);
+            setPendingFiles(prev => [...prev, ...trimmed].slice(0, MAX_FILES));
+          }
+          if (pdfFiles.length === 0 && textFiles.length === 0) {
+            setDocError(`No readable files found in ${file.name}`);
+          } else if (failedCount > 0) {
+            setDocError(
+              `${failedCount} PDF${failedCount > 1 ? 's' : ''} failed to upload — check the pdf-uploads bucket exists in Supabase.`
+            );
+          }
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Upload failed';
+        console.error('[Based] document processing failed:', err);
+        setDocError(msg);
+      }
+    }
+    setDocUploading(false);
+    e.target.value = '';
+  };
+
   const handleFilesOrFolderSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -799,6 +959,9 @@ export default function ChatPanel({
 
   const clearPendingFile = (index: number) =>
     setPendingFiles(prev => prev.filter((_, i) => i !== index));
+
+  const clearPendingDocument = (index: number) =>
+    setPendingDocuments(prev => prev.filter((_, i) => i !== index));
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     const items = Array.from(e.clipboardData.items);
@@ -1052,13 +1215,24 @@ export default function ChatPanel({
 
   const send = async (text?: string) => {
     const trimmed = (text ?? input).trim();
-    if (!trimmed && pendingImages.length === 0 && pendingFiles.length === 0) return;
+    if (
+      !trimmed &&
+      pendingImages.length === 0 &&
+      pendingFiles.length === 0 &&
+      pendingDocuments.length === 0
+    )
+      return;
     if (isGenerating) return;
 
     // Companion mode: intercept build requests, switch to Build mode, nudge user to send again
     if (chatMode === 'companion' && trimmed) {
       const lc = trimmed.toLowerCase();
-      if (BUILD_VERB_RE.test(lc) && BUILD_INTENT_RE.test(lc)) {
+      // Skip build detection for pasted terminal output / error messages
+      const looksLikeTerminalOutput =
+        /[A-Z]:\\\w/.test(trimmed) ||
+        (trimmed.includes('\n') &&
+          /\b(error|failed|not recognized|cannot|unable|exception)\b/i.test(trimmed));
+      if (!looksLikeTerminalOutput && BUILD_VERB_RE.test(lc) && BUILD_INTENT_RE.test(lc)) {
         setInput(trimmed);
         setMessages(prev => [
           ...prev,
@@ -1089,8 +1263,14 @@ export default function ChatPanel({
       content: f.content,
     }));
 
+    const documentBlocks = pendingDocuments.map(doc => ({
+      type: 'pdf' as const,
+      name: doc.name,
+      storageKey: doc.storageKey,
+    }));
+
     const messageContent: Message['content'] =
-      pendingImages.length > 0 || fileBlocks.length > 0
+      pendingImages.length > 0 || fileBlocks.length > 0 || documentBlocks.length > 0
         ? [
             ...pendingImages.map(img => ({
               type: 'image' as const,
@@ -1098,6 +1278,7 @@ export default function ChatPanel({
               data: img.data,
             })),
             ...fileBlocks,
+            ...documentBlocks,
             ...(trimmed ? [{ type: 'text' as const, text: trimmed }] : []),
           ]
         : trimmed;
@@ -1105,6 +1286,7 @@ export default function ChatPanel({
     setInput('');
     setPendingImages([]);
     setPendingFiles([]);
+    setPendingDocuments([]);
     setGenProgress(null);
     setLastSuggestions([]);
 
@@ -1143,8 +1325,8 @@ export default function ChatPanel({
       track('generation_started');
 
       // Strip base64 image data from all but the most recent image-bearing message.
-      // The server only uses the last image anyway — keeping old ones re-sends MBs each turn.
       // File blocks are converted to fenced code blocks for the API.
+      // PDFs are now stored by key in Supabase — no stripping needed.
       const msgsForApi = (() => {
         let imageKept = false;
         return [...newMessages]
@@ -2032,6 +2214,16 @@ export default function ChatPanel({
         onDrop={handleDrop}
       >
         {isDragging && <div className="drag-overlay">Drop image or file here</div>}
+        {memorySavedFlash && (
+          <div style={{
+            position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+            marginBottom: 8, background: 'var(--accent, #6366f1)', color: '#fff',
+            borderRadius: 20, padding: '4px 14px', fontSize: 11, fontWeight: 600,
+            letterSpacing: '0.03em', pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 10,
+          }}>
+            ◈ Saved to memory
+          </div>
+        )}
         <AnimatePresence>
           {showStudioBanner && (
             <motion.div
@@ -2187,6 +2379,40 @@ export default function ChatPanel({
             ))}
           </div>
         )}
+        {docUploading && (
+          <div className="chat-pending-files">
+            <span className="chat-pending-files-meta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />
+              Uploading PDF...
+            </span>
+          </div>
+        )}
+        {docError && (
+          <div className="chat-pending-files">
+            <span className="chat-pending-files-meta" style={{ color: 'var(--color-error, #e05)' }}>
+              ⚠ {docError}
+            </span>
+          </div>
+        )}
+        {pendingDocuments.length > 0 && (
+          <div className="chat-pending-files">
+            <span className="chat-pending-files-meta">
+              ◈ {pendingDocuments.length} PDF{pendingDocuments.length !== 1 ? 's' : ''} attached
+            </span>
+            {pendingDocuments.map((doc, idx) => (
+              <div key={idx} className="chat-file-pending-pill">
+                <span className="chat-file-pending-name">{doc.name}</span>
+                <button
+                  className="chat-file-pending-remove"
+                  onClick={() => clearPendingDocument(idx)}
+                  title="Remove PDF"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
         {generationMode !== 'chat' && (
           <div className="chat-mode-bar chat-mode-bar--active">
             <ModeDropdown
@@ -2239,6 +2465,14 @@ export default function ChatPanel({
             multiple
             onChange={handleFilesOrFolderSelect}
           />
+          <input
+            type="file"
+            ref={docFileInputRef}
+            style={{ display: 'none' }}
+            accept=".pdf,.zip"
+            multiple
+            onChange={handleDocFileSelect}
+          />
           <button
             className="upload-btn"
             onClick={() => fileInputRef.current?.click()}
@@ -2263,8 +2497,8 @@ export default function ChatPanel({
           <div className="attach-files-wrap" style={{ position: 'relative' }}>
             <button
               className="upload-btn"
-              disabled={isGenerating}
-              title="Attach files or folder"
+              disabled={isGenerating || docUploading}
+              title={docUploading ? 'Uploading...' : 'Attach files or folder'}
               onClick={() => setShowAttachMenu(prev => !prev)}
               onBlur={e => {
                 if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node)) {
@@ -2306,6 +2540,16 @@ export default function ChatPanel({
                   }}
                 >
                   Folder
+                </button>
+                <button
+                  className="attach-menu-item"
+                  onMouseDown={e => {
+                    e.preventDefault();
+                    docFileInputRef.current?.click();
+                    setShowAttachMenu(false);
+                  }}
+                >
+                  PDF / ZIP
                 </button>
               </div>
             )}
@@ -2486,7 +2730,10 @@ export default function ChatPanel({
             disabled={
               isGenerating ||
               isGeneratingMedia ||
-              (!input.trim() && pendingImages.length === 0 && pendingFiles.length === 0)
+              (!input.trim() &&
+                pendingImages.length === 0 &&
+                pendingFiles.length === 0 &&
+                pendingDocuments.length === 0)
             }
             whileTap={{ scale: 0.95 }}
           >

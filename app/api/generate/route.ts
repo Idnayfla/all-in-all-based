@@ -1560,6 +1560,7 @@ function stripTags(text: string) {
 type ApiContentBlock =
   | { type: 'text'; text: string }
   | { type: 'image'; mediaType: string; data: string }
+  | { type: 'pdf'; name: string; storageKey: string }
   | { type: 'clarify'; question: string }
   | { type: 'error'; message: string }
   | { type: string; [key: string]: unknown };
@@ -1582,11 +1583,95 @@ type ClaudeImageBlock = {
   type: 'image';
   source: { type: 'base64'; media_type: ImageMediaType; data: string };
 };
-type ClaudeContentBlock = ClaudeTextBlock | ClaudeImageBlock;
+type ClaudeDocumentBlock = {
+  type: 'document';
+  source: { type: 'base64'; media_type: 'application/pdf'; data: string };
+};
+type ClaudeContentBlock = ClaudeTextBlock | ClaudeImageBlock | ClaudeDocumentBlock;
+
+// 300 pages per chunk — at ~2,341 tok/page (dense textbook) that's ~702k tokens,
+// leaving ~300k headroom for system prompt + history + response within the 1M limit.
+// 20M base64 chars per chunk covers typical PDFs at this page count.
+// Multi-pass: each chunk is a separate sequential API call (Anthropic's 600-page aggregate
+// limit means we can never send multiple document blocks totalling > 600 pages in one request).
+const PDF_CHUNK_PAGES = 300;
+const PDF_MAX_CHUNK_B64 = 20_000_000;
+
+type PdfEntry = {
+  chunks: string[];
+  pageRanges: Array<[number, number]>; // 1-indexed [startPage, endPage] per chunk
+  pagesIncluded: number;
+  totalPages: number;
+};
+
+async function splitPdfToChunks(buf: ArrayBuffer): Promise<PdfEntry> {
+  const { PDFDocument } = await import('pdf-lib');
+  const src = await PDFDocument.load(buf, { ignoreEncryption: true });
+  const totalPages = src.getPageCount();
+
+  const makeChunk = async (start: number, count: number): Promise<string> => {
+    if (start === 0 && count >= totalPages) return Buffer.from(buf).toString('base64');
+    const out = await PDFDocument.create();
+    const pages = await out.copyPages(src, Array.from({ length: count }, (_, i) => start + i));
+    pages.forEach(p => out.addPage(p));
+    return Buffer.from(await out.save({ useObjectStreams: true })).toString('base64');
+  };
+
+  const chunks: string[] = [];
+  const pageRanges: Array<[number, number]> = [];
+  let pagesIncluded = 0;
+  let start = 0;
+
+  while (start < totalPages) {
+    let count = Math.min(PDF_CHUNK_PAGES, totalPages - start);
+    let b64 = await makeChunk(start, count);
+
+    // If this chunk is too big, halve until it fits
+    while (b64.length > PDF_MAX_CHUNK_B64 && count > 10) {
+      count = Math.floor(count / 2);
+      b64 = await makeChunk(start, count);
+    }
+
+    chunks.push(b64);
+    pageRanges.push([start + 1, start + count]);
+    pagesIncluded += count;
+    start += count;
+  }
+
+  return { chunks, pageRanges, pagesIncluded, totalPages };
+}
+
+async function prefetchPdfs(
+  messages: ApiMessage[],
+  userId: string
+): Promise<Map<string, PdfEntry>> {
+  const keys = new Set<string>();
+  for (const msg of messages) {
+    if (!Array.isArray(msg.content)) continue;
+    for (const b of msg.content as ApiContentBlock[]) {
+      if (b.type === 'pdf' && 'storageKey' in b) {
+        const key = (b as { storageKey: string }).storageKey;
+        if (key.startsWith(`${userId}/`)) keys.add(key);
+      }
+    }
+  }
+  const map = new Map<string, PdfEntry>();
+  await Promise.all(
+    [...keys].map(async key => {
+      const { data, error } = await supabaseAdmin.storage.from('pdf-uploads').download(key);
+      if (error || !data) return;
+      map.set(key, await splitPdfToChunks(await data.arrayBuffer()));
+    })
+  );
+  return map;
+}
 
 function toClaudeContent(
   content: string | ApiContentBlock[],
-  appendText?: string
+  appendText?: string,
+  stripDocuments = false,
+  pdfDataMap?: Map<string, PdfEntry>,
+  chunkIndex?: number // if set, only include this specific chunk (multi-pass mode)
 ): string | ClaudeContentBlock[] {
   if (typeof content === 'string') {
     return appendText ? content + appendText : content;
@@ -1609,6 +1694,44 @@ function toClaudeContent(
           },
         });
       }
+    } else if (block.type === 'pdf') {
+      const b = block as { type: 'pdf'; name: string; storageKey: string };
+      if (stripDocuments) {
+        blocks.push({ type: 'text', text: `[PDF: ${b.name}]` });
+      } else {
+        const entry = pdfDataMap?.get(b.storageKey);
+        if (entry) {
+          const chunksToSend =
+            chunkIndex !== undefined ? [entry.chunks[chunkIndex]] : entry.chunks;
+          const [startPage, endPage] =
+            chunkIndex !== undefined
+              ? entry.pageRanges[chunkIndex]
+              : [1, entry.pagesIncluded];
+          if (entry.pagesIncluded < entry.totalPages || chunkIndex !== undefined) {
+            blocks.push({
+              type: 'text',
+              text:
+                chunkIndex !== undefined
+                  ? chunkIndex === 0
+                    ? `[PDF auto-processing: section 1 of ${entry.chunks.length} (pages ${startPage}–${endPage} of ${entry.totalPages}). The system is automatically sending all ${entry.chunks.length} sections — DO NOT ask the user to upload more pages. Respond to this section normally; all sections are concatenated into one reply for the user.]`
+                    : `[PDF auto-processing: section ${chunkIndex + 1} of ${entry.chunks.length} (pages ${startPage}–${endPage} of ${entry.totalPages}). Continue your analysis directly — no greeting, no "Got it", no re-introduction. Pick up exactly where section ${chunkIndex} ended.]`
+                  : `[PDF: pages 1–${entry.pagesIncluded} of ${entry.totalPages} loaded across ${entry.chunks.length} section(s). Content beyond page ${entry.pagesIncluded} is not available.]`,
+            });
+          }
+          for (const chunk of chunksToSend) {
+            blocks.push({
+              type: 'document',
+              source: {
+                type: 'base64' as const,
+                media_type: 'application/pdf' as const,
+                data: chunk,
+              },
+            });
+          }
+        } else {
+          blocks.push({ type: 'text', text: `[PDF: ${b.name}]` });
+        }
+      }
     } else if (block.type === 'clarify') {
       const b = block as { type: 'clarify'; question: string };
       // clarify blocks become a plain-text summary so conversation history stays coherent
@@ -1623,7 +1746,11 @@ function toClaudeContent(
   if (appendText && appendText.trim()) blocks.push({ type: 'text', text: appendText });
   // if all we have is appendText and no real content, return as string
   if (blocks.length === 0) return appendText ?? '';
-  if (blocks.length === 1 && blocks[0].type === 'text' && !blocks.some(b => b.type === 'image')) {
+  if (
+    blocks.length === 1 &&
+    blocks[0].type === 'text' &&
+    !blocks.some(b => b.type === 'image' || b.type === 'document')
+  ) {
     return blocks[0].text;
   }
   return blocks;
@@ -2006,6 +2133,11 @@ export async function POST(req: NextRequest) {
         Array.isArray(m.content) && (m.content as ApiContentBlock[]).some(b => b.type === 'image')
     );
 
+    // True if any recent message contains a PDF document — forces Anthropic routing.
+    const hasDocument = recentMessages.some(
+      m => Array.isArray(m.content) && (m.content as ApiContentBlock[]).some(b => b.type === 'pdf')
+    );
+
     // Edit-intent detection: append Image Studio tip when image + edit keyword
     const EDIT_INTENT_RE =
       /\b(darken|brighten|lighten|darker|brighter|crop|filter|rotate|flip|blur|sharpen|resize|adjust|enhance|edit|retouch|remove\s+background|color|saturate|exposure)\b/i;
@@ -2019,12 +2151,17 @@ export async function POST(req: NextRequest) {
       ? `\n\nCurrent project files:\n${(existingFiles as ProjectFile[]).map(f => `--- ${f.name} (${f.language}) ---\n${f.content}`).join('\n\n')}`
       : '';
 
+    // Download PDFs from Supabase Storage for the current message only; history uses placeholders.
+    const pdfDataMap = hasDocument
+      ? await prefetchPdfs(recentMessages.slice(-1), userId)
+      : new Map<string, PdfEntry>();
+
     const anthropicMessages = recentMessages.map((m, i) => ({
       role: m.role as 'user' | 'assistant',
       content:
         i === recentMessages.length - 1 && m.role === 'user'
-          ? toClaudeContent(m.content, context || undefined)
-          : toClaudeContent(m.content),
+          ? toClaudeContent(m.content, context || undefined, false, pdfDataMap)
+          : toClaudeContent(m.content, undefined, true), // history — replace PDFs with [PDF: name]
     }));
 
     // Static SYSTEM is first so it caches across all requests; dynamic parts appended after.
@@ -2614,8 +2751,8 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
             if (!routeToChat) {
               // Planner parse failed — stream via vision model (images) or text model (no images)
               let fullText = '';
-              if (imageBlocks.length > 0 || hasRecentImage) {
-                if (usingFreeModel && HAS_GEMINI_KEY) {
+              if (imageBlocks.length > 0 || hasRecentImage || hasDocument) {
+                if (usingFreeModel && HAS_GEMINI_KEY && !hasDocument) {
                   fullText = await streamGeminiVisionCollecting(
                     GEMINI_IMAGE_SYSTEM,
                     anthropicMessages,
@@ -2684,11 +2821,11 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
 
           if (routeToChat) {
             let fullText = '';
-            if (imageBlocks.length > 0 || hasRecentImage) {
-              // Image in current or recent message — Groq/Cerebras have no vision support.
-              // Free tier → Gemini Flash 2.0 (multimodal, free quota).
-              // Based AI (or no Gemini key) → Anthropic Opus with full conversation history.
-              if (usingFreeModel && HAS_GEMINI_KEY) {
+            if (imageBlocks.length > 0 || hasRecentImage || hasDocument) {
+              // Image/document in current or recent message — Groq/Cerebras have no vision/document support.
+              // Free tier → Gemini Flash 2.0 (multimodal, free quota) — but not for PDFs (Gemini path can't handle document blocks).
+              // Based AI (or PDF, or no Gemini key) → Anthropic Opus with full conversation history.
+              if (usingFreeModel && HAS_GEMINI_KEY && !hasDocument) {
                 fullText = await streamGeminiVisionCollecting(
                   GEMINI_IMAGE_SYSTEM,
                   anthropicMessages,
@@ -2697,19 +2834,62 @@ VAGUE examples (ONLY these should ever be false): "make an app", "build somethin
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ chunk: t })}\n\n`))
                 );
               } else {
-                const stream = await client.messages.stream({
-                  model: MODEL_OPUS,
-                  max_tokens: 12000,
-                  system: systemBlocks,
-                  messages: anthropicMessages,
-                });
-                for await (const chunk of stream) {
-                  if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
-                    fullText += chunk.delta.text;
-                    controller.enqueue(
-                      encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
-                    );
+                // Anthropic enforces a 600-page aggregate limit across ALL document blocks
+                // in a single request. Multi-chunk PDFs must always be processed in separate
+                // sequential API calls (one per chunk) to stay under that limit.
+                const streamChunk = async (ci: number, prevResponse?: string) => {
+                  let msgs = recentMessages.map((m, i) => ({
+                    role: m.role as 'user' | 'assistant',
+                    content:
+                      i === recentMessages.length - 1 && m.role === 'user'
+                        ? toClaudeContent(m.content, context || undefined, false, pdfDataMap, ci)
+                        : toClaudeContent(m.content, undefined, true),
+                  }));
+                  // Inject tail of previous chunk response as assistant context so Based
+                  // continues naturally instead of re-greeting or asking for more uploads
+                  if (ci > 0 && prevResponse) {
+                    const lastMsg = msgs[msgs.length - 1];
+                    msgs = [
+                      ...msgs.slice(0, -1),
+                      { role: 'assistant' as const, content: prevResponse.slice(-1500) },
+                      lastMsg,
+                    ];
                   }
+                  const stream = await client.messages.stream({
+                    model: MODEL_OPUS,
+                    max_tokens: 12000,
+                    system: systemBlocks,
+                    messages: msgs,
+                  });
+                  let text = '';
+                  for await (const chunk of stream) {
+                    if (
+                      chunk.type === 'content_block_delta' &&
+                      chunk.delta.type === 'text_delta'
+                    ) {
+                      text += chunk.delta.text;
+                      controller.enqueue(
+                        encoder.encode(`data: ${JSON.stringify({ chunk: chunk.delta.text })}\n\n`)
+                      );
+                    }
+                  }
+                  return text;
+                };
+
+                const pdfEntries = hasDocument ? [...pdfDataMap.values()] : [];
+                const maxChunks = Math.max(...pdfEntries.map(e => e.chunks.length), 1);
+
+                let prevChunkResponse = '';
+                for (let ci = 0; ci < maxChunks; ci++) {
+                  if (ci > 0) {
+                    controller.enqueue(
+                      encoder.encode(`data: ${JSON.stringify({ chunk: '\n\n' })}\n\n`)
+                    );
+                    fullText += '\n\n';
+                  }
+                  const chunkText = await streamChunk(ci, ci > 0 ? prevChunkResponse : undefined);
+                  fullText += chunkText;
+                  prevChunkResponse = chunkText;
                 }
               }
             } else if (!usingFreeModel && HAS_ANTHROPIC_KEY) {

@@ -17,6 +17,7 @@ Significant product, technical, and business decisions. Rationale preserved so f
 
 **Decision**: Adopt a 7-point AI cost management framework as a standing operating principle for Based.
 **Principles**:
+
 1. Track cost per active user (not total bill) — target <$0.10/active user/day
 2. Cap max output tokens aggressively (companion: 1024, generate chat: 4096)
 3. Use prompt caching properly — stable at top, variables at bottom
@@ -24,8 +25,8 @@ Significant product, technical, and business decisions. Rationale preserved so f
 5. Rate-limit by user ID not IP (in place via companion_usage table)
 6. Route easy jobs to cheapest provider (Groq → Cerebras → Anthropic fallback)
 7. Alert on power-user spikes ($5/day threshold) — future: PostHog event
-**Long-term**: Own the model layer (Based Model fine-tune on a small open-source base) to eliminate Anthropic dependency at scale.
-**Owner**: Hus Alfyandi
+   **Long-term**: Own the model layer (Based Model fine-tune on a small open-source base) to eliminate Anthropic dependency at scale.
+   **Owner**: Hus Alfyandi
 
 ---
 

@@ -1233,15 +1233,22 @@ export default function CompanionOverlayPage() {
     [isAndroidBridge, panelWidth]
   );
 
-  // Restore messages from localStorage on mount (survives WebView recreation)
+  // Restore messages from localStorage on mount (survives WebView recreation).
+  // Skip restore if messages are older than 2 hours — prevents stale conversations
+  // from a previous day bleeding into a fresh session.
   useEffect(() => {
     try {
       const stored = localStorage.getItem('based_companion_messages');
-      if (stored) {
+      const ts = localStorage.getItem('based_companion_messages_ts');
+      const age = ts ? Date.now() - parseInt(ts) : Infinity;
+      if (stored && age < 2 * 60 * 60 * 1000) {
         const parsed = JSON.parse(stored) as Msg[];
         if (Array.isArray(parsed) && parsed.length > 0) {
           setMessages(parsed);
         }
+      } else if (stored) {
+        localStorage.removeItem('based_companion_messages');
+        localStorage.removeItem('based_companion_messages_ts');
       }
     } catch {
       // ignore parse errors — start fresh
@@ -1253,6 +1260,7 @@ export default function CompanionOverlayPage() {
     try {
       if (messages.length === 0) {
         localStorage.removeItem('based_companion_messages');
+        localStorage.removeItem('based_companion_messages_ts');
       } else {
         // Strip captureThumb (base64 images) and cap at 40 messages to stay under quota
         const toSave = messages
@@ -1260,10 +1268,12 @@ export default function CompanionOverlayPage() {
           .slice(-40)
           .map(({ captureThumb: _, ...m }) => m);
         localStorage.setItem('based_companion_messages', JSON.stringify(toSave));
+        localStorage.setItem('based_companion_messages_ts', Date.now().toString());
       }
     } catch {
       // Still over quota — clear messages entirely so theme/personality saves work
       localStorage.removeItem('based_companion_messages');
+      localStorage.removeItem('based_companion_messages_ts');
     }
   }, [messages]);
 

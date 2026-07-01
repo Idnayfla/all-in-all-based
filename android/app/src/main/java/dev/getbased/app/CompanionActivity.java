@@ -7,6 +7,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+
+import androidx.activity.OnBackPressedCallback;
+import androidx.core.content.ContextCompat;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -52,6 +55,9 @@ public class CompanionActivity extends AppCompatActivity {
 
     static final String ACTION_COMPANION_CLOSED = "dev.getbased.app.COMPANION_CLOSED";
     static final String ACTION_CLOSE_REQUEST    = "dev.getbased.app.COMPANION_CLOSE_REQUEST";
+
+    /** Set to true in onCreate, false in onDestroy — lets FloatingBubbleService query this. */
+    static volatile boolean isRunning = false;
 
     private static final String COMPANION_URL            = "https://getbased.dev/companion";
     private static final int    REQUEST_MEDIA_PROJECTION = 1002;
@@ -150,6 +156,7 @@ public class CompanionActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        isRunning = true;
         overridePendingTransition(0, 0);
         getWindow().setWindowAnimations(0);
 
@@ -316,6 +323,9 @@ public class CompanionActivity extends AppCompatActivity {
                     // Only restore if React rendered an empty messages list
                     "    var existingBubbles=container.querySelectorAll('.companion-bubble');" +
                     "    if(existingBubbles.length>0)return;" +
+                    // Skip restore if messages are older than 2 hours (stale session)
+                    "    var ts=parseInt(localStorage.getItem('based_companion_messages_ts')||'0');" +
+                    "    if(Date.now()-ts>7200000){localStorage.removeItem('based_companion_messages');localStorage.removeItem('based_companion_messages_ts');return;}" +
                     "    var stored=null;" +
                     "    try{var raw=localStorage.getItem('based_companion_messages');if(raw)stored=JSON.parse(raw);}catch(e){}" +
                     "    if(!stored||!Array.isArray(stored)||stored.length===0)return;" +
@@ -356,9 +366,9 @@ public class CompanionActivity extends AppCompatActivity {
                     "        if(text.trim())msgs.push({role:role,content:text.trim()});" +
                     "      });" +
                     "      if(msgs.length>0){" +
-                    "        try{localStorage.setItem('based_companion_messages',JSON.stringify(msgs));}catch(e){}" +
+                    "        try{localStorage.setItem('based_companion_messages',JSON.stringify(msgs));localStorage.setItem('based_companion_messages_ts',Date.now().toString());}catch(e){}" +
                     "      } else {" +
-                    "        localStorage.removeItem('based_companion_messages');" +
+                    "        localStorage.removeItem('based_companion_messages');localStorage.removeItem('based_companion_messages_ts');" +
                     "      }" +
                     "    }" +
                     "    var obs=new MutationObserver(saveMsgs);" +
@@ -799,6 +809,14 @@ public class CompanionActivity extends AppCompatActivity {
 
         setContentView(root);
 
+        // Modern back-press handling (replaces deprecated onBackPressed override).
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                dismissSelf();
+            }
+        });
+
         // Slide the panel up from off-screen on open. Pure Java animation — no CSS
         // dependency, so it works even before the WebView page finishes loading.
         panel.setTranslationY(panelHeight);
@@ -821,11 +839,8 @@ public class CompanionActivity extends AppCompatActivity {
         });
 
         IntentFilter filter = new IntentFilter(ACTION_CLOSE_REQUEST);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(closeRequestReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            registerReceiver(closeRequestReceiver, filter);
-        }
+        ContextCompat.registerReceiver(this, closeRequestReceiver, filter,
+                ContextCompat.RECEIVER_NOT_EXPORTED);
 
         // Register in-process frame callback so ScreenCaptureService can deliver
         // frames directly without going through a broadcast intent.
@@ -1315,13 +1330,9 @@ public class CompanionActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onBackPressed() {
-        dismissSelf();
-    }
-
-    @Override
     protected void onDestroy() {
         super.onDestroy();
+        isRunning = false;
         if (orientationListener != null) orientationListener.disable();
         stopCameraCapture();
         stopPhotoCamera();
@@ -1333,8 +1344,7 @@ public class CompanionActivity extends AppCompatActivity {
 
     @Override
     public void finish() {
-        Intent broadcast = new Intent(ACTION_COMPANION_CLOSED);
-        sendBroadcast(broadcast);
+        sendBroadcast(new Intent(ACTION_COMPANION_CLOSED).setPackage(getPackageName()));
         super.finish();
     }
 
@@ -1362,12 +1372,6 @@ public class CompanionActivity extends AppCompatActivity {
         overridePendingTransition(0, 0);
     }
 
-    @Override
-    protected void onUserLeaveHint() {
-        super.onUserLeaveHint();
-        // User navigated away (home button, tap-outside-non-touch-modal window, etc.) — close cleanly
-        if (!isFinishing()) dismissSelf();
-    }
 
     /** Exposed to JavaScript as window.AndroidBridge */
     @SuppressWarnings("unused") // all methods called from JS via @JavascriptInterface
