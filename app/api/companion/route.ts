@@ -13,6 +13,52 @@ import { BRAIN_TOOLS, runBrainTool, listTasks, listCalendarEvents } from '@/lib/
 import { getSchedulingPrefs } from '@/lib/schedulingPrefs';
 import { getEffectiveTier, TIER_LIMITS } from '@/lib/tiers';
 
+const PDF_CHUNK_PAGES = 300;
+const PDF_MAX_CHUNK_B64 = 20_000_000;
+
+type PdfEntry = {
+  chunks: string[];
+  pageRanges: Array<[number, number]>;
+  pagesIncluded: number;
+  totalPages: number;
+};
+
+async function splitPdfToChunks(buf: ArrayBuffer): Promise<PdfEntry> {
+  const { PDFDocument } = await import('pdf-lib');
+  const src = await PDFDocument.load(buf, { ignoreEncryption: true });
+  const totalPages = src.getPageCount();
+
+  const makeChunk = async (start: number, count: number): Promise<string> => {
+    if (start === 0 && count >= totalPages) return Buffer.from(buf).toString('base64');
+    const out = await PDFDocument.create();
+    const pages = await out.copyPages(src, Array.from({ length: count }, (_, i) => start + i));
+    pages.forEach(p => out.addPage(p));
+    return Buffer.from(await out.save({ useObjectStreams: true })).toString('base64');
+  };
+
+  const chunks: string[] = [];
+  const pageRanges: Array<[number, number]> = [];
+  let pagesIncluded = 0;
+  let start = 0;
+
+  while (start < totalPages) {
+    let count = Math.min(PDF_CHUNK_PAGES, totalPages - start);
+    let b64 = await makeChunk(start, count);
+
+    while (b64.length > PDF_MAX_CHUNK_B64 && count > 10) {
+      count = Math.floor(count / 2);
+      b64 = await makeChunk(start, count);
+    }
+
+    chunks.push(b64);
+    pageRanges.push([start + 1, start + count]);
+    pagesIncluded += count;
+    start += count;
+  }
+
+  return { chunks, pageRanges, pagesIncluded, totalPages };
+}
+
 export const maxDuration = 60;
 // Screenshots sent from the desktop companion can be several MB as base64.
 // Raise the per-route body size limit to 20 MB so they are not rejected.
@@ -887,6 +933,7 @@ export async function POST(req: NextRequest) {
 
     let finalReply = '';
     const collectedSystemActions: Array<Record<string, unknown>> = [];
+    let memorySaved = false;
 
     for (let round = 0; round < 6; round++) {
       const response = await client.messages.create({
@@ -920,6 +967,8 @@ export async function POST(req: NextRequest) {
           tu.name,
           tu.input as Record<string, unknown>
         );
+        // Track memory saves for client indicator
+        if (tu.name === 'rewrite_memory' || tu.name === 'upsert_entity') memorySaved = true;
         // Intercept system control sentinels — collect for client-side execution.
         if (out.startsWith('__SYSTEM_ACTION__')) {
           try {
@@ -954,6 +1003,9 @@ export async function POST(req: NextRequest) {
               enc.encode(`data: ${JSON.stringify({ system_actions: collectedSystemActions })}\n\n`)
             );
           }
+          if (memorySaved) {
+            controller.enqueue(enc.encode(`data: ${JSON.stringify({ memory_saved: true })}\n\n`));
+          }
           controller.enqueue(enc.encode('data: [DONE]\n\n'));
           controller.close();
         },
@@ -978,7 +1030,7 @@ export async function POST(req: NextRequest) {
   function toAnthropicContent(
     content: string | Array<{ type: string; [key: string]: unknown }>,
     stripDocuments = false,
-    pdfDataMap?: Map<string, string>
+    pdfDataMap?: Map<string, PdfEntry>
   ): Anthropic.MessageParam['content'] {
     if (typeof content === 'string') return content;
     const result: Anthropic.MessageParam['content'] = [];
@@ -990,12 +1042,20 @@ export async function POST(req: NextRequest) {
             text: `[PDF: ${(b.name as string) ?? 'document'}]`,
           });
         } else {
-          const base64 = pdfDataMap?.get(b.storageKey as string);
-          if (base64) {
-            (result as Anthropic.ContentBlockParam[]).push({
-              type: 'document',
-              source: { type: 'base64', media_type: 'application/pdf', data: base64 },
-            } as unknown as Anthropic.ContentBlockParam);
+          const entry = pdfDataMap?.get(b.storageKey as string);
+          if (entry) {
+            if (entry.pagesIncluded < entry.totalPages) {
+              (result as Anthropic.ContentBlockParam[]).push({
+                type: 'text',
+                text: `[PDF: pages 1–${entry.pagesIncluded} of ${entry.totalPages} loaded across ${entry.chunks.length} section(s). Content beyond page ${entry.pagesIncluded} is not available.]`,
+              });
+            }
+            for (const chunk of entry.chunks) {
+              (result as Anthropic.ContentBlockParam[]).push({
+                type: 'document',
+                source: { type: 'base64', media_type: 'application/pdf', data: chunk },
+              } as unknown as Anthropic.ContentBlockParam);
+            }
           } else {
             (result as Anthropic.ContentBlockParam[]).push({
               type: 'text',
@@ -1059,7 +1119,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Pre-download PDFs from Supabase Storage for the current (last) message.
-  const pdfDataMap = new Map<string, string>();
+  const pdfDataMap = new Map<string, PdfEntry>();
   if (hasDocument && jwtUserId) {
     const lastMsg = typedMessages[typedMessages.length - 1];
     const keys: string[] = [];
@@ -1076,8 +1136,7 @@ export async function POST(req: NextRequest) {
       keys.map(async key => {
         const { data, error } = await supabaseAdmin.storage.from('pdf-uploads').download(key);
         if (error || !data) return;
-        const buf = await data.arrayBuffer();
-        pdfDataMap.set(key, Buffer.from(buf).toString('base64'));
+        pdfDataMap.set(key, await splitPdfToChunks(await data.arrayBuffer()));
       })
     );
   }

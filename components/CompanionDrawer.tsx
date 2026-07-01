@@ -43,6 +43,7 @@ export default function CompanionDrawer({
   }, [messages]);
   const [input, setInput] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [memorySaved, setMemorySaved] = useState(false);
   const [slowWarning, setSlowWarning] = useState(false);
   const slowWarningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hardResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -197,16 +198,20 @@ export default function CompanionDrawer({
             break;
           }
           try {
-            const { text: chunk } = JSON.parse(raw);
-            if (chunk)
+            const parsed = JSON.parse(raw);
+            if (parsed.text)
               setMessages(prev => {
                 const next = [...prev];
                 next[next.length - 1] = {
                   ...next[next.length - 1],
-                  content: next[next.length - 1].content + chunk,
+                  content: next[next.length - 1].content + parsed.text,
                 };
                 return next;
               });
+            if (parsed.memory_saved) {
+              setMemorySaved(true);
+              setTimeout(() => setMemorySaved(false), 3000);
+            }
           } catch {}
         }
       }
@@ -329,6 +334,17 @@ export default function CompanionDrawer({
         <div ref={bottomRef} />
       </div>
 
+      {memorySaved && (
+        <div style={{
+          position: 'absolute', bottom: 80, left: '50%', transform: 'translateX(-50%)',
+          background: 'var(--accent, #6366f1)', color: '#fff', borderRadius: 20,
+          padding: '4px 12px', fontSize: 11, fontWeight: 600, letterSpacing: '0.03em',
+          pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 10,
+          animation: 'fade-in-out 3s ease forwards',
+        }}>
+          ◈ Saved to memory
+        </div>
+      )}
       <div className="companion-input-area">
         <div className="companion-capture-row">
           <button

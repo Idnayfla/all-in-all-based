@@ -333,6 +333,7 @@ export default function ChatPanel({
   const micPickerRef = useRef<HTMLDivElement>(null);
   const [mobileInputOpen, setMobileInputOpen] = useState(false);
   const [studioBannerDismissed, setStudioBannerDismissed] = useState(false);
+  const [memorySavedFlash, setMemorySavedFlash] = useState(false);
   const mobileTextareaRef = useRef<HTMLTextAreaElement>(null);
   const recordingStartRef = useRef<number>(0);
   const stopRecordingRef = useRef<boolean>(false);
@@ -344,6 +345,15 @@ export default function ChatPanel({
       setTimeout(() => mobileTextareaRef.current?.focus(), 50);
     }
   }, [openInputTrigger]);
+
+  useEffect(() => {
+    const handler = () => {
+      setMemorySavedFlash(true);
+      setTimeout(() => setMemorySavedFlash(false), 3000);
+    };
+    window.addEventListener('memory-updated', handler);
+    return () => window.removeEventListener('memory-updated', handler);
+  }, []);
 
   const submitFlag = async (msgIdx: number, _msgContent: string, _userPrompt: string) => {
     if (flagSending) return;
@@ -1217,7 +1227,12 @@ export default function ChatPanel({
     // Companion mode: intercept build requests, switch to Build mode, nudge user to send again
     if (chatMode === 'companion' && trimmed) {
       const lc = trimmed.toLowerCase();
-      if (BUILD_VERB_RE.test(lc) && BUILD_INTENT_RE.test(lc)) {
+      // Skip build detection for pasted terminal output / error messages
+      const looksLikeTerminalOutput =
+        /[A-Z]:\\\w/.test(trimmed) ||
+        (trimmed.includes('\n') &&
+          /\b(error|failed|not recognized|cannot|unable|exception)\b/i.test(trimmed));
+      if (!looksLikeTerminalOutput && BUILD_VERB_RE.test(lc) && BUILD_INTENT_RE.test(lc)) {
         setInput(trimmed);
         setMessages(prev => [
           ...prev,
@@ -2199,6 +2214,16 @@ export default function ChatPanel({
         onDrop={handleDrop}
       >
         {isDragging && <div className="drag-overlay">Drop image or file here</div>}
+        {memorySavedFlash && (
+          <div style={{
+            position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)',
+            marginBottom: 8, background: 'var(--accent, #6366f1)', color: '#fff',
+            borderRadius: 20, padding: '4px 14px', fontSize: 11, fontWeight: 600,
+            letterSpacing: '0.03em', pointerEvents: 'none', whiteSpace: 'nowrap', zIndex: 10,
+          }}>
+            ◈ Saved to memory
+          </div>
+        )}
         <AnimatePresence>
           {showStudioBanner && (
             <motion.div
@@ -2356,7 +2381,10 @@ export default function ChatPanel({
         )}
         {docUploading && (
           <div className="chat-pending-files">
-            <span className="chat-pending-files-meta">◈ Uploading PDFs...</span>
+            <span className="chat-pending-files-meta" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span className="spinner" style={{ width: 10, height: 10, borderWidth: 1.5 }} />
+              Uploading PDF...
+            </span>
           </div>
         )}
         {docError && (
@@ -2469,8 +2497,8 @@ export default function ChatPanel({
           <div className="attach-files-wrap" style={{ position: 'relative' }}>
             <button
               className="upload-btn"
-              disabled={isGenerating}
-              title="Attach files or folder"
+              disabled={isGenerating || docUploading}
+              title={docUploading ? 'Uploading...' : 'Attach files or folder'}
               onClick={() => setShowAttachMenu(prev => !prev)}
               onBlur={e => {
                 if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node)) {
